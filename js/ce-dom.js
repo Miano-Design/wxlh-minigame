@@ -132,9 +132,13 @@
 
   /* 弹窗宿主：网页版把弹窗 appendChild 到 #modal-root。这里把它的 innerHTML 接住，
      交给引擎画成底部抽屉（见 js/ce-app.js）。不接住的话，网页版的弹窗小游戏里全丢。 */
-  const capture = (root, bucket) => {
+  // 注意：这里在模块作用域，拿不到 install() 的 g —— 元素桶要当参数传进来（早先写 g.__CE_MODALS_ELS 直接抛错被 catch 吞了）
+  const capture = (root, bucket, els) => {
     root.appendChild = function (child) {
-      try { bucket.push(child && child.innerHTML ? child.innerHTML : ''); (g.__CE_MODALS_ELS = g.__CE_MODALS_ELS || []).push(child); } catch (e) {}
+      try {
+        bucket.push(child && child.innerHTML ? child.innerHTML : '');
+        if (els) els.push(child);
+      } catch (e) {}
       this.children.push(child);
       return child;
     };
@@ -145,6 +149,7 @@
     g = g || (typeof window !== 'undefined' ? window : global);
     const byId = {};
     g.__CE_MODALS = g.__CE_MODALS || [];
+    g.__CE_MODALS_ELS = g.__CE_MODALS_ELS || [];
     g.__CE_TOASTS = g.__CE_TOASTS || [];
     const doc = {
       getElementById(id) {
@@ -162,7 +167,7 @@
       addEventListener() {}, removeEventListener() {},
       body: makeEl('body'),
       documentElement: makeEl('html'),
-      __modalRoot: capture(makeEl('div'), g.__CE_MODALS),
+      __modalRoot: capture(makeEl('div'), g.__CE_MODALS, g.__CE_MODALS_ELS),
       __toastRoot: capture(makeEl('div'), g.__CE_TOASTS),
       __battleRoot: (function (el) {
         // 战斗层：网页版每次刷新都 createElement + appendChild，这里把最新内容同步到 innerHTML 上，
