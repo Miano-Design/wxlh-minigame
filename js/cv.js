@@ -292,6 +292,8 @@ CV.draw = function () {
   fillPanel(0, 0, CV.W, CV.TOP + 2, { r: 0, line: 'rgba(0,0,0,0)' });
   const st = (CV.statusText && CV.statusText()) || '';
   drawText(st, CV.W / 2, CV.TOP / 2 + 4, { size: 12, align: 'center', color: CV.C.text });
+  // 顶栏点一下 = 打开货币图鉴（网页版也是这个交互）
+  addHit('open_curdoc', 0, 0, CV.W, CV.TOP);
 
   if (top) {
     const panel = CV.panels[top.name];

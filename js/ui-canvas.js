@@ -590,7 +590,8 @@ function boot() {
   CV.statusText = () => {
     const s = S();
     if (!s) return '';
-    return `${s.player.name || '执灯者'} Lv.${s.player.level}   ◈${fmt(s.cur.points)} ✦${fmt(s.cur.holy)} ◆${fmt(s.cur.otherworld)}`;
+    // 前面带上游戏名：提审材料要求"截图内能看到小游戏名字"
+    return `残域灯阁 · ${s.player.name || '执灯者'} Lv.${s.player.level}   ◈${fmt(s.cur.points)} ✦${fmt(s.cur.holy)} ◆${fmt(s.cur.otherworld)}`;
   };
   CV.tabs = [
     { panel: 'home', name: '灯阁' },
