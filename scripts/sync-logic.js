@@ -9,6 +9,8 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = path.resolve(__dirname, '../../wxlh-game/js');
+const WEB_ROOT = path.resolve(__dirname, '../../wxlh-game');   // 网页版根目录（底包文件在它下面）
+const PROJ = path.resolve(__dirname, '..');                    // 本工程根目录
 const DST = path.resolve(__dirname, '../js');
 /* 逻辑层 4 份：必须逐字节一致，而且不许碰 DOM */
 const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
@@ -16,11 +18,16 @@ const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
    它当然会碰 DOM——那正是我们要复用的"界面字符串工厂"，
    小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。 */
 const EXTRA = { 'ui.js': 'ui-web.js' };
+/* 网页版的"包"也一起搬一份（新工程以网页版为底）：入口页、样式、图标清单。
+   注意：小游戏运行时用的是编译好的 js/ce-style.js，css/style.css 只是"底包快照"。 */
+const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],
+  ['manifest.webmanifest', 'manifest.webmanifest'], ['sw.js', 'sw.js']];
 
 let changed = 0, same = 0;
-const JOBS = FILES.map(f => [f, f]).concat(Object.keys(EXTRA).map(k => [k, EXTRA[k]]));
+const JOBS = FILES.map(f => [f, f]).concat(Object.keys(EXTRA).map(k => [k, EXTRA[k]])).concat(PACK);
 JOBS.forEach(([f, out]) => {
-  const a = path.join(SRC, f), b = path.join(DST, out);
+  const fromJs = FILES.indexOf(f) >= 0 || EXTRA[f] !== undefined;
+  const a = path.join(fromJs ? SRC : WEB_ROOT, f), b = path.join(fromJs ? DST : PROJ, out);
   if (!fs.existsSync(a)) { console.error('✗ 找不到源文件：' + a); process.exitCode = 1; return; }
   const src = fs.readFileSync(a);
   const old = fs.existsSync(b) ? fs.readFileSync(b) : null;

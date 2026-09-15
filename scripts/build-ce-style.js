@@ -481,6 +481,7 @@ const PAGE_SPECS = [
   { name: '执灯者·伙伴', tab: 'roster', fn: 'charsScreen' },
   { name: '执灯者·成长', tab: 'roster', fn: 'growScreen' },
   { name: '背包', tab: 'bag' },
+  { name: '背包·装备', tab: 'bag', fn: 'equipScreen' },
 ];
 
 /* 同一页在不同存档状态下会生出不同的类名组合（做完的主线按钮是 primary、没做完是 ghost…）。

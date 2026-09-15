@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 17:05 */
+   生成时间：2026-09-15 17:10 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -397,6 +397,15 @@ module.exports = {
   "paddingLeft": 6,
   "color": "#e9edf6",
   "textAlign": "center"
+ },
+ "mb2": {
+  "marginBottom": 10
+ },
+ "eq-bar": {
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontSize": 11,
+  "color": "#7a849b"
  },
  "tt-dot": {
   "width": 6,
@@ -2473,6 +2482,99 @@ module.exports = {
   "textAlign": "center",
   "marginBottom": 2,
   "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "marginBottom": 10,
+  "flexDirection": "row",
+  "paddingBottom": 0,
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight__text.active.pill.sm": {
+  "color": "#fff",
+  "fontSize": 11,
+  "flex": 0,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 5,
+  "paddingRight": 11,
+  "paddingBottom": 5,
+  "paddingLeft": 11,
+  "minHeight": 34,
+  "borderRadius": 999,
+  "borderTopLeftRadius": 999,
+  "borderTopRightRadius": 999,
+  "borderBottomRightRadius": 999,
+  "borderBottomLeftRadius": 999,
+  "borderWidth": 1,
+  "borderColor": "#d43a4f",
+  "backgroundColor": "#d43a4f22",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight__text.pill.sm": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "flex": 0,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 5,
+  "paddingRight": 11,
+  "paddingBottom": 5,
+  "paddingLeft": 11,
+  "minHeight": 34,
+  "borderRadius": 999,
+  "borderTopLeftRadius": 999,
+  "borderTopRightRadius": 999,
+  "borderBottomRightRadius": 999,
+  "borderBottomLeftRadius": 999,
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "backgroundColor": "#111621",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.eq-bar": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "flexDirection": "row",
+  "alignItems": "center"
+ },
+ "view#app__scrollview#view__view.screen__view.eq-bar__text": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginRight": 8
+ },
+ "view#app__scrollview#view__view.screen__view.eq-bar__text.btn.ghost.push.small": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "minHeight": 40,
+  "paddingTop": 0,
+  "paddingRight": 13,
+  "paddingBottom": 0,
+  "paddingLeft": 13,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "backgroundColor": "transparent",
+  "fontWeight": "bold",
+  "minWidth": 44,
+  "flex": 1,
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "marginRight": 8
+ },
+ "view#app__scrollview#view__view.screen__view.hint": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 19
  },
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__view.tt-name": {
   "color": "#e9edf6",

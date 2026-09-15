@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="残域" />
+  <meta name="theme-color" content="#0a0d13" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>残域</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <!-- 资源后面挂版本号：手机浏览器把 CSS/JS 缓存得很凶，不带版本号会出现"明明更新了，
+       手机上还是旧样式"（例如图标还是旧的歪的那种）。发布新版本时把这个 v 一起改掉。 -->
+  <link rel="stylesheet" href="css/style.css?v=9.5.22" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="player-row">
+        <span class="pname" id="tb-name">执灯者</span>
+        <span class="plv" id="tb-lv">Lv.1</span>
+        <span class="genelock" id="tb-gene"></span>
+        <span class="tb-spacer"></span>
+      </div>
+      <div id="curbar"></div>
+    </header>
+    <main id="view"></main>
+    <nav id="navbar"></nav>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <div id="battle-root"></div>
+  <script src="js/data.js?v=9.5.22"></script>
+  <script src="js/core.js?v=9.5.22"></script>
+  <script src="js/battle.js?v=9.5.22"></script>
+  <script src="js/dungeon.js?v=9.5.22"></script>
+  <script src="js/ui.js?v=9.5.22"></script>
+  <script src="js/main.js?v=9.5.22"></script>
+  <script>
+    // 装机用：加了 Service Worker 之后，手机"添加到主屏幕"就是全屏 App，断网也能玩。
+    // 有新版本时自动刷一次（从主屏图标打开时没有刷新按钮，不自动刷就会一直用旧版）。
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloaded) return;
+        reloaded = true;
+        location.reload();
+      });
+    }
+  </script>
+</body>
+</html>
