@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:00 */
+   生成时间：2026-09-15 16:11 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -38,11 +38,7 @@ module.exports = {
   "marginBottom": 14
  },
  "text-rows": {
-  "margin": 0,
-  "marginTop": 0,
-  "marginRight": 0,
-  "marginBottom": 0,
-  "marginLeft": 0
+  "marginBottom": 14
  },
  "list-row": {
   "flexDirection": "row",
@@ -338,6 +334,15 @@ module.exports = {
   "paddingLeft": 14
  },
  "tap": {},
+ "tab-cards": {
+  "flexDirection": "row",
+  "paddingTop": 10,
+  "paddingRight": 0,
+  "paddingBottom": 10,
+  "paddingLeft": 0,
+  "marginBottom": 10,
+  "backgroundColor": "#0b0e15f5"
+ },
  "bg-head": {
   "flexDirection": "row",
   "alignItems": "center",
@@ -446,10 +451,7 @@ module.exports = {
   "paddingTop": 2,
   "paddingRight": 14,
   "paddingBottom": 10,
-  "paddingLeft": 14,
-  "opacity": 0,
-  "width": 0,
-  "height": 0
+  "paddingLeft": 14
  },
  "view#app__view#topbar__view#curbar__view.cur-chip": {
   "color": "#e9edf6",
@@ -470,32 +472,27 @@ module.exports = {
   "paddingBottom": 5,
   "paddingLeft": 11,
   "minHeight": 40,
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh5spr3": {
   "color": "#ffd76a",
   "fontSize": 12,
-  "marginRight": 5,
-  "opacity": 0
+  "marginRight": 5
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-val": {
   "color": "#e9edf6",
   "fontSize": 12,
-  "marginRight": 5,
-  "opacity": 0
+  "marginRight": 5
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isx1l3rubl": {
   "color": "#6ec6ff",
   "fontSize": 12,
-  "marginRight": 5,
-  "opacity": 0
+  "marginRight": 5
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh4wp74": {
   "color": "#ff9ecb",
   "fontSize": 12,
-  "marginRight": 5,
-  "opacity": 0
+  "marginRight": 5
  },
  "view#app__view#topbar__view#curbar__view.cur-chip.more": {
   "color": "#7a849b",
@@ -516,14 +513,12 @@ module.exports = {
   "paddingBottom": 5,
   "paddingLeft": 11,
   "minHeight": 40,
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__view#topbar__view#curbar__view.cur-chip.more__text.cur-val": {
   "color": "#7a849b",
   "fontSize": 12,
-  "marginRight": 5,
-  "opacity": 0
+  "marginRight": 5
  },
  "view#app__scrollview#view": {
   "color": "#e9edf6",
@@ -559,11 +554,7 @@ module.exports = {
   "paddingRight": 14,
   "paddingBottom": 14,
   "paddingLeft": 14,
-  "marginBottom": 0,
-  "margin": 0,
-  "marginTop": 0,
-  "marginRight": 0,
-  "marginLeft": 0
+  "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static": {
   "color": "#e9edf6",
@@ -859,11 +850,7 @@ module.exports = {
   "borderTopRightRadius": 10,
   "borderBottomRightRadius": 10,
   "borderBottomLeftRadius": 10,
-  "marginBottom": 0,
-  "margin": 0,
-  "marginTop": 0,
-  "marginRight": 0,
-  "marginLeft": 0
+  "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row": {
   "color": "#e9edf6",
@@ -1063,13 +1050,6 @@ module.exports = {
   },
   "lineHeight": 16,
   "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card.idle-card__text.hint.mt2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 10,
-  "lineHeight": 19,
-  "width": "100%"
  },
  "view#app__view#navbar": {
   "color": "#e9edf6",
@@ -1783,10 +1763,7 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "flexDirection": "row",
-  "paddingBottom": 6,
-  "opacity": 0,
-  "width": 0,
-  "height": 0
+  "paddingBottom": 6
  },
  "view#app__scrollview#view__view.screen__view.pill-tabs__text.active.pill": {
   "color": "#fff",
@@ -1807,8 +1784,7 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#d43a4f",
   "backgroundColor": "#d43a4f22",
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.pill-tabs__text.pill": {
   "color": "#7a849b",
@@ -1829,8 +1805,7 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#232b3b",
   "backgroundColor": "#111621",
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.filter-bar": {
   "color": "#e9edf6",
@@ -1852,10 +1827,7 @@ module.exports = {
   "paddingBottom": 0,
   "flex": 1,
   "marginBottom": 0,
-  "marginRight": 8,
-  "opacity": 0,
-  "width": 0,
-  "height": 0
+  "marginRight": 8
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs__text.active.pill": {
   "color": "#fff",
@@ -1876,8 +1848,7 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#d43a4f",
   "backgroundColor": "#d43a4f22",
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs__text.pill": {
   "color": "#7a849b",
@@ -1898,8 +1869,7 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#232b3b",
   "backgroundColor": "#111621",
-  "marginRight": 6,
-  "opacity": 0
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.search-input#char-search": {
   "color": "#e9edf6",
@@ -2111,61 +2081,56 @@ module.exports = {
   "maxWidth": "42%",
   "marginRight": 14
  },
- "view#app__scrollview#view__view.screen__view.fill.mb3.pill-tabs": {
+ "view#app__scrollview#view__view.screen__view.tab-cards": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "marginBottom": 14,
   "flexDirection": "row",
-  "paddingBottom": 6,
-  "opacity": 0,
-  "width": 0,
-  "height": 0
+  "paddingTop": 10,
+  "paddingRight": 0,
+  "paddingBottom": 10,
+  "paddingLeft": 0,
+  "marginBottom": 10,
+  "backgroundColor": "#0b0e15f5"
  },
- "view#app__scrollview#view__view.screen__view.fill.mb3.pill-tabs__text.active.pill": {
+ "view#app__scrollview#view__view.screen__view.tab-cards__text.active.tab-card": {
   "color": "#fff",
   "fontSize": 12,
   "flex": 1,
+  "minWidth": 0,
+  "minHeight": 44,
   "flexDirection": "row",
   "alignItems": "center",
-  "paddingTop": 8,
-  "paddingRight": 14,
-  "paddingBottom": 8,
-  "paddingLeft": 14,
-  "minHeight": 44,
-  "borderRadius": 999,
-  "borderTopLeftRadius": 999,
-  "borderTopRightRadius": 999,
-  "borderBottomRightRadius": 999,
-  "borderBottomLeftRadius": 999,
+  "justifyContent": "center",
   "borderWidth": 1,
   "borderColor": "#d43a4f",
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
   "backgroundColor": "#d43a4f22",
-  "justifyContent": "center",
-  "marginRight": 6,
-  "opacity": 0
+  "fontWeight": "bold",
+  "marginRight": 10
  },
- "view#app__scrollview#view__view.screen__view.fill.mb3.pill-tabs__text.pill": {
+ "view#app__scrollview#view__view.screen__view.tab-cards__text.tab-card": {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 1,
+  "minWidth": 0,
+  "minHeight": 44,
   "flexDirection": "row",
   "alignItems": "center",
-  "paddingTop": 8,
-  "paddingRight": 14,
-  "paddingBottom": 8,
-  "paddingLeft": 14,
-  "minHeight": 44,
-  "borderRadius": 999,
-  "borderTopLeftRadius": 999,
-  "borderTopRightRadius": 999,
-  "borderBottomRightRadius": 999,
-  "borderBottomLeftRadius": 999,
+  "justifyContent": "center",
   "borderWidth": 1,
   "borderColor": "#232b3b",
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
   "backgroundColor": "#111621",
-  "justifyContent": "center",
-  "marginRight": 6,
-  "opacity": 0
+  "fontWeight": "bold",
+  "marginRight": 10
  },
  "view#app__scrollview#view__view.screen__view.card.mb3": {
   "color": "#e9edf6",

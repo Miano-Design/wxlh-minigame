@@ -535,8 +535,8 @@ window.UI = (function () {
   // 「执灯者」= 队伍编成 / 伙伴图鉴 / 成长线，子页共用一条顶部胶囊
   function rosterScreen() {
     const sub = { party: partyScreen, chars: charsScreen, grow: growScreen }[rosterView] || partyScreen;
-    return `<div class="pill-tabs fill mb3">
-        ${ROSTER_TABS.map(t => `<div class="pill ${rosterView === t.id ? 'active' : ''}" data-roster="${t.id}">${t.name}</div>`).join('')}
+    return `<div class="tab-cards">
+        ${ROSTER_TABS.map(t => `<div class="tab-card ${rosterView === t.id ? 'active' : ''}" data-roster="${t.id}">${t.name}</div>`).join('')}
       </div>
       ${sub()}`;
   }
@@ -716,7 +716,6 @@ window.UI = (function () {
         <button class="btn small ghost" data-act="open-idlelines">派人分工</button>
         <button class="btn primary" data-act="claim-all" ${t0.claimable ? '' : 'disabled'}>${t0.claimable ? `一键收取（${t0.claimable}）` : '一键收取'}</button>
       </div>
-      <div class="hint mt2">离线也算：回来点一次「一键收取」就把挂机、任务、周常、成就、图鉴里攒下的奖励一起领走。</div>
     </div>`;
   }
   /* 一块三列纯文字宫格：名字一行、状态一行，不用图标认路。
@@ -727,7 +726,7 @@ window.UI = (function () {
     list.filter(x => x[3] && !C().isUnlocked(x[3])).forEach(x => locked.push(x[1]));
     if (!open.length) return '';
     return `<div class="text-menu">${open.map(tile).join('')}</div>
-      ${locked.length ? `<div class="hint mt2">还没解锁：${locked.join(' / ')}（跟着关卡进度开，推图就会一个个亮起来）</div>` : ''}`;
+      ${locked.length ? `<div class="hint mt2">还没解锁：${locked.join(' / ')}</div>` : ''}`;
   }
   function menuGroup(title, sec, list, before) {
     const grid = tileGrid(list);
@@ -780,14 +779,14 @@ window.UI = (function () {
       ${tileGrid(lines)}
       <div class="grid-title">日常</div>
       ${tileGrid(daily)}`
-      + '<div class="hint mt2">血统与境界属于主角自身：点上面【主角】那张卡，在里面选血统 / 渡劫。这里与「执灯者 → 成长」是同一批养成线的总览。</div>';
+      + '<div class="hint mt2">全部养成线的总览在「执灯者 → 成长」。</div>'
   }
   /* 游历：只放「游历奇遇」本身——挂机路上随机冒出来的奇遇，进度条就是它的唯一入口。 */
   function travelBlock() {
     const pend = C().pendingTravel();
     return `<div class="section-title" data-sec="travel">游历</div>
       ${travelStrip()}
-      <div class="hint mt2">${pend ? '已经有奇遇躺着等领了，点上面那条领走。' : '挂机每 10 分钟出一次，攒着不会丢。'}</div>`;
+`;
   }
   /* 设置：玩法指南 / 货币图鉴 / 设置与存档。
      这三样全站只在这里出现一次（顶栏原来那两个图标按钮已经撤掉）。 */
@@ -1281,7 +1280,7 @@ window.UI = (function () {
           <div class="pos-row-label" data-row="back">后排 <span>3 格 · 相对安全，适合输出与治疗</span></div>
           <div class="party-slots">${slotTile(2)}${slotTile(3)}${slotTile(4)}</div>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--dim)"><b>长按</b>任意一格抓起，拖到别的位置松手就换过去（主角那张牌也一样，可以拖到前排也可以拖到后排，直接拖到「前排 / 后排」这行字上也能整排搬）。上阵固定 <b>前 2 后 3</b>，一共 5 格。</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--dim)"><b>长按</b>拖动换位（前 2 后 3，共 5 格）</div>
         <button class="btn small block mt3" data-act="auto-equip">⚡ 一键最优装备</button>
         <div class="btn-grid3 mt2">
           <button class="btn small ghost" data-preset-save="0">存预设 1</button>
@@ -1294,11 +1293,11 @@ window.UI = (function () {
           <button class="btn small gold" data-preset-use="2">套用预设 3</button>
         </div>
         <div class="hint mt1">
-          当前预设：${C().S.presets.map((p, i) => `${i + 1}${p && p.filter(Boolean).length ? '✓' : '—'}`).join(' ')} · 预设记录 5 个上阵位置（含主角站哪一排），一键切换阵容
+          当前预设：${C().S.presets.map((p, i) => `${i + 1}${p && p.filter(Boolean).length ? '✓' : '—'}`).join(' ')}
         </div>
       </div>
       <div class="card">
-        <h3>成员一览 <span class="sub">点名字看详情 · 换位在上面的站位区长按拖</span></h3>
+        <h3>成员一览 <span class="sub">点名字看详情</span></h3>
         ${S.party.map((id, i) => {
           const inFront = i < 2;
           if (!id) return '';
@@ -3263,7 +3262,7 @@ window.UI = (function () {
     const view = which || (curTab === 'bag' ? bagView : 'item');
     if (view === 'equip') return equipScreen();
     return `<div class="card mb3">${bagPoolGrid(view === 'mat' ? 'mat' : 'item')}</div>
-      <div class="hint">点格子看用途与用法（批量使用在详情里：1 / 10 / 全部）。空格子留着以后装东西，末尾的「＋」是扩容。</div>`;
+      <div class="hint">末尾的「＋」是扩容</div>`;
   }
   /* 待领箱：背包满时收到的东西先存在这里，清出格子一键领回。
      以前这类道具是直接丢掉的（addItem 的返回值没人看），玩家根本不知道自己亏了什么（V9.5）。 */
@@ -3281,8 +3280,10 @@ window.UI = (function () {
   }
   // 背包作为一级页签：三栏共用一条顶部胶囊
   function bagScreen() {
-    return `<div class="pill-tabs fill mb3">
-        ${BAG_TABS.map(t => `<div class="pill ${bagView === t.id ? 'active' : ''}" data-bagview="${t.id}">${t.name}</div>`).join('')}
+    /* V9.5.2：三个主标签从"圆角胶囊"改成"矩形卡片"，并吸在顶栏（货币条）下方——
+       翻到下面挑装备时，这一排不动，随时能换栏、也随时知道自己在哪一栏。 */
+    return `<div class="tab-cards">
+        ${BAG_TABS.map(t => `<div class="tab-card ${bagView === t.id ? 'active' : ''}" data-bagview="${t.id}">${t.name}</div>`).join('')}
       </div>
       ${stashBar()}
       ${bagBody(bagView)}`;
