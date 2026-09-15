@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.2';
+  const GAME_VER = '9.5.4';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -102,7 +102,6 @@ window.UI = (function () {
     return `<div class="card">
       <h3>🗡 装备 <span class="sub">${filled}/${slots.length} 件 · 点方块换装</span></h3>
       <div class="eq-grid">${tiles}</div>
-      <div class="hint mt2">一件装备只能一个人穿：换给别人时会自动从原来那个人身上卸下。</div>
     </div>`;
   }
 
@@ -586,7 +585,7 @@ window.UI = (function () {
       { act: 'open-reincarn', unlock: 'reincarn', ico: '♾', name: '转生天赋',
         cur: `${S.player.reincarnations} 世`, desc: '重置等级与世界，换永久天赋点；四支天赋树越点越强' },
     ];
-    return `<div class="hint mb3">这些是"长期变强"的线，全部永久生效。点任意一条看细节。</div>
+    return `
       ${rows.map(x => {
       const ok = !x.unlock || C().isUnlocked(x.unlock);
       return `<div class="grow-row card plain${ok ? ' tap' : ''}" ${ok ? `data-act="${x.act}"` : `data-locked="${x.unlock}"`}>
@@ -665,23 +664,25 @@ window.UI = (function () {
     const spentSkill = (S.player.skillLv || [1, 1, 1]).reduce((s, x) => s + x - 1, 0);
     const sect = C().sectInfo();
     // 参考产品的主界面最上面就是这种【标签】值 的文字行，一行一件事，不做卡片格子
-    return `<div class="card text-rows" data-sec="hero">
-      <div class="row static">
+    /* V9.5.3：整块主角卡都可点（父亲大人要求）——以前只有【主角】那一行的黄字能点，
+       现在把 data-protag 挂到卡片本身，四行随便点哪里都进角色界面。 */
+    return `<div class="card text-rows" data-sec="hero" data-protag="1" style="cursor:pointer">
+      <div class="row">
         <span class="rk">【境界】</span>
         <span class="rv" style="color:${st.hasBloodline ? 'var(--gold)' : 'var(--accent)'}">${st.curName || '未定血统'}</span>
         <span class="rs">${st.hasBloodline ? `第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶` : '点【主角】卡里选血统'}</span>
       </div>
-      <div class="row static">
+      <div class="row">
         <span class="rk">【等级】</span>
         <span class="rv">Lv.${S.player.level}</span>
         <span class="rs">EXP ${Math.floor(S.player.exp / expNeed * 100)}%</span>
       </div>
-      <div class="row" data-protag="1">
+      <div class="row">
         <span class="rk">【主角】</span>
         <span class="rv" style="${(S.player.attrPoints || S.player.skillPoints) ? 'color:var(--gold)' : ''}">六维待分 ${S.player.attrPoints || 0} · 技能待加 ${S.player.skillPoints || 0}</span>
         <span class="rs">点开：加点 / 洗点 / 血统 / 境界 ›</span>
       </div>
-      <div class="row static">
+      <div class="row">
         <span class="rk">【转生】</span>
         <span class="rv">${S.player.reincarnations} 世</span>
         <span class="rs">权限 Lv.${au.lv} · 评级 Lv.${sect.lv}</span>
@@ -859,7 +860,6 @@ window.UI = (function () {
       const w = D.WORLDS.find(x => x.id === pr.worldId);
       return `<div class="card" style="border-color:#ffd76a88;margin-bottom:10px">
         <h3>继续上次副本 <span class="sub">${w ? w.name : pr.worldId} · 第 ${pr.stage}/12 关 · 第 ${Math.min((pr.wave || 0) + 1, (pr.waves || [1]).length)}/${(pr.waves || [1]).length} 波</span></h3>
-        <div class="hint mb2">进度已经保存，随时可以接着打（已获得的奖励不会丢）。</div>
         <div class="btn-row">
           <button class="btn small primary" data-resume-run="1">继续探索</button>
           <button class="btn small ghost" data-drop-run="1">放弃这一轮</button>
@@ -1052,7 +1052,6 @@ window.UI = (function () {
         <div style="display:flex;gap:6px">${partyHpHtml()}</div>
         ${potionBar}
         ${Object.keys(run.buffs).length ? `<div style="margin-top:8px;font-size:11px;color:var(--green)">本关增益：${Object.entries(run.buffs).map(([k, v]) => `${D.CONSUMABLE_TAG[k] || k}+${Math.round(v * 100)}%`).join(' ')}</div>` : ''}
-        <div class="hint mt2">进关之后一口气打到最后一波：每波打完直接接下一波，不弹结算页。血量波间继承不会自动回满，打到一半血线低了，就在战斗界面底部那条「战备补给」里点治疗剂（喝了从下一波进场生效）。</div>
       </div>
       <div class="card"><h3>本关波次</h3>${waveList}</div>
       <div style="height:84px"></div>
@@ -1280,7 +1279,6 @@ window.UI = (function () {
           <div class="pos-row-label" data-row="back">后排 <span>3 格 · 相对安全，适合输出与治疗</span></div>
           <div class="party-slots">${slotTile(2)}${slotTile(3)}${slotTile(4)}</div>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--dim)"><b>长按</b>拖动换位（前 2 后 3，共 5 格）</div>
         <button class="btn small block mt3" data-act="auto-equip">⚡ 一键最优装备</button>
         <div class="btn-grid3 mt2">
           <button class="btn small ghost" data-preset-save="0">存预设 1</button>
@@ -1297,7 +1295,7 @@ window.UI = (function () {
         </div>
       </div>
       <div class="card">
-        <h3>成员一览 <span class="sub">点名字看详情</span></h3>
+        <h3>成员一览</h3>
         ${S.party.map((id, i) => {
           const inFront = i < 2;
           if (!id) return '';
@@ -1623,12 +1621,10 @@ window.UI = (function () {
         <div class="btn-row">
           <button class="btn small" data-starup="1" ${c.star >= maxStar ? 'disabled' : ''}>升星${starCost ? `（碎片 ${starCost}）` : ''}</button>
         </div>
-        <div class="hint mt2">重复招募到同一名伙伴会转成她的碎片；星级决定成长上限与技能强度。</div>
       </div>
       <div class="card">
         <h3>🎯 六维属性 <span class="sub">固定成长 · 不用加点</span></h3>
         ${attrGrid(st.attrs)}
-        <div class="hint mt2">伙伴的六维由稀有度、等级、星级决定；越往上练，六维越高。</div>
       </div>
       <div class="card">
         <h3>⚡ 技能 <span class="sub">芯片 ▣${fmt(S.cur.skillChip)}</span></h3>
@@ -1858,7 +1854,7 @@ window.UI = (function () {
     const shown = bagEquipList();
     return `${equipFilterBar()}
       <div class="card mb3">${bagPoolGrid('equip')}</div>
-      <div class="hint">${shown.length ? `筛出 ${shown.length} 件 · ` : ''}点格子看属性与强化。穿在角色身上的装备不占背包格，卸下后才会回到这里；装备格满了以后，新掉落的装备会自动分解成 ◆异界结晶。</div>
+      <div class="hint">${shown.length ? `筛出 ${shown.length} 件` : ''}</div>
       ${equipBatchBar()}`;
   }
   function equipDetail(uid, wrap) {
@@ -1892,7 +1888,6 @@ window.UI = (function () {
         <button class="btn small ${eq.lock ? 'primary' : 'ghost'}" data-lock="1">${eq.lock ? '🔒 已锁定' : '🔓 锁定保护'}</button>
         <button class="btn small ghost" data-decomp="1" ${eq.lock ? 'disabled' : ''}>分解（◆${D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3}）</button>
       </div>
-      <div class="hint mt1">锁定后这件装备不会被分解（含批量分解），一键最优装备也不会把它换走。</div>
     `);
     w.querySelector('[data-lock]').onclick = () => {
       const r = C().toggleEquipLock(uid);
@@ -3262,7 +3257,7 @@ window.UI = (function () {
     const view = which || (curTab === 'bag' ? bagView : 'item');
     if (view === 'equip') return equipScreen();
     return `<div class="card mb3">${bagPoolGrid(view === 'mat' ? 'mat' : 'item')}</div>
-      <div class="hint">末尾的「＋」是扩容</div>`;
+`;
   }
   /* 待领箱：背包满时收到的东西先存在这里，清出格子一键领回。
      以前这类道具是直接丢掉的（addItem 的返回值没人看），玩家根本不知道自己亏了什么（V9.5）。 */

@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:11 */
+   生成时间：2026-09-15 16:18 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -322,9 +322,6 @@ module.exports = {
   "flexDirection": "row",
   "flexWrap": "wrap"
  },
- "mb3": {
-  "marginBottom": 14
- },
  "grow-row": {
   "flexDirection": "row",
   "alignItems": "center",
@@ -342,6 +339,9 @@ module.exports = {
   "paddingLeft": 0,
   "marginBottom": 10,
   "backgroundColor": "#0b0e15f5"
+ },
+ "mb3": {
+  "marginBottom": 14
  },
  "bg-head": {
   "flexDirection": "row",
@@ -539,7 +539,7 @@ module.exports = {
   "paddingBottom": 14,
   "paddingLeft": 12
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
   "backgroundColor": "#111621",
@@ -556,7 +556,7 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row": {
   "color": "#e9edf6",
   "fontSize": 15,
   "flexDirection": "row",
@@ -569,13 +569,13 @@ module.exports = {
   "borderBottomColor": "#ffffff0d",
   "flexWrap": "wrap"
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static__text.rk": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rk": {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
   "marginRight": 10
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static__text.isxwtv0ps.rv": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxwtv0ps.rv": {
   "color": "#d43a4f",
   "fontSize": 13,
   "flex": 1,
@@ -587,13 +587,13 @@ module.exports = {
   "textOverflow": "ellipsis",
   "marginRight": 10
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static__text.rs": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rs": {
   "color": "#7a849b",
   "fontSize": 11,
   "minWidth": 0,
   "marginRight": 10
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row.static__text.rv": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rv": {
   "color": "#e9edf6",
   "fontSize": 13,
   "flex": 1,
@@ -603,43 +603,6 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "flexDirection": "row",
-  "alignItems": "center",
-  "paddingTop": 7,
-  "paddingRight": 0,
-  "paddingBottom": 7,
-  "paddingLeft": 0,
-  "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d",
-  "flexWrap": "wrap"
- },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row__text.rk": {
-  "color": "#7a849b",
-  "fontSize": 12,
-  "flex": 0,
-  "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row__text.rv": {
-  "color": "#e9edf6",
-  "fontSize": 13,
-  "flex": 1,
-  "textAlign": "right",
-  "fontWeight": "bold",
-  "whiteSpace": "nowrap",
-  "minWidth": 0,
-  "maxWidth": "62%",
-  "textOverflow": "ellipsis",
-  "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row__text.rs": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "minWidth": 0,
   "marginRight": 10
  },
  "view#app__scrollview#view__view.screen__view.card": {
@@ -1147,6 +1110,7 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b",
+  "lineHeight": 24,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow": {
@@ -1226,6 +1190,7 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b",
+  "lineHeight": 24,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow": {
@@ -1285,6 +1250,7 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b",
+  "lineHeight": 24,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow": {
@@ -1449,16 +1415,6 @@ module.exports = {
   "paddingTop": 34,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card__view.isxkw7k65": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 8
- },
- "view#app__scrollview#view__view.screen__view.card__view.isxkw7k65__text": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "width": "100%"
- },
  "view#app__scrollview#view__view.screen__view.card__text.block.btn.mt3.small": {
   "color": "#e9edf6",
   "fontSize": 12,
@@ -1557,6 +1513,11 @@ module.exports = {
   "fontSize": 11,
   "marginTop": 4,
   "lineHeight": 19,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.card__text": {
+  "color": "#e9edf6",
+  "fontSize": 15,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row": {
@@ -1966,13 +1927,6 @@ module.exports = {
    "backgroundColor": "#1d2534"
   }
  },
- "view#app__scrollview#view__view.screen__text.hint.mb3": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginBottom": 14,
-  "lineHeight": 19,
-  "width": "100%"
- },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain": {
   "color": "#e9edf6",
   "fontSize": 15,
@@ -2274,12 +2228,6 @@ module.exports = {
   "marginBottom": 2,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__text.hint": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "lineHeight": 19,
-  "width": "100%"
- },
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__view.tt-name": {
   "color": "#e9edf6",
   "fontSize": 13,
@@ -2342,6 +2290,7 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b",
+  "lineHeight": 24,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow": {
@@ -2385,7 +2334,7 @@ module.exports = {
   "fontSize": 15,
   "marginRight": 12
  },
- "view#app__scrollview#view__view.screen__view.card.text-rows__view.row__text.isxmq1bso.rv": {
+ "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxmq1bso.rv": {
   "color": "#e6b64c",
   "fontSize": 13,
   "flex": 1,
