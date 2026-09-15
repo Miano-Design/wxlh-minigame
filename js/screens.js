@@ -724,22 +724,44 @@ CV.register('char', function (p) {
   attributePanel(eff, '伙伴');
 });
 
+/* 卡内小标题：网页版是「| 六维属性」这种带竖线的写法 */
+function cardTitle(label, right) {
+  L.y += 4;
+  CV.drawText('|', 16, L.y + 8, { size: 13, bold: true, color: CV.C.accent });
+  CV.drawText(label, 24, L.y + 8, { size: 13, bold: true, color: CV.C.text });
+  if (right) CV.drawText(right, CV.W - 16, L.y + 8, { size: 11, align: 'right', color: CV.C.gold });
+  L.y += 24;
+}
 CV.register('protagonist', function () {
-  const s = S(), st = Core.effectivePlayerStats();
-  L.text(`${s.player.name}  Lv.${s.player.level}`, { size: 17, bold: true });
-  L.text(`战力 ${fmt(Core.playerPower())} · 可用属性点 ${s.player.attrPoints} · 技能点 ${s.player.skillPoints}`, { size: 12, color: CV.C.dim });
-  L.text(`攻 ${fmt(st.atk)}　防 ${fmt(st.def)}　生 ${fmt(st.hp)}　速 ${fmt(st.spd)}　暴击 ${(st.crit * 100).toFixed(1)}%　闪避 ${(st.eva * 100).toFixed(1)}%`, { size: 12 });
+  const s = S(), sp = s.player, st = Core.effectivePlayerStats();
+  // 头部卡：头像 + 名字 +（主角）标签 + 右侧大号战力（对齐网页版的 .pg-main / hero）
+  CV.fillPanel(12, L.y, CV.W - 24, 86, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
+  CV.fillPanel(24, L.y + 15, 56, 56, { grad: ['#3a2a12', '#8a6a20'], line: CV.C.gold, r: 28 });
+  CV.drawText((sp.name || '执')[0], 52, L.y + 43, { size: 26, bold: true, align: 'center', color: '#fff7e6' });
+  CV.drawText(sp.name, 92, L.y + 26, { size: 17, bold: true });
+  CV.drawText('Lv.' + sp.level, 92, L.y + 48, { size: 11, color: CV.C.dim });
+  CV.fillPanel(132, L.y + 17, 46, 18, { fill: '#2a1f12', line: CV.C.gold, r: 4 });
+  CV.drawText('主角', 155, L.y + 26, { size: 10, align: 'center', color: CV.C.gold });
+  CV.drawText(fmt(Core.playerPower()), CV.W - 24, L.y + 30, { size: 22, bold: true, align: 'right', color: CV.C.gold });
+  CV.drawText('战力', CV.W - 24, L.y + 52, { size: 10, align: 'right', color: CV.C.dim });
+  CV.addHit('open_protagonist', 12, L.y, CV.W - 24, 1);   // 头部本身不重复挂点击
+  L.y += 94;
   L.text(`境界：${Core.realmState().curName || '未选血统'}（${Core.realmState().realm} 阶 · 全属性 +${(Core.realmBonusPct() * 100).toFixed(1)}%）`, { size: 12, color: CV.C.gold });
-  L.title('六维', `可用 ${s.player.attrPoints} 点`);
+  L.text(`攻 ${fmt(st.atk)}　防 ${fmt(st.def)}　生 ${fmt(st.hp)}　速 ${fmt(st.spd)}　暴击 ${(st.crit * 100).toFixed(1)}%　闪避 ${(st.eva * 100).toFixed(1)}%`, { size: 12 });
+  // 六维卡（与网页版同构：已分配 N 点 → +X，右侧 [+1]）
+  cardTitle('六维属性', `可用点数 ${sp.attrPoints || 0}`);
+  L.text('每升 1 级获得 3 点；每点 +2 维值；加错了随时点「洗点」，不花任何东西。', { size: 11, color: CV.C.dim });
   D.ATTR_META.forEach(a => {
-    L.row(a.name, a.desc, { id: 'attr_' + a.id, value: `+${s.player.attrs[a.id] || 0}`, valueColor: CV.C.gold });
+    const n = sp.attrs[a.id] || 0;
+    L.row(a.name, `${a.desc}　已分配 ${n} 点 → +${n * D.ATTR_POINT_VALUE}`, { id: 'attr_' + a.id, value: '+1', valueColor: CV.C.gold });
   });
   L.btnRow([{ label: '洗点（免费）', id: 'reset_attrs', size: 12 }, { label: '加 5 点', id: 'attr_add5', size: 12 }]);
   L.btnRow([
     { label: '🔒 铭刻', id: 'open_genelock', size: 12 },
     { label: '⚗️ 炼化台（血清）', id: 'open_refine', size: 12 },
   ]);
-  L.title('技能', `可用技能点 ${s.player.skillPoints}`);
+  cardTitle('血统技能', `可用技能点 ${s.player.skillPoints || 0}`);
+  L.text('每升 1 级获得 1 点技能点；点错了点「重置」会退回全部技能点。', { size: 11, color: CV.C.dim });
   const sk = Core.protagonistSkills();
   ['s1', 's2', 'ult'].forEach((k, i) => {
     L.row(`${sk[k].name} Lv.${(s.player.skillLv || [1, 1, 1])[i]}`, sk[k].desc || '', { id: 'pskill_' + i, value: '升级' });
