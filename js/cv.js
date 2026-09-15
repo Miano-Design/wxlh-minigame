@@ -91,7 +91,16 @@ function rrect(x, y, w, h, r) {
 }
 function fillPanel(x, y, w, h, opt) {
   const c = CV.ctx; opt = opt || {};
-  c.fillStyle = opt.fill || CV.C.panel;
+  // opt.grad = [上色, 下色] → 与网页版卡片/按钮的 linear-gradient(180deg,…) 同款
+  let painted = false;
+  if (opt.grad && c.createLinearGradient) {
+    const g = c.createLinearGradient(0, y, 0, y + h);
+    if (g && g.addColorStop) {
+      g.addColorStop(0, opt.grad[0]); g.addColorStop(1, opt.grad[1]);
+      c.fillStyle = g; painted = true;
+    }
+  }
+  if (!painted) c.fillStyle = opt.fill || opt.grad && opt.grad[0] || CV.C.panel;
   rrect(x, y, w, h, opt.r == null ? CV.RADIUS : opt.r);
   c.fill();
   c.strokeStyle = opt.line || CV.C.line;
@@ -107,6 +116,9 @@ function drawText(str, x, y, opt) {
   c.fillText(String(str), x, y);
 }
 function addHit(id, x, y, w, h) { if (id) CV.hits.push({ id, x, y, w, h }); }
+// 按下反馈（网页版是 transform: scale(.97)）：按到哪个按钮，就把它画小一点点
+function isPressed(id) { return !!id && CV.pressedId === id && (Date.now() - (CV.pressedAt || 0)) < 160; }
+CV.pressedId = null; CV.pressedAt = 0;
 
 /* ---------- 排版游标（业务层只跟它打交道） ---------- */
 const L = {
@@ -149,7 +161,8 @@ const L = {
   row(label, sub, opt) {
     opt = opt || {};
     const h = sub ? 54 : 44;
-    fillPanel(12, this.y, CV.W - 24, h, { fill: opt.disabled ? CV.C.panel : CV.C.panel });
+    // 卡片：网页版 .card 是浅渐变 + 1px 描边
+    fillPanel(12, this.y, CV.W - 24, h, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
     drawText(label, 24, this.y + (sub ? 20 : h / 2), { size: 14, bold: !!opt.bold, color: opt.disabled ? CV.C.dim : CV.C.text });
     if (sub) drawText(sub, 24, this.y + 38, { size: 11, color: CV.C.dim });
     if (opt.value) drawText(opt.value, CV.W - 24, this.y + (sub ? 20 : h / 2), { size: 13, align: 'right', color: opt.valueColor || CV.C.gold });
@@ -162,14 +175,21 @@ const L = {
   btn(label, id, opt) {
     opt = opt || {};
     const h = opt.h || 44;
-    const w = opt.w || (CV.W - 32);
-    const x = opt.x != null ? opt.x : (CV.W - w) / 2;
-    CV.ctx.fillStyle = opt.disabled ? CV.C.panel : (opt.primary ? CV.C.accent : CV.C.panel2);
-    rrect(x, this.y, w, h, 10);
-    CV.ctx.fill();
-    CV.ctx.strokeStyle = CV.C.line;
-    CV.ctx.stroke();
-    drawText(label, x + w / 2, this.y + h / 2, { size: opt.size || 14, bold: true, align: 'center', color: opt.disabled ? CV.C.dim : CV.C.text });
+    const full = opt.w || (CV.W - 32);
+    const press = isPressed(id);
+    const w = full - (press ? 6 : 0);
+    const x = (opt.x != null ? opt.x : (CV.W - full) / 2) + (press ? 3 : 0);
+    // 与网页版 .btn 对齐：圆角 7、描边 line2；primary / gold 是 180deg 渐变，ghost 透明底
+    const style = opt.disabled ? { fill: CV.C.panel, line: CV.C.line }
+      : opt.primary ? { grad: ['#c9364a', CV.C.accent2], line: '#e05a6d40' }
+        : opt.gold ? { grad: ['#b98d2a', '#87631a'], line: '#e6b64c44' }
+          : opt.ghost ? { fill: 'transparent', line: CV.C.line }
+            : { fill: CV.C.panel2, line: CV.C.line2 };
+    fillPanel(x, this.y + (press ? 1 : 0), w, h - (press ? 2 : 0), Object.assign({ r: CV.RADIUS_SM }, style));
+    drawText(label, x + w / 2, this.y + h / 2, {
+      size: opt.size || 13, bold: true, align: 'center',
+      color: opt.disabled ? CV.C.dim : (opt.gold ? '#fdf3dc' : (opt.ghost ? CV.C.text2 : CV.C.text)),
+    });
     if (id && !opt.disabled) addHit(id, x, this.y, w, h);
     this.y += h + 8;
     return this;
@@ -178,15 +198,16 @@ const L = {
   btnRow(list) {
     const n = list.length, gap = 8, w = (CV.W - 32 - gap * (n - 1)) / n;
     list.forEach((b, i) => {
-      const x = 16 + i * (w + gap);
-      const h = b.h || 40;
-      CV.ctx.fillStyle = b.disabled ? CV.C.panel : (b.primary ? CV.C.accent : CV.C.panel2);
-      rrect(x, this.y, w, h, 10);
-      CV.ctx.fill();
-      CV.ctx.strokeStyle = CV.C.line;
-      CV.ctx.stroke();
-      drawText(b.label, x + w / 2, this.y + h / 2, { size: b.size || 13, bold: true, align: 'center', color: b.disabled ? CV.C.dim : CV.C.text });
-      if (b.id && !b.disabled) addHit(b.id, x, this.y, w, h);
+      const press = isPressed(b.id);
+      const x = 16 + i * (w + gap) + (press ? 2 : 0);
+      const bh = b.h || 40;
+      const style = b.disabled ? { fill: CV.C.panel, line: CV.C.line }
+        : b.primary ? { grad: ['#c9364a', CV.C.accent2], line: '#e05a6d40' }
+          : b.gold ? { grad: ['#b98d2a', '#87631a'], line: '#e6b64c44' }
+            : { fill: CV.C.panel2, line: CV.C.line2 };
+      fillPanel(x, this.y + (press ? 1 : 0), w - (press ? 4 : 0), bh - (press ? 2 : 0), Object.assign({ r: CV.RADIUS_SM }, style));
+      drawText(b.label, x + w / 2, this.y + bh / 2, { size: b.size || 12, bold: true, align: 'center', color: b.disabled ? CV.C.dim : CV.C.text });
+      if (b.id && !b.disabled) addHit(b.id, x, this.y, w, bh);
     });
     this.y += (list[0] && list[0].h || 40) + 8;
     return this;
@@ -306,6 +327,12 @@ CV.draw = function () {
     tabs.forEach((t, i) => {
       const x = i * tw;
       const active = CV.stack.length === 1 && CV.top() && CV.top().name === t.panel;
+      // 网页版选中态：顶部一道 26×2 的金色小横条（.nav-item.active::before）
+      if (active) {
+        CV.ctx.fillStyle = CV.C.gold;
+        rrect(x + tw / 2 - 13, CV.H - CV.NAV_H, 26, 2, 1);
+        CV.ctx.fill();
+      }
       drawText(t.name, x + tw / 2, CV.H - CV.NAV_H / 2, { size: 14, bold: active, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       addHit('nav_' + t.panel, x, CV.H - CV.NAV_H, tw, CV.NAV_H);
     });
@@ -335,6 +362,12 @@ CV._touch = null;
 CV.onTouchStart = function (x, y) {
   const d = CV.toDesign(x, y);
   CV._touch = { x0: d.x, y0: d.y, y: d.y, moved: false, scrolled: false };
+  // 按下的那一刻先记下"按到了谁"，用来做缩放反馈（手指一离开就恢复）
+  for (let i = CV.hits.length - 1; i >= 0; i--) {
+    const h = CV.hits[i];
+    if (d.x >= h.x && d.x <= h.x + h.w && d.y >= h.y && d.y <= h.y + h.h) { CV.pressedId = h.id; CV.pressedAt = Date.now(); return; }
+  }
+  CV.pressedId = null;
 };
 CV.onTouchMove = function (x, y) {
   const t = CV._touch, top = CV.top();
