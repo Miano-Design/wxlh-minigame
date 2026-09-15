@@ -390,7 +390,7 @@ module.exports = {
   "justifyContent": "flex-start",
   "paddingTop": 5,
   "paddingRight": 6,
-  "paddingBottom": 5,
+  "paddingBottom": 11,
   "paddingLeft": 6,
   "color": "#e9edf6",
   "textAlign": "center"
@@ -2201,7 +2201,7 @@ module.exports = {
   "justifyContent": "flex-start",
   "paddingTop": 5,
   "paddingRight": 6,
-  "paddingBottom": 5,
+  "paddingBottom": 11,
   "paddingLeft": 6,
   "textAlign": "center",
   ":active": {
@@ -2249,7 +2249,7 @@ module.exports = {
   "justifyContent": "flex-start",
   "paddingTop": 5,
   "paddingRight": 6,
-  "paddingBottom": 5,
+  "paddingBottom": 11,
   "paddingLeft": 6,
   "textAlign": "center",
   "width": "20.0000%"
@@ -2271,7 +2271,7 @@ module.exports = {
   "justifyContent": "center",
   "paddingTop": 5,
   "paddingRight": 6,
-  "paddingBottom": 5,
+  "paddingBottom": 11,
   "paddingLeft": 6,
   "textAlign": "center",
   ":active": {
