@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:32 */
+   生成时间：2026-09-15 16:35 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -50,6 +50,13 @@ module.exports = {
   "borderBottomWidth": 1,
   "borderBottomColor": "#ffffff0d"
  },
+ "t1": {
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
  "tag": {
   "fontSize": 10,
   "borderWidth": 1,
@@ -65,6 +72,11 @@ module.exports = {
   "paddingLeft": 6,
   "color": "#b6bfd0",
   "fontWeight": "normal"
+ },
+ "t2": {
+  "fontSize": 11,
+  "color": "#7a849b",
+  "marginTop": 3
  },
  "btn": {
   "flexDirection": "row",
@@ -654,7 +666,8 @@ module.exports = {
   "fontSize": 15,
   "fontWeight": "bold",
   "flexDirection": "row",
-  "alignItems": "center"
+  "alignItems": "center",
+  "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t1__text": {
   "color": "#e9edf6",
@@ -677,6 +690,8 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 1,
   "paddingLeft": 6,
+  "alignSelf": "center",
+  "lineHeight": 14,
   "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t2": {
@@ -1126,16 +1141,22 @@ module.exports = {
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "width": "100%"
+  "fontWeight": "bold",
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 10,
+  "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
   "borderRadius": 7,
@@ -1147,12 +1168,15 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 1,
   "paddingLeft": 6,
-  "fontWeight": "normal",
-  "width": "100%"
+  "alignSelf": "center",
+  "lineHeight": 14,
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__text.t2": {
-  "color": "#e9edf6",
-  "fontSize": 15,
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.chev": {
@@ -1210,11 +1234,17 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow__text.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow__text.t2": {
-  "color": "#e9edf6",
-  "fontSize": 15,
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__text.chev": {
@@ -1273,11 +1303,17 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow__text.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow__text.t2": {
-  "color": "#e9edf6",
-  "fontSize": 15,
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.chev": {
@@ -1568,7 +1604,8 @@ module.exports = {
   "fontSize": 15,
   "fontWeight": "bold",
   "flexDirection": "row",
-  "alignItems": "center"
+  "alignItems": "center",
+  "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text": {
   "color": "#e9edf6",
@@ -1591,6 +1628,8 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 1,
   "paddingLeft": 6,
+  "alignSelf": "center",
+  "lineHeight": 14,
   "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.tag": {
@@ -1608,6 +1647,8 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 1,
   "paddingLeft": 6,
+  "alignSelf": "center",
+  "lineHeight": 14,
   "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__text.t2": {
@@ -2310,16 +2351,22 @@ module.exports = {
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "width": "100%"
+  "fontWeight": "bold",
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 10,
+  "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
   "borderRadius": 7,
@@ -2331,12 +2378,15 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 1,
   "paddingLeft": 6,
-  "fontWeight": "normal",
-  "width": "100%"
+  "alignSelf": "center",
+  "lineHeight": 14,
+  "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__text.t2": {
-  "color": "#e9edf6",
-  "fontSize": 15,
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__text.chev": {
@@ -2371,6 +2421,7 @@ module.exports = {
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
+  "flexWrap": "wrap",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__text.t2": {
