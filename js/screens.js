@@ -182,21 +182,110 @@ CV.register('world', function (p) {
 });
 
 /* ================= 战斗 ================= */
-let battle = null;
+let battle = null;        // 当前这一波的播放状态
+let stageRun = null;      // 一整关（1~3 波）的进度：血量继承、累计掉落、阵亡次数
+
+/* 单位卡片：名字 + 血条 + 百分比（和网页版的战场格子一个意思） */
+function battleUnit(u, x, y, w) {
+  const h = 78;
+  const dead = u.hp <= 0;
+  CV.fillPanel(x, y, w, h, { fill: dead ? '#12161d' : CV.C.panel2, line: u.isBoss ? CV.C.accent : CV.C.line, r: 10 });
+  const nm = u.name.length > 4 ? u.name.slice(0, 4) : u.name;
+  CV.drawText(nm, x + w / 2, y + 14, { size: 11, align: 'center', color: dead ? CV.C.dim : (u.isBoss ? CV.C.accent : CV.C.text), bold: !!u.isBoss });
+  const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
+  const bw = w - 12, bh = 8;
+  CV.ctx.fillStyle = '#0f141d';
+  rrectL(x + 6, y + 26, bw, bh, 4); CV.ctx.fill();
+  CV.ctx.fillStyle = dead ? '#3a2027' : (pct < 0.35 ? CV.C.red : (u.side === 'enemy' ? '#e06666' : CV.C.green));
+  if (pct > 0) { rrectL(x + 6, y + 26, Math.max(2, bw * pct), bh, 4); CV.ctx.fill(); }
+  CV.drawText(`${Math.round(pct * 100)}%`, x + w / 2, y + 44, { size: 10, align: 'center', color: dead ? CV.C.dim : CV.C.dim });
+  if (dead) CV.drawText('倒下', x + w / 2, y + 62, { size: 10, align: 'center', color: CV.C.dim });
+  else if (u.side === 'ally') CV.drawText(u.position === 'front' ? '前排' : '后排', x + w / 2, y + 62, { size: 10, align: 'center', color: CV.C.dim });
+  if (battle) battle.rects[u.uid] = { x, y, w, h };      // 记下位置，飘字才知道往哪飘
+}
+function rrectL(x, y, w, h, r) {
+  const c = CV.ctx;
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
 CV.register('battle', function () {
   if (!battle) { L.text('战斗数据丢失，返回重进'); return; }
-  const s = battle.spec;
-  L.text(s.title, { size: 15, bold: true });
-  L.text(battle.res.win === null ? '战斗中…' : (battle.res.win ? '✔ 胜利' : '✘ 失败'), { size: 13, color: battle.res.win === null ? CV.C.dim : (battle.res.win ? CV.C.green : CV.C.red) });
+  const b = battle;
+  const allies = b.order.filter(uid => b.units[uid].side === 'ally');
+  const foes = b.order.filter(uid => b.units[uid].side === 'enemy');
+  // 标题行
+  CV.drawText(b.spec.title, 16, L.y + 10, { size: 14, bold: true });
+  CV.drawText(`第 ${b.round || 1} 回合`, CV.W - 16, L.y + 10, { size: 12, align: 'right', color: CV.C.dim });
+  L.y += 26;
+  // 敌方
+  CV.drawText('敌方', 16, L.y + 8, { size: 11, color: CV.C.dim });
+  L.y += 18;
+  const fw = Math.min(64, Math.floor((CV.W - 32 - (foes.length - 1) * 6) / Math.max(1, foes.length)));
+  foes.forEach((uid, i) => battleUnit(b.units[uid], 16 + i * (fw + 6), L.y, fw));
+  L.y += 86;
+  // 我方：后排在上、前排在下（和战场的视觉一致）
+  const aw = Math.min(64, Math.floor((CV.W - 32 - (allies.length - 1) * 6) / Math.max(1, allies.length)));
+  ['back', 'front'].forEach(row => {
+    const list = allies.filter(uid => (b.units[uid].position === 'front' ? 'front' : 'back') === row);
+    if (!list.length) return;
+    CV.drawText(row === 'front' ? '我方前排 · 挨打优先' : '我方后排', 16, L.y + 8, { size: 11, color: CV.C.dim });
+    L.y += 18;
+    list.forEach((uid, i) => battleUnit(b.units[uid], 16 + i * (aw + 6), L.y, aw));
+    L.y += 86;
+  });
+  // 飘字（在对应单位上方浮一会儿）
+  const now = Date.now();
+  b.floaters = b.floaters.filter(f => now - f.at < 900);
+  b.rects = b.rects || {};
+  b.floaters.forEach(f => {
+    const rc = b.rects[f.uid];
+    if (!rc) return;
+    const k = (now - f.at) / 900;
+    const color = f.cls === 'crit' ? CV.C.gold : f.cls === 'heal' ? CV.C.green : f.cls === 'miss' ? CV.C.dim : CV.C.red;
+    CV.drawText(f.text, rc.x + rc.w / 2, rc.y - 8 - k * 18, { size: f.cls === 'crit' ? 13 : 11, align: 'center', color, bold: true });
+  });
+  // 控制条
+  L.btnRow([
+    { label: `${b.speed}× 速度`, id: 'battle_speed', size: 12 },
+    { label: b.done ? '已结束' : '⏩ 跳过', id: b.done ? null : 'battle_skip', disabled: b.done, size: 12 },
+  ]);
+  // 战备补给（只在"整关连打"时有意义：药剂作用于下一波进场）
+  if (stageRun && !b.done) {
+    const lastWave = stageRun.wave >= stageRun.waves.length - 1;
+    if (lastWave) CV.drawText('收官战 · 药剂要到下一关才生效（每关开局满血）', 16, L.y + 10, { size: 11, color: CV.C.dim });
+    else CV.drawText('战备补给 · 喝了从下一波进场生效', 16, L.y + 10, { size: 11, color: CV.C.dim });
+    L.y += 24;
+    if (!lastWave) {
+      const pots = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].type === 'consumable' && D.ITEMS[k].where === 'explore' && (S().items[k] || 0) > 0);
+      if (pots.length) {
+        const row = pots.slice(0, 3).map(k => ({ label: `${(D.ITEMS[k].effect || {}).healPct ? '🧪' : '💉'}${D.ITEMS[k].name}×${S().items[k]}`, id: 'bpotion_' + k, size: 11 }));
+        L.btnRow(row);
+      } else CV.drawText('（背包里没有探索消耗品）', 16, L.y + 8, { size: 11, color: CV.C.dim });
+    }
+  }
+  // 战报
   L.title('战报');
-  battle.log.slice(Math.max(0, battle.shown - 12), Math.max(1, battle.shown)).forEach(line => L.text(line, { size: 12, color: CV.C.dim }));
-  L.spacer(10);
-  if (!battle.done) L.btn('⏩ 跳过动画', 'battle_skip', { primary: true });
-  else if (battle.outcome) L.btn(battle.outcome.label, 'battle_after', { primary: true });
+  b.log.slice(-6).forEach(line => L.text(line, { size: 11, color: CV.C.dim }));
+  // 结果
+  if (b.done) {
+    L.spacer(6);
+    L.text(b.res.win ? '✔ 本波胜利' : '✘ 本波失败', { size: 16, bold: true, align: 'center', color: b.res.win ? CV.C.green : CV.C.red });
+    const acts = (b.outcome && (b.outcome.actions || [b.outcome])) || [];
+    acts.filter(Boolean).forEach((a, i) => {
+      L.btn(a.label, a.id || ('battle_act_' + i), { primary: !!a.primary, disabled: !!a.disabled });
+    });
+    if (b.outcome && b.outcome.note) L.text(b.outcome.note, { size: 11, color: CV.C.dim, align: 'center' });
+  }
 });
 
 function startBattle(spec) {
-  const allies = buildAllies(spec.hpPct) || [];
+  const allies = spec.allies || buildAllies(spec.hpMap, spec.extraAtk) || [];
   if (!allies.length) { CV.toast('全队重伤，先恢复再战'); return; }
   const enemies = spec.enemies || Dungeon.makeEnemies(spec.worldId, spec.diff, spec.stage, spec.kind);
   const res = Battle.run({
@@ -204,46 +293,123 @@ function startBattle(spec) {
     maxRounds: spec.maxRounds || (spec.kind === 'boss' ? 50 : 30),
     allyHitMod: (Battle.MECHANICS[spec.worldId] || {}).allyHitMod || 0,
   });
-  const nameOf = {};
-  res.frames[0].allies.concat(res.frames[0].enemies).forEach(u => { nameOf[u.uid] = u.name; });
-  const log = [];
-  res.frames.forEach(f => {
-    if (f.type === 'attack') log.push(`${nameOf[f.actor] || '?'} 出手`);
-    else if (f.type === 'skill') log.push(`✨ ${nameOf[f.actor] || '?'} 使用【${f.name}】`);
-    else if (f.type === 'damage') log.push(`${nameOf[f.target] || '?'} 受到 ${f.dmg}${f.crit ? '（暴击）' : ''}${f.killed ? ' —— 倒下' : ''}`);
-    else if (f.type === 'heal') log.push(`${nameOf[f.target] || '?'} 回复 ${f.amount}`);
-    else if (f.type === 'dodge') log.push(`${nameOf[f.target] || '?'} 闪避`);
-    else if (f.type === 'skip') log.push(`😵 ${nameOf[f.actor] || '?'} 无法行动`);
-    else if (f.type === 'dot') log.push(`${nameOf[f.target] || '?'} 持续伤害 ${f.dmg}`);
-    else if (f.type === 'rule') log.push(`👁 ${f.text}`);
-    else if (f.type === 'phase') log.push(`🔥 ${f.text}`);
-    else if (f.type === 'revive') log.push(`♻ ${f.text}`);
-    else if (f.type === 'summon') log.push(`🕯 ${f.text}`);
-  });
+  const units = {}, order = [];
+  res.frames[0].allies.concat(res.frames[0].enemies).forEach(u => { units[u.uid] = Object.assign({}, u); order.push(u.uid); });
   battle = {
-    spec, res, nameOf, log, shown: 0, done: false, outcome: null,
-    units: res.frames[0].allies.concat(res.frames[0].enemies).map(u => Object.assign({}, u)),
+    spec, res, units, order, idx: 0, round: 0, log: [], floaters: [], rects: {},
+    speed: S().settings.speed || 1, done: false, outcome: null, doneAt: 0,
   };
+  pushLog(battle, `⚔ ${spec.title}`);
   CV.reset('battle');
 }
-CV.on('battle_skip', () => { if (battle) { battle.shown = battle.log.length; finishBattle(); } });
-CV.on('battle_after', () => { const f = battle && battle.outcome && battle.outcome.run; battle = null; if (f) f(); });
+
+function pushLog(b, line) { b.log.push(line); if (b.log.length > 200) b.log.shift(); }
+function nmOf(b, uid) { return (b.units[uid] && b.units[uid].name) || '?'; }
+function addFloater(b, uid, text, cls) { b.floaters.push({ uid, text, cls, at: Date.now() }); if (b.floaters.length > 12) b.floaters.shift(); }
+
+/* 把一帧结算到界面上（和网页版 applyFrame 同一套口径） */
+function applyFrame(b, f) {
+  const U = b.units;
+  switch (f.type) {
+    case 'round': b.round = f.n; if (f.n <= 3 || f.n % 5 === 0) pushLog(b, `—— 第 ${f.n} 回合 ——`); break;
+    case 'attack': break;
+    case 'skill': pushLog(b, `✨ ${nmOf(b, f.actor)} 使用【${f.name}】`); break;
+    case 'damage': {
+      const u = U[f.target];
+      if (u) u.hp = Math.max(0, u.hp - f.dmg);
+      addFloater(b, f.target, (f.crit ? '暴击 ' : '-') + fmt(f.dmg), f.crit ? 'crit' : 'dmg');
+      if (f.healed) { const s = U[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); addFloater(b, f.source, '+' + fmt(f.healed), 'heal'); } }
+      if (f.killed) pushLog(b, `💀 ${nmOf(b, f.target)} 倒下`);
+      break;
+    }
+    case 'dot': { const u = U[f.target]; if (u) u.hp = Math.max(0, u.hp - f.dmg); addFloater(b, f.target, '-' + fmt(f.dmg), 'dmg'); if (f.killed) pushLog(b, `💀 ${nmOf(b, f.target)} 倒下`); break; }
+    case 'heal': { const u = U[f.target]; if (u) u.hp = Math.min(u.maxHp, u.hp + f.amount); addFloater(b, f.target, '+' + fmt(f.amount), 'heal'); break; }
+    case 'shield': addFloater(b, f.target, '🛡+' + fmt(f.amount), 'heal'); break;
+    case 'dodge': addFloater(b, f.target, '闪避', 'miss'); break;
+    case 'skip': pushLog(b, `😵 ${nmOf(b, f.actor)} 无法行动`); break;
+    case 'buff': addFloater(b, f.target, '↑ ' + f.name, 'heal'); break;
+    case 'revive': { const u = U[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); pushLog(b, `♻ ${f.text}`); break; }
+    case 'summon': if (f.enemy) { U[f.enemy.uid] = Object.assign({}, f.enemy); b.order.push(f.enemy.uid); } pushLog(b, `🕯 ${f.text}`); break;
+    case 'phase': pushLog(b, `🔥 ${f.text}`); break;
+    case 'rule': pushLog(b, `👁 ${f.text}`); break;
+    case 'nearDeath': addFloater(b, f.target, '⚠ 濒死', 'crit'); break;
+    default: break;
+  }
+}
+
+/* 主循环每 120ms 调一次：按倍速推进若干帧 */
+function tickBattle() {
+  const b = battle;
+  if (!b) return null;
+  if (b.done) {
+    const o = b.outcome;
+    if (o && o.auto && Date.now() - b.doneAt >= (o.autoMs || 900)) { const fn = o.auto; b.outcome = null; fn(); }
+    return b;
+  }
+  const n = Math.max(1, Math.round(2.5 * (b.speed || 1)));
+  for (let i = 0; i < n && b.idx < b.res.frames.length; i++) applyFrame(b, b.res.frames[b.idx++]);
+  if (b.idx >= b.res.frames.length) finishBattle();
+  return b;
+}
+
+CV.on('battle_speed', () => {
+  if (!battle) return;
+  battle.speed = battle.speed >= 3 ? 1 : battle.speed + 1;
+  S().settings.speed = battle.speed;
+  Core.save();
+  CV.toast(`${battle.speed}× 速度`);
+});
+CV.on('battle_skip', () => {
+  if (!battle) return;
+  while (battle.idx < battle.res.frames.length) applyFrame(battle, battle.res.frames[battle.idx++]);
+  finishBattle();
+});
+CV.on('battle_after', () => {
+  const b = battle;
+  if (!b || !b.outcome) return;
+  const a = (b.outcome.actions || [b.outcome])[0];
+  if (a && a.run) { b.outcome = null; a.run(); }
+});
+CV.on('battle_next', () => { const b = battle; if (b && b.outcome && b.outcome.auto) { const fn = b.outcome.auto; b.outcome = null; fn(); } });
+CV.onPrefix('bpotion_', id => {
+  const key = id.slice(8);
+  if (!stageRun || !battle) return;
+  if (!Core.removeItem(key)) { CV.toast('道具不足'); return; }
+  const eff = (D.ITEMS[key] || {}).effect || {};
+  const parts = [];
+  if (eff.healPct) {
+    let down = 0;
+    Object.keys(stageRun.hp).forEach(cid => {
+      if (stageRun.hp[cid] <= 0.01) { down++; return; }
+      stageRun.hp[cid] = Math.min(1, stageRun.hp[cid] + eff.healPct);
+    });
+    parts.push(`全队恢复 ${Math.round(eff.healPct * 100)}% 生命${down ? `（${down} 名已阵亡，不复活）` : ''}`);
+  }
+  ['atkPct', 'spdPct', 'defPct'].forEach(k => {
+    if (!eff[k]) return;
+    stageRun.buffs = stageRun.buffs || {};
+    stageRun.buffs[k] = (stageRun.buffs[k] || 0) + eff[k];
+    parts.push(`${D.CONSUMABLE_TAG[k] || k} +${Math.round(eff[k] * 100)}%`);
+  });
+  Core.task('item1', 1);
+  Core.save();
+  CV.toast(`${D.ITEMS[key].name}：${parts.join(' · ')}（下一波进场生效）`);
+});
 
 function finishBattle() {
   if (!battle || battle.done) return;
   battle.done = true;
+  battle.doneAt = Date.now();
   const spec = battle.spec;
   if (!battle.res.win) {
-    battle.outcome = {
-      label: '返回',
-      run: () => CV.reset(spec.back || 'worlds'),
-    };
-    // 失败：如果是副本，清掉这一轮
-    if (spec.onLose) spec.onLose();
+    pushLog(battle, '✘ 本波失败');
+    if (spec.onLose) { battle.outcome = spec.onLose(battle); return; }
+    battle.outcome = { actions: [{ label: '返回', id: 'battle_after', run: () => CV.reset(spec.back || 'worlds') }] };
     return;
   }
-  if (spec.onWin) { battle.outcome = spec.onWin(battle); return; }
-  battle.outcome = { label: '返回', run: () => CV.reset('worlds') };
+  pushLog(battle, '✔ 本波胜利');
+  if (spec.onWin) { battle.outcome = spec.onWin(battle.res, battle.units); return; }
+  battle.outcome = { actions: [{ label: '返回', id: 'battle_after', run: () => CV.reset('worlds') }] };
 }
 
 /* 队伍编成（网页版在 ui.js，这里给小游戏版一份；建议后续搬进 core.js 共用） */
@@ -287,40 +453,83 @@ function buildAllies(hpPctMap, extraAtk) {
 function startStage(worldId, diff, stageIdx) {
   const s = S();
   const stage = stageIdx + 1;
-  const waves = Dungeon.wavePlan(stage);
-  const pb = takePreBuff();                     // 战前增益（看广告来的）只吃这一关
-  let hp = {};
+  const hp = {};
   s.party.filter(Boolean).forEach(id => { hp[id] = 1; });
-  const gotAll = [];
-  let won = true, rounds = 0;
-  for (let i = 0; i < waves.length; i++) {
-    const kind = waves[i];
-    const allies = buildAllies(hp, pb);
-    if (!allies.length) { won = false; break; }
-    const res = Battle.run({ allies, enemies: Dungeon.makeEnemies(worldId, diff, stage, kind), worldId, maxRounds: kind === 'boss' ? 50 : 30 });
-    rounds += res.rounds;
-    if (!res.win) { won = false; break; }
-    // 写回血量
-    res.frames[0].allies.forEach(u => { if (u.charId !== undefined) hp[u.charId] = 1; });
-    const end = res.frames[res.frames.length - 1];
-    const g = Dungeon.grantRewards(worldId, diff, stage, kind);
-    Core.addCharExp(s.party.filter(Boolean), g.rewards.exp);
-    Core.addPlayerBattleExp(Math.round(g.rewards.exp * 0.5));
-    Core.battleSettle({}, true, kind === 'boss');
-    g.got.forEach(x => gotAll.push(x));
+  stageRun = {
+    worldId, diff, stageIdx, stage,
+    waves: Dungeon.wavePlan(stage),   // 1~4 关 1 波、5~8 关 2 波、9~12 关 3 波
+    wave: 0, hp, got: [], rounds: 0, deaths: 0,
+    extraAtk: takePreBuff(),          // 战前增益（看广告来的）只吃这一关
+    buffs: null,
+  };
+  runWave();
+}
+
+/* 打当前这一波（网页版是"点进去就打、波间无缝连打"，这里同一套） */
+function runWave() {
+  const r = stageRun;
+  if (!r) return;
+  const kind = r.waves[r.wave];
+  const w = D.WORLDS.find(x => x.id === r.worldId);
+  const label = { combat: '遭遇战', elite: '精英伏击', boss: '守关之战' }[kind] || '';
+  startBattle({
+    title: `${w ? w.name : r.worldId} 第 ${r.stage}/12 关 · 第 ${r.wave + 1}/${r.waves.length} 波 · ${label}`,
+    worldId: r.worldId, kind, hpMap: r.hp, extraAtk: r.extraAtk,
+    enemies: Dungeon.makeEnemies(r.worldId, r.diff, r.stage, kind),
+    maxRounds: kind === 'boss' ? 50 : 30,
+    back: 'world',
+    onWin: (res, units) => afterWave(res, units),
+    onLose: () => ({
+      actions: [
+        { label: '📺 复活再战（全队回 50%）', primary: true, run: reviveStage },
+        { label: '放弃这一关', run: () => { stageRun = null; battle = null; CV.reset('world'); } },
+      ],
+      note: '复活后从这一波重打；已经拿到的奖励不会丢',
+    }),
+  });
+}
+
+/* 一波打完：写回血量、结算掉落、无缝接下一波 */
+function afterWave(res, units) {
+  const r = stageRun;
+  if (!r) return { actions: [{ label: '返回', run: () => CV.reset('worlds') }] };
+  Object.values(units).forEach(u => {
+    if (u.side === 'ally' && u.charId !== undefined) r.hp[u.charId] = Math.max(0, u.hp / u.maxHp);
+  });
+  if (Object.values(units).some(u => u.side === 'ally' && u.hp <= 0)) r.deaths++;
+  const kind = r.waves[r.wave];
+  const g = Dungeon.grantRewards(r.worldId, r.diff, r.stage, kind);
+  Core.addCharExp(S().party.filter(Boolean), g.rewards.exp);
+  Core.addPlayerBattleExp(Math.round(g.rewards.exp * 0.5));
+  Core.battleSettle({}, true, kind === 'boss');
+  g.got.forEach(x => r.got.push(x));
+  r.rounds += res.rounds;
+  Core.save();
+  r.wave++;
+  if (r.wave < r.waves.length) {
+    // 还有下一波：停一下直接接上，不用再点一次"开打"
+    return { auto: runWave, autoMs: 1100, note: `第 ${r.wave}/${r.waves.length} 波通过，接着打下一波…` };
   }
-  if (!won) {
-    Core.save();
-    CV.reset('stagefail');
-    return { worldId, diff, stageIdx, won };
-  }
-  const comp = Core.stageComplete(worldId, diff, stageIdx, 3);
-  const got = { worldId, diff, stageIdx, won, rounds, gotAll, first: comp.firstClearReward, unlocks: comp.newUnlocks };
+  // 最后一波：结算整关
+  const stars = 1 + (r.deaths ? 0 : 1) + (r.rounds <= 20 ? 1 : 0);
+  const comp = Core.stageComplete(r.worldId, r.diff, r.stageIdx, stars);
+  Core.clearPendingRun();
   Core.save();
   G.AD.interstitial();
-  battle = { spec: { title: `${worldId} 第 ${stage} 关` }, res: { win: true }, log: [], done: true };
-  CV.reset('stageresult', got);
-  return got;
+  const data = {
+    worldId: r.worldId, diff: r.diff, stageIdx: r.stageIdx, stars,
+    rounds: r.rounds, gotAll: r.got, first: comp.firstClearReward, unlocks: comp.newUnlocks,
+  };
+  stageRun = null;
+  return { auto: () => { battle = null; CV.reset('stageresult', data); }, autoMs: 1200, note: '通关！正在结算…' };
+}
+
+/* 看广告复活：全队至少 50% 血，从当前这一波重打 */
+function reviveStage() {
+  if (!stageRun) { battle = null; CV.reset('worlds'); return; }
+  Object.keys(stageRun.hp).forEach(cid => { stageRun.hp[cid] = Math.max(stageRun.hp[cid], 0.5); });
+  battle = null;
+  runWave();
 }
 
 CV.register('stageresult', function (g) {
@@ -845,6 +1054,9 @@ CV.register('settings', function () {
 module.exports = {
   startStage, startBattle, buildAllies, finishBattle,
   battle: () => battle,
+  stageRun: () => stageRun,
+  tickBattle,
+  reviveStage,
   armPreBuff: () => { preBuff = 0.25; },
   hasPreBuff: () => preBuff > 0,
 };

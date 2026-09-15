@@ -157,10 +157,7 @@ on('ad_other', () => G.AD.show('otherworld_pack').then(r => {
 }));
 on('ad_sweep', () => G.AD.show('sweep_plus').then(r => {
   if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
-  const s = S();
-  if (s.sweep.date !== Core.dailyDate()) { s.sweep.date = Core.dailyDate(); s.sweep.count = 0; }
-  s.sweep.count = Math.max(0, (s.sweep.count || 0) - 3);
-  Core.save();
+  Core.addSweepBonus(3);              // 独立额度，新的那天也照给
   CV.toast(`今日扫荡次数 +3（剩 ${Core.sweepLeft()} 次）`);
 }));
 on('ad_prebuff', () => G.AD.show('pre_buff').then(r => {
@@ -524,13 +521,12 @@ function boot() {
   CV.ctx = canvas.getContext('2d');
   let info = {};
   try { info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync(); } catch (e) { info = {}; }
-  CV.W = info.windowWidth || 375;
-  CV.H = info.windowHeight || 812;
   CV.DPR = info.pixelRatio || 2;
-  CV.TOP = (info.safeArea && info.safeArea.top) ? info.safeArea.top + 26 : 34;
-  CV.NAV_H = 62;
-  canvas.width = CV.W * CV.DPR;
-  canvas.height = CV.H * CV.DPR;
+  CV.setup(info);                       // 自适应：算缩放 / 居中偏移 / 刘海与底部安全区
+  canvas.width = CV.pxW * CV.DPR;
+  canvas.height = CV.pxH * CV.DPR;
+  // 浏览器预览时把 CSS 尺寸也同步（小游戏里 canvas.style 不存在，跳过）
+  if (canvas.style) { canvas.style.width = CV.pxW + 'px'; canvas.style.height = CV.pxH + 'px'; }
   CV.ctx.scale(CV.DPR, CV.DPR);
   CV.statusText = () => {
     const s = S();
@@ -577,13 +573,14 @@ function boot() {
     const dt = Math.min(10, (now - last) / 1000);
     last = now;
     Core.onlineTick(dt);
-    const b = Scr.battle();
-    if (b && !b.done && b.shown < b.log.length) {
-      b.shown = Math.min(b.log.length, b.shown + 2);
-      if (b.shown >= b.log.length) Scr.finishBattle();
-    }
     CV.draw();
   }, 1000);
+  // 战斗播放单独一条快循环：只有打仗的时候才跑，省电
+  setInterval(() => {
+    if (!Scr.battle()) return;
+    Scr.tickBattle();
+    CV.draw();
+  }, 120);
   setInterval(() => Core.save(), 15000);
   CV.draw();
 }

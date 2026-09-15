@@ -99,10 +99,25 @@ async function main() {
   CV.dispatch('claim_idle');
   t('「一键收取」结算挂机收益', Core.S.cur.points > p0 && Core.S.idle.bankSec === 0);
 
-  // 打第 1 关（战斗 → 奖励 → 结算页）
+  // 打第 1 关：现在是"逐波播放"（战斗画面 → 结算），测试要把这一局跑完
+  function playOut(maxStep) {
+    let guard = 0;
+    while (Scr.battle() && guard++ < (maxStep || 400)) {
+      const b = Scr.battle();
+      if (!b.done) Scr.tickBattle();
+      else if (b.outcome && b.outcome.auto) CV.dispatch('battle_next');   // 波间自动接下一波
+      else break;
+    }
+  }
   CV.reset('worlds');
   CV.dispatch('stage_W01_normal_0');
-  t('点关卡能打完并进结算页', CV.top().name === 'stageresult', CV.top().name);
+  t('点关卡会先进战斗画面（逐波播放）', CV.top().name === 'battle', CV.top().name);
+  const b0 = Scr.battle();
+  t('战斗画面有双方单位与站位数据', !!b0 && b0.order.length >= 2 && b0.units[b0.order[0]].maxHp > 0);
+  UI._draw();
+  t('战斗画面能画出站位与血条（可点区域 ≥3）', CV.hits.length >= 3, 'hits=' + CV.hits.length);
+  playOut();
+  t('打完之后进结算页', CV.top().name === 'stageresult', CV.top().name);
   t('结算页有可点的后续动作', CV.hits.length > 0);
   t('通关记录已落盘（3 星）', Core.S.worlds.W01.stages.normal[0] > 0);
   const expBefore = Core.S.player.exp;

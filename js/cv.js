@@ -6,7 +6,11 @@
    这一层只认三件事：**怎么画、怎么滚动、点到谁**。业务全在 screens.js 里。
 */
 const CV = {
+  /* 设计坐标：所有界面代码都按"375 宽"这套设计尺寸写，
+     真机上由 setup() 算出缩放与居中偏移，在 draw 里统一 transform —— 这样界面代码一行都不用改。
+     W/H 是"设计尺寸"，不是物理像素。 */
   W: 375, H: 812, TOP: 30, NAV_H: 62,
+  pxW: 375, pxH: 812, scale: 1, ox: 0, topInset: 0, bottomInset: 0,
   ctx: null, DPR: 2,
   stack: [], hits: [], toasts: [],
   panels: {},
@@ -15,6 +19,27 @@ const CV = {
     text: '#e6edf7', dim: '#8b98ad', gold: '#ffd76a', accent: '#d43a4f', green: '#7ee0a3', red: '#ff6b6b',
   },
 };
+
+/* 自适应：按窗口宽度算缩放（平板上按 520 宽封顶并居中，跟网页版的 max-width:520px 一致），
+   同时把刘海与底部小黑条留出来 —— 这两块用物理像素处理，不参与缩放。 */
+CV.setup = function (info) {
+  const W = info.windowWidth || 375;
+  const H = info.windowHeight || 812;
+  const sa = info.safeArea || null;
+  CV.pxW = W; CV.pxH = H;
+  CV.topInset = sa && sa.top ? sa.top : 0;
+  CV.bottomInset = sa && sa.bottom != null ? Math.max(0, H - sa.bottom) : 0;
+  CV.scale = Math.min(520 / 375, W / 375);            // 上限 520/375 ≈ 1.39（平板别铺满）
+  CV.ox = Math.round((W - 375 * CV.scale) / 2);
+  CV.W = 375;
+  // 设计高度 = 可用物理高度 / 缩放；太矮的设备给个下限，避免界面被压扁
+  CV.H = Math.max(560, Math.round((H - CV.topInset - CV.bottomInset) / CV.scale));
+  CV.TOP = 30;
+  CV.NAV_H = 62;
+  return CV;
+};
+// 物理坐标 → 设计坐标（触摸用）
+CV.toDesign = (x, y) => ({ x: (x - CV.ox) / CV.scale, y: (y - CV.topInset) / CV.scale });
 
 CV.register = (name, fn) => { CV.panels[name] = fn; };
 CV.open = (name, params) => { CV.stack.push({ name, params: params || {}, scroll: 0 }); };
@@ -182,8 +207,14 @@ const L = {
 CV.draw = function () {
   const c = CV.ctx;
   CV.hits = [];
+  // 每次重画都从"物理像素 → DPR"这一层开始，避免 transform 叠加
+  c.setTransform(CV.DPR, 0, 0, CV.DPR, 0, 0);
   c.fillStyle = CV.C.bg;
-  c.fillRect(0, 0, CV.W, CV.H);
+  c.fillRect(0, 0, CV.pxW, CV.pxH);            // 先铺满物理屏（上下留白也是这个底色）
+  // 进入"设计坐标"：平移出刘海与居中偏移，再按设备宽度缩放
+  c.save();
+  c.translate(CV.ox, CV.topInset);
+  c.scale(CV.scale, CV.scale);
 
   const top = CV.top();
   // 顶栏
@@ -244,31 +275,35 @@ CV.draw = function () {
     rrect(24, y - 15, CV.W - 48, 30, 15); CV.ctx.fill();
     drawText(t.msg, CV.W / 2, y, { size: 12, align: 'center', color: CV.C.gold });
   });
+  c.restore();
 };
 
 /* ---------- 触摸 ---------- */
 CV._touch = null;
 CV.onTouchStart = function (x, y) {
-  CV._touch = { x0: x, y0: y, y, moved: false, scrolled: false };
+  const d = CV.toDesign(x, y);
+  CV._touch = { x0: d.x, y0: d.y, y: d.y, moved: false, scrolled: false };
 };
 CV.onTouchMove = function (x, y) {
   const t = CV._touch, top = CV.top();
   if (!t || !top) return;
-  const dy = t.y - y;
-  if (Math.abs(y - t.y0) > 8) t.moved = true;
+  const d = CV.toDesign(x, y);
+  const dy = t.y - d.y;
+  if (Math.abs(d.y - t.y0) > 8) t.moved = true;
   if (t.moved) {
     top.scroll = Math.max(0, Math.min(top.maxScroll || 0, top.scroll + dy));
     t.scrolled = true;
   }
-  t.y = y;
+  t.y = d.y;
 };
 CV.onTouchEnd = function (x, y) {
   const t = CV._touch;
   CV._touch = null;
   if (!t || t.scrolled) return;
+  const d = CV.toDesign(x, y);
   for (let i = CV.hits.length - 1; i >= 0; i--) {
     const h = CV.hits[i];
-    if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return CV.dispatch(h.id);
+    if (d.x >= h.x && d.x <= h.x + h.w && d.y >= h.y && d.y <= h.y + h.h) return CV.dispatch(h.id);
   }
 };
 CV.dispatch = function (id) {

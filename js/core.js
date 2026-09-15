@@ -53,7 +53,8 @@ window.Core = (function () {
       // 保底按池分开记账：高级 / 限定 各自算 SSR / UR / 当期 UP 的累计数
       recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '' },
       shop: { dailyDate: '', dailyItems: [], bought: {} },
-      sweep: { date: '', count: 0 },
+      // bonus：广告"看视频 +3 次扫荡"这类额外额度（当天有效，跨天清零）
+      sweep: { date: '', count: 0, bonus: 0 },
       tasks: { date: '', daily: {}, claimed: {}, allClaimed: false, weekKey: '', weekly: {}, weeklyClaimed: {}, weeklyAllClaimed: false },
       login: { day: 0, round: 1, lastClaim: '' },
       idle: { bankSec: 0, lastTs: Date.now(), lines: { cultivate: null, gather: null, explore: null, guard: null } },
@@ -165,6 +166,7 @@ window.Core = (function () {
     if (!S.realmScaled) { S.player.realm = S.player.realm * 4; S.realmScaled = true; }
     S.auth = S.auth || 0;   // 灯阁权限等级
     S.sweep = Object.assign(def.sweep, S.sweep || {});
+    S.sweep.bonus = S.sweep.bonus || 0;
     // 老存档补新字段：设置项 / 图鉴领取记录 / 登录轮次
     S.settings = Object.assign(def.settings, S.settings || {});
     S.tasks = Object.assign(def.tasks, S.tasks || {});
@@ -2308,8 +2310,17 @@ window.Core = (function () {
   function sweepCap() { return D.SWEEP_DAILY_CAP + authority().sweep; }
   // 今日剩余扫荡次数（跨天自动重置）
   function sweepLeft() {
-    if (S.sweep.date !== dailyDate()) return sweepCap();
-    return Math.max(0, sweepCap() - (S.sweep.count || 0));
+    if (S.sweep.date !== dailyDate()) return sweepCap() + (S.sweep.bonus || 0);
+    return Math.max(0, sweepCap() + (S.sweep.bonus || 0) - (S.sweep.count || 0));
+  }
+  // 广告奖励：今日扫荡次数 +n（跨天先归零，避免昨天的额度留到今天）
+  function addSweepBonus(n) {
+    const k = Math.max(0, Math.floor(n || 0));
+    if (!k) return 0;
+    if (S.sweep.date !== dailyDate()) { S.sweep.date = dailyDate(); S.sweep.count = 0; S.sweep.bonus = 0; }
+    S.sweep.bonus = (S.sweep.bonus || 0) + k;
+    save();
+    return S.sweep.bonus;
   }
 
   /* ================= 任务 / 登录 ================= */
@@ -2814,6 +2825,7 @@ window.Core = (function () {
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
     buyShopItem, openBox, openBoxes, dailyDate, sweepLeft, enhanceMat,
+    addSweepBonus,
     shopReq,
     ensureDaily, task, claimTask, claimAllTasks, loginReward,
     ensureWeekly, weeklyState, claimWeekly, claimAllWeekly, weekKey,

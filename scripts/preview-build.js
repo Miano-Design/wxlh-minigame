@@ -15,7 +15,7 @@ FILES.forEach(([name, file]) => {
   parts.push(`def(${JSON.stringify(name)},function(module,exports,require){\n${src}\n});`);
 });
 // 小游戏里入口是 require('./js/ui-canvas.js')，这里把它的导出挂到全局，预览页才拿得到
-parts.push("window.UI = reg['ui-canvas'].exports; window.CV = reg['cv'].exports;");
+parts.push("window.UI = reg['ui-canvas'].exports; window.CV = reg['cv'].exports; window.SCR = reg['screens'].exports;");
 parts.push('})();');
 const out = path.join(ROOT, '_preview_bundle.js');
 fs.writeFileSync(out, parts.join('\n'));

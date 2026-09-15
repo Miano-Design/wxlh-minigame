@@ -16,8 +16,9 @@
   const store = {};
   window.wx = {
     createCanvas: () => document.getElementById('c'),
-    getWindowInfo: () => ({ windowWidth: 375, windowHeight: 812, pixelRatio: 1, safeArea: { top: 0 } }),
-    getSystemInfoSync: () => ({ windowWidth: 375, windowHeight: 812, pixelRatio: 1, safeArea: { top: 0 } }),
+    // 用浏览器窗口的真实尺寸：这样浏览器预览与真机是同一套自适应逻辑
+    getWindowInfo: () => ({ windowWidth: window.innerWidth, windowHeight: window.innerHeight, pixelRatio: window.devicePixelRatio || 1, safeArea: { top: 0, bottom: window.innerHeight } }),
+    getSystemInfoSync: () => ({ windowWidth: window.innerWidth, windowHeight: window.innerHeight, pixelRatio: window.devicePixelRatio || 1, safeArea: { top: 0, bottom: window.innerHeight } }),
     getStorageSync: k => (k in store ? store[k] : ''),
     setStorageSync: (k, v) => { store[k] = v; },
     removeStorageSync: k => { delete store[k]; },
@@ -58,7 +59,16 @@
   for (let i = 0; i < 12; i++) Core.grantEquip('W05', 'SSR');
   Core.grantEquip('W08', 'UR');
   Core.save();
-  CV.reset('home');
+  // 预览哪一屏：默认首页；?s=battle 看战斗画面；?s=bag 看背包
+  const want = new URLSearchParams(location.search).get('s') || 'home';
+  if (want === 'battle') {
+    CV.dispatch('stage_W01_normal_5');            // 第 6 关是 2 波
+    for (let i = 0; i < 14; i++) window.SCR.tickBattle();   // 打一会儿，停在战斗画面上
+  } else if (want === 'bag') {
+    CV.reset('bag', { pool: 'item' });
+  } else {
+    CV.reset('home');
+  }
   try { CV.draw(); } catch (e) {
     const p = document.createElement('pre'); p.id = 'err'; p.textContent = 'DRAW ERR ' + e.message + '\n' + e.stack;
     document.body.appendChild(p);

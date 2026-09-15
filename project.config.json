@@ -31,7 +31,15 @@
   "condition": {},
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "file", "value": "_preview_bundle.js" },
+      { "type": "file", "value": "preview.html" },
+      { "type": "file", "value": "preview-home.png" },
+      { "type": "file", "value": "preview-battle.png" },
+      { "type": "file", "value": "README.md" },
+      { "type": "file", "value": "AD_SLOTS.md" },
+      { "type": "folder", "value": "scripts" }
+    ],
     "include": []
   },
   "isGameTourist": false,
