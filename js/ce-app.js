@@ -38,8 +38,18 @@ function pageMarkup(tab, opts) {
   const S = screens();
   /* 弹窗：网页版往 #modal-root 里塞的内容（被 ce-dom 接住）→ 翻译成引擎标记，作为最上层 */
   const modals = (window.__CE_MODALS || []);
-  const overlay = modals.length ? CEHtml.toXml(modals[modals.length - 1]) : '';
-  const withOverlay = (xml) => (overlay ? xml.replace(/<\/view>\s*$/, `<view id="modal-root">${overlay}</view></view>`) : xml);
+  const modalXml = modals.length ? CEHtml.toXml(modals[modals.length - 1]) : '';
+  /* 战斗层：网页版 startBattle() 把整屏战斗写进 #battle-root（定时器每回合重写），
+     这里每次都读它最新的 innerHTML，画在最上层。 */
+  const battleRoot = window.__CE_BATTLE_ROOT;
+  const battleHtml = battleRoot && battleRoot.innerHTML ? battleRoot.innerHTML : '';
+  const battleXml = battleHtml ? CEHtml.toXml(battleHtml) : '';
+  const withOverlay = (xml) => {
+    let out = xml;
+    if (battleXml) out = out.replace(/<\/view>\s*$/, `<view id="battle-root">${battleXml}</view></view>`);
+    if (modalXml) out = out.replace(/<\/view>\s*$/, `<view id="modal-root">${modalXml}</view></view>`);
+    return out;
+  };
   const sub = SUBS[tab];
   const navTab = sub ? sub.tab : tab;
   const fn = S && S[((opts && opts.fn) || (sub && sub.fn) || SCREEN_FN[tab] || tab)];
@@ -142,6 +152,20 @@ function bind(app, out) {
   });
 }
 
+let battlePoll = null;
+function watchBattle(app) {
+  if (battlePoll) return;
+  let last = '';
+  battlePoll = setInterval(() => {
+    const root = window.__CE_BATTLE_ROOT;
+    const html = root && root.innerHTML ? root.innerHTML : '';
+    if (html === last) return;                       // 没变就不画
+    last = html;
+    try { draw(app); } catch (e) { console.warn('[CE] 战斗重画失败：' + e.message); }
+    if (!html && battlePoll) { clearInterval(battlePoll); battlePoll = null; }   // 战斗结束就停
+  }, 100);
+}
+
 function draw(app) {
   const out = CEEngine.renderPage(app.view.ctx, app.view.W, app.view.H, pageMarkup(app.tab));
   bind(app, out);
@@ -151,6 +175,7 @@ function draw(app) {
     + (out.scroller ? ` · 滚动区 ${Math.round(out.scroller.layoutBox.width)}×${Math.round(out.scroller.layoutBox.height)}` : '')
     + (out.scroller ? ` · 内容高 ${Math.round(out.scroller.scrollHeight)}` : ''));
   if (CEEngine.isDevtools()) CEEngine.devtoolsLog(out.Layout);
+  if (window.__CE_BATTLE_ROOT && window.__CE_BATTLE_ROOT.innerHTML) watchBattle(app);
   return out;
 }
 

@@ -33,3 +33,7 @@
 #modal-root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 #modal-root .modal-mask { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
 #modal-root .sheet { left: 0; bottom: 0; }
+
+/* 战斗层（网页版的 #battle-overlay 是 fixed 全屏）：canvas 里改成绝对定位铺满 */
+#battle-root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+#battle-root #battle-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }

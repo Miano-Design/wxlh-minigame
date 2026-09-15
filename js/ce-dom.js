@@ -22,7 +22,9 @@
       classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
       innerHTML: '', outerHTML: '', textContent: '', value: '', id: '', className: '',
       onclick: null, onchange: null, oninput: null,
-      querySelector() { return null; },
+      // 返回空壳而不是 null：网页版里有大量 `querySelector(...).innerHTML = ...`、`.onclick = ...`，
+      // 返回 null 会当场抛错把整段流程打断（战斗层、弹窗都栽在这）。
+      querySelector() { return makeEl('div'); },
       querySelectorAll() { return []; },
       appendChild(c) { this.children.push(c); return c; },
       insertBefore(c) { this.children.push(c); return c; },
@@ -57,9 +59,12 @@
       getElementById(id) {
         if (id === 'modal-root') return doc.__modalRoot;
         if (id === 'toast-root') return doc.__toastRoot;
+        if (id === 'battle-root') { g.__CE_BATTLE_ROOT = doc.__battleRoot; return doc.__battleRoot; }
         return (byId[id] = byId[id] || makeEl('div'));
       },
-      querySelector() { return null; },
+      // 返回空壳而不是 null：网页版里有大量 `querySelector(...).innerHTML = ...`、`.onclick = ...`，
+      // 返回 null 会当场抛错把整段流程打断（战斗层、弹窗都栽在这）。
+      querySelector() { return makeEl('div'); },
       querySelectorAll() { return []; },
       createElement: makeEl,
       createDocumentFragment: () => makeEl('fragment'),
@@ -68,6 +73,12 @@
       documentElement: makeEl('html'),
       __modalRoot: capture(makeEl('div'), g.__CE_MODALS),
       __toastRoot: capture(makeEl('div'), g.__CE_TOASTS),
+      __battleRoot: (function (el) {
+        // 战斗层：网页版每次刷新都 createElement + appendChild，这里把最新内容同步到 innerHTML 上，
+        // 小游戏侧每次读 innerHTML 就能拿到"当前这一帧的战斗画面"
+        el.appendChild = function (child) { this.children = [child]; this.innerHTML = (child && child.innerHTML) || ''; return child; };
+        return el;
+      })(makeEl('div')),
       head: makeEl('head'),
       readyState: 'complete',
     };

@@ -529,6 +529,16 @@ function loadMarkups() {
         window.UI.modal('弹窗标题', '弹窗内容', { center: true });
         out.push({ name: '首页 + 弹窗' + st.name, markup: CEApp.pageMarkup('home') });
         if (window.__CE_MODALS) window.__CE_MODALS.length = 0;
+        /* 战斗层同样要编：开一场真的战斗，把战斗画面的样式也枚举进来 */
+        try {
+          const worldId = Object.keys(Core.S.worlds)[0];
+          const allies = window.UI._panels.buildAllies(null, null);
+          const enemies = window.Dungeon.makeEnemies(worldId, 'normal', 1, 'normal');
+          window.UI._panels._startBattle({ title: '编译用', allies: allies, enemies: enemies, worldId: worldId,
+            onEnd: function () { return { rewards: [], after: function () {} }; } });
+          out.push({ name: '首页 + 战斗' + st.name, markup: CEApp.pageMarkup('home') });
+          if (window.__CE_BATTLE_ROOT) window.__CE_BATTLE_ROOT.innerHTML = '';
+        } catch (e) { /* 战斗起不来也不该让编译挂掉 */ }
         if (window.__CE_MODALS_ELS) window.__CE_MODALS_ELS.length = 0;
       }
     } catch (e) { /* 弹窗打不开也不该让编译挂掉 */ }

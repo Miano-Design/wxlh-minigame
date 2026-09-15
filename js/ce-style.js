@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 17:15 */
+   生成时间：2026-09-15 17:16 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -37,29 +37,8 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14
  },
- "t1": {
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "flexDirection": "row",
-  "alignItems": "center",
-  "flexWrap": "wrap"
- },
- "t2": {
-  "fontSize": 11,
-  "color": "#7a849b",
-  "marginTop": 3
- },
- "section-title": {
-  "flexDirection": "row",
-  "alignItems": "center",
-  "fontSize": 12,
-  "color": "#b6bfd0",
-  "fontWeight": "bold",
-  "letterSpacing": 1,
-  "marginTop": 18,
-  "marginRight": 4,
-  "marginBottom": 10,
-  "marginLeft": 4
+ "text-rows": {
+  "marginBottom": 14
  },
  "list-row": {
   "flexDirection": "row",
@@ -75,25 +54,33 @@ module.exports = {
   "flex": 1,
   "minWidth": 0
  },
- "chev": {
-  "flex": 0,
-  "alignSelf": "center",
-  "color": "#7a849b",
-  "fontSize": 16
- },
- "hint": {
-  "fontSize": 11,
-  "color": "#7a849b"
- },
- "mt2": {
-  "marginTop": 10
- },
- "blk": {
-  "width": "100%"
- },
- "btn-row": {
+ "t1": {
+  "fontSize": 15,
+  "fontWeight": "bold",
   "flexDirection": "row",
+  "alignItems": "center",
   "flexWrap": "wrap"
+ },
+ "tag": {
+  "fontSize": 11,
+  "borderWidth": 1,
+  "borderColor": "#333e55",
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "paddingTop": 1,
+  "paddingRight": 6,
+  "paddingBottom": 1,
+  "paddingLeft": 6,
+  "color": "#b6bfd0",
+  "fontWeight": "normal"
+ },
+ "t2": {
+  "fontSize": 11,
+  "color": "#7a849b",
+  "marginTop": 3
  },
  "btn": {
   "flexDirection": "row",
@@ -116,24 +103,17 @@ module.exports = {
   "fontSize": 13,
   "fontWeight": "bold"
  },
- "text-rows": {
-  "marginBottom": 14
- },
- "tag": {
-  "fontSize": 11,
-  "borderWidth": 1,
-  "borderColor": "#333e55",
-  "borderRadius": 7,
-  "borderTopLeftRadius": 7,
-  "borderTopRightRadius": 7,
-  "borderBottomRightRadius": 7,
-  "borderBottomLeftRadius": 7,
-  "paddingTop": 1,
-  "paddingRight": 6,
-  "paddingBottom": 1,
-  "paddingLeft": 6,
+ "section-title": {
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontSize": 12,
   "color": "#b6bfd0",
-  "fontWeight": "normal"
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginTop": 18,
+  "marginRight": 4,
+  "marginBottom": 10,
+  "marginLeft": 4
  },
  "text-menu": {
   "flexDirection": "row",
@@ -159,6 +139,13 @@ module.exports = {
   "color": "#e9edf6",
   "minWidth": 0
  },
+ "hint": {
+  "fontSize": 11,
+  "color": "#7a849b"
+ },
+ "mt2": {
+  "marginTop": 10
+ },
  "grid-title": {
   "fontSize": 11,
   "color": "#7a849b",
@@ -183,6 +170,10 @@ module.exports = {
   "paddingLeft": 0,
   "borderBottomWidth": 0,
   "borderBottomColor": "#ffffff0d",
+  "flexWrap": "wrap"
+ },
+ "btn-row": {
+  "flexDirection": "row",
   "flexWrap": "wrap"
  },
  "nav-item": {
@@ -214,6 +205,45 @@ module.exports = {
   "paddingBottom": 0,
   "left": "50%",
   "bottom": 0
+ },
+ "b-field": {
+  "flex": 1,
+  "flexDirection": "column",
+  "paddingTop": 0,
+  "paddingRight": 14,
+  "paddingBottom": 0,
+  "paddingLeft": 14
+ },
+ "b-row": {
+  "flexDirection": "row",
+  "justifyContent": "center",
+  "flexWrap": "wrap"
+ },
+ "b-line-label": {
+  "textAlign": "center",
+  "fontSize": 11,
+  "color": "#7a849b",
+  "letterSpacing": 1
+ },
+ "b-controls": {
+  "flexDirection": "column",
+  "paddingTop": 0,
+  "paddingRight": 14,
+  "paddingBottom": 12,
+  "paddingLeft": 14
+ },
+ "b-potions": {
+  "flexDirection": "column",
+  "marginBottom": 8
+ },
+ "chev": {
+  "flex": 0,
+  "alignSelf": "center",
+  "color": "#7a849b",
+  "fontSize": 16
+ },
+ "blk": {
+  "width": "100%"
  },
  "world-card": {
   "flexDirection": "row",
@@ -594,231 +624,6 @@ module.exports = {
   "paddingBottom": 14,
   "paddingLeft": 12
  },
- "view#app__scrollview#view__view.screen__view.card": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "backgroundColor": "#111621",
-  "borderWidth": 1,
-  "borderColor": "#232b3b",
-  "borderRadius": 10,
-  "borderTopLeftRadius": 10,
-  "borderTopRightRadius": 10,
-  "borderBottomRightRadius": 10,
-  "borderBottomLeftRadius": 10,
-  "paddingTop": 14,
-  "paddingRight": 14,
-  "paddingBottom": 14,
-  "paddingLeft": 14,
-  "marginBottom": 14
- },
- "view#app__scrollview#view__view.screen__view.card__view.t1": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "flexDirection": "row",
-  "alignItems": "center",
-  "flexWrap": "wrap"
- },
- "view#app__scrollview#view__view.screen__view.card__view.t1__text.t1-t": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "marginRight": 6
- },
- "view#app__scrollview#view__view.screen__view.card__view.t2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 3,
-  "lineHeight": 18
- },
- "view#app__scrollview#view__view.screen__view.card__view.t2__text.t2-t": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "lineHeight": 18,
-  "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.section-title": {
-  "color": "#b6bfd0",
-  "fontSize": 12,
-  "flexDirection": "row",
-  "alignItems": "center",
-  "fontWeight": "bold",
-  "letterSpacing": 1,
-  "marginTop": 18,
-  "marginRight": 4,
-  "marginBottom": 10,
-  "marginLeft": 4
- },
- "view#app__scrollview#view__view.screen__view.section-title__text.section-title-t": {
-  "color": "#b6bfd0",
-  "fontSize": 12,
-  "fontWeight": "bold",
-  "letterSpacing": 1,
-  "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "flexDirection": "row",
-  "alignItems": "center",
-  "paddingTop": 10,
-  "paddingRight": 4,
-  "paddingBottom": 10,
-  "paddingLeft": 4,
-  "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "flex": 1,
-  "minWidth": 0,
-  "marginRight": 14
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "flexDirection": "row",
-  "alignItems": "center",
-  "flexWrap": "wrap"
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1__text.t1-t": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "marginRight": 6
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 3,
-  "lineHeight": 18
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2__text.t2-t": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "lineHeight": 18,
-  "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__text.chev": {
-  "color": "#7a849b",
-  "fontSize": 16,
-  "flex": 0,
-  "alignSelf": "center",
-  "lineHeight": 16,
-  "marginRight": 14
- },
- "view#app__scrollview#view__view.screen__view.blk.hint.mt2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 10,
-  "width": "100%",
-  "lineHeight": 19
- },
- "view#app__scrollview#view__view.screen__view.blk.hint.mt2__text.blk.hint-t": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "lineHeight": 19,
-  "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "backgroundColor": "#111621",
-  "borderWidth": 1,
-  "borderColor": "#232b3b",
-  "borderRadius": 10,
-  "borderTopLeftRadius": 10,
-  "borderTopRightRadius": 10,
-  "borderBottomRightRadius": 10,
-  "borderBottomLeftRadius": 10,
-  "paddingTop": 14,
-  "paddingRight": 14,
-  "paddingBottom": 14,
-  "paddingLeft": 14,
-  "marginBottom": 14
- },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "flexDirection": "row",
-  "alignItems": "center",
-  "flexWrap": "wrap"
- },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1__text.t1-t": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "marginRight": 6
- },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 3,
-  "lineHeight": 18
- },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2__text.t2-t": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "lineHeight": 18,
-  "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "marginTop": 10,
-  "flexDirection": "row",
-  "flexWrap": "wrap"
- },
- "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary": {
-  "color": "#e9edf6",
-  "fontSize": 13,
-  "flexDirection": "row",
-  "alignItems": "center",
-  "justifyContent": "center",
-  "minHeight": 44,
-  "paddingTop": 0,
-  "paddingRight": 12,
-  "paddingBottom": 0,
-  "paddingLeft": 12,
-  "borderRadius": 7,
-  "borderTopLeftRadius": 7,
-  "borderTopRightRadius": 7,
-  "borderBottomRightRadius": 7,
-  "borderBottomLeftRadius": 7,
-  "borderWidth": 1,
-  "borderColor": "#e05a6d40",
-  "backgroundColor": "#c9364a",
-  "fontWeight": "bold",
-  "width": "100%",
-  "flex": 1,
-  "minWidth": 86,
-  "whiteSpace": "normal",
-  "textAlign": "center",
-  ":active": {
-   "backgroundColor": "#1d2534"
-  },
-  "lineHeight": 16,
-  "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary__text.btn-t": {
-  "color": "#e9edf6",
-  "fontSize": 13,
-  "fontWeight": "bold",
-  "lineHeight": 16,
-  "textAlign": "center",
-  "whiteSpace": "normal",
-  "marginRight": 6
- },
- "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 10,
-  "width": "100%",
-  "lineHeight": 19
- },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
@@ -884,6 +689,23 @@ module.exports = {
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
   "marginRight": 10
+ },
+ "view#app__scrollview#view__view.screen__view.card": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row": {
   "color": "#e9edf6",
@@ -1436,6 +1258,358 @@ module.exports = {
   "paddingBottom": 18,
   "paddingLeft": 18,
   "width": "100%"
+ },
+ "view#app__view#battle-root": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "position": "absolute",
+  "left": 0,
+  "top": 0,
+  "right": 0,
+  "bottom": 0
+ },
+ "view#app__view#battle-root__view.b-head": {
+  "color": "#e9edf6",
+  "fontSize": 15
+ },
+ "view#app__view#battle-root__view.b-head__text.b-title": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "width": "100%"
+ },
+ "view#app__view#battle-root__view.b-head__text.btn.ghost.small": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "minHeight": 40,
+  "paddingTop": 0,
+  "paddingRight": 13,
+  "paddingBottom": 0,
+  "paddingLeft": 13,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "backgroundColor": "transparent",
+  "fontWeight": "bold",
+  "minWidth": 44,
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "width": "100%"
+ },
+ "view#app__view#battle-root__view.b-field": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flex": 1,
+  "flexDirection": "column",
+  "paddingTop": 0,
+  "paddingRight": 14,
+  "paddingBottom": 0,
+  "paddingLeft": 14
+ },
+ "view#app__view#battle-root__view.b-field__view.b-row.enemies": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "justifyContent": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__view#battle-root__view.b-field__text.b-line-label": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "textAlign": "center",
+  "letterSpacing": 1,
+  "width": "100%"
+ },
+ "view#app__view#battle-root__view.b-field__view.allies.b-row.back": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "justifyContent": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__view#battle-root__view.b-field__view.allies.b-row.front": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "justifyContent": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__view#battle-root__view#battle-log": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "height": 86,
+  "marginTop": 8,
+  "marginRight": 14,
+  "marginBottom": 8,
+  "marginLeft": 14,
+  "paddingTop": 8,
+  "paddingRight": 12,
+  "paddingBottom": 8,
+  "paddingLeft": 12,
+  "backgroundColor": "#00000066",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10
+ },
+ "view#app__view#battle-root__view.b-controls": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "column",
+  "paddingTop": 0,
+  "paddingRight": 14,
+  "paddingBottom": 12,
+  "paddingLeft": 14
+ },
+ "view#app__view#battle-root__view.b-controls__view.b-potions": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "column",
+  "marginBottom": 8
+ },
+ "view#app__view#battle-root__view.b-controls__text.block.btn": {
+  "color": "#e9edf6",
+  "fontSize": 13,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "minHeight": 44,
+  "paddingTop": 0,
+  "paddingRight": 18,
+  "paddingBottom": 0,
+  "paddingLeft": 18,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#333e55",
+  "backgroundColor": "#161d2a",
+  "fontWeight": "bold",
+  "width": "100%",
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "marginBottom": 8
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.section-title": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginTop": 18,
+  "marginRight": 4,
+  "marginBottom": 10,
+  "marginLeft": 4
+ },
+ "view#app__scrollview#view__view.screen__view.section-title__text.section-title-t": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginRight": 10
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 10,
+  "paddingRight": 4,
+  "paddingBottom": 10,
+  "paddingLeft": 4,
+  "borderBottomWidth": 1,
+  "borderBottomColor": "#ffffff0d"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__text.chev": {
+  "color": "#7a849b",
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.blk.hint.mt2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 10,
+  "width": "100%",
+  "lineHeight": 19
+ },
+ "view#app__scrollview#view__view.screen__view.blk.hint.mt2__text.blk.hint-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 19,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "marginTop": 10,
+  "flexDirection": "row",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary": {
+  "color": "#e9edf6",
+  "fontSize": 13,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "minHeight": 44,
+  "paddingTop": 0,
+  "paddingRight": 12,
+  "paddingBottom": 0,
+  "paddingLeft": 12,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#e05a6d40",
+  "backgroundColor": "#c9364a",
+  "fontWeight": "bold",
+  "width": "100%",
+  "flex": 1,
+  "minWidth": 86,
+  "whiteSpace": "normal",
+  "textAlign": "center",
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "lineHeight": 16,
+  "marginRight": 10
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary__text.btn-t": {
+  "color": "#e9edf6",
+  "fontSize": 13,
+  "fontWeight": "bold",
+  "lineHeight": 16,
+  "textAlign": "center",
+  "whiteSpace": "normal",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 10,
+  "width": "100%",
+  "lineHeight": 19
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card": {
   "color": "#e9edf6",
