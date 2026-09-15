@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.7';
+  const GAME_VER = '9.5.8';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -836,7 +836,7 @@ window.UI = (function () {
           <div class="t1">深井 <span class="tag">终局挑战</span></div>
           <div class="t2">${corridorLocked ? '🔒 ' + C().unlockTip('corridor') : `当前第 ${S.corridor.floor} 层 · 历史最高 ${S.corridor.best} 层`}</div>
         </div>
-        <span style="color:var(--dim)">›</span>
+        <span class="chev">›</span>
       </div>`;
     const worlds = D.WORLDS.map((w, i) => {
       const st = S.worlds[w.id];
@@ -850,7 +850,7 @@ window.UI = (function () {
           <div class="t1">${w.name} ${cleared ? '<span class="tag" style="color:var(--green);border-color:#2f5b41">已通关</span>' : ''}</div>
           <div class="t2">${unlocked ? `进度 ${prog}/12 · ${w.mechanic.split('：')[0]}` : '🔒 通关上一世界解锁'}</div>
         </div>
-        <span style="color:var(--dim)">›</span>
+        <span class="chev">›</span>
       </div>`;
     }).join('');
     const S0 = C().S;
@@ -1312,11 +1312,11 @@ window.UI = (function () {
             <button class="btn small ghost" data-remove="${id}">下阵</button>
           </div>`;
         }).join('')}
-        ${S.party.filter(id => id && id !== '@player').length ? '' : `<div class="empty">还没有伙伴上阵。上阵共 5 格（前 2 后 3），主角占 1 格，还能再上 4 名队友。</div>
+        ${S.party.filter(id => id && id !== '@player').length ? '' : `<div class="empty">还没有伙伴上阵。</div>
           <button class="btn primary block mt3" data-act="open-recruit">✦ 去招募伙伴</button>`}
       </div>
       <div class="card">
-        <h3>🧩 阵型 <span class="sub">主角是"万能补位"</span></h3>
+        <h3>🧩 阵型</h3>
         <div class="kv"><span class="k">当前构成</span><span>${fbCount || '—'}</span></div>
         <div class="kv"><span class="k">成阵</span><span style="color:var(--green)">${fb.names.length ? fb.names.join(' · ') : '未成阵'}</span></div>
         <div class="kv"><span class="k">加成</span><span style="color:var(--green)">${fbText.join(' · ') || '无'}</span></div>
@@ -1329,7 +1329,6 @@ window.UI = (function () {
           <span class="fm-on">${on ? '已激活' : ''}</span>
         </div>`;
       }).join('')}</div>
-        <div style="margin-top:8px;font-size:11px;color:var(--dim)">「同阵营」一族只取命中的最高档，不重复叠；主角不属于任何阵营，但可以顶任意一个阵营的名额。</div>
         <div class="hint mt1">克制环：先锋→策略→科技→异能→先锋（克制伤害+15%）</div>
       </div>
       `;

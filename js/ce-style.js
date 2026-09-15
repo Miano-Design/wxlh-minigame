@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:27 */
+   生成时间：2026-09-15 16:31 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -188,6 +188,12 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b"
+ },
+ "chev": {
+  "flex": 0,
+  "alignSelf": "center",
+  "color": "#7a849b",
+  "fontSize": 16
  },
  "pos-row-label": {
   "marginTop": 8,
@@ -1149,9 +1155,12 @@ module.exports = {
   "fontSize": 15,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.isxod3ay4": {
+ "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.chev": {
   "color": "#7a849b",
-  "fontSize": 15,
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card": {
@@ -1208,9 +1217,12 @@ module.exports = {
   "fontSize": 15,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__text.isxod3ay4": {
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__text.chev": {
   "color": "#7a849b",
-  "fontSize": 15,
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card": {
@@ -1268,9 +1280,12 @@ module.exports = {
   "fontSize": 15,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.isxod3ay4": {
+ "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.chev": {
   "color": "#7a849b",
-  "fontSize": 15,
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card__view": {
@@ -1713,12 +1728,6 @@ module.exports = {
   "minWidth": 36,
   "textAlign": "right",
   "marginRight": 6
- },
- "view#app__scrollview#view__view.screen__view.card__text.isxkw7k65": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 8,
-  "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.pill-tabs": {
   "color": "#e9edf6",
@@ -2329,9 +2338,12 @@ module.exports = {
   "fontSize": 15,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__text.isxod3ay4": {
+ "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__text.chev": {
   "color": "#7a849b",
-  "fontSize": 15,
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxmq1bso.rv": {
