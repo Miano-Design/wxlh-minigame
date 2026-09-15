@@ -1226,7 +1226,9 @@ CV.register('curdoc', function () {
   L.text('顶栏点货币也能开这一个页面', { size: 11, color: CV.C.dim });
   D.CURRENCIES.forEach(c => {
     const doc = CUR_DOC[c.id] || ['—', '—'];
-    L.row(`${c.icon} ${c.name}`, `来源：${doc[0]}\n用途：${doc[1]}`, { value: fmt(S().cur[c.id] || 0), valueColor: CV.C.gold });
+    // 来源 / 用途分两行，别挤在一行被截断
+    L.row(`${c.icon} ${c.name}`, `来源：${doc[0]}`, { value: fmt(S().cur[c.id] || 0), valueColor: CV.C.gold });
+    L.text(`用途：${doc[1]}`, { size: 11, color: CV.C.dim });
   });
 });
 
