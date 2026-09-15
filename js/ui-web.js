@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.5';
+  const GAME_VER = '9.5.6';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1076,10 +1076,7 @@ window.UI = (function () {
       </div>
       <div class="card">
         <h3>♜ 深井印记 <span class="sub">${C().corridorMarks()}/${D.CORRIDOR_MARK_CAP} 枚</span></h3>
-        <div class="note">
-          历史最高层每 ${D.CORRIDOR_MARK_STEP} 层积 1 枚，每枚在深井内给全队 <b style="color:var(--gold)">+1.5%</b> 全属性。
-          当前深井内加成：<b style="color:var(--gold)">+${Math.round(C().corridorMarkBonus() * 100)}%</b>
-        </div>
+  <div class="note">当前深井内加成：+${(C().corridorMarkBonus() * 100).toFixed(1)}%</div>
       </div>
       <div class="card">
         <h3>本层守卫</h3>
@@ -1364,7 +1361,7 @@ window.UI = (function () {
           </div>
         </div>
         <div class="bar exp mt3"><i style="width:${lvlPct}%"></i></div>
-        <div class="hint mt1">EXP ${Math.floor(lvlPct)}% · 当前 ${C().idleRates().expPerMin.toFixed(1)} EXP / 分</div>
+        <div class="hint mt1">EXP ${Math.floor(lvlPct)}% · 当前挂机 ${C().idleRates().expPerMin.toFixed(1)} EXP/分</div>
       </div>
       <div class="card">
         <h3>🎯 六维属性 <span class="sub">可用点数 ${S.player.attrPoints || 0}</span>
@@ -1395,7 +1392,7 @@ window.UI = (function () {
         ` : S.player.level < D.BLOODLINE_UNLOCK_LV ? `
           <div class="note">🔒 主角 Lv.${D.BLOODLINE_UNLOCK_LV} 觉醒血统（当前 Lv.${S.player.level}）</div>
         ` : `
-          <div class="hint mb2">选择一种血统觉醒（不可更改）：境界线也跟着它走。</div>
+          
           <div class="grid2">${Object.entries(D.BLOODLINES).map(([id, bl]) => `<button class="btn small" data-pbl="${id}">${id}<br><span style="font-size:10px;font-weight:400;color:var(--dim)">${bl.desc.split('。')[0]}</span></button>`).join('')}</div>
         `}
       </div>
@@ -1408,7 +1405,7 @@ window.UI = (function () {
       <div class="card">
         <h3>📊 属性面板 <span class="sub">装备 / 血统 / 境界 / 铭刻都已算进来</span></h3>
         ${statGrid(st)}
-        <div class="hint mt2">主角与伙伴的成长体系独立：随玩家等级成长、无星级碎片、6 装备槽、血统自选、铭刻每阶全属性额外 +3%。</div>
+        
       </div>
       <div class="card"><button class="btn small ghost block" data-rename="1">✏️ 修改名字</button></div>
     `);
@@ -1702,7 +1699,7 @@ window.UI = (function () {
     const S = C().S;
     const items = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
     const w = showPanel(wrap, '使用经验道具', `
-      <div class="note mb3">给 <b>${cname(id)}</b> 喂经验模块，可一次喂多个。</div>
+      <div class="note mb3">喂给 <b>${cname(id)}</b></div>
       ${items.map(([k, n]) => `
       <div class="list-row">
         <div class="grow"><div class="t1">${D.ITEMS[k].name}</div><div class="t2">+${fmt(D.ITEMS[k].exp)} EXP · 拥有 ${n}</div></div>
@@ -1912,7 +1909,7 @@ window.UI = (function () {
       const canPlayer = D.PLAYER_SLOTS.includes(eq.slot);
       const candidates = (eq.charId ? [eq.charId] : (canPlayer ? ['@player'] : []).concat(Object.keys(S.chars)))
         .filter(id => C().canEquip(id, eq));
-      const w2 = modal('装备给…', (wearer ? `<div class="hint mb2">现在穿在 <b>${cname(wearer)}</b> 身上；换成别人会自动从他身上取下（一件装备只能有一个人穿）。</div>` : '')
+      const w2 = modal('装备给…', (wearer ? `<div class="hint mb2">现在穿在 <b>${cname(wearer)}</b> 身上</div>` : '')
         + candidates.map(id => {
         if (id === '@player') {
           return `<div class="list-row tap" data-to="@player">
@@ -1948,7 +1945,7 @@ window.UI = (function () {
     const w = showPanel(wrap, '招募伙伴', `
       <div class="card mb3">
         <h3>每日免费 <span class="sub">${free ? '今日可领' : '明天再来'}</span></h3>
-        <div class="hint mb2">一天一次，免费招募同样计入主线与每日任务。</div>
+        
         <button class="btn primary block" data-free="1" ${free ? '' : 'disabled'}>免费招募 1 次</button>
       </div>
       ${Object.entries(D.RECRUIT_POOLS).map(([pid, p]) => {
@@ -2058,10 +2055,6 @@ window.UI = (function () {
     }).join('');
     const w = showPanel(wrap, '概率公示', `
       <div class="card" style="margin-bottom:10px;border-color:#ffd76a55">
-        <div class="note">
-          下面每一档出率都是<b>抽卡真正使用的数值</b>（和代码里那份配置是同一份，不存在"写着好看"）。
-          有招募券时优先扣券，没券才扣货币；十连要么给 10 张券、要么给足货币，不混着扣。
-        </div>
       </div>
       ${rows}
       <button class="btn ghost block" style="margin-top:4px" data-back>‹ 返回招募</button>`);
@@ -2131,7 +2124,7 @@ window.UI = (function () {
   /* ================= 建筑 ================= */
   function buildingsModal(wrap) {
     const S = C().S;
-    const w = showPanel(wrap, '基地建设', `<div class="hint mb2">建筑升级全部消耗 ◈点数（挂机与副本产出），每级效果永久生效。</div>` + D.BUILDINGS.map(b => {
+    const w = showPanel(wrap, '基地建设', `<div class="hint mb2">全部消耗 ◈点数</div>` + D.BUILDINGS.map(b => {
       const lv = S.buildings[b.id];
       const cost = D.buildingCost(b.id, lv);
       return `<div class="card mb3">
@@ -2164,9 +2157,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c44">
         <h3>药园 <span class="sub">${busy} / ${D.GARDEN_PLOTS} 块在用</span></h3>
-        <div class="note">花 ◈点数种下灵田，到点回来收强化材料——这是"点数换材料"的稳定出口，不用一直刷副本。
-          另外有几率出稀有物（兽魂石 / 装备箱）。种下就开始计时，离线也算。
-          收货分量按"强化时用点数替代材料"的价定，比直接用点数补材料划算。</div>
+  <div class="note">有几率出稀有物（兽魂石 / 装备箱）</div>
       </div>
       ${plots.map(p => `<div class="list-row">
         <span class="tag">第 ${p.idx + 1} 块</span>
@@ -2211,7 +2202,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c44">
         <h3>斗法台 <span class="sub">第 ${st.floor} 台 · 历史最高 ${st.best} 台</span></h3>
-        <div class="note">守擂者按你自己的队伍战力换算出来，越往上越强。每天 <b>${st.cap}</b> 次机会，
+        <div class="note">每天 <b>${st.cap}</b> 次机会，
           赢了升一台并拿 ◆异界结晶 + ♜深井徽记，输了退一台（次数照常消耗，不会卡死在第 1 台）。</div>
         <div class="kv mt2"><span class="k">今日剩余</span><span>${st.left} / ${st.cap}</span></div>
         <div class="kv"><span class="k">本台奖励</span><span style="color:var(--gold)">◆${fmt(st.reward.otherworld)} · ♜${st.reward.corridor}</span></div>
@@ -2224,7 +2215,7 @@ window.UI = (function () {
           <div class="t2">HP ${fmt(e.hp)} · 攻 ${fmt(e.atk)} · 防 ${fmt(e.def)} · 速 ${e.spd}</div></div>
         </div>`).join('')}
       </div>
-      <div class="hint">打不过就先去推图、强化装备、升评级——守擂者是跟着你的战力一起长的，不会变成死墙。</div>`;
+      `;
     const w = showPanel(wrap, '斗法台', body);
     const btn = w.querySelector('[data-arena]');
     if (btn) btn.onclick = () => {
@@ -2252,8 +2243,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c44">
         <h3>法宝 <span class="sub">已得 ${st.own.length} / ${D.FABAO.length} 件</span></h3>
-        <div class="note">装备给的是数值，法宝给的是<b>效果</b>（吸血 / 开场能量 / 减伤…）。主角同时只带 1 件，
-          随时可以换。买法宝只花 ◆异界结晶——这是高级货币在"抽卡 + 秘术 + 权限"之外的第四个出口。</div>
+  <div class="note">主角同时只带 1 件 · 用 ◆异界结晶 购买</div>
         <div class="kv mt2"><span class="k">当前佩戴</span><span style="color:var(--gold)">${on ? `${on.name}（${on.desc}）` : '未佩戴'}</span></div>
       </div>
       ${D.FABAO.map(f => {
@@ -2301,7 +2291,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c44">
         <h3>坐骑 <span class="sub">已驯服 ${st.own.length} / ${D.MOUNTS.length} 匹</span></h3>
-        <div class="note">坐骑给的是<b>基础数值</b>（攻击 / 生命 / 防御 / 速度），<b>全队通用，伙伴也吃</b>。
+        <div class="note"><b>全队通用，伙伴也吃</b>。
           同时只骑 1 匹，随时能换；花 ◈点数 + 强化材料驯服，高阶坐骑额外花 ◆异界结晶。</div>
         <div class="kv mt2"><span class="k">当前乘骑</span><span style="color:var(--gold)">${on ? `${on.name}（${on.desc}）` : '未乘骑'}</span></div>
       </div>
@@ -2346,12 +2336,12 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c66">
         <h3>求签 <span class="sub">每天免费 1 次</span></h3>
-        <div class="note">签文分五档（大吉 → 末吉），给<b>当天的挂机加成</b>和一笔硬通货。签文只算当天，
+        <div class="note">签文分五档（大吉 → 末吉），给<b>当天的挂机加成</b>，只算当天，
           隔天自动失效——上线先求一签，再看今天要打哪儿。</div>
         ${st.canDraw
           ? `<button class="btn gold block mt3" data-sign-draw="1">🎋 摇 一 签</button>`
           : `<div class="note mt2" style="color:var(--gold)">今日已求：【${pick ? pick.tier : st.tier}】${pick ? ' ' + pick.text : ''}</div>
-             <div class="hint mt1">今日挂机产出 +${Math.round(st.idlePct * 100)}%，明天可以再求。</div>`}
+             <div class="hint mt1">今日挂机产出 +${Math.round(st.idlePct * 100)}%</div>`}
         <div class="hint mt2">累计求签 ${st.total} 次 · 每天 0 点重置</div>
       </div>
       <div class="card">
@@ -2362,7 +2352,7 @@ window.UI = (function () {
             <div class="t2">挂机 +${Math.round(s.idlePct * 100)}% · ${rewardText(s.gain)}</div></div>
           <span class="t2">${Math.round(s.weight)}%</span>
         </div>`).join('')}
-        <div class="hint mt1">权重合计 ${D.SIGNS.reduce((a, s) => a + s.weight, 0)}%，越好的签越难摇到。</div>
+        <div class="hint mt1">权重合计 ${D.SIGNS.reduce((a, s) => a + s.weight, 0)}%</div>
       </div>`;
     const w = showPanel(wrap, '求签', body);
     const btn = w.querySelector('[data-sign-draw]');
@@ -2388,8 +2378,6 @@ window.UI = (function () {
       const body = `
         <div class="card" style="border-color:#e6b64c66">
           <h3>选择血统 <span class="sub">选定后不可更改</span></h3>
-          <div class="note">血统决定两件事：<b>你走哪一条境界线</b>（血族走血奴→血仆→血卫…，修真走炼气→筑基→金丹…），
-            以及升级血统时主角吃到的属性方向。选完立刻生效，境界线从第 1 境·初期 开始算。</div>
         </div>
         ${Object.entries(D.BLOODLINES).map(([id, bl]) => `
           <div class="card">
@@ -2461,8 +2449,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#ffd76a55">
         <h3>灯阁评级 <span class="sub">Lv.${info.lv} / ${info.max}</span></h3>
-        <div class="note">这条线<b>不用你点</b>：打关卡、战斗获胜、挂机都会自动涨经验，满了就升。
-          每升一级，全队（含主角）所有基础属性 +${(info.rate * 100).toFixed(1)}%，永久生效、转生保留。</div>
+  <div class="note">每级 全队全属性 +${(C().realmBonusPct() * 100).toFixed(1)}%（转生保留）</div>
         <div class="bar exp mt3"><i style="width:${info.maxed ? 100 : Math.min(100, info.exp / info.need * 100)}%"></i></div>
         <div class="kv"><span class="k">${info.maxed ? '已到顶' : '距离下一级'}</span>
           <span>${info.maxed ? '满级' : `${fmt(info.exp)} / ${fmt(info.need)}`}</span></div>
@@ -2474,7 +2461,7 @@ window.UI = (function () {
       </div>
       <div class="card">
         <h3>评级经验从哪来</h3>
-        <div class="hint mb2">首通给全额，重复刷同一关只给一半——所以"往前推"永远比"原地刷"划算。</div>
+        <div class="hint mb2">首通全额 · 重复刷一半</div>
         <div class="kv"><span class="k">通关 普通 / 困难 / 地狱</span><span style="white-space:nowrap">+${g.normal} / +${g.hard} / +${g.hell}</span></div>
         <div class="kv"><span class="k">每打赢一场战斗</span><span>+${g.win}</span></div>
         <div class="kv"><span class="k">挂机（在线 / 离线都算）</span><span>每分钟 +${g.perMin}</span></div>
@@ -2493,8 +2480,7 @@ window.UI = (function () {
           <div class="event-desc">${pend.ico} <b>${pend.name}</b><br>${pend.desc}</div>
           <button class="btn primary block mt3" data-travel-claim>领取：${C().rewardTextOf(pend.effect)}</button>
         ` : `
-          <div class="note">挂机每累计 ${Math.round(prog.every / 60)} 分钟，路上就会冒一次奇遇（在线、离线都算）。
-            攒满会自动挂在这里，<b>不会过期丢东西</b>，回来点一下就行。</div>
+  <div class="note">每累计 ${Math.round(prog.every / 60)} 分钟出一次奇遇</div>
           <div class="bar mt3"><i style="width:${Math.round(prog.pct * 100)}%"></i></div>
           <div class="kv"><span class="k">距离下一次</span><span>${Math.max(0, Math.round(prog.every - prog.sec))} 秒</span></div>
         `}
@@ -2529,9 +2515,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#ffd76a55">
         <h3>秘术阁 <span class="sub">已修 ${total} / ${maxTotal} 级</span></h3>
-        <div class="note">12 条秘术，每条每级只加一点点（0.2%~0.5%），但可以一直修到顶：
-          升级<b>只花 ◆异界结晶</b>，这是给"抽卡之外"的第二条长期出口。
-          前 8 条加<b>战斗</b>（攻/生/防/速/暴击/暴伤/技能/闪避），后 4 条加<b>挂机经济</b>（产出/经验/掉落/离线效率）。</div>
+  <div class="note">升级只花 ◆异界结晶 · 前 8 条加战斗，后 4 条加挂机经济</div>
         <div class="kv mt2"><span class="k">◆异界结晶</span><span style="color:var(--gold)">${fmt(coin)}</span></div>
       </div>
       ${D.KEJI.map(k => {
@@ -2559,7 +2543,7 @@ window.UI = (function () {
            ['挂机产出', kb.idlePct], ['经验获取', kb.expPct], ['掉落概率', kb.dropPct], ['离线效率', kb.offlinePct]]
           .filter(([, v]) => v)
           .map(([n, v]) => `<div class="kv"><span class="k">${n}</span><span style="color:var(--gold)">+${(v * 100).toFixed(1)}%</span></div>`)
-          .join('') || '<div class="note">还没修任何秘术。先挑一条来点，哪怕 1 级也立刻生效。</div>'}
+          .join('') || '<div class="note">还没修任何秘术</div>'}
       </div>`;
     const w = showPanel(wrap, '秘术阁', body);
     w.querySelectorAll('[data-keji]').forEach(b => b.onclick = () => {
@@ -2584,11 +2568,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#ffd76a55">
         <h3>灯阁权限 <span class="sub">Lv.${info.lv} / ${info.max}</span></h3>
-        <div class="note">
-          用<b>高级货币</b>向灯阁换取永久授权：投入一次，之后每一分钟都在生效，<b>转生也不清空</b>。<br>
-          和"基地建设"分工不同——建筑花的是挂机就能刷的 ◈点数，这里花的是 ✦圣洁晶石 + ◆异界结晶，
-          给高级货币一条"抽卡之外的长期出口"。
-        </div>
+  <div class="note">投入一次永久生效，转生不清空 · 花 ✦圣洁晶石 + ◆异界结晶</div>
       </div>
       <div class="card">
         <h3>当前生效</h3>
@@ -2600,7 +2580,7 @@ window.UI = (function () {
         ${info.now.allPct ? `<div class="kv"><span class="k">全队全属性</span><span style="color:var(--gold)">+${Math.round(info.now.allPct * 100)}%</span></div>` : ''}
       </div>
       ${info.maxed
-        ? '<div class="card"><h3>已满级</h3><div class="note">灯阁已把最高权限交给你了。</div></div>'
+        ? '<div class="card"><h3>已满级</h3></div>'
         : `<div class="card" style="border-color:#ffd76a66">
         <h3>下一级 · Lv.${info.lv + 1}</h3>
         <div class="note mb2">${info.nextDesc}</div>
@@ -2666,7 +2646,7 @@ window.UI = (function () {
     const line = D.IDLE_LINES.find(l => l.id === lineId);
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const body = `
-      <div class="note mb3">选一名伙伴派往「${line.name}」，战力越高产出越高。</div>
+      <div class="note mb3">选一名伙伴派往「${line.name}」</div>
       ${bench.map(id => {
       const used = D.IDLE_LINES.find(l => l.id !== lineId && S.idle.lines[l.id] === id);
       return `<div class="list-row" data-idlelead="${id}" style="cursor:pointer${used ? ';opacity:.5' : ''}">
@@ -2816,8 +2796,6 @@ window.UI = (function () {
       return showPanel(wrap, '境界 · 渡劫', `
         <div class="card" style="border-color:#e6b64c66">
           <h3>还没有境界线</h3>
-          <div class="note">境界不是人人相同的公共阶梯——它跟着你的血统走（血族走血奴→血仆→血卫…，修真走炼气→筑基→金丹…）。
-            先选定一种血统，境界线才会开启。</div>
           <button class="btn gold block mt3" data-act="open-bloodline">去选血统</button>
         </div>`);
     }
@@ -2843,11 +2821,7 @@ window.UI = (function () {
     const body = `
       <div class="card">
         <h3>${st.bloodline} · ${st.curName} <span class="sub">第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶</span></h3>
-        <div class="note">
-          每突破一小阶，主角全属性永久 <b style="color:var(--gold)">+${(D.REALM_PCT * 100).toFixed(1)}%</b>。
-          当前加成：<b style="color:var(--gold)">+${(st.bonusPct * 100).toFixed(1)}%</b>（满 ${D.REALMS.length} 阶合计 +${(D.REALMS.length * D.REALM_PCT * 100).toFixed(1)}%）<br>
-          渡劫失败只扣材料与点数，<b>等级不掉</b>，可以反复挑战。
-        </div>
+  <div class="note">当前境界加成：+${(C().realmBonusPct() * 100).toFixed(1)}%</div>
       </div>
       ${st.next ? `<div class="card" style="border-color:#ffd76a66">
         <h3>下一阶 · ${st.nextName || '—'} <span class="sub">成功率 ${Math.round(st.rate * 100)}%</span></h3>
@@ -2855,7 +2829,7 @@ window.UI = (function () {
         <div class="kv"><span class="k">渡劫材料</span><span style="color:${st.haveMat >= st.matN ? 'var(--green)' : 'var(--accent)'}">${D.ITEMS[st.matItem].name} ${st.haveMat} / ${st.matN}</span></div>
         <div class="kv"><span class="k">点数</span><span style="color:${(S.cur.points || 0) >= st.points ? 'var(--green)' : 'var(--accent)'}">◈${fmt(st.points)}</span></div>
         <button class="btn primary block" style="margin-top:10px" data-realm="1" ${st.levelOk && st.haveMat >= st.matN && (S.cur.points || 0) >= st.points ? '' : 'disabled'}>⚡ 渡劫（成功率 ${Math.round(st.rate * 100)}%）</button>
-        <div class="hint mt1">失败也会扣掉上面的材料与点数——这就是"渡"字的分量，但等级永远不掉。</div>
+        <div class="hint mt1">失败也扣材料与点数（等级不掉）</div>
       </div>` : '<div class="card"><h3>已至大圆满</h3><div class="note">当前境界已是这条血统的终点。</div></div>'}
       <div class="section-title">${st.bloodline}境界线 · ${majors.length} 大境 × ${D.REALM_TIERS.length} 小阶</div>
       ${groups}`;
@@ -3095,7 +3069,7 @@ window.UI = (function () {
     const S = C().S;
     const info = C().geneLockInfo();
     const w = showPanel(wrap, '铭刻', `
-      <div class="note mb3">在生死之间突破人类极限。当前：<b style="color:var(--accent)">${S.player.geneLock > 0 ? D.GENE_LOCKS[S.player.geneLock - 1].name : '未解锁'}</b></div>
+      <div class="note mb3">当前：<b style="color:var(--accent)">${S.player.geneLock > 0 ? D.GENE_LOCKS[S.player.geneLock - 1].name : '未解锁'}</b></div>
       ${D.GENE_LOCKS.map((g, i) => {
         const unlocked = S.player.geneLock > i;
         const isNext = S.player.geneLock === i;
@@ -3126,10 +3100,7 @@ window.UI = (function () {
     const w = showPanel(wrap, '转生', `
       <div class="card">
         <h3>转生 <span class="sub">已转生 ${S.player.reincarnations} 次</span></h3>
-        <div class="note">
-          重置玩家等级与世界进度，保留伙伴/装备/血统/铭刻/天赋。<br>
-          下次转生获得 <b style="color:var(--gold)">♾${rpGain}</b> 转生点。
-        </div>
+  <div class="note">保留伙伴 / 装备 / 血统 / 铭刻 / 天赋</div>
         <div style="font-size:11px;margin-top:8px;color:${can ? 'var(--green)' : 'var(--accent)'}">
           条件：玩家Lv.${S.player.level}/100 · 铭刻${S.player.geneLock}/5 · 灯芯Lv.${S.buildings.core}/30
         </div>
@@ -3265,7 +3236,7 @@ window.UI = (function () {
     const txt = list.slice(0, 4).map(x => `${(D.ITEMS[x.id] || {}).name || x.id}×${x.n}`).join(' · ');
     return `<div class="card mb3" style="border-color:#ffd76a88">
       <h3>📮 待领箱 <span class="sub">${n} 件</span></h3>
-      <div class="hint mb2">背包满的时候收到的道具会先存这里，不会丢。</div>
+      <div class="hint mb2">背包满时收到的道具先存这里</div>
       <div class="hint mb2" style="color:var(--text2)">${txt}${list.length > 4 ? ` … 还有 ${list.length - 4} 种` : ''}</div>
       <button class="btn small primary" data-stashclaim="1">全部领回</button>
     </div>`;
@@ -3347,7 +3318,7 @@ window.UI = (function () {
         <button class="btn small" data-exp="10" ${n >= 10 ? '' : 'disabled'}>用 10 个</button>
         <button class="btn small gold" data-exp="0" ${n >= 1 ? '' : 'disabled'}>全部用（${n}）</button>
       </div>
-      <div class="hint mt1">先选伙伴，再确认数量。</div>`;
+      `;
     } else if (it.type === 'serum') {
       const sd = it.serum || {};
       actions = `<div class="btn-row">
@@ -3362,9 +3333,9 @@ window.UI = (function () {
       actions = run
         ? `<div class="btn-row"><button class="btn small gold" data-runuse="1">在本次探索中使用</button></div>`
         : `<div class="btn-row"><button class="btn small" data-gotoexplore="1">进副本后使用 ›</button></div>
-           <div class="hint mt1">探索中的队伍血量会继承，进场前也可以先备好。</div>`;
+           `;
     } else if (it.type === 'material') {
-      actions = `<div class="note">强化装备时自动优先消耗，不需要手动使用。</div>`;
+      actions = `<div class="note">强化装备时自动优先消耗</div>`;
     } else if (it.type === 'ticket') {
       const pool = D.RECRUIT_POOLS[it.pool] || {};
       const tk = C().ticketOf(it.pool);
@@ -3564,7 +3535,7 @@ window.UI = (function () {
     const body = `
       <div class="card">
         <h3>玩法说明</h3>
-        <div class="hint mb2">不知道点哪个、不知道货币怎么花，先看这两处。</div>
+        
         <div class="btn-row">
           <button class="btn small" data-act="open-guide">❓ 玩法指南</button>
           <button class="btn small" data-act="open-curdoc">▤ 货币图鉴</button>
@@ -3606,12 +3577,12 @@ window.UI = (function () {
       </div>
       <div class="card">
         <h3>存档与备份</h3>
-        <div class="hint mb2">进度只存在这台设备里。换设备、清缓存之前先「导出」一份，或者存进下面的存档槽。</div>
+        <div class="hint mb2">进度只存在这台设备里</div>
         <div class="btn-row">
           <button class="btn small" data-save-export="1">📤 导出存档</button>
           <button class="btn small" data-save-import="1">📥 导入存档</button>
         </div>
-        <div class="hint mt3 mb2">手动存档槽（三格互不影响，随时存、随时读）：</div>
+        <div class="hint mt3 mb2">手动存档槽（三格）：</div>
         ${C().slotInfo().map(s => `
           <div class="list-row">
             <div class="grow"><div class="t1">存档槽 ${s.slot}</div>
@@ -3674,7 +3645,7 @@ window.UI = (function () {
     if (saveExport) saveExport.onclick = () => {
       const json = C().exportSave();
       const m = modal('导出存档', `
-        <div class="hint mb2">全选下面这段文字复制走（存到备忘录 / 网盘都行），下次粘进「导入存档」就能接着玩。</div>
+        <div class="hint mb2">全选下面这段文字复制走</div>
         <textarea id="exp-ta" readonly style="width:100%;height:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:11px;line-height:1.5;outline:none;word-break:break-all">${esc(json)}</textarea>
         <div class="btn-row mt3"><button class="btn small primary" data-copy>📋 复制</button><button class="btn small ghost" data-close>关闭</button></div>`, { center: true });
       const ta = m.querySelector('#exp-ta');
@@ -3691,7 +3662,7 @@ window.UI = (function () {
     const saveImport = w.querySelector('[data-save-import]');
     if (saveImport) saveImport.onclick = () => {
       const m = modal('导入存档', `
-        <div class="hint mb2">把导出的存档内容粘到下面，确认后<b style="color:var(--accent)">当前进度会被覆盖</b>。</div>
+        <div class="hint mb2">粘到下面，确认后<b style="color:var(--accent)">当前进度会被覆盖</b></div>
         <textarea id="imp-ta" placeholder="在这里粘贴存档内容…" style="width:100%;height:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:11px;line-height:1.5;outline:none;word-break:break-all"></textarea>
         <div class="btn-row mt3"><button class="btn small primary" data-doimport>确认导入</button><button class="btn small ghost" data-close>取消</button></div>`, { center: true });
       m.querySelector('[data-close]').onclick = () => closeModal(m);
@@ -3734,7 +3705,7 @@ window.UI = (function () {
     w.querySelector('[data-newprotag]').onclick = () => {
       closeModal(w);
       const nw = modal('新建主角', `
-        <div class="note mb3">当前主角会被保留，可随时切回。新主角从 Lv.1 开始，用于体验不同的血统路线。</div>
+        <div class="note mb3">新主角从 Lv.1 开始（当前主角保留）</div>
         <input id="np-input" maxlength="12" placeholder="输入新主角名字（12字内）" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none;margin-bottom:12px" />
         <button class="btn primary block" data-ok>创建并开始探索</button>`, { center: true });
       nw.querySelector('[data-ok]').onclick = () => {
