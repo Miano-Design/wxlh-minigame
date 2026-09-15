@@ -9,21 +9,33 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal
     : (typeof globalThis !== 'undefined') ? globalThis : this;
+  // wx 在小游戏里一定存在；但为了能在 Node 里跑测试、也不让"环境异常"直接白屏，缺了就退化成内存存储
+  const WX = (typeof wx !== 'undefined') ? wx : null;
 
   /* ---------- ① window ---------- */
   if (!G.window) G.window = G;
 
   /* ---------- ② localStorage（wx 本地存储，单 key 上限 1MB，我们的存档只有几十 KB） ---------- */
-  function safeGet(k) { try { const v = wx.getStorageSync(k); return (v === '' || v === undefined) ? null : v; } catch (e) { return null; } }
-  function safeSet(k, v) { try { wx.setStorageSync(k, v); return true; } catch (e) { return false; } }
-  function safeDel(k) { try { wx.removeStorageSync(k); return true; } catch (e) { return false; } }
+  const mem = {};
+  function safeGet(k) {
+    if (!WX || !WX.getStorageSync) return (k in mem ? mem[k] : null);
+    try { const v = WX.getStorageSync(k); return (v === '' || v === undefined) ? null : v; } catch (e) { return null; }
+  }
+  function safeSet(k, v) {
+    if (!WX || !WX.setStorageSync) { mem[k] = v; return true; }
+    try { WX.setStorageSync(k, v); return true; } catch (e) { return false; }
+  }
+  function safeDel(k) {
+    if (!WX || !WX.removeStorageSync) { delete mem[k]; return true; }
+    try { WX.removeStorageSync(k); return true; } catch (e) { return false; }
+  }
   if (!G.localStorage) {
     G.localStorage = {
       getItem: safeGet,
       setItem: (k, v) => safeSet(k, String(v)),
       removeItem: safeDel,
       // 存档列表 / 调试用
-      keys: () => { try { return wx.getStorageInfoSync().keys || []; } catch (e) { return []; } },
+      keys: () => { if (!WX || !WX.getStorageInfoSync) return Object.keys(mem); try { return WX.getStorageInfoSync().keys || []; } catch (e) { return []; } },
     };
   }
 
@@ -35,7 +47,7 @@
     interstitial: 'adunit-yyyyyyyyyyyyyyyy',
   };
   // 找不到广告或没有真 ID 时，整个模块进入"演练模式"：奖励照给，只是没有广告
-  const CAN_USE_AD = !!(wx.createRewardedVideoAd) && AD_UNITS.rewarded.indexOf('xxxx') < 0;
+  const CAN_USE_AD = !!(WX && WX.createRewardedVideoAd) && AD_UNITS.rewarded.indexOf('xxxx') < 0;
 
   /* ---------- ④ 每个点位的每日次数（跳过日期重置、防改时间） ---------- */
   const QUOTA_KEY = 'wxlh_ad_quota';
@@ -72,7 +84,7 @@
   function getRewarded() {
     if (!CAN_USE_AD) return null;
     if (rewardedAd) return rewardedAd;
-    rewardedAd = wx.createRewardedVideoAd({ adUnitId: AD_UNITS.rewarded });
+    rewardedAd = WX.createRewardedVideoAd({ adUnitId: AD_UNITS.rewarded });
     // 拉取失败时下一次 show 会自动重试；这里只记录，不影响流程
     rewardedAd.onError(() => {});
     return rewardedAd;
@@ -106,13 +118,13 @@
   /* ---------- 插屏（按节奏弹，别贪） ---------- */
   let interAd = null, lastInter = 0, stageCounter = 0;
   function maybeInterstitial(force) {
-    if (!wx.createInterstitialAd || AD_UNITS.interstitial.indexOf('yyyy') < 0) return;
+    if (!WX || !WX.createInterstitialAd || AD_UNITS.interstitial.indexOf('yyyy') < 0) return;
     stageCounter++;
     const now = Date.now();
     const ok = force ? (now - lastInter > 60000) : (stageCounter % 3 === 0 && now - lastInter > 60000);
     if (!ok) return;
     if (!interAd) {
-      interAd = wx.createInterstitialAd({ adUnitId: AD_UNITS.interstitial });
+      interAd = WX.createInterstitialAd({ adUnitId: AD_UNITS.interstitial });
       interAd.onError(() => {});
     }
     lastInter = now;

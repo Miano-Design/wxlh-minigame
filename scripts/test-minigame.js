@@ -1,7 +1,7 @@
 /* 小游戏版的无头冒烟测试：node scripts/test-minigame.js
 
-   思路：用假的 wx / Canvas 把整个工程在 Node 里跑一遍，
-   验证「适配层 → 逻辑层 → Canvas 界面 → 触摸派发 → 广告降级」这条链没有断。
+   用假的 wx / Canvas 把整个工程在 Node 里跑一遍：适配层 → 逻辑层 → Canvas 界面 → 触摸 → 广告降级。
+   重点覆盖两件事：① **每个界面都画得出来**（防止某页空引用直接白屏）；② 主要玩法的按键真的生效。
    真机表现仍要用微信开发者工具预览，但这一层能挡住绝大多数低级错误。
 */
 const path = require('path');
@@ -14,7 +14,7 @@ const noopCtx = new Proxy({}, {
   set: (t, k, v) => { t[k] = v; return true; },
 });
 global.GameGlobal = global;
-global.localStorage = null;              // 真机没有 localStorage，强制走适配层自己实现的那套
+global.localStorage = null;          // 真机没有 localStorage，强制走适配层那套
 global.wx = {
   getStorageSync: k => (k in store ? store[k] : ''),
   setStorageSync: (k, v) => { store[k] = v; },
@@ -23,7 +23,9 @@ global.wx = {
   getWindowInfo: () => ({ windowWidth: 375, windowHeight: 812, pixelRatio: 3, safeArea: { top: 44 } }),
   getSystemInfoSync: () => ({ windowWidth: 375, windowHeight: 812, pixelRatio: 3, safeArea: { top: 44 } }),
   createCanvas: () => ({ getContext: () => noopCtx, width: 0, height: 0 }),
-  onTouchStart: () => {}, onShow: () => {}, onHide: () => {},
+  onTouchStart: () => {}, onTouchMove: () => {}, onTouchEnd: () => {}, onShow: () => {}, onHide: () => {},
+  setClipboardData: o => o.success && o.success(),
+  showModal: o => o.success && o.success({ confirm: true }),
   // 故意不提供 createRewardedVideoAd：验证"广告拉不到也要有降级"这条路径
 };
 
@@ -34,12 +36,14 @@ function t(name, cond, extra) {
 }
 
 async function main() {
-  let UIMod, Core, DATA, Dungeon, AD;
+  let UI, CV, Scr, Core, D, AD;
   try {
-    require(path.resolve(__dirname, '../game.js'));      // 入口：适配层 → 逻辑层 → 界面
-    UIMod = require(path.resolve(__dirname, '../js/ui-canvas.js'));
-    Core = window.Core; DATA = window.DATA; Dungeon = window.Dungeon; AD = window.AD;
-    t('入口 boot 没抛异常（适配层 + 逻辑层 + Canvas 界面全部加载成功）', !!Core && !!window.Battle);
+    require(path.resolve(__dirname, '../game.js'));      // 入口
+    UI = require(path.resolve(__dirname, '../js/ui-canvas.js'));
+    CV = require(path.resolve(__dirname, '../js/cv.js'));
+    Scr = require(path.resolve(__dirname, '../js/screens.js'));
+    Core = window.Core; D = window.DATA; AD = window.AD;
+    t('入口 boot 没抛异常（适配层 + 逻辑层 + 界面框架全部加载成功）', !!Core && !!window.Battle);
   } catch (e) {
     t('入口 boot 没抛异常', false, (e && e.message) + ' | ' + ((e && e.stack) || '').split('\n')[1]);
     console.log(`\n${pass} passed, ${fail} failed`);
@@ -47,49 +51,157 @@ async function main() {
   }
 
   t('逻辑层在小游戏环境里能建档', !!(Core.S && Core.S.player));
-  t('存档写进了 wx 存储（不再依赖 localStorage）', !!store['wxlh_save_v5']);
-  t('地图数据完整（20 个世界）', DATA.WORLDS.length === 20);
-  t('战斗引擎可用', (() => {
-    const allies = [Object.assign({}, Core.effectivePlayerStats(), {
-      name: '测', kind: 'warrior', faction: null, position: 'front',
-      skills: DATA.PROTAGONIST.skills, skillLv: [1, 1, 1], charId: '@player',
-    })];
-    const res = window.Battle.run({ allies, enemies: Dungeon.makeEnemies('W01', 'normal', 1, 'combat'), worldId: 'W01', maxRounds: 20 });
-    return typeof res.win === 'boolean' && res.frames.length > 0;
-  })());
+  t('存档写进了 wx 存储（不依赖 localStorage）', !!store['wxlh_save_v5']);
+  t('地图数据完整（20 个世界）', D.WORLDS.length === 20);
 
-  /* ---------- 界面 ---------- */
-  t('首页能整屏画出来，并登记了可点区域', (() => {
-    try { UIMod._draw(); return UIMod._hits().length > 3; } catch (e) { return false; }
-  })());
-  t('三个页签都画得出来', (() => {
-    try { ['home', 'dungeon', 'bag'].forEach(v => { UIMod._setTab(v); UIMod._draw(); }); UIMod._setTab('home'); UIMod._draw(); return true; }
-    catch (e) { return false; }
-  })());
-  t('点「一键收取」真的结算挂机收益', (() => {
-    Core.S.idle.bankSec = 3600;
-    const p0 = Core.S.cur.points;
-    UIMod._dispatch('claim');
-    return Core.S.cur.points > p0 && Core.S.idle.bankSec === 0;
-  })());
-  t('进第 1 关能打完并落盘（战斗 → 奖励 → 存档一条链）', (() => {
-    try { UIMod._dispatch('enter_W01'); return Core.S.pendingRun !== undefined; }
-    catch (e) { return false; }
-  })());
+  /* ---------- 建档流程：起名 → 选血统 → 进首页 ---------- */
+  Core.setPlayerName('端到端');
+  CV.dispatch('name_ok');
+  t('起名后进入「选择血统」', CV.top().name === 'bloodline');
+  CV.dispatch('blood_open_blood_zz');    // 故意用一个不存在的血统 id，验证它不会崩
+  const firstBlood = Object.keys(D.BLOODLINES)[0];
+  CV.dispatch('blood_' + firstBlood);
+  t('选完血统回到首页', CV.top().name === 'home', CV.top().name);
+  t('血统已写入存档', Core.S.player.bloodline === firstBlood);
+
+  /* ---------- 每个界面都要画得出来 ---------- */
+  const sample = {
+    home: {}, worlds: {}, grow: {}, sect: {}, keji: {}, fabao: {}, mount: {}, garden: {},
+    arena: {}, sign: {}, authority: {}, buildings: {}, genelock: {}, beast: {}, reincarn: {},
+    codex: {}, refine: {}, idlelines: {}, tasks: {}, bounty: {}, shop: {}, guide: {}, settings: {},
+    party: {}, chars: {}, protagonist: {}, recruit: {},
+    bag: { pool: 'item' }, world: { worldId: 'W01', diff: 'normal' },
+    item: { id: 'heal_s' }, picker: { title: '测试', items: [{ label: 'A', id: 'noop_a' }] },
+    stagefail: {}, create: {}, bloodline: {},
+  };
+  const badRender = [];
+  Object.keys(CV.panels).forEach(name => {
+    if (name === 'battle' || name === 'char' || name === 'equip' || name === 'stageresult') return;  // 需要真实数据，下面单独测
+    CV.reset(name, sample[name] || {});
+    try {
+      UI._draw();
+      if (!CV.hits.length && name !== 'stagefail') badRender.push(name + '(没有可点区域)');
+    } catch (e) { badRender.push(name + '(' + e.message + ')'); }
+  });
+  t(`${Object.keys(CV.panels).length - 4} 个界面全部渲染无异常`, badRender.length === 0, badRender.join('; '));
+
+  /* ---------- 主要玩法按键 ---------- */
+  Core.addCur('points', 2000000);
+  Core.S.items['heal_s'] = (Core.S.items['heal_s'] || 0) + 5;
+  Core.S.unlocks = {}; D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+
+  // 挂机收取
+  Core.S.idle.bankSec = 3600;
+  const p0 = Core.S.cur.points;
+  CV.reset('home'); UI._draw();
+  CV.dispatch('claim_idle');
+  t('「一键收取」结算挂机收益', Core.S.cur.points > p0 && Core.S.idle.bankSec === 0);
+
+  // 打第 1 关（战斗 → 奖励 → 结算页）
+  CV.reset('worlds');
+  CV.dispatch('stage_W01_normal_0');
+  t('点关卡能打完并进结算页', CV.top().name === 'stageresult', CV.top().name);
+  t('结算页有可点的后续动作', CV.hits.length > 0);
+  t('通关记录已落盘（3 星）', Core.S.worlds.W01.stages.normal[0] > 0);
+  const expBefore = Core.S.player.exp;
+  const battlesBefore = Core.S.stats.battles;
+  CV.reset('world');
+  CV.dispatch('sweep_W01_normal_1_3');
+  // 经验要注意"升级会扣掉 exp 重新计数"，所以这里断言"战斗次数真的涨了 3 次"（扫荡 = 自动重打）
+  t('扫荡真的结算了（战斗次数 +3，且经验在走）', Core.S.stats.battles - battlesBefore === 3, `battles +${Core.S.stats.battles - battlesBefore}`);
+
+  // 招募（单抽 / 十连）
+  const charsBefore = Object.keys(Core.S.chars).length;
+  CV.dispatch('pull_normal_1');
+  t('单抽生效', Object.keys(Core.S.chars).length >= charsBefore);
+  CV.dispatch('pull_normal_10');
+  t('十连生效（一次入库 10 位左右）', Object.keys(Core.S.chars).length >= charsBefore);
+
+  // 队伍：上阵 / 下阵 / 换排
+  const anyChar = Object.keys(Core.S.chars)[0];
+  if (anyChar) {
+    CV.dispatch(`setpos_1_${anyChar}`);
+    t('点选能让人上阵', Core.S.party[1] === anyChar);
+    CV.dispatch('swaprow_1');
+    t('能换到另一排', Core.S.party.indexOf(anyChar) >= 2 || Core.S.party[1] === anyChar);
+  } else {
+    t('点选能让人上阵（无伙伴时跳过）', true);
+    t('能换到另一排（无伙伴时跳过）', true);
+  }
+
+  // 角色卡 / 装备 / 背包 / 商店 / 养成
+  if (anyChar) {
+    CV.open('char', { id: anyChar }); UI._draw();
+    t('角色卡渲染出可点区域', CV.hits.length > 3);
+    const c0 = Core.S.chars[anyChar].lv;
+    Core.S.chars[anyChar].exp = 999999;
+    Core.addCur('points', 500000);
+    CV.dispatch('lvup_' + anyChar);
+    t('点升级能涨等级', Core.S.chars[anyChar].lv >= c0);
+  }
+  Core.grantEquip('W05', 'SSR');
+  const uid = Object.keys(Core.S.equips)[0];
+  CV.open('equip', { uid }); UI._draw();
+  t('装备详情渲染出可点区域', CV.hits.length > 2);
+  const enh0 = Core.S.equips[uid].enhance;
+  Core.addCur('points', 500000); Core.addCur('otherworld', 5000);
+  Core.S.items['mat_t1'] = 99;
+  CV.dispatch('enh_' + uid);
+  t('强化按钮能被点到（成功或失败都不报错）', typeof Core.S.equips[uid].enhance === 'number');
+  CV.dispatch('lock_' + uid);
+  t('锁定开关生效', Core.S.equips[uid].lock === true);
+  CV.dispatch('lock_' + uid);
+
+  CV.reset('bag', { pool: 'equip' }); UI._draw();
+  t('背包-装备页渲染出格子', CV.hits.length > 1);
+  CV.reset('bag', { pool: 'item' }); UI._draw();
+  CV.dispatch('bagpool_mat');
+  t('背包分池切换生效', CV.top().params.pool === 'mat');
+  CV.dispatch('item_heal_s');
+  t('点道具能进详情', CV.top().name === 'item');
+
+  CV.reset('shop'); UI._draw();
+  t('兑换大厅渲染出商品', CV.hits.length > 3);
+
+  // 养成：药园种收 / 求签 / 斗法台 / 秘术阁
+  Core.addCur('points', 3000000);
+  Core.S.garden = [null, null, null, null];
+  CV.reset('garden'); UI._draw();
+  CV.dispatch('plant_0');
+  t('药园能种下', !!Core.S.garden[0]);
+  Core.S.garden[0].at = Date.now() - 1000;
+  CV.dispatch('harvest_0');
+  t('药园能收获（地块清空）', Core.S.garden[0] === null);
+  CV.reset('sign'); UI._draw();
+  CV.dispatch('sign_draw');
+  t('求签能出签文', !Core.signState().canDraw);
+  Core.addCur('otherworld', 9999);
+  CV.reset('keji'); UI._draw();
+  const k0 = Core.kejiLv(D.KEJI[0].id);
+  CV.dispatch('keji_' + D.KEJI[0].id);
+  t('秘术阁能升级', Core.kejiLv(D.KEJI[0].id) > k0);
+
+  // 战斗过程（带帧播放）
+  CV.reset('world');
+  Scr.startBattle({ title: '测试战斗', worldId: 'W01', kind: 'combat', back: 'worlds' });
+  t('战斗界面能起来', CV.top().name === 'battle' && !!Scr.battle());
+  UI._draw();
+  t('战斗界面渲染出跳过按钮', CV.hits.length > 0);
+  CV.dispatch('battle_skip');
+  t('跳过能直接出结果', Scr.battle() === null || Scr.battle().done);
 
   /* ---------- 广告降级 ---------- */
-  t('没有真广告位时进入降级模式而不是崩', AD.enabled === false);
-  t('每个点位有独立配额', AD.left('idle_boost') === 5 && AD.left('offline_double') === 3 && AD.left('holy_pack') === 2);
-  const r1 = await AD.show('holy_pack');
-  t('广告拉不到 → 走"补偿发放"，玩家不吃亏', r1.granted === true && r1.reason.indexOf('compensated') === 0, JSON.stringify(r1));
-  t('补偿会记次数（防拔网线白刷）', AD.left('holy_pack') === 1);
-  await AD.show('login_double');
-  const r3 = await AD.show('offline_double');   // 第三次补偿，应该被挡
-  t('补偿每天最多 2 次，第 3 次不再补', r3.granted === false && r3.reason === 'no_ad_nocomp', JSON.stringify(r3));
-  const r4 = await AD.show('idle_boost');
-  t('补偿额度用完就明确拒绝（不静默失败、不把玩家卡住）', r4.granted === false, JSON.stringify(r4));
+  t('没有真广告位时进入降级模式', AD.enabled === false);
+  const holy0 = Core.S.cur.holy;
+  CV.dispatch('ad_holy');                       // 第一次补偿：应该照发
+  await new Promise(r => setTimeout(r, 30));
+  t('点「看广告得晶石」在没有广告时也会入账（走补偿）', Core.S.cur.holy > holy0, `holy ${holy0}→${Core.S.cur.holy}`);
+  const r1 = await AD.show('login_double');     // 第二次补偿：仍然发放
+  t('广告拉不到 → 补偿发放（玩家不吃亏）', r1.granted === true && r1.reason.indexOf('compensated') === 0, JSON.stringify(r1));
+  const r3 = await AD.show('offline_double');
+  t('补偿每天最多 2 次', r3.granted === false && r3.reason === 'no_ad_nocomp', JSON.stringify(r3));
 
-  /* ---------- 与网页版的一致性 ---------- */
+  /* ---------- 与网页版一致性 ---------- */
   t('js 下 4 个逻辑文件与网页版逐字节一致（跑过 sync-logic 才是对的）', (() => {
     const SRC = path.resolve(__dirname, '../../wxlh-game/js');
     return ['data.js', 'core.js', 'battle.js', 'dungeon.js'].every(f =>

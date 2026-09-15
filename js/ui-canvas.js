@@ -1,354 +1,515 @@
-/* Canvas 界面层（小游戏没有 DOM，所有界面都得自己画）
-   ------------------------------------------------------------------------
-   这一版是**骨架**：已经跑通"首页 + 世界列表 + 打一关 + 存档 + 广告按钮"的最小闭环，
-   证明逻辑层可以原样复用。剩下的 30 多个界面按 README「二期」逐个补。
+/* 小游戏入口层：初始化画布、绑定触摸、注册全部按钮行为、跑主循环。
+   界面在 screens.js，框架在 cv.js。
 
-   写法：立即模式（immediate mode）——每次 draw() 重画一整屏，顺便把"可点区域"记进 hits[]，
-   触摸时反查 hits 派发。好处是不用维护"控件树"，几百行就能撑起全部界面。
+   动态 id（装备 uid / 角色 id / 关卡坐标…）统一走 CV.onPrefix，不用为每条数据单独注册。
 */
+const CV = require('./cv.js');
+const Scr = require('./screens.js');
+const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
+const Core = window.Core;
+const D = window.DATA;
+const L = CV.L;
+const fmt = CV.fmt;
 
-const G = GameGlobal;
+function S() { return Core.S; }
 
-let canvas, ctx, W = 375, H = 667, DPR = 2, TOP = 24, NAV_H = 64;
-let tab = 'home';
-let hits = [];            // 本次绘制产生的可点区域 {x,y,w,h,id}
-let toasts = [];          // 飘一句提示
-let lastIdle = Date.now();
-let screen = null;        // 战斗结果等临时界面
+/* ---------- 选择器面板 ---------- */
+CV.register('picker', function (p) {
+  L.text(p.text || '选一个', { size: 12, color: CV.C.dim });
+  (p.items || []).forEach(it => L.row(it.label, it.sub || '', { id: it.id, value: it.value || '' }));
+  if (!(p.items || []).length) L.text('没有可选项', { color: CV.C.dim });
+});
+function picker(title, items, text) { CV.open('picker', { title, items, text }); }
 
-const COLOR = {
-  bg: '#0a0d13', panel: '#141a24', panel2: '#1c2432', line: '#2a3446',
-  text: '#e6edf7', dim: '#8b98ad', gold: '#ffd76a', accent: '#d43a4f', green: '#7ee0a3',
+CV.panels.titleOf = function (panel) {
+  if (!panel) return '';
+  const map = {
+    world: '关卡选择', battle: '战斗中', stageresult: '结算', stagefail: '队伍重伤',
+    party: '队伍', chars: '伙伴', char: '伙伴详情', protagonist: '主角', bag: '背包',
+    item: '道具', equip: '装备', recruit: '招募', grow: '养成', sect: '灯阁评级',
+    keji: '秘术阁', fabao: '法宝', mount: '坐骑', garden: '药园', arena: '斗法台', sign: '求签',
+    authority: '灯阁权限', buildings: '基地建设', genelock: '铭刻', beast: '伴生体',
+    reincarn: '转生天赋', codex: '灯录', refine: '炼化台', idlelines: '挂机分工',
+    tasks: '任务与成就', bounty: '限时悬赏', shop: '兑换大厅', guide: '玩法指南',
+    settings: '设置', create: '创建执灯者', bloodline: '选择血统',
+  };
+  if (panel.name === 'picker') return (panel.params && panel.params.title) || '选择';
+  return map[panel.name] || '';
 };
 
-/* ---------- 绘制原语 ---------- */
-function roundRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-function panel(x, y, w, h) {
-  ctx.fillStyle = COLOR.panel;
-  roundRect(x, y, w, h, 12);
-  ctx.fill();
-  ctx.strokeStyle = COLOR.line;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-}
-function text(str, x, y, opt) {
-  opt = opt || {};
-  ctx.fillStyle = opt.color || COLOR.text;
-  ctx.font = `${opt.bold ? 'bold ' : ''}${opt.size || 14}px sans-serif`;
-  ctx.textAlign = opt.align || 'left';
-  ctx.textBaseline = opt.baseline || 'middle';
-  ctx.fillText(str, x, y);
-}
-// 按钮：画出来 + 登记可点区域
-function button(id, label, x, y, w, h, opt) {
-  opt = opt || {};
-  const disabled = !!opt.disabled;
-  ctx.fillStyle = disabled ? COLOR.panel : (opt.primary ? COLOR.accent : COLOR.panel2);
-  roundRect(x, y, w, h, 10);
-  ctx.fill();
-  ctx.strokeStyle = COLOR.line;
-  ctx.stroke();
-  text(label, x + w / 2, y + h / 2, { align: 'center', size: opt.size || 14, bold: true, color: disabled ? COLOR.dim : COLOR.text });
-  if (!disabled) hits.push({ x, y, w, h, id });
-}
-function toast(msg) {
-  toasts.push({ msg, at: Date.now() });
-  if (toasts.length > 3) toasts.shift();
-}
-function fmt(n) {
-  n = Math.floor(n || 0);
-  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-  if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
-  return String(n);
-}
-function hhmmss(sec) {
-  sec = Math.floor(sec || 0);
-  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
-  if (h) return `${h}小时${m}分`;
-  if (m) return `${m}分${s}秒`;
-  return `${s}秒`;
-}
-
-/* ---------- 队伍编成（网页版在 ui.js 里，小游戏版先放在这；后续建议把它搬进 core.js 共用） ---------- */
-function buildAllies() {
-  const S = Core.S;
-  const fb = Core.factionBuffs(S.party);
-  const allies = [];
-  S.party.forEach((id, idx) => {
-    if (!id) return;
-    const position = idx < 2 ? 'front' : 'back';
-    if (id === '@player') {
-      const st = Core.effectivePlayerStats();
-      allies.push(Object.assign({}, st, {
-        name: Core.S.player.name || '主角', kind: 'warrior', faction: null, position,
-        skills: Core.protagonistSkills(), skillLv: S.player.skillLv || [1, 1, 1],
-        atk: Math.round(st.atk * (1 + fb.atkPct)), maxHp: Math.round(st.hp * (1 + fb.hpPct)),
-        hp: Math.round(st.hp * (1 + fb.hpPct)), skillMult: (st.skillMult || 1) + fb.skillPct, charId: '@player',
-      }));
-      return;
-    }
-    const base = DATA.charById[id];
-    if (!base) return;
-    const eff = Core.effectiveStats(id);
-    const fullHp = Math.round(eff.hp * (1 + fb.hpPct));
-    allies.push(Object.assign({}, eff, {
-      name: base.name, kind: base.kind, faction: base.faction, position,
-      skills: base.skills, skillLv: S.chars[id].skillLv,
-      atk: Math.round(eff.atk * (1 + fb.atkPct)), maxHp: fullHp, hp: fullHp,
-      skillMult: eff.skillMult + fb.skillPct, charId: id,
-    }));
+/* ---------- 首次进入：起名 + 选血统 ---------- */
+const NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊'];
+let nameIdx = Math.floor(Math.random() * NAMES.length);
+CV.register('create', function () {
+  L.text('你被神秘存在选中，成为「执灯者」', { size: 15, bold: true });
+  L.text('灯阁需要一个名字来记录你的行程。', { size: 12, color: CV.C.dim });
+  L.spacer(12);
+  L.text(NAMES[nameIdx], { size: 22, bold: true, align: 'center', color: CV.C.gold });
+  L.spacer(8);
+  L.btnRow([
+    { label: '🎲 换一个', id: 'name_roll' },
+    { label: '就用这个', id: 'name_ok', primary: true },
+  ]);
+  L.text('新手上手三件事：① 选血统；② 点「一键收取」领挂机与任务；③ 去残域打第 1 关解锁招募。', { size: 11, color: CV.C.dim });
+});
+CV.register('bloodline', function () {
+  L.text('选一条血统：境界线跟着血统走，选定不能改', { size: 13, bold: true });
+  Object.keys(D.BLOODLINES).forEach(k => {
+    L.row(k, D.BLOODLINES[k].desc, { id: 'blood_' + k, value: '选择' });
   });
-  return allies;
-}
+});
 
-/* ---------- 界面 ---------- */
-function drawHome() {
-  const S = Core.S;
-  let y = TOP + 10;
-  panel(12, y, W - 24, 96);
-  text(`${S.player.name || '执灯者'}  Lv.${S.player.level}`, 24, y + 26, { size: 16, bold: true });
-  const st = Core.effectivePlayerStats();
-  text(`战力 ${fmt(Core.teamPower())}`, W - 24, y + 26, { align: 'right', size: 12, color: COLOR.gold });
-  text(`◈${fmt(S.cur.points)}   ✦${fmt(S.cur.holy)}   ◆${fmt(S.cur.otherworld)}`, 24, y + 52, { size: 13, color: COLOR.gold });
-  text(`身上：攻击 ${fmt(st.atk)} · 生命 ${fmt(st.hp)}`, 24, y + 74, { size: 12, color: COLOR.dim });
-  y += 110;
+/* ================= 行为注册 ================= */
+const on = CV.on, onP = CV.onPrefix;
 
-  // 挂机卡
-  const bank = Core.idleBankGains();
-  panel(12, y, W - 24, 120);
-  text('挂机中', 24, y + 24, { size: 14, bold: true });
-  text(hhmmss(bank.seconds), W - 24, y + 24, { align: 'right', size: 13, color: COLOR.gold });
-  text(`◈${fmt(bank.points)} · EXP ${fmt(bank.exp)}${bank.otherworld ? ' · ◆' + bank.otherworld : ''}`, 24, y + 50, { size: 13 });
-  const canClaim = bank.seconds >= 60;
-  button('claim', canClaim ? '一键收取' : '再攒一会儿', 24, y + 68, W - 48, 40, { primary: canClaim, disabled: !canClaim });
-  y += 132;
+/* ---------- 简单入口 ---------- */
+on('to_worlds', () => CV.reset('worlds'));
+on('open_protagonist', () => CV.open('protagonist'));
+on('open_grow', () => CV.open('grow'));
+on('open_settings', () => CV.open('settings'));
+on('open_guide', () => CV.open('guide'));
+on('open_recruit', () => CV.open('recruit'));
+on('open_chars', () => CV.open('chars'));
+on('open_achievements', () => CV.open('tasks'));
+['sect', 'keji', 'fabao', 'mount', 'garden', 'arena', 'sign', 'authority', 'buildings',
+  'genelock', 'beast', 'reincarn', 'codex', 'refine', 'idlelines', 'tasks', 'bounty', 'shop']
+  .forEach(n => on('open_' + n, () => CV.open(n)));
 
-  // 广告点位示范（真实项目里这块会铺满 AD_SLOTS.md 的八个点）
-  panel(12, y, W - 24, 116);
-  text('📺 看广告拿好处（每日限次）', 24, y + 22, { size: 13, bold: true, color: COLOR.green });
-  const l1 = G.AD.left('idle_boost');
-  button('ad_idle', `⏩ 挂机加速 2 小时（${l1}）`, 24, y + 40, W - 48, 36, { disabled: l1 <= 0 });
-  const l2 = G.AD.left('holy_pack');
-  button('ad_holy', `✦ 圣洁晶石 ×30（${l2}）`, 24, y + 82, W - 48, 30, { disabled: l2 <= 0, size: 13 });
-  if (!G.AD.enabled) text('（开发者工具里没有真广告，按下去走"补偿发放"分支）', W / 2, y + 118, { align: 'center', size: 10, color: COLOR.dim });
-  y += 128;
-
-  text('主线：推进「菌毯巢穴」，把招募和商店解锁出来', 24, y, { size: 12, color: COLOR.dim });
-}
-
-function drawDungeon() {
-  const S = Core.S;
-  let y = TOP + 10;
-  text('残域 · 世界列表', 24, y, { size: 16, bold: true });
-  y += 26;
-  DATA.WORLDS.slice(0, 6).forEach(w => {
-    const unlocked = S.worlds[w.id] && S.worlds[w.id].unlocked;
-    panel(12, y, W - 24, 56);
-    text(`${w.name}${unlocked ? '' : ' 🔒'}`, 24, y + 20, { size: 14, bold: true, color: unlocked ? COLOR.text : COLOR.dim });
-    text(w.mechanic, 24, y + 40, { size: 11, color: COLOR.dim });
-    if (unlocked) button('enter_' + w.id, '进入', W - 92, y + 10, 64, 36, { primary: true, size: 13 });
-    y += 64;
-  });
-  y += 4;
-  panel(12, y, W - 24, 74);
-  text('深井（无限爬塔）', 24, y + 22, { size: 13, bold: true });
-  text(`当前第 ${S.corridor.floor} 层 · 历史最高 ${S.corridor.best} 层`, 24, y + 44, { size: 11, color: COLOR.dim });
-}
-
-function drawBag() {
-  const S = Core.S;
-  let y = TOP + 10;
-  text('背包', 24, y, { size: 16, bold: true });
-  y += 26;
-  const u = Core.bagUsage();
-  text(`道具 ${u.itemStacks}/${u.cap} · 材料 ${u.matUsed}/${u.matCap} · 装备 ${u.eqUsed}/${u.eqCap}`, 24, y, { size: 12, color: COLOR.dim });
-  y += 24;
-  const items = Object.keys(S.items).filter(k => S.items[k] > 0).slice(0, 8);
-  if (!items.length) text('（空）', 24, y, { size: 12, color: COLOR.dim });
-  items.forEach(k => {
-    panel(12, y, W - 24, 40);
-    text(DATA.ITEMS[k].name, 24, y + 20, { size: 13 });
-    text('×' + S.items[k], W - 24, y + 20, { align: 'right', size: 13, color: COLOR.gold });
-    y += 46;
-  });
-}
-
-function drawResult() {
-  const r = screen.data;
-  let y = TOP + 40;
-  text(r.win ? '胜 利' : '任务失败', W / 2, y, { align: 'center', size: 26, bold: true, color: r.win ? COLOR.gold : COLOR.accent });
-  y += 40;
-  text(`${r.rounds} 回合`, W / 2, y, { align: 'center', size: 13, color: COLOR.dim });
-  y += 30;
-  r.log.forEach(line => {
-    text(line, 24, y, { size: 12 });
-    y += 20;
-  });
-  button('back_home', '返回', 24, H - NAV_H - 80, W - 48, 48, { primary: true });
-}
-
-/* ---------- 主绘制 ---------- */
-function draw() {
-  hits = [];
-  ctx.fillStyle = COLOR.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // 顶栏
-  const S = Core.S;
-  panel(0, 0, W, TOP + 4);
-  text(`${S.player.name || '执灯者'} · Lv.${S.player.level}`, W / 2, TOP - 6, { align: 'center', size: 13, color: COLOR.text });
-
-  if (screen && screen.name === 'result') drawResult();
-  else if (tab === 'home') drawHome();
-  else if (tab === 'dungeon') drawDungeon();
-  else drawBag();
-
-  // 底部导航
-  const tabs = [['home', '灯阁'], ['dungeon', '残域'], ['bag', '背包'], ['more', '更多']];
-  const tw = W / tabs.length;
-  panel(0, H - NAV_H, W, NAV_H);
-  tabs.forEach(([id, name], i) => {
-    const x = i * tw;
-    const active = tab === id;
-    text(name, x + tw / 2, H - NAV_H / 2, { align: 'center', size: 14, bold: active, color: active ? COLOR.gold : COLOR.dim });
-    hits.push({ x, y: H - NAV_H, w: tw, h: NAV_H, id: 'tab_' + id });
-  });
-
-  // 提示
-  toasts.forEach((t, i) => {
-    if (Date.now() - t.at > 2600) return;
-    const y = H - NAV_H - 40 - i * 30;
-    ctx.fillStyle = 'rgba(20,26,36,.95)';
-    roundRect(24, y - 14, W - 48, 28, 14);
-    ctx.fill();
-    text(t.msg, W / 2, y, { align: 'center', size: 12, color: COLOR.gold });
-  });
-}
-
-/* ---------- 触摸派发 ---------- */
-function onTap(x, y) {
-  for (let i = hits.length - 1; i >= 0; i--) {
-    const h = hits[i];
-    if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) { dispatch(h.id); return; }
-  }
-}
-function dispatch(id) {
-  if (id.startsWith('tab_')) {
-    tab = id.slice(4);
-    screen = null;
-    return;
-  }
-  if (id === 'claim') {
-    const g = Core.claimIdle();
-    toast(`收了 ◈${fmt(g.points)} · EXP ${fmt(g.exp)}`);
-    Core.save();
-    return;
-  }
-  if (id === 'ad_idle') {
-    G.AD.show('idle_boost').then(r => {
-      if (!r.granted) { toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
-      Core.S.idle.bankSec += 7200;                 // 2 小时挂机
-      const g = Core.claimIdle();
-      Core.save();
-      toast(`+◈${fmt(g.points)} · +EXP ${fmt(g.exp)}${r.reason !== 'ok' ? '（广告不可用，已补偿）' : ''}`);
-    });
-    return;
-  }
-  if (id === 'ad_holy') {
-    G.AD.show('holy_pack').then(r => {
-      if (!r.granted) { toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
-      Core.addCur('holy', 30);
-      Core.save();
-      toast('✦ 圣洁晶石 +30');
-    });
-    return;
-  }
-  if (id.startsWith('enter_')) {
-    fight(id.slice(6), 'normal', 0);
-    return;
-  }
-  if (id === 'back_home') {
-    screen = null;
-    tab = 'home';
-    return;
-  }
-}
-
-/* ---------- 打一关（证明战斗引擎、副本生成、队伍编成都能原样跑） ---------- */
-function fight(worldId, diff, stageIdx) {
-  const stage = stageIdx + 1;
-  const allies = buildAllies();
-  if (!allies.length) { toast('没有可出战的成员'); return; }
-  const kind = Dungeon.finalKind(stage);           // 第 1~4 关是遭遇战，第 4 关是精英…
-  const enemies = Dungeon.makeEnemies(worldId, diff, stage, kind);
-  const res = Battle.run({ allies, enemies, worldId, maxRounds: 30 });
-  const log = [];
-  log.push(`${res.win ? '打赢了' : '打输了'} · ${res.rounds} 回合`);
-  if (res.win) {
-    const g = Dungeon.grantRewards(worldId, diff, stage, kind);
-    Core.addCharExp(Core.S.party.filter(Boolean), g.rewards.exp);
-    Core.addPlayerBattleExp(Math.round(g.rewards.exp * 0.5));
-    Core.battleSettle({}, true, kind === 'boss');
-    const comp = Core.stageComplete(worldId, diff, stageIdx, 3);
-    log.push('◈+' + fmt(g.rewards.points));
-    g.got.filter(x => x.k === 'equip').forEach(x => log.push('🗡 ' + x.v.name));
-    if (comp.firstClearReward) log.push('首通奖励已发');
-    G.AD.interstitial();                            // 插屏：按 3 关 1 次 + 60 秒冷却的节奏自己控制
-  }
+/* ---------- 首页 ---------- */
+on('claim_idle', () => {
+  const g = Core.claimIdle();
+  CV.toast(`收了 ◈${fmt(g.points)} · EXP ${fmt(g.exp)}${g.matCount ? ' · 材料×' + g.matCount : ''}`);
+});
+on('claim_quest', () => {
+  const q = Core.mainQuestState().find(x => !x.claimed && x.done);
+  if (!q) { CV.toast('还没有可领的主线奖励'); return; }
+  const r = Core.claimQuest(q.q.id);
+  CV.toast(r.ok ? `主线奖励已领${r.unlocked && r.unlocked.length ? '，解锁 ' + r.unlocked.join('、') : ''}` : (r.msg || '领取失败'));
+});
+on('ad_idle', () => G.AD.show('idle_boost').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  S().idle.bankSec += 7200;
+  const g = Core.claimIdle();
+  CV.toast(`+◈${fmt(g.points)} · +EXP ${fmt(g.exp)}${r.reason.indexOf('compensated') === 0 ? '（广告不可用，已补偿）' : ''}`);
+}));
+on('ad_holy', () => G.AD.show('holy_pack').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  Core.addCur('holy', 30);
   Core.save();
-  screen = { name: 'result', data: { win: res.win, rounds: res.rounds, log } };
-  draw();
+  CV.toast('✦ 圣洁晶石 +30');
+}));
+on('ad_recruit', () => G.AD.show('free_recruit').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  const p = Core.recruitOnce('normal', { noCost: true });     // 广告出资的免费一抽（普通池）
+  CV.toast(p && p.error ? '抽卡失败' : `抽到 ${p.name}（${p.rarity}）${p.isNew ? ' · 新伙伴！' : ` · 碎片 +${p.shards}`}`);
+}));
+on('nav_more', () => CV.open('grow'));
+
+/* ---------- 残域 ---------- */
+on('resume_run', () => {
+  const pr = S().pendingRun;
+  if (!pr) { CV.toast('没有可继续的副本'); return; }
+  Scr.startStage(pr.worldId, pr.diff, pr.stageIdx);
+});
+on('corridor_fight', () => startCorridor());
+on('next_stage', () => {
+  const g = CV.top().params;
+  const nx = Core.nextStage(g.worldId, g.diff, g.stageIdx);
+  if (nx) Scr.startStage(nx.worldId, nx.diff, nx.stageIdx);
+  else CV.toast('已经没有下一关了');
+});
+on('retry_stage', () => { const g = CV.top().params; Scr.startStage(g.worldId, g.diff, g.stageIdx); });
+on('ad_revive', () => G.AD.show('revive').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日复活次数已用完' : '广告没看完，没有复活'); return; }
+  const g = CV.top().params || {};
+  CV.toast('全队恢复 50%，再来一次');
+  if (g.worldId !== undefined) Scr.startStage(g.worldId, g.diff, g.stageIdx); else CV.reset('worlds');
+}));
+on('open_sweep', () => {
+  const p = CV.top().params;
+  const s = S();
+  const cleared = [];
+  for (let i = 0; i < 12; i++) if (s.worlds[p.worldId].stages[p.diff][i] > 0) cleared.push(i + 1);
+  if (!cleared.length) { CV.toast('通关后才能扫荡'); return; }
+  const max = cleared[cleared.length - 1];
+  picker('扫荡', [
+    { label: `扫荡第 ${max} 关 ×1`, sub: `今日剩余 ${Core.sweepLeft()} 次`, id: `sweep_${p.worldId}_${p.diff}_${max}_1` },
+    { label: `扫荡第 ${max} 关 ×5`, sub: '和真实战斗同样结算（含经验）', id: `sweep_${p.worldId}_${p.diff}_${max}_5` },
+    { label: '全部剩余次数', sub: `今日还剩 ${Core.sweepLeft()} 次`, id: `sweep_${p.worldId}_${p.diff}_${max}_0` },
+  ], '扫荡 = 自动重打这一关，经验和战斗次数都照算');
+});
+
+/* ---------- 队伍 ---------- */
+[0, 1, 2, 3, 4].forEach(i => {
+  on('slot_' + i, () => pickPartyMember(i));
+  on('slotmenu_' + i, () => {
+    const id = S().party[i];
+    if (!id) { pickPartyMember(i); return; }
+    const items = [{ label: id === '@player' ? '看主角详情' : '看伙伴详情', id: id === '@player' ? 'open_protagonist' : 'char_' + id }];
+    if (id !== '@player') items.push({ label: '下阵', id: 'unset_' + i });
+    if (!(i < 2 && S().party.filter((x, j) => x && j < 2).length === 1 && id !== '@player')) {
+      items.push({ label: `换到${i < 2 ? '后排' : '前排'}`, id: 'swaprow_' + i });
+    }
+    picker(Core.charName(id), items, i < 2 ? '前排吃伤害，后排相对安全' : '主角也能站后排');
+  });
+  on('unset_' + i, () => { S().party[i] = null; Core.save(); CV.back(); CV.toast('已下阵'); });
+  on('swaprow_' + i, () => {
+    const id = S().party[i];
+    const r = Core.moveMemberRow(id, i < 2 ? 'back' : 'front');
+    CV.toast(r.msg || '已换位');
+    CV.back();
+  });
+});
+function pickPartyMember(idx) {
+  const s = S();
+  const items = Object.keys(s.chars).map(id => {
+    const c = s.chars[id], b = D.charById[id];
+    return {
+      label: `${b.name} ${c.star}★`,
+      sub: `Lv.${c.lv} · 战力 ${fmt(Core.power(id))}${s.party.includes(id) ? ' · 已上阵' : ''}`,
+      id: `setpos_${idx}_${id}`,
+    };
+  });
+  picker(`位置 ${idx + 1}（${idx < 2 ? '前排' : '后排'}）`, items, '上阵 5 格：前 2 后 3，主角占一格');
+}
+on('party_add', () => {
+  const empty = S().party.indexOf(null);
+  if (empty < 0) { CV.toast('队伍满了，先点一位换下来'); return; }
+  pickPartyMember(empty);
+});
+on('auto_equip', () => { const r = Core.autoEquipBest(); CV.toast(`一键最优装备：调整了 ${r.changed} 处`); });
+[0, 1, 2].forEach(i => {
+  on('preset_save_' + i, () => { const r = Core.savePreset(i); CV.toast(r.msg); });
+  on('preset_use_' + i, () => { const r = Core.applyPreset(i); CV.toast(r.msg); });
+});
+
+/* ---------- 主角 ---------- */
+on('attr_add5', () => {
+  const s = S();
+  if (!s.player.attrPoints) { CV.toast('没有可用属性点'); return; }
+  const ids = D.ATTR_META.map(x => x.id);
+  let n = 0;
+  while (s.player.attrPoints > 0 && n < 5) { Core.allocateAttr(ids[n % ids.length], 1); n++; }
+  CV.toast('已分配 5 点');
+});
+on('reset_attrs', () => { const r = Core.resetAttrs(); CV.toast(r.msg); });
+on('reset_skills', () => { const r = Core.resetSkills(); CV.toast(r.msg); });
+on('realm_try', () => { const r = Core.attemptRealm(); CV.toast(r.msg); });
+on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; });
+on('name_ok', () => { Core.setPlayerName(NAMES[nameIdx]); CV.reset('bloodline'); });
+
+/* ---------- 背包 ---------- */
+['item', 'mat', 'equip'].forEach(pool => on('bagpool_' + pool, () => { CV.top().params.pool = pool; }));
+on('stash_claim', () => {
+  const r = Core.claimStash();
+  CV.toast(r.moved ? `领回 ${r.moved} 件${r.left ? `，还有 ${r.left} 件装不下` : ''}` : '背包还是满的，先扩容');
+});
+
+/* ---------- 设置 ---------- */
+['sfx', 'autoBattle', 'autoNext', 'confirmBig', 'autoSellN', 'autoSellR'].forEach(k => on('toggle_' + k, () => {
+  const s = S();
+  const cur = (k === 'autoSellN' || k === 'autoSellR') ? !!s.settings[k] : s.settings[k] !== false;
+  s.settings[k] = !cur;
+  Core.save();
+  CV.toast('已' + (s.settings[k] ? '开启' : '关闭'));
+}));
+on('save_export', () => {
+  const json = Core.exportSave();
+  if (wx.setClipboardData) wx.setClipboardData({ data: json, success: () => CV.toast('存档已复制到剪贴板'), fail: () => CV.toast('复制失败') });
+  else CV.toast('当前环境不支持复制');
+});
+on('save_wipe', () => {
+  const doIt = () => { Core.wipeSave(); if (wx.reLaunch) wx.reLaunch({}); };
+  if (!wx.showModal) { doIt(); return; }
+  wx.showModal({
+    title: '删除进度', content: '将永久删除当前游戏进度，确定？', confirmText: '删除',
+    success: res => { if (res.confirm) doIt(); },
+  });
+});
+
+/* ---------- 前缀型（动态 id） ---------- */
+onP('nav_', () => {});                       // 框架已处理，这里占位避免落到"还没接上"
+onP('open_world_', id => CV.open('world', { worldId: id.slice(11), diff: 'normal' }));
+onP('wdiff_', id => { CV.top().params = { worldId: CV.top().params.worldId, diff: id.slice(6) }; });
+onP('stage_', id => {
+  const [, wid, diff, idx] = id.split('_');
+  Scr.startStage(wid, diff, +idx);
+});
+onP('sweep_', id => {
+  const [, wid, diff, stage, times] = id.split('_');
+  const n = times === '0' ? Core.sweepLeft() : +times;
+  const r = Dungeon.sweep(wid, diff, +stage, n);
+  if (!r.ok) { CV.toast(r.msg); return; }
+  const agg = { equips: 0, items: 0, exp: 0 };
+  r.total.forEach(t => t.got.forEach(g => {
+    if (g.k === 'equip') agg.equips++;
+    else if (g.k === 'item') agg.items += (g.n || 1);
+    else if (g.k === 'exp') agg.exp += g.v;
+    else agg[g.k] = (agg[g.k] || 0) + g.v;
+  }));
+  CV.back();
+  const parts = [`EXP+${fmt(agg.exp)}`];
+  ['points', 'otherworld', 'story', 'skillChip'].forEach(k => { if (agg[k]) parts.push(`${curIconLocal(k)}+${fmt(agg[k])}`); });
+  if (agg.equips) parts.push(`装备×${agg.equips}`);
+  if (agg.items) parts.push(`道具×${agg.items}`);
+  CV.toast(`扫荡 ×${r.count}：` + parts.join(' '));
+});
+onP('setpos_', id => {
+  const [, idx, charId] = id.split('_');
+  const s = S();
+  const i = +idx;
+  s.party[i] = charId;
+  s.party = s.party.map((x, j) => (j !== i && x === charId ? null : x));
+  Core.save();
+  CV.back();
+  CV.toast(`${Core.charName(charId)} 已上阵`);
+});
+onP('char_', id => CV.open('char', { id: id.slice(5) }));
+onP('lvup_', id => { const r = Core.levelUp(id.slice(5), 1); CV.toast(r.msg); });
+onP('starup_', id => { const r = Core.starUp(id.slice(7)); CV.toast(r.msg); });
+onP('blup_', id => { const r = Core.bloodlineUpgrade(id.slice(5)); CV.toast(r.msg); });
+onP('skillup_', id => { const [, cid, i] = id.split('_'); const r = Core.skillUp(cid, +i); CV.toast(r.msg); });
+onP('feed_', id => {
+  const cid = id.slice(5), s = S();
+  const items = Object.keys(s.items).filter(k => (D.ITEMS[k] || {}).type === 'exp').map(k => ({
+    label: D.ITEMS[k].name, sub: `现有 ${s.items[k]} · 每个 +${fmt(D.ITEMS[k].exp)} EXP · 点一下全部喂掉`, id: `useexp_${cid}_${k}`,
+  }));
+  picker('喂经验模块', items, '经验模块也能在背包 → 道具里点开看来源');
+});
+onP('useexp_', id => { const [, cid, k] = id.split('_'); const r = Core.useExpItem(cid, k, 999); CV.toast(r.msg); CV.back(); });
+onP('attr_', id => { const r = Core.allocateAttr(id.slice(5), 1); CV.toast(r.msg); });
+onP('pskill_', id => { const r = Core.allocateSkill(+id.slice(7)); CV.toast(r.msg); });
+onP('blood_', id => { const r = Core.choosePlayerBloodline(id.slice(6)); CV.toast(r.msg); if (r.ok) CV.reset('home'); });
+onP('item_', id => CV.open('item', { id: id.slice(5) }));
+onP('box_', id => {
+  const [, k, n] = id.split('_');
+  const have = S().items[k] || 0;
+  const r = Core.openBoxes(k, n === '0' ? have : +n);
+  CV.toast(r.ok ? `开出 ${r.count} 件${r.sold ? `（自动分解 ${r.sold} 件）` : ''}` : '没有可开的箱子');
+});
+onP('feedpick_', id => {
+  const k = id.slice(9);
+  const items = Object.keys(S().chars).map(cid => ({ label: Core.charName(cid), sub: `Lv.${S().chars[cid].lv}`, id: `useexp2_${cid}_${k}` }));
+  picker('喂给谁', items, `把 ${D.ITEMS[k].name} 喂给某位伙伴`);
+});
+onP('useexp2_', id => { const [, cid, k] = id.split('_'); const r = Core.useExpItem(cid, k, 999); CV.toast(r.msg); CV.back(); });
+onP('expand_', id => { const r = Core.buyBagCap(id.slice(7) === 'equip' ? 'eq' : id.slice(7)); CV.toast(r.msg); });
+onP('equipnew_', id => {
+  const rest = id.slice(9);                       // charId_slot
+  const i = rest.lastIndexOf('_');
+  pickEquipFor(rest.slice(0, i), rest.slice(i + 1));
+});
+onP('pequipnew_', id => pickEquipFor('@player', id.slice(10)));
+onP('equip_', id => CV.open('equip', { uid: id.slice(6) }));
+onP('doequip_', id => {
+  const rest = id.slice(8);
+  const i = rest.indexOf('_');
+  const cid = rest.slice(0, i), uid = rest.slice(i + 1);
+  const r = Core.equipItem(cid, uid);
+  CV.toast(r ? `${Core.charName(cid)} 换上了装备` : '穿不上（部位或定位不符）');
+  CV.back();
+});
+onP('enh_', id => { const r = Core.enhance(id.slice(4)); CV.toast(r.msg); });
+onP('lock_', id => { const r = Core.toggleEquipLock(id.slice(5)); CV.toast(r.lock ? '🔒 已锁定' : '🔓 已解锁'); });
+onP('decomp_', id => {
+  const r = Core.decompose(id.slice(7));
+  if (r.ok) { CV.toast(`分解成功，获得 ◆${r.gain}`); CV.back(); } else CV.toast(r.msg || '分解失败');
+});
+onP('equipto_', id => {
+  const uid = id.slice(8), e = S().equips[uid];
+  if (!e) return;
+  const items = ['@player'].concat(Object.keys(S().chars))
+    .filter(cid => Core.canEquip(cid, e))
+    .map(cid => ({ label: Core.charName(cid), sub: cid === '@player' ? '主角' : `Lv.${S().chars[cid].lv}`, id: `doequip_${cid}_${uid}` }));
+  picker('装备给…', items, '一件装备只能有一个人穿');
+});
+function pickEquipFor(charId, slot) {
+  const s = S();
+  const worn = {};
+  Object.values(s.equipped || {}).forEach(sl => Object.values(sl || {}).forEach(u => { if (u) worn[u] = 1; }));
+  const items = Object.values(s.equips)
+    .filter(e => e.slot === slot && !worn[e.uid] && Core.canEquip(charId, e))
+    .sort((a, b) => Core.equipScore(b) - Core.equipScore(a))
+    .slice(0, 40)
+    .map(e => ({ label: `${e.name} +${e.enhance}`, sub: `${e.rarity} · 评分 ${Math.round(Core.equipScore(e))}`, id: `doequip_${charId}_${e.uid}` }));
+  picker(`给 ${Core.charName(charId)} 换${D.EQUIP_SLOTS[slot]}`, items, '只列能穿的（部位 / 定位 / 专属限制都算过）');
+}
+onP('pull_', id => {
+  const [, pool, n] = id.split('_');
+  if (n === '1') {
+    const r = Core.recruitOnce(pool);
+    CV.toast(r.error ? r.error : `抽到 ${r.name}（${r.rarity}）${r.isNew ? ' · 新伙伴！' : ` · 碎片 +${r.shards}`}`);
+  } else {
+    const r = Core.recruitTen(pool);
+    if (r.error) { CV.toast(r.error); return; }
+    const best = r.results.reduce((a, b) => (D.RARITIES.indexOf(b.rarity) > D.RARITIES.indexOf(a.rarity) ? b : a), r.results[0]);
+    CV.toast(`十连完成：最高 ${best.rarity} ${best.name}${best.isNew ? '（新）' : ''}`);
+  }
+});
+onP('keji_', id => { const r = Core.kejiUp(id.slice(5), 1); CV.toast(r.msg); });
+onP('fabao_buy_', id => { const r = Core.buyFabao(id.slice(10)); CV.toast(r.msg); });
+onP('fabao_on_', id => { const r = Core.wearFabao(id.slice(9)); CV.toast(r.msg); });
+onP('mount_buy_', id => { const r = Core.buyMount(id.slice(10)); CV.toast(r.msg); });
+onP('mount_on_', id => { const r = Core.wearMount(id.slice(9)); CV.toast(r.msg); });
+onP('plant_', id => { const i = +id.slice(6); const r = Core.plantGarden(i, D.GARDEN[i].id); CV.toast(r.msg); });
+onP('harvest_', id => { if (id === 'harvest_all') return; const r = Core.harvestGarden(+id.slice(8)); CV.toast(r.msg); });
+on('harvest_all', () => { const r = Core.harvestAllGarden(); CV.toast(r.msg); });
+on('arena_fight', () => {
+  const st = Core.arenaState();
+  Scr.startBattle({
+    title: `斗法台 第 ${st.floor} 台`, worldId: null, kind: 'combat', enemies: st.enemies, back: 'arena',
+    onWin: () => ({
+      label: '返回', run: () => { const r = Core.arenaSettle(true); CV.reset('arena'); CV.toast(r.msg || ''); },
+    }),
+  });
+});
+on('sign_draw', () => { const r = Core.drawSign(); CV.toast(r.msg); });
+onP('build_', id => { const r = Core.upgradeBuilding(id.slice(6)); CV.toast(r.msg); });
+on('genelock_up', () => { const r = Core.geneLockUnlock(); CV.toast(r.msg); });
+on('auth_up', () => { const r = Core.upgradeAuthority(); CV.toast(r.msg); });
+onP('hatch_', id => { const n = +id.slice(6); const r = Core.hatchBeast(n); CV.toast(r.ok ? r.msg : r.msg); });
+onP('beast_', id => {
+  const bid = id.slice(6);
+  const x = Core.beastState().list.find(v => v.id === bid);
+  if (!x) { CV.toast('还没有这只伴生体'); return; }
+  picker(x.b.name, [
+    { label: x.active ? '已随行' : '设为随行', id: 'beastset_' + bid },
+    { label: `升级（兽魂 ${D.BEAST_SOUL_PER_LV * x.lv}）`, sub: `Lv.${x.lv}/${D.BEAST_MAX_LV}`, id: 'beastlv_' + bid },
+  ], x.b.desc || '随行一只，给全队加成 + 五行克制');
+});
+onP('beastset_', id => { const r = Core.setActiveBeast(id.slice(9)); CV.toast(r.msg); CV.back(); });
+onP('beastlv_', id => { const r = Core.beastLevelUp(id.slice(8)); CV.toast(r.msg); });
+onP('talent_', id => { const r = Core.buyTalent(id.slice(7)); CV.toast(r.ok ? '天赋提升成功' : r.msg); });
+on('do_reincarn', () => { const r = Core.reincarnate(); CV.toast(r.ok ? `转生成功，获得 ♾${r.rp}` : r.msg); });
+onP('codex_', id => { const r = Core.claimCodexReward(+id.slice(6)); CV.toast(r.msg); });
+onP('craft_', id => { const r = Core.craftSerum(id.slice(6), 1); CV.toast(r.msg); });
+onP('serum_p_', id => { const r = Core.useSerum('@player', id.slice(8), 1); CV.toast(r.msg); });
+onP('line_', id => {
+  const lid = id.slice(5);
+  const line = D.IDLE_LINES.find(l => l.id === lid);
+  const s = S();
+  const items = [{ label: '撤下领队', id: `linepick_${lid}__none` }].concat(
+    Object.keys(s.chars).filter(cid => !s.party.includes(cid)).map(cid => ({
+      label: Core.charName(cid),
+      sub: `${line.attrName} ${Math.round((Core.effectiveStats(cid).attrs[line.attr] || 0))}`,
+      id: `linepick_${lid}_${cid}`,
+    })));
+  picker(line.name, items, `这条线看领队的【${line.attrName}】，上阵主力不能派`);
+});
+onP('linepick_', id => {
+  const rest = id.slice(9);
+  const i = rest.indexOf('_');
+  const lid = rest.slice(0, i), cid = rest.slice(i + 1);
+  const r = Core.setIdleLeader(lid, cid === '_none' ? null : cid);
+  CV.toast(r.msg);
+  CV.back();
+});
+onP('task_', id => { if (id === 'task_all') return; const r = Core.claimTask(id.slice(5)); CV.toast(r.ok ? '奖励已领' : (r.msg || '还没完成')); });
+on('task_all', () => { const r = Core.claimAllTasks(); CV.toast(r.ok ? '全部日常奖励已领' : (r.msg || '还有没完成的')); });
+onP('weekly_', id => { if (id === 'weekly_all') return; const r = Core.claimWeekly(id.slice(7)); CV.toast(r.msg || (r.ok ? '已领' : '没完成')); });
+on('weekly_all', () => { const r = Core.claimAllWeekly(); CV.toast(r.msg || (r.ok ? '周常全清奖励已领' : '')); });
+onP('ach_', id => { const r = Core.claimAchievement(id.slice(4)); CV.toast(r.msg); });
+on('bounty_renew', () => { const r = Core.renewBounties(); CV.toast(r.msg); });
+onP('bounty_', id => { const r = Core.claimBounty(id.slice(7)); CV.toast(r.msg); });
+onP('buy_', id => {
+  const rest = id.slice(4);                       // shopKey_idx
+  const i = rest.lastIndexOf('_');
+  const r = Core.buyShopItem(rest.slice(0, i), +rest.slice(i + 1));
+  CV.toast(r.msg || (r.ok ? '购买成功' : '买不了'));
+});
+
+function curIconLocal(k) { const c = D.CURRENCIES.find(x => x.id === k); return c ? c.icon : ''; }
+
+function startCorridor() {
+  const s = S(), floor = s.corridor.floor;
+  const spec = D.corridorEnemy(floor);
+  const enemies = [spec];
+  if (spec.isBoss) enemies.push({ name: '深井之影', hp: Math.round(spec.hp * 0.3), atk: Math.round(spec.atk * 0.5), def: Math.round(spec.def * 0.5), spd: 70, faction: null, eva: 0.05 });
+  Scr.startBattle({
+    title: `深井 · 第 ${floor} 层`, worldId: null, kind: spec.isBoss ? 'boss' : 'combat', enemies, back: 'worlds',
+    onWin: () => {
+      const rw = D.corridorReward(floor);
+      Core.addCur('points', rw.points); Core.addCur('story', rw.story); Core.addCur('corridor', rw.corridor);
+      if (rw.bloodCrystal) Core.addCur('bloodCrystal', rw.bloodCrystal);
+      const before = Core.corridorMarks();
+      s.corridor.floor++; s.corridor.best = Math.max(s.corridor.best, floor);
+      Core.battleSettle({}, true, spec.isBoss);
+      Core.save();
+      const gotMark = Core.corridorMarks() > before;
+      return { label: '继续下一层', run: () => { CV.reset('worlds'); CV.toast(`深井通过：◈+${fmt(rw.points)} · ♜+${rw.corridor}${gotMark ? ' · 获得深井印记' : ''}`); } };
+    },
+  });
 }
 
-/* ---------- 启动 ---------- */
+/* ================= 启动 ================= */
 function boot() {
-  canvas = wx.createCanvas();                       // 第一次创建 = 上屏 canvas
-  ctx = canvas.getContext('2d');
+  const canvas = wx.createCanvas();               // 第一次创建 = 上屏 canvas
+  CV.ctx = canvas.getContext('2d');
   let info = {};
   try { info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync(); } catch (e) { info = {}; }
-  W = info.windowWidth || 375;
-  H = info.windowHeight || 667;
-  DPR = info.pixelRatio || 2;
-  TOP = (info.safeArea && info.safeArea.top) ? info.safeArea.top + 22 : 30;
-  canvas.width = W * DPR;
-  canvas.height = H * DPR;
-  ctx.scale(DPR, DPR);
+  CV.W = info.windowWidth || 375;
+  CV.H = info.windowHeight || 812;
+  CV.DPR = info.pixelRatio || 2;
+  CV.TOP = (info.safeArea && info.safeArea.top) ? info.safeArea.top + 26 : 34;
+  CV.NAV_H = 62;
+  canvas.width = CV.W * CV.DPR;
+  canvas.height = CV.H * CV.DPR;
+  CV.ctx.scale(CV.DPR, CV.DPR);
+  CV.statusText = () => {
+    const s = S();
+    if (!s) return '';
+    return `${s.player.name || '执灯者'} Lv.${s.player.level}   ◈${fmt(s.cur.points)} ✦${fmt(s.cur.holy)} ◆${fmt(s.cur.otherworld)}`;
+  };
+  CV.tabs = [
+    { panel: 'home', name: '灯阁' },
+    { panel: 'worlds', name: '残域' },
+    { panel: 'party', name: '执灯者' },
+    { panel: 'bag', name: '背包' },
+  ];
 
-  // 存档：能读就读，读不到就是新档
   if (!Core.load()) { Core.newGame(); }
   Core.ensureDaily();
-  const off = Core.settleOffline();                 // 离线收益已经由核心层入账（V9.5 起）
-  if (off && off.seconds >= 300) toast(`离线 ${hhmmss(off.seconds)}，+◈${fmt(off.gains.points)}`);
+  const off = Core.settleOffline();                // 离线收益由核心层入账
+  if (!S().player.name) CV.reset('create');
+  else if (!S().player.bloodline) CV.reset('bloodline');
+  else CV.reset('home');
+  if (off && off.seconds >= 300) CV.toast(`离线 ${CV.hhmmss(off.seconds)}：+◈${fmt(off.gains.points)}`);
 
-  wx.onTouchStart && wx.onTouchStart(e => {
-    const t = e.touches && e.touches[0];
-    if (!t) return;
-    onTap(t.clientX !== undefined ? t.clientX : t.pageX, t.clientY !== undefined ? t.clientY : t.pageY);
-    draw();
+  const T = (e, fn) => { const t = e.touches && e.touches[0]; if (t) fn(t.clientX !== undefined ? t.clientX : t.pageX, t.clientY !== undefined ? t.clientY : t.pageY); };
+  if (wx.onTouchStart) wx.onTouchStart(e => { T(e, CV.onTouchStart); CV.draw(); });
+  if (wx.onTouchMove) wx.onTouchMove(e => { T(e, CV.onTouchMove); });
+  if (wx.onTouchEnd) wx.onTouchEnd(e => {
+    const t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+    if (t) CV.onTouchEnd(t.clientX !== undefined ? t.clientX : t.pageX, t.clientY !== undefined ? t.clientY : t.pageY);
+    CV.draw();
   });
-  wx.onShow && wx.onShow(() => { Core.save(); draw(); });
-  wx.onHide && wx.onHide(() => { Core.save(); });
+  if (wx.onShow) wx.onShow(() => { Core.save(); CV.draw(); });
+  if (wx.onHide) wx.onHide(() => { Core.save(); });
 
-  // 主循环：一秒一帧，驱动挂机累计与界面刷新
+  let last = Date.now();
   setInterval(() => {
     const now = Date.now();
-    const dt = Math.min(10, (now - lastIdle) / 1000);
-    lastIdle = now;
+    const dt = Math.min(10, (now - last) / 1000);
+    last = now;
     Core.onlineTick(dt);
-    draw();
+    const b = Scr.battle();
+    if (b && !b.done && b.shown < b.log.length) {
+      b.shown = Math.min(b.log.length, b.shown + 2);
+      if (b.shown >= b.log.length) Scr.finishBattle();
+    }
+    CV.draw();
   }, 1000);
   setInterval(() => Core.save(), 15000);
-
-  draw();
+  CV.draw();
 }
 
-// 测试用出口（scripts/test-minigame.js 靠它验"画得出来、点得到"）
-module.exports = { boot, _draw: draw, _dispatch: dispatch, _hits: () => hits, _setTab: v => { tab = v; screen = null; } };
+module.exports = {
+  boot,
+  _draw: CV.draw,
+  _dispatch: CV.dispatch,
+  _open: CV.open,
+  _reset: CV.reset,
+  _stack: () => CV.stack,
+  _hits: () => CV.hits,
+  _touch: (x0, y0, x1, y1) => { CV.onTouchStart(x0, y0); if (y1 !== undefined) CV.onTouchMove(x0, y1); CV.onTouchEnd(x1 === undefined ? x0 : x1, y1 === undefined ? y0 : y1); },
+};

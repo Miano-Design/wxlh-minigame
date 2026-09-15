@@ -12,6 +12,8 @@ require('./js/data.js');
 require('./js/core.js');
 require('./js/battle.js');
 require('./js/dungeon.js');
+require('./js/cv.js');        // Canvas 界面框架
+require('./js/screens.js');   // 全部界面
 
 const UI = require('./js/ui-canvas.js');
 
