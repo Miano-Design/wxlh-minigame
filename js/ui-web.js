@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.13';
+  const GAME_VER = '9.5.14';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {

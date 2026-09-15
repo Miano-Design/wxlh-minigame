@@ -50,6 +50,10 @@ module.exports = {
   "borderBottomWidth": 1,
   "borderBottomColor": "#ffffff0d"
  },
+ "grow": {
+  "flex": 1,
+  "minWidth": 0
+ },
  "t1": {
   "fontSize": 15,
   "fontWeight": "bold",
@@ -1135,6 +1139,8 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1": {
@@ -1227,6 +1233,8 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow__text.t1": {
@@ -1296,6 +1304,8 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow__text.t1": {
@@ -2343,6 +2353,8 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
   "marginRight": 12
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1": {
