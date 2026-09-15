@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:40 */
+   生成时间：2026-09-15 16:42 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -2255,8 +2255,8 @@ module.exports = {
   "width": "20.0000%"
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.add.bg-slot": {
-  "color": "#e6b64c",
-  "fontSize": 18,
+  "color": "#7a849b",
+  "fontSize": 22,
   "minHeight": 62,
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
@@ -2264,11 +2264,11 @@ module.exports = {
   "borderBottomRightRadius": 10,
   "borderBottomLeftRadius": 10,
   "borderWidth": 1,
-  "borderColor": "#e6b64c",
-  "backgroundColor": "#ffd76a11",
+  "borderColor": "#333e55",
+  "backgroundColor": "transparent",
   "flexDirection": "column",
   "alignItems": "center",
-  "justifyContent": "flex-start",
+  "justifyContent": "center",
   "paddingTop": 5,
   "paddingRight": 6,
   "paddingBottom": 5,
@@ -2277,13 +2277,13 @@ module.exports = {
   ":active": {
    "backgroundColor": "#ffd76a22"
   },
-  "lineHeight": 18,
+  "lineHeight": 22,
   "width": "20.0000%"
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.add.bg-slot__text": {
-  "color": "#e6b64c",
-  "fontSize": 18,
-  "lineHeight": 18,
+  "color": "#7a849b",
+  "fontSize": 22,
+  "lineHeight": 22,
   "textAlign": "center",
   "marginBottom": 2,
   "width": "100%"
