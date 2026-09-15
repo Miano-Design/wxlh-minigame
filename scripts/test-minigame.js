@@ -30,6 +30,7 @@ global.wx = {
   createCanvas: () => ({ getContext: () => noopCtx, width: 0, height: 0 }),
   onTouchStart: () => {}, onTouchMove: () => {}, onTouchEnd: () => {}, onShow: () => {}, onHide: () => {},
   onTouchCancel: () => {},
+  offTouchStart: () => {}, offTouchMove: () => {}, offTouchEnd: () => {}, offTouchCancel: () => {},
   setClipboardData: o => o.success && o.success(),
   showModal: o => o.success && o.success({ confirm: true }),
   // 故意不提供 createRewardedVideoAd：验证"广告拉不到也要有降级"这条路径
@@ -294,10 +295,11 @@ async function main() {
   t('首页同时铺开了集中广告区与各玩法入口', homeHtmlHits > 10, `可点区域 ${homeHtmlHits}`);
 
   /* ---------- 与网页版一致性 ---------- */
-  t('js 下 4 个逻辑文件与网页版逐字节一致（跑过 sync-logic 才是对的）', (() => {
+  t('js 下 4 个逻辑文件 + 界面层 ui-web.js 与网页版逐字节一致（跑过 sync-logic 才是对的）', (() => {
     const SRC = path.resolve(__dirname, '../../wxlh-game/js');
     return ['data.js', 'core.js', 'battle.js', 'dungeon.js'].every(f =>
-      fs.readFileSync(path.join(SRC, f)).equals(fs.readFileSync(path.resolve(__dirname, '../js', f))));
+      fs.readFileSync(path.join(SRC, f)).equals(fs.readFileSync(path.resolve(__dirname, '../js', f))))
+      && fs.readFileSync(path.join(SRC, 'ui.js')).equals(fs.readFileSync(path.resolve(__dirname, '../js/ui-web.js')));
   })());
   t('逻辑层里没有 DOM 调用（小游戏没有 DOM）', (() => {
     const bad = [/\bdocument\./, /\bnavigator\./, /querySelector/];
@@ -307,36 +309,21 @@ async function main() {
     });
   })());
 
-  /* ---------- 路线 B（引擎渲染）冒烟 ---------- */
-  const CEHome = require(path.resolve(__dirname, '../js/ce-home.js'));
-  const CEContext = require(path.resolve(__dirname, '../js/ce-context.js'));
-  const CETpl = require(path.resolve(__dirname, '../js/ce-tpl-home.js'));
-  const CEHomeData = require(path.resolve(__dirname, '../js/ce-home-data.js'));
-  const CEStyle = require(path.resolve(__dirname, '../js/ce-style.js'));
-  const ceSample = CEHomeData.sample();
-  let ceOk = false, ceInfo = '';
-  try {
-    const out = CEHome.render(noopCtx, 375, 812, ceSample);
-    ceOk = !!out.Layout && !!out.root && out.root.children.length >= 3;
-    ceInfo = '元素 ' + (out.Layout.eleCount || 0) + ' 个';
-  } catch (e) { ceInfo = (e && e.message) + ' | ' + ((e && e.stack) || '').split('\n')[1]; }
-  t('路线B：引擎版首页整条链路能渲染（模板 → 上下文类名 → 编译样式表 → 引擎）', ceOk, ceInfo);
-  t('路线B：模板里每个元素的上下文类名都在样式表里（模板改了没重跑编译就会红）', (() => {
-    const prepared = CEContext.prepare(CETpl(ceSample));
-    const keys = Object.keys(CEStyle);
-    const miss = [];
-    CEContext.walk(prepared.xml, (node) => { if (keys.indexOf(node.path) < 0) miss.push(node.path.slice(-40)); });
-    ceInfo = miss.length ? miss.slice(0, 3).join(' / ') : '';
-    return miss.length === 0;
-  })());
-  t('路线B：真实存档也能拼出首页数据（js/ce-home-data.js 的 fromCore）', (() => {
-    try { const d = CEHomeData.fromCore(); ceInfo = d.player.name + ' Lv.' + d.player.lv + ' · 养成格 ' + d.grow.length; return !!(d.hero && d.idle && d.nav.length === 4); }
-    catch (e) { ceInfo = (e && e.message); return false; }
-  })());
-  t('路线B：真实数据也能渲染（不是只对样例管用）', (() => {
-    try { return !!CEHome.render(noopCtx, 375, 812, CEHomeData.fromCore()).Layout; }
-    catch (e) { ceInfo = (e && e.message); return false; }
-  })());
+  /* ---------- 路线 B：四个页签（走网页版界面层 + 翻译层） ---------- */
+  const ceEnv = require(path.resolve(__dirname, 'ce-env.js'));
+  ceEnv.install();
+  const CEApp = require(path.resolve(__dirname, '../js/ce-app.js'));
+  const CEEngine = require(path.resolve(__dirname, '../js/ce-engine.js'));
+  [['home', '灯阁'], ['dungeon', '残域'], ['roster', '执灯者'], ['bag', '背包']].forEach(([tab, name]) => {
+    let ok = false, info = '';
+    try {
+      const res = CEEngine.renderPage(ceEnv.makeCtx(), 390, 844, CEApp.pageMarkup(tab));
+      ok = res.missing.length === 0;
+      info = `元素 ${res.Layout.eleCount} · 缺样式 ${res.missing.length}`;
+      if (res.missing.length) info += ' → ' + res.missing.slice(0, 3).map((p) => p.split('__').slice(-1)[0]).join(' / ');
+    } catch (e) { info = (e && e.message); }
+    t(`路线B：${name}页能渲染、且每个元素都查得到样式（查不到=黑底黑字）`, ok, info);
+  });
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

@@ -10,18 +10,24 @@ const path = require('path');
 
 const SRC = path.resolve(__dirname, '../../wxlh-game/js');
 const DST = path.resolve(__dirname, '../js');
+/* 逻辑层 4 份：必须逐字节一致，而且不许碰 DOM */
 const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
+/* 路线 B 额外复用网页版的**界面层**（js/ui.js → js/ui-web.js）：同样逐字节一致。
+   它当然会碰 DOM——那正是我们要复用的"界面字符串工厂"，
+   小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。 */
+const EXTRA = { 'ui.js': 'ui-web.js' };
 
 let changed = 0, same = 0;
-FILES.forEach(f => {
-  const a = path.join(SRC, f), b = path.join(DST, f);
+const JOBS = FILES.map(f => [f, f]).concat(Object.keys(EXTRA).map(k => [k, EXTRA[k]]));
+JOBS.forEach(([f, out]) => {
+  const a = path.join(SRC, f), b = path.join(DST, out);
   if (!fs.existsSync(a)) { console.error('✗ 找不到源文件：' + a); process.exitCode = 1; return; }
   const src = fs.readFileSync(a);
   const old = fs.existsSync(b) ? fs.readFileSync(b) : null;
-  if (old && old.equals(src)) { same++; console.log('= ' + f + '（一致）'); return; }
+  if (old && old.equals(src)) { same++; console.log('= ' + f + ' → ' + out + '（一致）'); return; }
   fs.writeFileSync(b, src);
   changed++;
-  console.log('✓ ' + f + '（已更新）');
+  console.log('✓ ' + f + ' → ' + out + '（已更新）');
 });
 
 // 顺手体检：逻辑层不许碰 DOM（碰了就说明有人在里面写了界面代码，小游戏会直接崩）

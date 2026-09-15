@@ -326,8 +326,16 @@ function convertDecls(decls, ctx) {
       case 'border-color': { const c = parseColorToken(val.split(/\s+/)[0]); if (c) out.borderColor = c; break; }
       case 'border-width': out.borderWidth = pxLen(val) ?? 0; break;
       case 'border-radius':
-        if (/px/.test(val)) setShorthand(out, prop, val, RAD); else note('丢弃', prop, val);
+        if (/px/.test(val)) setShorthand(out, prop, val, RAD);
+        else if (/%/.test(val)) meta.radiusPct = parseFloat(val) / 100;   // 圆形头像：等宽度定下来再折算
+        else note('丢弃', prop, val);
         break;
+      case 'aspect-ratio': {
+        const m = val.match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);   // 形如 1 / 1
+        if (m) meta.aspect = parseFloat(m[1]) / parseFloat(m[2]);
+        else note('丢弃', prop, val);
+        break;
+      }
       case 'background': case 'background-color': {
         if (/gradient\(/.test(val)) {
           const c = gradientFirstColor(val);
@@ -374,7 +382,7 @@ function convertDecls(decls, ctx) {
       case 'display':
         if (val === 'grid' || val === 'inline-grid') { out.flexDirection = 'row'; out.flexWrap = 'wrap'; meta.isGrid = true; }
         else if (val === 'flex' || val === 'inline-flex') { out.flexDirection = out.flexDirection || 'row'; }
-        else if (val === 'none') note('丢弃', prop, 'display:none（模板里别写这个节点）');
+        else if (val === 'none') { meta.hidden = true; note('映射', 'display:none', '透明 + 零尺寸（引擎没有"不画"）'); }
         break;
       case 'flex-direction':
         if (val === 'column' || val === 'row') out.flexDirection = val;
@@ -458,17 +466,63 @@ function setShorthandSafe(out, prop, val, map) {
   setShorthand(out, prop, toks.join(' '), map);
 }
 
-/* ============================ 4. 页面模板 ============================ */
-const PAGES = [
-  { name: 'home', tpl: 'js/ce-tpl-home.js', data: 'home' },
+/* ============================ 4. 页面（含状态变体） ============================ */
+/* 页面标记不手写、也不另外维护一份：直接调**网页版界面层**的函数，
+   走和小游戏运行时同一条翻译链（js/ce-html.js）。改网页版，重跑本脚本就跟着变。 */
+const PAGE_SPECS = [
+  { name: '灯阁（首页）', tab: 'home' },
+  { name: '残域', tab: 'dungeon' },
+  { name: '执灯者·队伍', tab: 'roster', fn: 'partyScreen' },
+  { name: '执灯者·伙伴', tab: 'roster', fn: 'charsScreen' },
+  { name: '执灯者·成长', tab: 'roster', fn: 'growScreen' },
+  { name: '背包', tab: 'bag' },
 ];
 
-function loadPages() {
-  const sample = require(path.resolve(ROOT, 'js/ce-home-data.js')).sample();
-  return PAGES.map((p) => {
-    const prepared = ctxMod.prepare(require(path.resolve(ROOT, p.tpl))(sample));
-    return { name: p.name, markup: prepared.xml, inlines: prepared.inlines };
+/* 同一页在不同存档状态下会生出不同的类名组合（做完的主线按钮是 primary、没做完是 ghost…）。
+   没编到的组合，运行时就是"整套样式都没有"——于是黑底黑字、边距全丢。
+   所以按几种状态各编一遍：新档原样 + 全部解锁 + 挂机有可领 + 未选血统。 */
+function loadMarkups() {
+  const env = require('./ce-env.js');
+  const { Core } = env.install();
+  const CEApp = require(path.resolve(ROOT, 'js/ce-app.js'));
+  const out = [];
+  const states = [
+    { name: '', setup() {} },
+    { name: '·全解锁', setup() { Core.isUnlocked = () => true; Core.freeRecruitAvailable = () => true; } },
+    { name: '·可领奖', setup() {
+      try {
+        Core.S.cur.points = 123456; Core.S.cur.holy = 88; Core.S.cur.otherworld = 66;
+        Core.S.player.attrPoints = 5; Core.S.player.skillPoints = 2;
+        Core.S.idle.lastTick = Date.now() - 3600 * 1000;
+      } catch (e) { /* 存档结构变了也不该让编译整个挂掉 */ }
+    } },
+    /* 下面两个是"页面会走另一条分支"的状态：分支里常带**行内样式**（金色 / 红色提示），
+       少编一个，运行时那两行字就是"没样式"（在开发者工具里会报 [CE] 缺样式）。 */
+    { name: '·奇遇待领', setup() {
+      Core.pendingTravel = () => ({ id: 'probe', name: '游历奇遇', effect: { points: 120 } });
+      Core.rewardTextOf = () => '◈120';
+    } },
+    { name: '·主线走完', setup() {
+      Core.mainQuestState = () => [{ q: { name: '全程走完', reward: { points: 500 } }, done: false, claimed: true }];
+      Core.todayState = () => ({ claimable: 3, dailyDone: 1, dailyTotal: 6, achClaimable: 2 });
+      Core.signState = () => ({ canDraw: false, tier: '上上' });
+    } },
+    { name: '·已选血统', setup() {
+      /* 选完血统后，首页【境界】那一行的值会变成金色（行内 style）——这一套也得编进来 */
+      try { Core.choosePlayerBloodline(window.DATA.BLOODLINES[0].id); } catch (e) { /* 数据改名了也不该让编译挂掉 */ }
+    } },
+  ];
+  states.forEach((st) => {
+    st.setup();
+    PAGE_SPECS.forEach((p) => {
+      try {
+        out.push({ name: p.name + st.name, markup: CEApp.pageMarkup(p.tab, { fn: p.fn }) });
+      } catch (e) {
+        console.error('✗ 页面渲染失败：' + p.name + st.name + ' → ' + e.message);
+      }
+    });
   });
+  return out;
 }
 
 /* ============================ 5. 主流程 ============================ */
@@ -501,10 +555,11 @@ function main() {
 
   /* 收集所有页面的元素（含祖先链），顺便算每个元素的 inline style */
   const elements = [];
-  loadPages().forEach((page) => {
-    ctxMod.walk(page.markup, (node, ancestors) => {
-      const isxCls = node.classes.filter((c) => page.inlines[c] !== undefined);
-      const inlineDecls = isxCls.length ? parseDecls(page.inlines[isxCls[0]]) : null;
+  loadMarkups().forEach((page) => {
+    const prepared = ctxMod.prepare(page.markup);
+    ctxMod.walk(prepared.xml, (node, ancestors) => {
+      const isxCls = node.classes.filter((c) => prepared.inlines[c] !== undefined);
+      const inlineDecls = isxCls.length ? parseDecls(prepared.inlines[isxCls[0]]) : null;
       elements.push({ page: page.name, node, ancestors, inlineDecls });
     });
   });
@@ -586,18 +641,60 @@ function main() {
     const gap = conv.meta && conv.meta.gap;
     if (!gap || conv.meta.isGrid) return;
     const row = conv.style.flexDirection !== 'column';
-    const wrap = conv.style.flexWrap === 'wrap';
     elements.forEach((k) => {
       if (!k.ancestors.length || k.ancestors[k.ancestors.length - 1].path !== el.node.path) return;
       const s = styles[k.node.path].style;
       if (row) s.marginRight = gap;
-      if (wrap || !row) s.marginBottom = gap;
+      /* 只给"竖排"补下边距：横排里 flex-wrap 是常态，给每个孩子都加下边距，
+         每一行都会白多出一截（实测：首页 4 行文字各多 10px，卡片凭空高 40px）。 */
+      if (!row) s.marginBottom = gap;
     });
     note('映射', 'gap', gap + 'px → 子元素边距');
   });
 
+  /* 块级文字：引擎里 <text> 不给宽度就按内容撑成一行（长句子直接顶出屏幕），
+     而网页版里这些是 <div> —— 占满父级宽度、自动换行。所以：
+       父级是竖排 / 普通流 → 给 100% 宽（js/ce-fit.js 再按画布宽折成像素）
+       父级是 flex 横排   → 不给（给了会把同一行后面的东西挤出去） */
+  elements.forEach((el) => {
+    if (el.node.tag !== 'text') return;
+    const conv = styles[el.node.path];
+    if (conv.style.width !== undefined || conv.style.flex) return;
+    const p = el.ancestors.length ? styles[el.ancestors[el.ancestors.length - 1].path] : null;
+    if (p && p.style.flexDirection === 'row') return;
+    conv.style.width = '100%';
+    if (p && p.style.alignItems === 'center' && conv.style.textAlign === undefined) conv.style.textAlign = 'center';
+  });
+
   /* 兜底：单个类名的样式（万一运行时出现样例里没有的上下文，至少不至于裸奔） */
   const bare = {};
+  /* display:none：引擎没有"不画这个节点"，只能透明 + 零尺寸
+     （opacity 会被引擎按父级乘到子孙身上，所以父级透明 = 整棵子树透明）
+     注意：**只收隐藏节点自己的盒子**，别把子孙也收成 0——
+     引擎遇到"宽度 0 的文字"会在换行循环里卡死（truncateText 截不出东西，指针又不动）。 */
+  const hiddenPaths = {};
+  elements.forEach((el) => {
+    const conv = styles[el.node.path];
+    const parentHidden = el.ancestors.some((a) => hiddenPaths[a.path]);
+    if (!conv.meta.hidden && !parentHidden) return;
+    hiddenPaths[el.node.path] = true;
+    conv.style.opacity = 0;
+    if (!parentHidden) { conv.style.width = 0; conv.style.height = 0; }
+  });
+
+  /* aspect-ratio（正方形头像）与百分比圆角：等宽度定下来再折算 */
+  elements.forEach((el) => {
+    const conv = styles[el.node.path];
+    const w = conv.style.width;
+    if (typeof w !== 'number') return;
+    if (conv.meta.aspect && conv.style.height === undefined) {
+      conv.style.height = Math.round(w * conv.meta.aspect);
+      note('映射', 'aspect-ratio', w + 'px → 高 ' + Math.round(w * conv.meta.aspect));
+    }
+    if (conv.meta.radiusPct && conv.style.borderRadius === undefined && conv.style.borderTopLeftRadius === undefined) {
+      conv.style.borderRadius = Math.round(w * conv.meta.radiusPct);
+    }
+  });
   elements.forEach(({ node }) => {
     node.classes.forEach((cls) => {
       const fake = { tag: node.tag, classes: [cls], id: '' };
@@ -624,6 +721,12 @@ function main() {
     const s = styles[k].style;
     const cleaned = {};
     Object.keys(s).forEach((p) => { if (s[p] !== undefined && s[p] !== null) cleaned[p] = s[p]; });
+    /* 文字兜底上色：引擎没颜色就按 #000000 画，在黑底上等于"这行字消失"。
+       编译期算不出来的（继承链断了）也给它一个页面默认色，宁可浅一点也别看不见。 */
+    if (k.split('__').pop().indexOf('text.') === 0 && !cleaned.color) {
+      cleaned.color = PAGE_TEXT;
+      note('兜底', '文字颜色', k.split('__').slice(-1)[0] + ' → ' + PAGE_TEXT);
+    }
     if (Object.keys(cleaned).length) out[k] = cleaned;
   });
 
@@ -648,4 +751,5 @@ function main() {
 
 const CSS_DROPPED = {};
 const SEL_DROPPED = {};
+const PAGE_TEXT = '#e9edf6';   // 页面默认文字色（网页版 body 的 color），只作兜底
 main();

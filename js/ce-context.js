@@ -127,5 +127,35 @@
     }
   }
 
-  return { prepare, walk, contextKey, inlineClass, stripAliases };
+  /* 行内样式串 → 引擎样式对象（只认常用几项：颜色 / 尺寸 / 透明度 / 边距）
+     用途：运行时的兜底——万一某个状态没编进样式表，至少别让文字变成看不见的黑字。 */
+  function inlineToStyle(text) {
+    const out = {};
+    String(text || '').split(';').forEach((part) => {
+      const i = part.indexOf(':');
+      if (i < 0) return;
+      const prop = part.slice(0, i).trim().toLowerCase();
+      const val = part.slice(i + 1).trim();
+      const px = val.match(/^(-?[\d.]+)px$/);
+      const num = px ? parseFloat(px[1]) : (/^-?[\d.]+$/.test(val) ? parseFloat(val) : null);
+      switch (prop) {
+        case 'color': out.color = val; break;
+        case 'background': case 'background-color': if (!/gradient|url/.test(val)) out.backgroundColor = val; break;
+        case 'border-color': out.borderColor = val; break;
+        case 'opacity': if (num !== null) out.opacity = num; break;
+        case 'font-size': if (num !== null) out.fontSize = num; break;
+        case 'font-weight': if (/^\d+$/.test(val)) out.fontWeight = parseInt(val, 10) >= 600 ? 'bold' : 'normal'; break;
+        case 'width': if (num !== null) out.width = num; else if (/%$/.test(val)) out.width = val; break;
+        case 'height': if (num !== null) out.height = num; else if (/%$/.test(val)) out.height = val; break;
+        case 'padding': if (num !== null) { out.paddingTop = num; out.paddingRight = num; out.paddingBottom = num; out.paddingLeft = num; } break;
+        case 'margin-top': if (num !== null) out.marginTop = num; break;
+        case 'margin-bottom': if (num !== null) out.marginBottom = num; break;
+        case 'text-align': if (/^(left|center|right)$/.test(val)) out.textAlign = val; break;
+        default: break;
+      }
+    });
+    return out;
+  }
+
+  return { prepare, walk, contextKey, inlineClass, stripAliases, inlineToStyle };
 });

@@ -3,67 +3,86 @@
 <head>
 <meta charset="utf-8" />
 <title>CE 预览</title>
-<style>html,body{margin:0;background:#111}#c{display:block}</style>
+<style>html,body{margin:0;background:#111}#c{display:block}#err{color:#f66;font:12px monospace;white-space:pre-wrap}</style>
 </head>
 <body>
-<!-- 路线 B 的浏览器预览壳：只为了迭代快（Chrome 无头截图几秒一张），
-     跑的还是小游戏里同一套代码（同一份模板 + 同一份样式表 + 同一个引擎）。
-     真机/模拟器验证仍以微信开发者工具为准。 -->
+<!-- 路线 B 的浏览器预览：**和小游戏里跑的是同一套代码**（同一份逻辑层、同一份网页版界面层、
+     同一个引擎、同一份编译样式表），只是把微信 API 换成浏览器能跑的那点差异。
+     用途：迭代快 —— 无头 Chrome 几秒一张图，四个页签可以逐页看。
+     用法：preview-ce.html?screen=dungeon&h=1400&debug=1（screen 默认 home） -->
 <canvas id="c" width="390" height="844" style="width:390px;height:844px"></canvas>
-<pre id="err" style="color:#f66;font:12px monospace;white-space:pre-wrap"></pre>
+<pre id="err"></pre>
+
+<!-- 逻辑层（与网页版逐字节一致） -->
+<script src="js/wx-adapter.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/dungeon.js"></script>
+<!-- 网页版界面层（同步过来的那一份，浏览器里本来就有真 DOM，直接跑） -->
+<script src="js/ui-web.js"></script>
+
 <script>window.module = { exports: {} }; window.exports = window.module.exports;</script>
 <script src="js/lib/canvas-engine.js"></script>
 <script>window.__ENGINE = window.module.exports; window.module = { exports: {} };</script>
 <script src="js/ce-context.js"></script>
 <script src="js/ce-fit.js"></script>
+<script src="js/ce-html.js"></script>
 <script src="js/ce-home-data.js"></script>
-<script src="js/ce-tpl-home.js"></script>
-<script>window.__TPL = window.module.exports; window.module = { exports: {} };</script>
 <script src="js/ce-style.js"></script>
-<script>
-window.__STYLE = window.module.exports;
-window.module = { exports: {} };
-/* 让 js/ce-home.js 在浏览器里也能 require：只映射它要的那几个兄弟模块 */
-window.require = function (p) {
-  var map = {
-    './lib/canvas-engine.js': window.__ENGINE,
-    './ce-context.js': window.CEContext,
-    './ce-fit.js': window.CEFit,
-    './ce-home-data.js': window.CEHomeData,
-    './ce-tpl-home.js': window.__TPL,
-    './ce-style.js': window.__STYLE,
-  };
-  if (!(p in map)) throw new Error('预览里没映射的 require: ' + p);
-  return map[p];
-};
-</script>
-<script src="js/ce-home.js"></script>
-<script>window.__HOME = window.module.exports; window.module = { exports: {} };</script>
+<script>window.__STYLE = window.module.exports; window.module = { exports: {} };</script>
+<!-- ce-*.js 是 CommonJS，浏览器里跑不了：由 scripts/ce-preview-build.js 打成一份（改完记得重跑） -->
+<script src="_ce_bundle.js"></script>
+
 <script>
 (function () {
+  var out = document.getElementById('err');
   try {
-    var W = 390, H = 844;
-    var mh = location.search.match(/h=(\d+)/);
-    if (mh) { H = parseInt(mh[1], 10); }
+    var q = location.search;
+    var mh = q.match(/h=(\d+)/);
+    var ms = q.match(/screen=(\w+)/);
+    var W = 390, H = mh ? parseInt(mh[1], 10) : 844;
+    var tab = ms ? ms[1] : 'home';
     var canvas = document.getElementById('c');
     canvas.width = W; canvas.height = H;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     var ctx = canvas.getContext('2d');
-    var out = window.__HOME.render(ctx, W, H, window.CEHomeData.sample());
-    var Layout = out.Layout;
-    document.title = 'OK 元素 ' + (Layout.eleCount || 0);
-    if (location.search.indexOf('debug') >= 0) {
+
+    if (q.indexOf('diag') >= 0) {
+      out.textContent = ['ENGINE:' + typeof window.__ENGINE, 'SHELL:' + typeof window.__SHELL,
+        'CEENGINE:' + typeof window.__CEENGINE, 'CEApp:' + typeof window.CEApp,
+        'CEApp keys:' + (window.CEApp ? Object.keys(window.CEApp).join(',') : '-'),
+        'CEHtml:' + typeof window.CEHtml, 'CEContext:' + typeof window.CEContext,
+        'CEFit:' + typeof window.CEFit, 'CEHomeData:' + typeof window.CEHomeData,
+        'UI:' + typeof window.UI, 'Core:' + typeof window.Core,
+        'UI._screens:' + (window.UI && window.UI._panels && window.UI._panels._screens ? 'yes' : 'no')].join('\n');
+      document.title = 'DIAG';
+      return;
+    }
+
+    /* 浏览器里没有 wx：适配层已经退化成内存存储，起个档就能看 */
+    if (!window.Core.S && !window.Core.load()) window.Core.newGame();
+
+    var markup = window.CEApp.pageMarkup(tab);
+    var res = window.__CEENGINE.renderPage(ctx, W, H, markup);
+    document.title = 'OK ' + tab + ' 元素 ' + (res.Layout.eleCount || 0)
+      + (res.missing.length ? ' 缺样式' + res.missing.length : '');
+    if (q.indexOf('debug') >= 0) {
       var lines = [];
       (function dump(el, d) {
         var lb = el.layoutBox || {};
-        lines.push(d + (el.type || '?') + ' [' + (el.className || '') + '] box=' + Math.round(lb.absoluteX || 0) + ',' + Math.round(lb.absoluteY || 0) + ' ' + Math.round(lb.width || 0) + 'x' + Math.round(lb.height || 0) + (el.value !== undefined ? ' value=' + JSON.stringify(String(el.value).slice(0, 18)) : ''));
+        var mg = '';
+        if (el.style && (el.style.marginTop || el.style.marginBottom)) mg = ' mt=' + (el.style.marginTop || 0) + ' mb=' + (el.style.marginBottom || 0);
+        lines.push(d + (el.type || '?') + ' [' + (el.className || '') + '] box=' + Math.round(lb.absoluteX || 0) + ','
+          + Math.round(lb.absoluteY || 0) + ' ' + Math.round(lb.width || 0) + 'x' + Math.round(lb.height || 0) + mg
+          + (el.value !== undefined ? ' value=' + JSON.stringify(String(el.value).slice(0, 20)) : ''));
         (el.children || []).forEach(function (c) { dump(c, d + '  '); });
-      })(Layout.children[0], '');
-      document.getElementById('err').textContent = lines.join('\n');
+      })(res.Layout.children[0], '');
+      out.textContent = lines.join('\n');
     }
   } catch (e) {
     document.title = 'ERR ' + e.message;
-    document.getElementById('err').textContent = (e && e.stack) || String(e);
+    out.textContent = (e && e.stack) || String(e);
   }
 })();
 </script>

@@ -21,7 +21,17 @@ require('./js/dungeon.js');
 const CE_SAMPLE = (typeof globalThis !== 'undefined' && globalThis.CE_SAMPLE !== undefined)
   ? globalThis.CE_SAMPLE : true;
 
-const ceOk = CE_SAMPLE && !!require('./js/ce-home.js').boot();
+let ceOk = false;
+if (CE_SAMPLE) {
+  try {
+    require('./js/ce-dom.js').install();   // 垫一套假 DOM：网页版界面层的字符串工厂才能跑
+    require('./js/ui-web.js');             // 网页版界面层（从 wxlh-game/js/ui.js 同步而来）
+    ceOk = !!require('./js/ce-app.js').boot();
+  } catch (e) {
+    console.error('[CE] 引擎版启动失败，回退原来的界面层：' + (e && e.message));
+    ceOk = false;
+  }
+}
 
 if (!ceOk) {
   /* 没开开关、引擎没起来、或者还没有存档（首次进入要走起名 / 选血统）→ 交给原来的界面层 */
