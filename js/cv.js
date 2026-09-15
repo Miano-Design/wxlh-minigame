@@ -14,9 +14,7 @@ const CV = {
   ctx: null, DPR: 2,
   stack: [], hits: [], toasts: [],
   panels: {},
-  /* 配色与圆角**照抄网页版的 CSS 变量**（css/style.css 的 :root）：
-     两边不一样，很大一部分原因就是"底色调、金色、灰阶"各走了一套。
-     以后网页版改配色，把这里跟着改一遍即可。 */
+  /* 配色照抄网页版 css/style.css 的 :root */
   C: {
     bg: '#07090e', bg2: '#0b0e15',
     panel: '#111621', panel2: '#161d2a', panel3: '#1d2534',
@@ -29,8 +27,7 @@ const CV = {
   RADIUS_SM: 7,
 };
 
-/* 自适应：按窗口宽度算缩放（平板上按 520 宽封顶并居中，跟网页版的 max-width:520px 一致），
-   同时把刘海与底部小黑条留出来 —— 这两块用物理像素处理，不参与缩放。 */
+/* 自适应：按窗口宽度缩放，平板按 520 宽封顶并居中；刘海与底部安全区按物理像素留白 */
 CV.setup = function (info) {
   const W = info.windowWidth || 375;
   const H = info.windowHeight || 812;
@@ -115,9 +112,7 @@ function drawText(str, x, y, opt) {
   c.textBaseline = 'middle';
   c.fillText(String(str), x, y);
 }
-/* ---------- 文字不许出画：量宽度 + 截断/换行 ----------
-   以前画文字不量宽度，长文案（货币图鉴的"来源/用途"、长名字的伙伴）
-   就直接画出屏幕右边——这就是"内容出画"。现在统一走这两个函数。 */
+/* 文字宽度约束：超长截断 / 折行 */
 function measure(str, size, bold) {
   const c = CV.ctx;
   try {
@@ -281,8 +276,7 @@ const L = {
     this.y += Math.ceil(cells.length / cols) * (h + gap);
     return this;
   },
-  /* 文字宫格：与网页版 .text-menu / .tile 同款 —— 3 列、每格只有「名字 + 状态」、描边方块、右上角可带红点。
-     网页版首页的「养成 / 日常」就是这一套，不是一行一条的列表。 */
+  /* 文字宫格（网页版 .text-menu）：3 列，名字 + 状态，右上角可带红点 */
   tiles(items, cols) {
     const n = cols || 3, gap = 8, h = 56;
     const w = (CV.W - 32 - gap * (n - 1)) / n;

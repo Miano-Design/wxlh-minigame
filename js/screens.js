@@ -29,7 +29,7 @@ function tileList(items) {
     L.row(it[1], it[2] || '', { id: it[0], value: it[3] || '' });
   });
 }
-/* 网页版那套三列文字宫格（养成 / 日常 / 其他都是它）；items 是 [id, 名字, 状态, 是否红点] */
+/* 三列文字宫格：items = [id, 名字, 状态, 红点] */
 function tileGrid3(items) {
   L.tiles(items.map(([id, name, sub, dot]) => ({ id, label: name, sub: sub || '', dot: !!dot })), 3);
 }
@@ -38,8 +38,7 @@ function fitTextLocal(str, maxW, size) {
   const CVmod = CV;
   return (CVmod.L && CVmod.L._fit) ? CVmod.L._fit(str, maxW, size, false) : str;
 }
-/* 网页版的养成/日常宫格：**已解锁的才铺成格子**，没解锁的折成一行灰字
-   （以前小游戏版把没解锁的也画成灰格子，和网页版观感差很多） */
+/* 养成/日常：已解锁才铺格子，未解锁折成一行灰字 */
 function tileGridWithLock(list) {
   const open = list.filter(it => !it[4] || Core.isUnlocked(it[4]));
   const locked = list.filter(it => it[4] && !Core.isUnlocked(it[4]));
@@ -55,7 +54,7 @@ let preBuff = 0;   // 战前增益：看一次广告，下一关全队攻击 +25
 function takePreBuff() { const v = preBuff; preBuff = 0; return v; }
 
 /* ================= 灯阁（首页） ================= */
-/* 新手引导：照网页版那套"上手三件事"讲清楚（网页版是弹窗，这里做成第一屏） */
+/* 新手引导 */
 CV.register('welcome', function () {
   L.spacer(10);
   L.text('欢迎来到灯阁', { size: 22, bold: true, align: 'center', color: CV.C.gold });
@@ -75,8 +74,7 @@ CV.register('welcome', function () {
 
 CV.register('home', function () {
   const s = S(), pst = Core.effectivePlayerStats();
-  /* 主角卡：照网页版做成"多行【标签】值"（不是大标题 + 三个数字）
-     【境界】血奴初期 / 【等级】Lv.2 / 【主角】六维待分 0·技能待加 0 / 【转生】0 世 */
+  /* 主角卡：【标签】值多行 */
   const sp = s.player;
   const rs = Core.realmState();
   CV.fillPanel(12, L.y, CV.W - 24, 134, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
@@ -151,7 +149,6 @@ CV.register('home', function () {
   L.btnRow([adBtn('idle_boost', '⏩ 挂机加速2h', 'ad_idle'), adBtn('offline_double', '🕒 离线翻倍', 'ad_offline')]);
   L.btnRow([adBtn('holy_pack', '✦晶石×30', 'ad_holy'), adBtn('otherworld_pack', '◆结晶×50', 'ad_other')]);
   L.btnRow([adBtn('free_recruit', '🎴 普通池抽1次', 'ad_recruit'), adBtn('sweep_plus', '⏩ 扫荡+3', 'ad_sweep')]);
-  L.text('同样的奖励在对应玩法里也能点：招募页 / 扫荡面板 / 开打前 / 失败结算页。', { size: 11, color: CV.C.dim });
 
   const t = Core.todayState();
   L.title('日常');
@@ -297,6 +294,7 @@ CV.register('battle', function () {
   L.y += 82;
   // 我方：后排在上、前排在下（和战场的视觉一致）
   const aw = Math.min(58, Math.floor((CV.W - 32 - (allies.length - 1) * 8) / Math.max(1, allies.length)));
+  const ax = (CV.W - (allies.length * aw + (allies.length - 1) * 8)) / 2;
   ['back', 'front'].forEach(row => {
     const list = allies.filter(uid => (b.units[uid].position === 'front' ? 'front' : 'back') === row);
     if (!list.length) return;
@@ -337,7 +335,7 @@ CV.register('battle', function () {
   // 战备补给（只在"整关连打"时有意义：药剂作用于下一波进场）
   if (stageRun && !b.done) {
     const lastWave = stageRun.wave >= stageRun.waves.length - 1;
-    if (lastWave) CV.drawText('收官战 · 药剂要到下一关才生效（每关开局满血）', 16, L.y + 10, { size: 11, color: CV.C.dim });
+    if (lastWave) CV.drawText('收官战：药剂留到下一关', 16, L.y + 10, { size: 11, color: CV.C.dim });
     else CV.drawText('战备补给 · 喝了从下一波进场生效', 16, L.y + 10, { size: 11, color: CV.C.dim });
     L.y += 24;
     if (!lastWave) {
@@ -762,7 +760,7 @@ CV.register('protagonist', function () {
   L.text(`攻 ${fmt(st.atk)}　防 ${fmt(st.def)}　生 ${fmt(st.hp)}　速 ${fmt(st.spd)}　暴击 ${(st.crit * 100).toFixed(1)}%　闪避 ${(st.eva * 100).toFixed(1)}%`, { size: 12 });
   // 六维卡（与网页版同构：已分配 N 点 → +X，右侧 [+1]）
   cardTitle('六维属性', `可用点数 ${sp.attrPoints || 0}`);
-  L.text('每升 1 级获得 3 点；每点 +2 维值；加错了随时点「洗点」，不花任何东西。', { size: 11, color: CV.C.dim });
+  L.text('每级 3 点，每点 +2 维值。', { size: 11, color: CV.C.dim });
   D.ATTR_META.forEach(a => {
     const n = sp.attrs[a.id] || 0;
     L.row(a.name, `${a.desc}　已分配 ${n} 点 → +${n * D.ATTR_POINT_VALUE}`, { id: 'attr_' + a.id, value: '+1', valueColor: CV.C.gold });
@@ -773,7 +771,7 @@ CV.register('protagonist', function () {
     { label: '⚗️ 炼化台（血清）', id: 'open_refine', size: 12 },
   ]);
   cardTitle('血统技能', `可用技能点 ${s.player.skillPoints || 0}`);
-  L.text('每升 1 级获得 1 点技能点；点错了点「重置」会退回全部技能点。', { size: 11, color: CV.C.dim });
+  L.text('技能点可随时重置退还。', { size: 11, color: CV.C.dim });
   const sk = Core.protagonistSkills();
   ['s1', 's2', 'ult'].forEach((k, i) => {
     L.row(`${sk[k].name} Lv.${(s.player.skillLv || [1, 1, 1])[i]}`, sk[k].desc || '', { id: 'pskill_' + i, value: '升级' });
@@ -799,7 +797,7 @@ CV.register('protagonist', function () {
   });
 });
 
-/* 十项属性面板（网页版那一屏总览，角色卡与主角卡共用） */
+/* 十项属性面板 */
 function attributePanel(st, who) {
   L.title('属性面板', who + '当前生效值');
   const rows = [
@@ -896,7 +894,7 @@ CV.register('bag', function (p) {
   L.grid(5, cells, { h: 58 });
 });
 
-/* 装备池的筛选与批量分解（与网页版的分类口径一致） */
+/* 装备池筛选与批量分解 */
 let bagSlotFilter = 'all', bagCatFilter = 'all', batchMode = false, batchSel = new Set();
 const SLOT_FILTERS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品'], ['SSR', 'SSR+']];
 const CAT_FILTERS = [['all', '全部'], ['normal', '普通'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
@@ -1256,7 +1254,7 @@ CV.register('shop', function () {
   });
 });
 CV.register('guide', function () {
-  L.text('这一页讲清游戏怎么玩；看广告的规则也写在里面。', { size: 11, color: CV.C.dim });
+  
   D.GUIDE_CHAPTERS.forEach(ch => {
     L.title(ch.t || ch.title || '章节');
     L.text(ch.body || ch.desc || '', { size: 12, color: CV.C.dim });
@@ -1278,7 +1276,7 @@ CV.register('guide', function () {
   L.btn('💠 货币图鉴（每种货币干什么用）', 'open_curdoc');
 });
 
-/* 货币图鉴：顶栏点货币也是开这个 */
+/* 货币图鉴 */
 const CUR_DOC = {
   points: ['挂机、副本、扫荡、每日任务、悬赏、药园收获', '抽普通池、升伙伴等级、买商店、装备强化、扩背包、种药园、驯坐骑'],
   story: ['深层副本、深井、故事商店相关产出', '故事商店（碎片、材料、技能芯片）'],
@@ -1299,7 +1297,7 @@ CV.register('curdoc', function () {
   });
 });
 
-/* 多主角：一个人可以养几条不同的血统线，随时切换 */
+/* 多主角 */
 CV.register('alts', function () {
   const list = Core.protagonistList();
   L.text(`当前操盘的角色：${list.map(p => (p.current ? '【' + p.name + '】' : p.name)).join(' · ')}`, { size: 12, color: CV.C.dim });
