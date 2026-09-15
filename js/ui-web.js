@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.6';
+  const GAME_VER = '9.5.7';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1348,9 +1348,9 @@ window.UI = (function () {
     const lvlPct = Math.min(100, S.player.exp / (D.EXP_TABLE[S.player.level] || 1) * 100);
     const w = showPanel(wrap, `${cname('@player')}（主角）`, `
       <div class="card">
-        <div style="display:flex;gap:12px;align-items:center">
+        <div style="display:flex;gap:12px;align-items:flex-start">
           ${charAvatar('@player', 56)}
-          <div class="grow" style="min-width:0">
+          <div style="flex:1;min-width:0">
             <div><b>${cname('@player')}</b> <span class="tag" style="color:var(--gold);border-color:var(--gold)">执灯者本人</span></div>
             <div class="hint mt1">Lv.${S.player.level}（玩家等级）· ${S.player.bloodline ? S.player.bloodline + '血统 Lv.' + S.player.bloodlineLv : '未选血统'}</div>
             <div class="hint">铭刻 ${gl > 0 ? D.GENE_LOCKS[gl - 1].name : '未解锁'} · 六维待分 ${S.player.attrPoints || 0} 点</div>
@@ -1591,9 +1591,9 @@ window.UI = (function () {
     const expItems = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
     const w = showPanel(wrap, `${cname(id)}`, `
       <div class="card">
-        <div style="display:flex;gap:12px;align-items:center">
+        <div style="display:flex;gap:12px;align-items:flex-start">
           ${charAvatar(id, 56)}
-          <div class="grow" style="min-width:0">
+          <div style="flex:1;min-width:0">
             <div>${rarityTag(ch.rarity)} <b>${cname(id)}</b> <span class="stars">${stars(c.star, maxStar)}</span></div>
             <div class="hint mt1">${ch.faction} · ${ch.role} · ${ch.bloodline}血统</div>
             <div class="hint">Lv.${c.lv} · 碎片 ${c.shards} · 血统 Lv.${c.bloodlineLv}</div>
