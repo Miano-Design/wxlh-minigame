@@ -230,12 +230,14 @@ CV.draw = function () {
   if (top) {
     const panel = CV.panels[top.name];
     const viewH = CV.H - CV.TOP - CV.NAV_H;
+    // 二级页顶部有返回条：正文本来就得从返回条下面开始，否则第一行会被盖住
+    const barH = CV.stack.length > 1 ? 46 : 0;
     c.save();
     c.beginPath();
-    c.rect(0, CV.TOP, CV.W, viewH);
+    c.rect(0, CV.TOP + barH, CV.W, viewH - barH);
     c.clip();
     c.translate(0, -top.scroll);
-    L.at(CV.TOP + 10);
+    L.at(CV.TOP + barH + 10);
     if (panel) {
       CV.lastError = null;
       try { panel(top.params); } catch (e) {
@@ -245,7 +247,7 @@ CV.draw = function () {
         top.contentH = CV.TOP + 60;
       }
     }
-    top.contentH = Math.max(L.y, viewH + CV.TOP);
+    top.contentH = Math.max(L.y, viewH + CV.TOP + barH);
     c.restore();
     top.maxScroll = Math.max(0, top.contentH - (CV.TOP + viewH));
     if (top.scroll > top.maxScroll) top.scroll = top.maxScroll;
