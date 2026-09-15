@@ -463,5 +463,7 @@ CV.rarityColorOf = function (r) {
 CV.fillPanel = fillPanel;
 CV.drawText = drawText;
 CV.addHit = addHit;
+CV.fitText = fitText;      // 业务层（战斗单位等）也要用
+CV.measure = measure;
 
 module.exports = CV;

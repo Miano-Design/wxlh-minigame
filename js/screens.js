@@ -33,11 +33,6 @@ function tileList(items) {
 function tileGrid3(items) {
   L.tiles(items.map(([id, name, sub, dot]) => ({ id, label: name, sub: sub || '', dot: !!dot })), 3);
 }
-function fitTextLocal(str, maxW, size) {
-  // 复用 cv 的宽度约束（超长截断加省略号）
-  const CVmod = CV;
-  return (CVmod.L && CVmod.L._fit) ? CVmod.L._fit(str, maxW, size, false) : str;
-}
 /* 养成/日常：已解锁才铺格子，未解锁折成一行灰字 */
 function tileGridWithLock(list) {
   const open = list.filter(it => !it[4] || Core.isUnlocked(it[4]));
@@ -81,7 +76,7 @@ CV.register('home', function () {
   const kv = (i, label, value, opt) => {
     const y = L.y + 19 + i * 24;
     CV.drawText(label, 24, y, { size: 12, color: (opt && opt.labelColor) || CV.C.dim });
-    if (value) CV.drawText(fitTextLocal(value, CV.W - 120 - 24, 12), 110, y, { size: 12, color: (opt && opt.color) || CV.C.text });
+    if (value) CV.drawText(CV.fitText(value, CV.W - 120 - 24, 12), 110, y, { size: 12, color: (opt && opt.color) || CV.C.text });
     if (opt && opt.right) CV.drawText(opt.right, CV.W - 24, y, { size: 11, align: 'right', color: opt.rightColor || CV.C.dim });
   };
   kv(0, '【境界】', rs.curName || '未选血统', { color: CV.C.gold, right: '全属性 +' + (Core.realmBonusPct() * 100).toFixed(1) + '%', rightColor: CV.C.gold });
@@ -254,7 +249,7 @@ function battleUnit(u, x, y, w) {
   CV.ctx.stroke();
   CV.drawText((u.name || '?')[0], cx, y + r + 4, { size: 18, bold: true, align: 'center', color: dead ? CV.C.dim : CV.C.text });
   // 名字 + 血条 + 百分比
-  CV.drawText(fitText(u.name.length > 5 ? u.name.slice(0, 5) : u.name, w + 8, 10), cx, y + 52, { size: 10, align: 'center', color: dead ? CV.C.dim : CV.C.dim });
+  CV.drawText(CV.fitText(u.name.length > 5 ? u.name.slice(0, 5) : u.name, w + 8, 10), cx, y + 52, { size: 10, align: 'center', color: dead ? CV.C.dim : CV.C.dim });
   const bw = Math.max(30, w - 6), bh = 5, bx = x + (w - bw) / 2;
   CV.ctx.fillStyle = '#0f141d';
   rrectL(bx, y + 60, bw, bh, 3); CV.ctx.fill();

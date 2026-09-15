@@ -76,7 +76,8 @@ async function main() {
   };
   const badRender = [];
   Object.keys(CV.panels).forEach(name => {
-    if (name === 'battle' || name === 'char' || name === 'equip' || name === 'stageresult') return;  // 需要真实数据，下面单独测
+    if (name === 'char' || name === 'equip' || name === 'stageresult') return;  // 需要真实数据，下面单独测
+    if (name === 'battle' && !Scr.battle()) return;   // 有战斗时才渲染（没有就跳过）
     CV.reset(name, sample[name] || {});
     try {
       UI._draw();
@@ -116,6 +117,7 @@ async function main() {
   t('战斗画面有双方单位与站位数据', !!b0 && b0.order.length >= 2 && b0.units[b0.order[0]].maxHp > 0);
   UI._draw();
   t('战斗画面能画出站位与血条（可点区域 ≥3）', CV.hits.length >= 3, 'hits=' + CV.hits.length);
+  t('战斗面板渲染无异常（框架不再吞异常）', !CV.lastError, CV.lastError && CV.lastError.message);
   playOut();
   t('打完之后进结算页', CV.top().name === 'stageresult', CV.top().name);
   t('结算页有可点的后续动作', CV.hits.length > 0);
