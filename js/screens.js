@@ -809,10 +809,11 @@ CV.register('bag', function (p) {
   const pool = p.pool || 'item';
   const s = S();
   const u = Core.bagUsage();
+  // 页签只写名字（数字放到下面的卡内标题里，与网页版一致）
   L.btnRow([
-    { label: `道具 ${u.itemStacks}/${u.cap}`, id: 'bagpool_item', primary: pool === 'item', size: 12 },
-    { label: `材料 ${u.matUsed}/${u.matCap}`, id: 'bagpool_mat', primary: pool === 'mat', size: 12 },
-    { label: `装备 ${u.eqUsed}/${u.eqCap}`, id: 'bagpool_equip', primary: pool === 'equip', size: 12 },
+    { label: '道具', id: 'bagpool_item', primary: pool === 'item' },
+    { label: '材料', id: 'bagpool_mat', primary: pool === 'mat' },
+    { label: '装备', id: 'bagpool_equip', primary: pool === 'equip' },
   ]);
   const stash = Core.stashCount();
   if (stash) L.row('📮 待领箱', `背包满时收到的 ${stash} 件，点一下领回`, { id: 'stash_claim', value: '领回' });
@@ -840,6 +841,10 @@ CV.register('bag', function (p) {
         { label: '⚡ 一键最优装备', id: 'auto_equip', size: 12 },
       ]);
     }
+    L.y += 2;
+    CV.drawText('装备格', 16, L.y + 8, { size: 13, bold: true, color: CV.C.text });
+    CV.drawText(`${u.eqUsed} / ${u.eqCap}`, CV.W - 16, L.y + 8, { size: 12, align: 'right', color: CV.C.dim });
+    L.y += 24;
     if (!list.length) L.text('这个筛选下没有未穿戴的装备', { color: CV.C.dim });
     const cells = list.slice(0, D.BAG_BASE_EQ_CAP + s.bag.eqExpands * D.BAG_EXPAND_SIZE).map(eq => {
       const sel = batchSel.has(eq.uid);
@@ -852,13 +857,18 @@ CV.register('bag', function (p) {
         id: batchMode ? (eq.lock ? null : 'bq_' + eq.uid) : 'equip_' + eq.uid,
       };
     });
-    while (cells.length < Math.min(u.eqCap, 30)) cells.push(null);
+    while (cells.length < Math.min(u.eqCap, 25)) cells.push(null);
+    cells.push({ label: '＋', sub: '+' + D.BAG_EXPAND_SIZE, id: 'expand_equip', color: CV.C.gold, bg: '#1a2230' });
     L.grid(5, cells, { h: 58 });
-    L.btn(`＋ 扩容 ${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(s.bag.eqExpands))}）`, 'expand_equip');
     return;
   }
   const isMat = k => (D.ITEMS[k] || {}).type === 'material';
   const list = Object.keys(s.items).filter(k => s.items[k] > 0 && (pool === 'mat' ? isMat(k) : !isMat(k)));
+  const capNow = pool === 'mat' ? u.matCap : u.cap;
+  const usedNow = pool === 'mat' ? u.matUsed : u.itemStacks;
+  CV.drawText(pool === 'mat' ? '材料格' : '道具格', 16, L.y + 8, { size: 13, bold: true, color: CV.C.text });
+  CV.drawText(`${usedNow} / ${capNow}`, CV.W - 16, L.y + 8, { size: 12, align: 'right', color: CV.C.dim });
+  L.y += 24;
   if (!list.length) L.text('（这一池还是空的）', { color: CV.C.dim });
   const cells = list.map(k => {
     const it = D.ITEMS[k];
@@ -869,10 +879,9 @@ CV.register('bag', function (p) {
       size: 11,
     };
   });
-  while (cells.length < Math.min(pool === 'mat' ? u.matCap : u.cap, 30)) cells.push(null);
+  while (cells.length < Math.min(capNow, 25)) cells.push(null);
+  cells.push({ label: '＋', sub: '+' + D.BAG_EXPAND_SIZE, id: 'expand_' + pool, color: CV.C.gold, bg: '#1a2230' });
   L.grid(5, cells, { h: 58 });
-  L.btn(`＋ 扩容 ${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(pool === 'mat' ? s.bag.matExpands : s.bag.itemExpands))}）`, 'expand_' + pool);
-  L.text('点格子看用途与用法（1 / 10 / 全部）', { size: 11, color: CV.C.dim });
 });
 
 /* 装备池的筛选与批量分解（与网页版的分类口径一致） */
