@@ -492,6 +492,8 @@ function loadMarkups() {
   const { Core } = env.install();
   const CEApp = require(path.resolve(ROOT, 'js/ce-app.js'));
   const out = [];
+  /* 弹窗（sheet）的样式也得编：借一个"开着弹窗的页面"来枚举它们的上下文 */
+  states_modal = true;
   const states = [
     { name: '', setup() {} },
     { name: '·全解锁', setup() { Core.isUnlocked = () => true; Core.freeRecruitAvailable = () => true; } },
@@ -520,6 +522,16 @@ function loadMarkups() {
   ];
   states.forEach((st) => {
     st.setup();
+    /* 每个状态再编一遍"首页 + 一个弹窗"：弹窗层（modal-mask / sheet / sheet-head…）的样式来源。
+       用和运行时同一种弹窗（居中确认框）来枚举，保证上下文键一致。 */
+    try {
+      if (window.UI && window.UI.modal) {
+        window.UI.modal('弹窗标题', '弹窗内容', { center: true });
+        out.push({ name: '首页 + 弹窗' + st.name, markup: CEApp.pageMarkup('home') });
+        if (window.__CE_MODALS) window.__CE_MODALS.length = 0;
+        if (window.__CE_MODALS_ELS) window.__CE_MODALS_ELS.length = 0;
+      }
+    } catch (e) { /* 弹窗打不开也不该让编译挂掉 */ }
     PAGE_SPECS.forEach((p) => {
       try {
         out.push({ name: p.name + st.name, markup: CEApp.pageMarkup(p.tab, { fn: p.fn }) });

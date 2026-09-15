@@ -36,11 +36,15 @@ function screens() {
 function pageMarkup(tab, opts) {
   if (tab === 'setup') return setupMarkup();
   const S = screens();
+  /* 弹窗：网页版往 #modal-root 里塞的内容（被 ce-dom 接住）→ 翻译成引擎标记，作为最上层 */
+  const modals = (window.__CE_MODALS || []);
+  const overlay = modals.length ? CEHtml.toXml(modals[modals.length - 1]) : '';
+  const withOverlay = (xml) => (overlay ? xml.replace(/<\/view>\s*$/, `<view id="modal-root">${overlay}</view></view>`) : xml);
   const sub = SUBS[tab];
   const navTab = sub ? sub.tab : tab;
   const fn = S && S[((opts && opts.fn) || (sub && sub.fn) || SCREEN_FN[tab] || tab)];
   if (!fn) throw new Error('[CE] 网页版界面层没有这个页面：' + tab);
-  return CEShell.shell(navTab, CEHtml.toXml(fn()), opts);
+  return withOverlay(CEShell.shell(navTab, CEHtml.toXml(fn()), opts));
 }
 
 
@@ -121,6 +125,15 @@ function bind(app, out) {
       el.on('click', () => {
         if (!window.Core.S.player.bloodline) return;
         app.tab = 'home';
+        draw(app);
+      });
+    } else if (el.className && el.className.indexOf('modal-mask') >= 0) {
+      el.on('click', () => {
+        const els = window.__CE_MODALS_ELS || [];
+        const last = els[els.length - 1];
+        try { if (last && window.UI && window.UI.closeModal) window.UI.closeModal(last); } catch (e) {}
+        if (window.__CE_MODALS) window.__CE_MODALS.length = 0;
+        if (window.__CE_MODALS_ELS) window.__CE_MODALS_ELS.length = 0;
         draw(app);
       });
     } else if (ds.act) {

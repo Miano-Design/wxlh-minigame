@@ -28,3 +28,8 @@
    引擎里的 <text> 不写宽度就按内容撑成一行，长句子会直接顶出屏幕，
    所以这类文字在模板里多挂一个 blk（宽度交给 js/ce-fit.js 按画布宽折算）。 */
 .blk { width: 100%; }
+
+/* 弹窗层（网页版的 sheet）：canvas 里没有 translateX(-50%)，抽屉直接贴左、满宽 */
+#modal-root { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+#modal-root .modal-mask { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+#modal-root .sheet { left: 0; bottom: 0; }

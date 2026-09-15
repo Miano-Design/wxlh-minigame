@@ -41,7 +41,7 @@
      交给引擎画成底部抽屉（见 js/ce-app.js）。不接住的话，网页版的弹窗小游戏里全丢。 */
   const capture = (root, bucket) => {
     root.appendChild = function (child) {
-      try { bucket.push(child && child.innerHTML ? child.innerHTML : ''); } catch (e) {}
+      try { bucket.push(child && child.innerHTML ? child.innerHTML : ''); (g.__CE_MODALS_ELS = g.__CE_MODALS_ELS || []).push(child); } catch (e) {}
       this.children.push(child);
       return child;
     };

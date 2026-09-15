@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 17:14 */
+   生成时间：2026-09-15 17:15 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -192,6 +192,28 @@ module.exports = {
   "justifyContent": "center",
   "color": "#7a849b",
   "fontSize": 11
+ },
+ "modal-mask": {
+  "position": "absolute",
+  "backgroundColor": "rgba(0,0,0,.62)"
+ },
+ "sheet": {
+  "position": "absolute",
+  "width": "100%",
+  "maxWidth": 520,
+  "maxHeight": "86%",
+  "backgroundColor": "#0b0e15",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderBottomWidth": 0,
+  "borderTopLeftRadius": 18,
+  "borderTopRightRadius": 18,
+  "borderBottomRightRadius": 0,
+  "borderBottomLeftRadius": 0,
+  "flexDirection": "column",
+  "paddingBottom": 0,
+  "left": "50%",
+  "bottom": 0
  },
  "world-card": {
   "flexDirection": "row",
@@ -1315,6 +1337,105 @@ module.exports = {
   "marginBottom": 3,
   "width": "100%",
   "textAlign": "center"
+ },
+ "view#app__view#modal-root": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "position": "absolute",
+  "left": 0,
+  "top": 0,
+  "right": 0,
+  "bottom": 0
+ },
+ "view#app__view#modal-root__view.modal-mask": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "position": "absolute",
+  "backgroundColor": "rgba(0,0,0,.62)",
+  "left": 0,
+  "top": 0,
+  "right": 0,
+  "bottom": 0
+ },
+ "view#app__view#modal-root__view.center.sheet": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "position": "absolute",
+  "width": "92%",
+  "maxWidth": 520,
+  "maxHeight": "86%",
+  "backgroundColor": "#0b0e15",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderBottomWidth": 0,
+  "borderTopLeftRadius": 18,
+  "borderTopRightRadius": 18,
+  "borderBottomRightRadius": 18,
+  "borderBottomLeftRadius": 18,
+  "flexDirection": "column",
+  "paddingBottom": 0,
+  "borderRadius": 18,
+  "left": 0,
+  "bottom": 0
+ },
+ "view#app__view#modal-root__view.center.sheet__view.sheet-head": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 14,
+  "paddingRight": 18,
+  "paddingBottom": 12,
+  "paddingLeft": 18,
+  "borderBottomWidth": 1,
+  "borderBottomColor": "#232b3b"
+ },
+ "view#app__view#modal-root__view.center.sheet__view.sheet-head__text": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "marginRight": 10
+ },
+ "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x": {
+  "color": "#7a849b",
+  "fontSize": 15,
+  "width": 34,
+  "height": 34,
+  "flex": 0,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#333e55",
+  "backgroundColor": "#111621",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "padding": 0,
+  "paddingTop": 0,
+  "paddingRight": 0,
+  "paddingBottom": 0,
+  "paddingLeft": 0,
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "lineHeight": 15,
+  "marginRight": 10
+ },
+ "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x__text.ce-ico": {
+  "color": "#7a849b",
+  "fontSize": 15,
+  "lineHeight": 15
+ },
+ "view#app__view#modal-root__view.center.sheet__text.sheet-body": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "paddingTop": 14,
+  "paddingRight": 18,
+  "paddingBottom": 18,
+  "paddingLeft": 18,
+  "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card": {
   "color": "#e9edf6",

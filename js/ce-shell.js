@@ -38,10 +38,13 @@ function navbarXml(tab) {
 function shell(tab, bodyXml, opts) {
   const d = (opts && opts.topbar) || CEHomeData.topbar();
   const noNav = !!(opts && opts.noNav);
+  /* 弹窗层：网页版的弹窗（sheet）塞在 #modal-root 里，这里把它画在最上层（放在最后 = 画在最上面） */
+  const overlay = (opts && opts.overlay) || '';
   return `<view id="app">
   ${topbarXml(d)}
   <scrollview id="view" scrollY="true"><view class="screen">${bodyXml}</view></scrollview>
   ${noNav ? '' : navbarXml(tab)}
+  ${overlay ? `<view id="modal-root">${overlay}</view>` : ''}
 </view>`;
 }
 
