@@ -115,6 +115,43 @@ function drawText(str, x, y, opt) {
   c.textBaseline = 'middle';
   c.fillText(String(str), x, y);
 }
+/* ---------- 文字不许出画：量宽度 + 截断/换行 ----------
+   以前画文字不量宽度，长文案（货币图鉴的"来源/用途"、长名字的伙伴）
+   就直接画出屏幕右边——这就是"内容出画"。现在统一走这两个函数。 */
+function measure(str, size, bold) {
+  const c = CV.ctx;
+  try {
+    c.font = `${bold ? 'bold ' : ''}${size}px sans-serif`;
+    const m = c.measureText ? c.measureText(String(str)) : null;
+    if (m && m.width) return m.width;
+  } catch (e) { /* 没有真 canvas 时用估算 */ }
+  // 估算：中文按一个字号宽，英文/数字按 0.55
+  let w = 0;
+  for (const ch of String(str)) w += /[\u4e00-\u9fa5\uff00-\uffef]/.test(ch) ? size : size * 0.55;
+  return w;
+}
+// 超长就截断加省略号（列表标签、按钮文字用）
+function fitText(str, maxW, size, bold) {
+  str = String(str);
+  if (maxW <= 0) return '';
+  if (measure(str, size, bold) <= maxW) return str;
+  let s = str;
+  while (s.length > 1 && measure(s + '…', size, bold) > maxW) s = s.slice(0, -1);
+  return s + '…';
+}
+// 长段落按宽度折行（段落文字用）
+function wrapText(str, maxW, size, bold) {
+  const out = [];
+  String(str).split('\n').forEach(par => {
+    let line = '';
+    for (const ch of par) {
+      if (line && measure(line + ch, size, bold) > maxW) { out.push(line); line = ch; }
+      else line += ch;
+    }
+    out.push(line);
+  });
+  return out;
+}
 function addHit(id, x, y, w, h) { if (id) CV.hits.push({ id, x, y, w, h }); }
 // 按下反馈（网页版是 transform: scale(.97)）：按到哪个按钮，就把它画小一点点
 function isPressed(id) { return !!id && CV.pressedId === id && (Date.now() - (CV.pressedAt || 0)) < 160; }
@@ -149,9 +186,11 @@ const L = {
   text(str, opt) {
     opt = opt || {};
     const size = opt.size || 13;
-    const lines = String(str).split('\n');
+    const x = opt.x || 16;
+    const maxW = (opt.maxW || (CV.W - 16 - x));
+    const lines = wrapText(str, maxW, size, opt.bold);   // 折行，不再画出屏幕
     lines.forEach(ln => {
-      drawText(ln, opt.x || 16, this.y + size / 2 + 2, { size, color: opt.color || CV.C.text, bold: opt.bold, align: opt.align });
+      drawText(ln, x, this.y + size / 2 + 2, { size, color: opt.color || CV.C.text, bold: opt.bold, align: opt.align });
       this.y += size + 6;
     });
     this.y += 2;
@@ -163,10 +202,12 @@ const L = {
     const h = sub ? 54 : 44;
     // 卡片：网页版 .card 是浅渐变 + 1px 描边
     fillPanel(12, this.y, CV.W - 24, h, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
-    drawText(label, 24, this.y + (sub ? 20 : h / 2), { size: 14, bold: !!opt.bold, color: opt.disabled ? CV.C.dim : CV.C.text });
-    if (sub) drawText(sub, 24, this.y + 38, { size: 11, color: CV.C.dim });
+    const valueW = opt.value ? measure(opt.value, 13) + 12 : 0;
+    const labelW = CV.W - 48 - valueW;                    // 左右各留 24 的边距
+    drawText(fitText(label, labelW, 14, !!opt.bold), 24, this.y + (sub ? 20 : h / 2), { size: 14, bold: !!opt.bold, color: opt.disabled ? CV.C.dim : CV.C.text });
+    if (sub) drawText(fitText(sub, CV.W - 48, 11), 24, this.y + 38, { size: 11, color: CV.C.dim });
     if (opt.value) drawText(opt.value, CV.W - 24, this.y + (sub ? 20 : h / 2), { size: 13, align: 'right', color: opt.valueColor || CV.C.gold });
-    if (opt.right) drawText(opt.right, CV.W - 24, this.y + (sub ? 38 : h / 2), { size: 11, align: 'right', color: CV.C.dim });
+    if (opt.right) drawText(fitText(opt.right, CV.W - 48, 11), CV.W - 24, this.y + (sub ? 38 : h / 2), { size: 11, align: 'right', color: CV.C.dim });
     if (opt.id && !opt.disabled) addHit(opt.id, 12, this.y, CV.W - 24, h);
     this.y += h + 8;
     return this;
@@ -186,7 +227,7 @@ const L = {
           : opt.ghost ? { fill: 'transparent', line: CV.C.line }
             : { fill: CV.C.panel2, line: CV.C.line2 };
     fillPanel(x, this.y + (press ? 1 : 0), w, h - (press ? 2 : 0), Object.assign({ r: CV.RADIUS_SM }, style));
-    drawText(label, x + w / 2, this.y + h / 2, {
+    drawText(fitText(label, w - 14, opt.size || 13, true), x + w / 2, this.y + h / 2, {
       size: opt.size || 13, bold: true, align: 'center',
       color: opt.disabled ? CV.C.dim : (opt.gold ? '#fdf3dc' : (opt.ghost ? CV.C.text2 : CV.C.text)),
     });
@@ -206,7 +247,7 @@ const L = {
           : b.gold ? { grad: ['#b98d2a', '#87631a'], line: '#e6b64c44' }
             : { fill: CV.C.panel2, line: CV.C.line2 };
       fillPanel(x, this.y + (press ? 1 : 0), w - (press ? 4 : 0), bh - (press ? 2 : 0), Object.assign({ r: CV.RADIUS_SM }, style));
-      drawText(b.label, x + w / 2, this.y + bh / 2, { size: b.size || 12, bold: true, align: 'center', color: b.disabled ? CV.C.dim : CV.C.text });
+      drawText(fitText(b.label, w - 10, b.size || 12, true), x + w / 2, this.y + bh / 2, { size: b.size || 12, bold: true, align: 'center', color: b.disabled ? CV.C.dim : CV.C.text });
       if (b.id && !b.disabled) addHit(b.id, x, this.y, w, bh);
     });
     this.y += (list[0] && list[0].h || 40) + 8;
@@ -243,8 +284,8 @@ const L = {
       const y = this.y + Math.floor(i / n) * (h + gap);
       fillPanel(x, y, w, h, { fill: CV.C.panel, line: CV.C.line2, r: 6 });
       const sub = it.sub ? (it.sub.length > 12 ? it.sub.slice(0, 12) : it.sub) : '';
-      drawText(it.label, x + w / 2, y + (sub ? 21 : h / 2), { size: 13, bold: true, align: 'center', color: it.disabled ? CV.C.dim : CV.C.text });
-      if (sub) drawText(sub, x + w / 2, y + 38, { size: 10, align: 'center', color: CV.C.dim });
+      drawText(fitText(it.label, w - 8, 13, true), x + w / 2, y + (sub ? 21 : h / 2), { size: 13, bold: true, align: 'center', color: it.disabled ? CV.C.dim : CV.C.text });
+      if (sub) drawText(fitText(sub, w - 8, 10), x + w / 2, y + 38, { size: 10, align: 'center', color: CV.C.dim });
       if (it.dot) {
         CV.ctx.fillStyle = CV.C.accent;
         CV.ctx.beginPath();
@@ -291,7 +332,7 @@ CV.draw = function () {
   // 顶栏
   fillPanel(0, 0, CV.W, CV.TOP + 2, { r: 0, line: 'rgba(0,0,0,0)' });
   const st = (CV.statusText && CV.statusText()) || '';
-  drawText(st, CV.W / 2, CV.TOP / 2 + 4, { size: 12, align: 'center', color: CV.C.text });
+  drawText(fitText(st, CV.W - 16, 12), CV.W / 2, CV.TOP / 2 + 4, { size: 12, align: 'center', color: CV.C.text });
   // 顶栏点一下 = 打开货币图鉴（网页版也是这个交互）
   addHit('open_curdoc', 0, 0, CV.W, CV.TOP);
 
