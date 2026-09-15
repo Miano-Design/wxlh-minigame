@@ -14,10 +14,19 @@ const CV = {
   ctx: null, DPR: 2,
   stack: [], hits: [], toasts: [],
   panels: {},
+  /* 配色与圆角**照抄网页版的 CSS 变量**（css/style.css 的 :root）：
+     两边不一样，很大一部分原因就是"底色调、金色、灰阶"各走了一套。
+     以后网页版改配色，把这里跟着改一遍即可。 */
   C: {
-    bg: '#0a0d13', panel: '#141a24', panel2: '#1c2432', line: '#2a3446',
-    text: '#e6edf7', dim: '#8b98ad', gold: '#ffd76a', accent: '#d43a4f', green: '#7ee0a3', red: '#ff6b6b',
+    bg: '#07090e', bg2: '#0b0e15',
+    panel: '#111621', panel2: '#161d2a', panel3: '#1d2534',
+    line: '#232b3b', line2: '#333e55',
+    text: '#e9edf6', text2: '#b6bfd0', dim: '#7a849b',
+    accent: '#d43a4f', accent2: '#97273a', gold: '#e6b64c', green: '#56c894', blue: '#6ec6ff',
+    red: '#d43a4f',
   },
+  RADIUS: 10,
+  RADIUS_SM: 7,
 };
 
 /* 自适应：按窗口宽度算缩放（平板上按 520 宽封顶并居中，跟网页版的 max-width:520px 一致），
@@ -83,7 +92,7 @@ function rrect(x, y, w, h, r) {
 function fillPanel(x, y, w, h, opt) {
   const c = CV.ctx; opt = opt || {};
   c.fillStyle = opt.fill || CV.C.panel;
-  rrect(x, y, w, h, opt.r == null ? 12 : opt.r);
+  rrect(x, y, w, h, opt.r == null ? CV.RADIUS : opt.r);
   c.fill();
   c.strokeStyle = opt.line || CV.C.line;
   c.lineWidth = 1;
@@ -106,9 +115,22 @@ const L = {
   gap(n) { this.y += (n == null ? 8 : n); return this; },
   /* 段落标题 */
   title(str, sub) {
-    drawText(str, 16, this.y + 10, { size: 15, bold: true, color: CV.C.gold });
-    if (sub) drawText(sub, CV.W - 16, this.y + 10, { size: 11, align: 'right', color: CV.C.dim });
-    this.y += 26;
+    // 与网页版 .section-title 同款：12px 灰字 + 右边一条渐隐细线（不是金色大字）
+    this.y += 8;
+    drawText(str, 16, this.y + 8, { size: 12, bold: true, color: CV.C.text2 });
+    const m = CV.ctx.measureText ? CV.ctx.measureText(str) : null;
+    const tw = (m && m.width) ? m.width : String(str).length * 12;
+    const lineX = 16 + tw + 10;
+    const grad = CV.ctx.createLinearGradient ? CV.ctx.createLinearGradient(lineX, 0, CV.W - 16, 0) : null;
+    if (grad) { grad.addColorStop(0, CV.C.line2); grad.addColorStop(1, 'rgba(0,0,0,0)'); CV.ctx.strokeStyle = grad; }
+    else CV.ctx.strokeStyle = CV.C.line2;
+    CV.ctx.lineWidth = 1;
+    CV.ctx.beginPath();
+    CV.ctx.moveTo(lineX, this.y + 8);
+    CV.ctx.lineTo(CV.W - 16, this.y + 8);
+    CV.ctx.stroke();
+    if (sub) drawText(sub, CV.W - 16, this.y + 24, { size: 10, align: 'right', color: CV.C.dim });
+    this.y += (sub ? 38 : 24);
     return this;
   },
   /* 纯说明文字 */
@@ -333,6 +355,11 @@ CV.hhmmss = hhmmss;
 CV.toast = toast;
 CV.L = L;
 CV.rarityColor = rarityColor;
+// 稀有度颜色直接取 data.js 那一份，保证两版一字不差
+CV.rarityColorOf = function (r) {
+  const D = (typeof window !== 'undefined' && window.DATA) || null;
+  return (D && D.RARITY_COLOR && D.RARITY_COLOR[r]) || rarityColor(r);
+};
 CV.fillPanel = fillPanel;
 CV.drawText = drawText;
 CV.addHit = addHit;

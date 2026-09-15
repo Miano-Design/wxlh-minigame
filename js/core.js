@@ -53,7 +53,7 @@ window.Core = (function () {
       // 保底按池分开记账：高级 / 限定 各自算 SSR / UR / 当期 UP 的累计数
       recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '' },
       shop: { dailyDate: '', dailyItems: [], bought: {} },
-      // bonus：广告"看视频 +3 次扫荡"这类额外额度（当天有效，跨天清零）
+      // bonus：额外扫荡额度（由玩法自行发放的临时加次数；网页版不发，恒为 0，跨天清零）
       sweep: { date: '', count: 0, bonus: 0 },
       tasks: { date: '', daily: {}, claimed: {}, allClaimed: false, weekKey: '', weekly: {}, weeklyClaimed: {}, weeklyAllClaimed: false },
       login: { day: 0, round: 1, lastClaim: '' },
@@ -2313,7 +2313,7 @@ window.Core = (function () {
     if (S.sweep.date !== dailyDate()) return sweepCap() + (S.sweep.bonus || 0);
     return Math.max(0, sweepCap() + (S.sweep.bonus || 0) - (S.sweep.count || 0));
   }
-  // 广告奖励：今日扫荡次数 +n（跨天先归零，避免昨天的额度留到今天）
+  // 今日额外扫荡额度 +n（跨天先归零，避免昨天的额度留到今天）
   function addSweepBonus(n) {
     const k = Math.max(0, Math.floor(n || 0));
     if (!k) return 0;

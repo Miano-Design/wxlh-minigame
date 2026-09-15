@@ -212,7 +212,7 @@ window.Dungeon = (function () {
     // 每日扫荡上限
     if (Core.S.sweep.date !== Core.dailyDate()) { Core.S.sweep.date = Core.dailyDate(); Core.S.sweep.count = 0; Core.S.sweep.bonus = 0; }
     const cap = Core.sweepCap();
-    // 剩余次数走 sweepLeft()：它已经把"看广告 +N 次"的额度算进去了
+    // 剩余次数走 sweepLeft()：它已经把「额外额度」算进去了
     const left = Core.sweepLeft();
     if (left <= 0) { Core.save(); return { ok: false, msg: `今日扫荡次数已用完（${cap}/${cap}）` }; }
     const n = Math.min(times, left);
