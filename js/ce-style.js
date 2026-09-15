@@ -2204,18 +2204,18 @@ module.exports = {
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled__text.bg-name": {
   "color": "#e9edf6",
-  "fontSize": 11,
+  "fontSize": 13,
   "textAlign": "center",
   "fontWeight": "bold",
   "wordBreak": "break-all",
-  "maxHeight": 27,
-  "lineHeight": 13,
+  "maxHeight": 32,
+  "lineHeight": 16,
   "marginBottom": 2,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled__text.bg-count": {
   "color": "#e6b64c",
-  "fontSize": 11,
+  "fontSize": 12,
   "textAlign": "center",
   "fontWeight": "bold",
   "marginBottom": 2,
