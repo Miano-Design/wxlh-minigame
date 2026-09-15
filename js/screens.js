@@ -29,6 +29,13 @@ function tileList(items) {
     L.row(it[1], it[2] || '', { id: it[0], value: it[3] || '' });
   });
 }
+/* 广告按钮的统一拼法：把"今天还剩几次"直接写在按钮上，玩家一眼知道还能薅几次 */
+function adBtn(slot, label, id, primary) {
+  const left = G.AD.left(slot);
+  return { label: left > 0 ? `${label}（${left}）` : `${label}·今日已完`, id, primary: !!primary, disabled: left <= 0, size: 12 };
+}
+let preBuff = 0;   // 战前增益：看一次广告，下一关全队攻击 +25%
+function takePreBuff() { const v = preBuff; preBuff = 0; return v; }
 
 /* ================= 灯阁（首页） ================= */
 CV.register('home', function () {
@@ -50,28 +57,7 @@ CV.register('home', function () {
     L.row(q.q.name, `第 ${mq.indexOf(q) + 1}/${mq.length} 步 · ${q.q.desc}`, { id: q.done ? 'claim_quest' : null, value: q.done ? '领取' : '' });
   } else L.text('主线已走完，去挑战更高难度与深井', { color: CV.C.dim });
 
-  // 挂机
-  const bank = Core.idleBankGains();
-  L.title('挂机', `效率 ${Math.round(Core.offlineEfficiency() * 100)}%`);
-  L.fillPanel(12, L.y, CV.W - 24, 96);
-  CV.drawText(hhmmssLocal(bank.seconds), 26, L.y + 24, { size: 14, bold: true });
-  CV.drawText(`◈${fmt(bank.points)} · EXP ${fmt(bank.exp)}${bank.otherworld ? ' · ◆' + bank.otherworld : ''}`, 26, L.y + 50, { size: 12, color: CV.C.dim });
-  const ready = bank.seconds >= 60;
-  CV.fillPanel(24, L.y + 62, CV.W - 48, 26, { fill: ready ? CV.C.accent : CV.C.panel2 });
-  CV.drawText(ready ? '一键收取' : '再攒一会儿', CV.W / 2, L.y + 75, { size: 13, bold: true, align: 'center', color: ready ? CV.C.text : CV.C.dim });
-  if (ready) CV.addHit('claim_idle', 24, L.y + 62, CV.W - 48, 26);
-  L.y += 104;
-
-  // 广告位（这几个是收入来源，首页必须显眼）
-  L.title('看广告拿好处', '每日限次');
-  const q1 = G.AD.left('idle_boost'), q2 = G.AD.left('holy_pack'), q3 = G.AD.left('free_recruit');
-  L.btnRow([
-    { label: `⏩ 加速2h（${q1}）`, id: 'ad_idle', size: 12, disabled: q1 <= 0 },
-    { label: `✦30（${q2}）`, id: 'ad_holy', size: 12, disabled: q2 <= 0 },
-    { label: `招募（${q3}）`, id: 'ad_recruit', size: 12, disabled: q3 <= 0 },
-  ]);
-
-  // 养成 / 日常
+  // 养成（与网页版同一批入口、同一套名字）
   const sect = Core.sectInfo();
   const bLv = Object.values(s.buildings).reduce((a, b) => a + b, 0);
   L.title('养成');
@@ -90,9 +76,42 @@ CV.register('home', function () {
     ['open_reincarn', '转生天赋', `${s.player.reincarnations} 世`],
     ['open_codex', '灯录', `${Core.codexState().owned}/${Core.codexState().total} 名`],
   ]);
+
+  // 游历（网页版这一段在「养成」与「挂机」之间）
+  const tv = Core.travelProgress();
+  L.title('游历', `每 ${Math.round(D.TRAVEL_EVERY_SEC / 60)} 分钟一次奇遇`);
+  if (tv.pending) {
+    const item = D.TRAVELS.find(x => x.id === tv.pending);
+    L.row(item ? item.name : '游历奇遇', '有一桩奇遇在等你收下', { id: 'claim_travel', value: '收下' });
+  } else {
+    L.text(`已走 ${Math.round(tv.pct * 100)}%`, { size: 12, color: CV.C.dim });
+    L.meter(tv.pct);
+  }
+
+  // 挂机
+  const bank = Core.idleBankGains();
+  L.title('挂机', `离线效率 ${Math.round(Core.offlineEfficiency() * 100)}% · 上限 ${Core.offlineCapHours().toFixed(0)} 小时`);
+  L.fillPanel(12, L.y, CV.W - 24, 96);
+  CV.drawText(hhmmssLocal(bank.seconds), 26, L.y + 24, { size: 14, bold: true });
+  CV.drawText(`◈${fmt(bank.points)} · EXP ${fmt(bank.exp)}${bank.otherworld ? ' · ◆' + bank.otherworld : ''}${bank.mat ? ' · ⚙️' + bank.mat : ''}`, 26, L.y + 50, { size: 12, color: CV.C.dim });
+  const ready = bank.seconds >= 60;
+  CV.fillPanel(24, L.y + 62, CV.W - 48, 26, { fill: ready ? CV.C.accent : CV.C.panel2 });
+  CV.drawText(ready ? '一键收取' : '再攒一会儿', CV.W / 2, L.y + 75, { size: 13, bold: true, align: 'center', color: ready ? CV.C.text : CV.C.dim });
+  if (ready) CV.addHit('claim_idle', 24, L.y + 62, CV.W - 48, 26);
+  L.y += 104;
+  L.btn('🧭 挂机分工（4 条产线派领队）', 'open_idlelines', { size: 12 });
+
+  // 看广告：集中区 + 分散在各自玩法里的入口，两条都保留（同行也是这么叠的）
+  L.title('看广告拿好处', '每日限次，用完就没了');
+  L.btnRow([adBtn('idle_boost', '⏩ 挂机加速2h', 'ad_idle'), adBtn('offline_double', '🕒 离线翻倍', 'ad_offline')]);
+  L.btnRow([adBtn('holy_pack', '✦晶石×30', 'ad_holy'), adBtn('otherworld_pack', '◆结晶×50', 'ad_other')]);
+  L.btnRow([adBtn('free_recruit', '🎴 普通池抽1次', 'ad_recruit'), adBtn('sweep_plus', '⏩ 扫荡+3', 'ad_sweep')]);
+  L.text('同样的奖励在对应玩法里也能点：招募页 / 扫荡面板 / 开打前 / 失败结算页。', { size: 11, color: CV.C.dim });
+
   const t = Core.todayState();
   L.title('日常');
   tileList([
+    ['open_login', '今日签到', `七日登录 · 第 ${s.login.day || 0}/7 天`],
     ['open_bounty', '限时悬赏', '按进度生成 · 到点作废'],
     ['open_tasks', '每日任务', `今日 ${t.dailyDone}/${t.dailyTotal}`],
     ['open_achievements', '成就', `${t.achClaimable} 项可领`],
@@ -102,7 +121,7 @@ CV.register('home', function () {
   ]);
   L.title('其他');
   tileList([
-    ['open_idlelines', '挂机分工', '派领队加产出'],
+    ['open_chars', '伙伴一览', `${Object.keys(s.chars).length} 名`],
     ['open_settings', '设置与存档', ''],
     ['open_guide', '玩法指南', ''],
   ]);
@@ -154,6 +173,9 @@ CV.register('world', function (p) {
     });
   }
   L.grid(4, cells);
+  L.title('开打前', '战前增益只作用于下一关');
+  L.btnRow([adBtn('pre_buff', '⚔ 攻击+25%', 'ad_prebuff', true), adBtn('sweep_plus', '⏩ 扫荡+3', 'ad_sweep')]);
+  if (preBuff) L.text('✔ 已就绪：下一关全队攻击 +25%', { size: 12, color: CV.C.green });
   if (st && st.stages[diff].some(x => x > 0)) {
     L.btn(`⏩ 扫荡（今日剩余 ${Core.sweepLeft()}/${D.SWEEP_DAILY_CAP} 次）`, 'open_sweep', { disabled: Core.sweepLeft() <= 0 });
   }
@@ -225,7 +247,8 @@ function finishBattle() {
 }
 
 /* 队伍编成（网页版在 ui.js，这里给小游戏版一份；建议后续搬进 core.js 共用） */
-function buildAllies(hpPctMap) {
+function buildAllies(hpPctMap, extraAtk) {
+  const pb = extraAtk || 0;
   const s = S();
   const fb = Core.factionBuffs(s.party);
   const out = [];
@@ -240,7 +263,7 @@ function buildAllies(hpPctMap) {
       out.push(Object.assign({}, st, {
         name: s.player.name || '主角', kind: 'warrior', faction: null, position,
         skills: Core.protagonistSkills(), skillLv: s.player.skillLv || [1, 1, 1],
-        atk: Math.round(st.atk * (1 + fb.atkPct)), spd: st.spd,
+        atk: Math.round(st.atk * (1 + fb.atkPct + pb)), spd: st.spd,
         maxHp: full, hp: Math.max(1, Math.round(full * ratio)),
         skillMult: (st.skillMult || 1) + fb.skillPct, charId: '@player',
       }));
@@ -253,7 +276,7 @@ function buildAllies(hpPctMap) {
     out.push(Object.assign({}, eff, {
       name: base.name, kind: base.kind, faction: base.faction, position,
       skills: base.skills, skillLv: s.chars[id].skillLv,
-      atk: Math.round(eff.atk * (1 + fb.atkPct)), maxHp: full, hp: Math.max(1, Math.round(full * ratio)),
+      atk: Math.round(eff.atk * (1 + fb.atkPct + pb)), maxHp: full, hp: Math.max(1, Math.round(full * ratio)),
       skillMult: eff.skillMult + fb.skillPct, charId: id,
     }));
   });
@@ -265,13 +288,14 @@ function startStage(worldId, diff, stageIdx) {
   const s = S();
   const stage = stageIdx + 1;
   const waves = Dungeon.wavePlan(stage);
+  const pb = takePreBuff();                     // 战前增益（看广告来的）只吃这一关
   let hp = {};
   s.party.filter(Boolean).forEach(id => { hp[id] = 1; });
   const gotAll = [];
   let won = true, rounds = 0;
   for (let i = 0; i < waves.length; i++) {
     const kind = waves[i];
-    const allies = buildAllies(hp);
+    const allies = buildAllies(hp, pb);
     if (!allies.length) { won = false; break; }
     const res = Battle.run({ allies, enemies: Dungeon.makeEnemies(worldId, diff, stage, kind), worldId, maxRounds: kind === 'boss' ? 50 : 30 });
     rounds += res.rounds;
@@ -548,6 +572,8 @@ CV.register('recruit', function () {
       { label: `十连（${curIconLocal(P.currency)}${P.ten[P.currency]}）`, id: 'pull_' + pool + '_10', primary: true },
     ]);
   });
+  L.title('看广告免费抽', '每天都能薅几次');
+  L.btnRow([adBtn('free_recruit', '🎴 普通池×1', 'ad_recruit'), adBtn('recruit_adv', '✦ 高级池×1', 'ad_recruit_adv', true)]);
   L.title('概率公示');
   Object.keys(D.RECRUIT_POOLS).forEach(pool => {
     const P = D.RECRUIT_POOLS[pool];
@@ -816,4 +842,9 @@ CV.register('settings', function () {
   L.text('个人开发 · 广告变现版 · 数据全部存在本机', { size: 11, color: CV.C.dim });
 });
 
-module.exports = { startStage, startBattle, buildAllies, finishBattle, battle: () => battle };
+module.exports = {
+  startStage, startBattle, buildAllies, finishBattle,
+  battle: () => battle,
+  armPreBuff: () => { preBuff = 0.25; },
+  hasPreBuff: () => preBuff > 0,
+};

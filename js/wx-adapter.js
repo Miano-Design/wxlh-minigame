@@ -52,14 +52,16 @@
   /* ---------- ④ 每个点位的每日次数（跳过日期重置、防改时间） ---------- */
   const QUOTA_KEY = 'wxlh_ad_quota';
   const LIMITS = {
-    offline_double: 3,   // 离线收益翻倍
+    offline_double: 3,   // 离线收益翻倍（放置类第一广告点）
     idle_boost: 5,       // 挂机加速 2 小时
-    revive: 1,           // 阵亡复活（每关 1 次，按关卡记，不按天）
-    free_recruit: 3,     // 免费招募
     sweep_plus: 2,       // 扫荡次数 +3
-    pre_buff: 5,         // 战前增益
+    pre_buff: 5,         // 战前增益（攻击 +25%）
+    free_recruit: 3,     // 普通池免费 1 抽
+    recruit_adv: 1,      // 高级池免费 1 抽（贵，所以只给 1 次）
+    holy_pack: 2,        // ✦圣洁晶石 ×30
+    otherworld_pack: 2,  // ◆异界结晶 ×50
     login_double: 1,     // 签到双倍
-    holy_pack: 2,        // 看广告得圣洁晶石
+    revive: 1,           // 阵亡复活（每关 1 次，按关卡记，不按天）
   };
   function today() {
     const d = new Date();

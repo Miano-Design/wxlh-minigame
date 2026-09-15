@@ -201,6 +201,73 @@ async function main() {
   const r3 = await AD.show('offline_double');
   t('补偿每天最多 2 次', r3.granted === false && r3.reason === 'no_ad_nocomp', JSON.stringify(r3));
 
+  /* ---------- 这一轮新增的广告点位 ---------- */
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const resetAd = () => { store['wxlh_ad_quota'] = JSON.stringify({ date: AD._today(), used: {}, comp: 0 }); };
+
+  resetAd();
+  const sweepBefore = Core.sweepLeft();
+  CV.dispatch('ad_sweep');
+  await sleep(30);
+  t('看广告：扫荡次数 +3', Core.sweepLeft() === sweepBefore + 3, `${sweepBefore} → ${Core.sweepLeft()}`);
+
+  resetAd();
+  const ow0 = Core.S.cur.otherworld;
+  CV.dispatch('ad_other');
+  await sleep(30);
+  t('看广告：◆异界结晶 +50', Core.S.cur.otherworld - ow0 === 50, `+${Core.S.cur.otherworld - ow0}`);
+
+  resetAd();
+  const holy1 = Core.S.cur.holy;
+  CV.dispatch('ad_holy');
+  await sleep(30);
+  t('看广告：✦圣洁晶石 +30', Core.S.cur.holy - holy1 === 30, `+${Core.S.cur.holy - holy1}`);
+
+  resetAd();
+  const pBefore = Core.S.cur.points;
+  Core.S.idle.bankSec = 0;
+  CV.lastOffline = { seconds: 3600, gains: { points: 1234, exp: 0, otherworld: 0, story: 0 } };
+  CV.dispatch('ad_offline');
+  await sleep(30);
+  t('看广告：离线收益翻倍（再补一份）', Core.S.cur.points - pBefore === 1234, `+${Core.S.cur.points - pBefore}`);
+
+  resetAd();
+  CV.dispatch('ad_prebuff');
+  await sleep(30);
+  t('看广告：拿到战前增益（下一关攻击 +25%）', Scr.hasPreBuff() === true);
+  CV.reset('world');
+  CV.dispatch('stage_W01_normal_1');
+  t('战前增益只作用于那一关（打完就消耗掉）', Scr.hasPreBuff() === false);
+
+  resetAd();
+  const rec0 = Core.S.stats.recruits;
+  CV.dispatch('ad_recruit_adv');
+  await sleep(30);
+  t('看广告：能在高级池免费抽 1 次（且不扣货币）', Core.S.stats.recruits - rec0 === 1, `+${Core.S.stats.recruits - rec0}`);
+
+  resetAd();
+  const rec1 = Core.S.stats.recruits;
+  CV.dispatch('ad_recruit');
+  await sleep(30);
+  t('看广告：能在普通池免费抽 1 次', Core.S.stats.recruits - rec1 === 1);
+
+  Core.S.travel.pending = D.TRAVELS[0].id;
+  CV.dispatch('claim_travel');
+  t('游历奇遇能收下（网页版有这一段，小游戏版补上了）', Core.S.travel.pending === null);
+
+  CV.reset('login'); UI._draw();
+  t('七日登录面板渲染正常且有可点区域', CV.hits.length > 0);
+  resetAd();
+  const rw0 = Core.S.cur.points + Core.S.cur.holy + Core.S.cur.otherworld;
+  CV.dispatch('ad_login_double');
+  await sleep(30);
+  t('签到奖励能看广告翻倍', Core.S.cur.points + Core.S.cur.holy + Core.S.cur.otherworld > rw0);
+
+  resetAd();
+  CV.reset('home'); UI._draw();
+  const homeHtmlHits = CV.hits.length;
+  t('首页同时铺开了集中广告区与各玩法入口', homeHtmlHits > 10, `可点区域 ${homeHtmlHits}`);
+
   /* ---------- 与网页版一致性 ---------- */
   t('js 下 4 个逻辑文件与网页版逐字节一致（跑过 sync-logic 才是对的）', (() => {
     const SRC = path.resolve(__dirname, '../../wxlh-game/js');

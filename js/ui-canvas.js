@@ -32,6 +32,7 @@ CV.panels.titleOf = function (panel) {
     reincarn: '转生天赋', codex: '灯录', refine: '炼化台', idlelines: '挂机分工',
     tasks: '任务与成就', bounty: '限时悬赏', shop: '兑换大厅', guide: '玩法指南',
     settings: '设置', create: '创建执灯者', bloodline: '选择血统',
+    login: '七日登录',
   };
   if (panel.name === 'picker') return (panel.params && panel.params.title) || '选择';
   return map[panel.name] || '';
@@ -59,6 +60,27 @@ CV.register('bloodline', function () {
   });
 });
 
+/* ---------- 七日登录（网页版是开游戏自动弹，小游戏版做成一个常驻入口） ---------- */
+function rewardText(r) {
+  const parts = [];
+  Object.entries(r || {}).forEach(([k, v]) => {
+    if (k === 'item') [].concat(v).forEach(id => parts.push((D.ITEMS[id] || {}).name || id));
+    else if (k === 'ssrTicket') parts.push('SSR 自选券');
+    else if (v) { const c = D.CURRENCIES.find(x => x.id === k); parts.push(`${c ? c.icon : ''}${fmt(v)}`); }
+  });
+  return parts.join(' · ') || '—';
+}
+CV.register('login', function () {
+  const s = S();
+  L.text(`七日登录 · 第 ${s.login.day || 0}/7 天（第 ${s.login.round || 1} 轮）`, { size: 16, bold: true });
+  D.LOGIN_REWARDS.forEach((r, i) => {
+    L.row(`第 ${i + 1} 天`, rewardText(r), { value: i < (s.login.day || 0) ? '已领' : (i === (s.login.day || 0) ? '今日' : '') });
+  });
+  L.text('每天开游戏自动发；看一次广告可以再拿一份（每天 1 次）', { size: 11, color: CV.C.dim });
+  const b = adBtnLocal('login_double', '🎁 今日奖励翻倍', 'ad_login_double');
+  L.btn(b.label, b.id, { primary: G.AD.left('login_double') > 0, disabled: G.AD.left('login_double') <= 0 });
+});
+
 /* ================= 行为注册 ================= */
 const on = CV.on, onP = CV.onPrefix;
 
@@ -71,11 +93,13 @@ on('open_guide', () => CV.open('guide'));
 on('open_recruit', () => CV.open('recruit'));
 on('open_chars', () => CV.open('chars'));
 on('open_achievements', () => CV.open('tasks'));
+on('open_login', () => CV.open('login'));
 ['sect', 'keji', 'fabao', 'mount', 'garden', 'arena', 'sign', 'authority', 'buildings',
   'genelock', 'beast', 'reincarn', 'codex', 'refine', 'idlelines', 'tasks', 'bounty', 'shop']
   .forEach(n => on('open_' + n, () => CV.open(n)));
 
 /* ---------- 首页 ---------- */
+CV.lastOffline = null;      // 记住"这次开游戏补了多少离线收益"，给"离线翻倍"用
 on('claim_idle', () => {
   const g = Core.claimIdle();
   CV.toast(`收了 ◈${fmt(g.points)} · EXP ${fmt(g.exp)}${g.matCount ? ' · 材料×' + g.matCount : ''}`);
@@ -102,6 +126,54 @@ on('ad_recruit', () => G.AD.show('free_recruit').then(r => {
   if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
   const p = Core.recruitOnce('normal', { noCost: true });     // 广告出资的免费一抽（普通池）
   CV.toast(p && p.error ? '抽卡失败' : `抽到 ${p.name}（${p.rarity}）${p.isNew ? ' · 新伙伴！' : ` · 碎片 +${p.shards}`}`);
+}));
+on('ad_recruit_adv', () => G.AD.show('recruit_adv').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  const p = Core.recruitOnce('advanced', { noCost: true });   // 高级池免费 1 抽（保底照常计数）
+  CV.toast(p && p.error ? '抽卡失败' : `抽到 ${p.name}（${p.rarity}）${p.isNew ? ' · 新伙伴！' : ` · 碎片 +${p.shards}`}`);
+}));
+/* 离线收益翻倍：把这次开游戏补的离线收益再补一份；没有离线记录时按 2 小时挂机结算 */
+on('ad_offline', () => G.AD.show('offline_double').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  const off = CV.lastOffline;
+  if (off && off.seconds >= 60) {
+    Core.addCur('points', off.gains.points);
+    Core.addCur('otherworld', off.gains.otherworld);
+    Core.addPlayerExp(off.gains.exp);
+    Core.save();
+    CV.toast(`离线收益翻倍：再 +◈${fmt(off.gains.points)} · +EXP ${fmt(off.gains.exp)}`);
+    CV.lastOffline = null;                      // 一份离线只翻一次
+  } else {
+    S().idle.bankSec += 7200;
+    const g = Core.claimIdle();
+    CV.toast(`这次没有离线记录，按 2 小时挂机补：+◈${fmt(g.points)} · +EXP ${fmt(g.exp)}`);
+  }
+}));
+on('ad_other', () => G.AD.show('otherworld_pack').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  Core.addCur('otherworld', 50);
+  Core.save();
+  CV.toast('◆ 异界结晶 +50');
+}));
+on('ad_sweep', () => G.AD.show('sweep_plus').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  const s = S();
+  if (s.sweep.date !== Core.dailyDate()) { s.sweep.date = Core.dailyDate(); s.sweep.count = 0; }
+  s.sweep.count = Math.max(0, (s.sweep.count || 0) - 3);
+  Core.save();
+  CV.toast(`今日扫荡次数 +3（剩 ${Core.sweepLeft()} 次）`);
+}));
+on('ad_prebuff', () => G.AD.show('pre_buff').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  Scr.armPreBuff();
+  CV.toast('⚔ 已就绪：下一关全队攻击 +25%');
+}));
+on('claim_travel', () => { const r = Core.claimTravel(); CV.toast(r.msg || '收下了'); });
+on('ad_login_double', () => G.AD.show('login_double').then(r => {
+  if (!r.granted) { CV.toast(r.reason === 'quota' ? '今日次数已用完' : '广告没看完，奖励没发'); return; }
+  const s = S();
+  const rw = D.LOGIN_REWARDS[Math.max(0, (s.login.day || 1) - 1)];
+  if (rw) { Core.applyRewardObj(rw); Core.save(); CV.toast('今日签到奖励翻倍到手'); }
 }));
 on('nav_more', () => CV.open('grow'));
 
@@ -136,8 +208,13 @@ on('open_sweep', () => {
     { label: `扫荡第 ${max} 关 ×1`, sub: `今日剩余 ${Core.sweepLeft()} 次`, id: `sweep_${p.worldId}_${p.diff}_${max}_1` },
     { label: `扫荡第 ${max} 关 ×5`, sub: '和真实战斗同样结算（含经验）', id: `sweep_${p.worldId}_${p.diff}_${max}_5` },
     { label: '全部剩余次数', sub: `今日还剩 ${Core.sweepLeft()} 次`, id: `sweep_${p.worldId}_${p.diff}_${max}_0` },
+    adBtnLocal('sweep_plus', '⏩ 看广告：今日次数 +3', 'ad_sweep'),
   ], '扫荡 = 自动重打这一关，经验和战斗次数都照算');
 });
+function adBtnLocal(slot, label, id) {
+  const left = G.AD.left(slot);
+  return { label: left > 0 ? `${label}（还剩 ${left} 次）` : `${label}·今日已完`, id, sub: '看 15~30 秒视频' };
+}
 
 /* ---------- 队伍 ---------- */
 [0, 1, 2, 3, 4].forEach(i => {
@@ -473,7 +550,15 @@ function boot() {
   if (!S().player.name) CV.reset('create');
   else if (!S().player.bloodline) CV.reset('bloodline');
   else CV.reset('home');
-  if (off && off.seconds >= 300) CV.toast(`离线 ${CV.hhmmss(off.seconds)}：+◈${fmt(off.gains.points)}`);
+  if (off && off.seconds >= 60) {
+    CV.lastOffline = off;                          // 存下来给「离线翻倍」用
+    CV.toast(`离线 ${CV.hhmmss(off.seconds)}：+◈${fmt(off.gains.points)}（首页可看广告翻倍）`);
+  }
+  // 七日登录：网页版是开游戏自动弹窗，小游戏版直接发 + 给一个常驻入口
+  if (S().player.name) {
+    const lr = Core.loginReward();
+    if (lr) CV.toast(`◀ 七日登录第 ${lr.day} 天：${rewardText(lr.reward)}`);
+  }
 
   const T = (e, fn) => { const t = e.touches && e.touches[0]; if (t) fn(t.clientX !== undefined ? t.clientX : t.pageX, t.clientY !== undefined ? t.clientY : t.pageY); };
   if (wx.onTouchStart) wx.onTouchStart(e => { T(e, CV.onTouchStart); CV.draw(); });
