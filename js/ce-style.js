@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:54 */
+   生成时间：2026-09-15 16:58 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -22,6 +22,18 @@ module.exports = {
   "fontSize": 12,
   "color": "#e9edf6"
  },
+ "section-title": {
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontSize": 12,
+  "color": "#b6bfd0",
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginTop": 18,
+  "marginRight": 4,
+  "marginBottom": 10,
+  "marginLeft": 4
+ },
  "card": {
   "backgroundColor": "#111621",
   "borderWidth": 1,
@@ -35,9 +47,6 @@ module.exports = {
   "paddingRight": 14,
   "paddingBottom": 14,
   "paddingLeft": 14,
-  "marginBottom": 14
- },
- "text-rows": {
   "marginBottom": 14
  },
  "list-row": {
@@ -61,26 +70,30 @@ module.exports = {
   "alignItems": "center",
   "flexWrap": "wrap"
  },
- "tag": {
-  "fontSize": 11,
-  "borderWidth": 1,
-  "borderColor": "#333e55",
-  "borderRadius": 7,
-  "borderTopLeftRadius": 7,
-  "borderTopRightRadius": 7,
-  "borderBottomRightRadius": 7,
-  "borderBottomLeftRadius": 7,
-  "paddingTop": 1,
-  "paddingRight": 6,
-  "paddingBottom": 1,
-  "paddingLeft": 6,
-  "color": "#b6bfd0",
-  "fontWeight": "normal"
- },
  "t2": {
   "fontSize": 11,
   "color": "#7a849b",
   "marginTop": 3
+ },
+ "chev": {
+  "flex": 0,
+  "alignSelf": "center",
+  "color": "#7a849b",
+  "fontSize": 16
+ },
+ "hint": {
+  "fontSize": 11,
+  "color": "#7a849b"
+ },
+ "mt2": {
+  "marginTop": 10
+ },
+ "blk": {
+  "width": "100%"
+ },
+ "btn-row": {
+  "flexDirection": "row",
+  "flexWrap": "wrap"
  },
  "btn": {
   "flexDirection": "row",
@@ -103,17 +116,24 @@ module.exports = {
   "fontSize": 13,
   "fontWeight": "bold"
  },
- "section-title": {
-  "flexDirection": "row",
-  "alignItems": "center",
-  "fontSize": 12,
+ "text-rows": {
+  "marginBottom": 14
+ },
+ "tag": {
+  "fontSize": 11,
+  "borderWidth": 1,
+  "borderColor": "#333e55",
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "paddingTop": 1,
+  "paddingRight": 6,
+  "paddingBottom": 1,
+  "paddingLeft": 6,
   "color": "#b6bfd0",
-  "fontWeight": "bold",
-  "letterSpacing": 1,
-  "marginTop": 18,
-  "marginRight": 4,
-  "marginBottom": 10,
-  "marginLeft": 4
+  "fontWeight": "normal"
  },
  "text-menu": {
   "flexDirection": "row",
@@ -139,13 +159,6 @@ module.exports = {
   "color": "#e9edf6",
   "minWidth": 0
  },
- "hint": {
-  "fontSize": 11,
-  "color": "#7a849b"
- },
- "mt2": {
-  "marginTop": 10
- },
  "grid-title": {
   "fontSize": 11,
   "color": "#7a849b",
@@ -170,10 +183,6 @@ module.exports = {
   "paddingLeft": 0,
   "borderBottomWidth": 0,
   "borderBottomColor": "#ffffff0d",
-  "flexWrap": "wrap"
- },
- "btn-row": {
-  "flexDirection": "row",
   "flexWrap": "wrap"
  },
  "nav-item": {
@@ -204,12 +213,6 @@ module.exports = {
   "backgroundColor": "#232c42",
   "borderWidth": 1,
   "borderColor": "#232b3b"
- },
- "chev": {
-  "flex": 0,
-  "alignSelf": "center",
-  "color": "#7a849b",
-  "fontSize": 16
  },
  "pos-row-label": {
   "marginTop": 8,
@@ -560,6 +563,171 @@ module.exports = {
   "paddingBottom": 14,
   "paddingLeft": 12
  },
+ "view#app__scrollview#view__view.screen__view.section-title": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginTop": 18,
+  "marginRight": 4,
+  "marginBottom": 10,
+  "marginLeft": 4
+ },
+ "view#app__scrollview#view__view.screen__view.card": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 10,
+  "paddingRight": 4,
+  "paddingBottom": 10,
+  "paddingLeft": 4,
+  "borderBottomWidth": 1,
+  "borderBottomColor": "#ffffff0d"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__text.chev": {
+  "color": "#7a849b",
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "paddingTop": 10,
+  "paddingRight": 4,
+  "paddingBottom": 10,
+  "paddingLeft": 4,
+  "borderBottomWidth": 1,
+  "borderBottomColor": "#ffffff0d"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__text.chev": {
+  "color": "#7a849b",
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 10,
+  "width": "100%",
+  "lineHeight": 19
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "marginTop": 10,
+  "flexDirection": "row",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary": {
+  "color": "#e9edf6",
+  "fontSize": 13,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "justifyContent": "center",
+  "minHeight": 44,
+  "paddingTop": 0,
+  "paddingRight": 12,
+  "paddingBottom": 0,
+  "paddingLeft": 12,
+  "borderRadius": 7,
+  "borderTopLeftRadius": 7,
+  "borderTopRightRadius": 7,
+  "borderBottomRightRadius": 7,
+  "borderBottomLeftRadius": 7,
+  "borderWidth": 1,
+  "borderColor": "#e05a6d40",
+  "backgroundColor": "#c9364a",
+  "fontWeight": "bold",
+  "width": "100%",
+  "flex": 1,
+  "minWidth": 86,
+  "whiteSpace": "normal",
+  "textAlign": "center",
+  ":active": {
+   "backgroundColor": "#1d2534"
+  },
+  "lineHeight": 16,
+  "marginRight": 10
+ },
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary__text.btn-t": {
+  "color": "#e9edf6",
+  "fontSize": 13,
+  "fontWeight": "bold",
+  "lineHeight": 16,
+  "textAlign": "center",
+  "whiteSpace": "normal",
+  "marginRight": 6
+ },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
@@ -625,23 +793,6 @@ module.exports = {
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
   "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "backgroundColor": "#111621",
-  "borderWidth": 1,
-  "borderColor": "#232b3b",
-  "borderRadius": 10,
-  "borderTopLeftRadius": 10,
-  "borderTopRightRadius": 10,
-  "borderBottomRightRadius": 10,
-  "borderBottomLeftRadius": 10,
-  "paddingTop": 14,
-  "paddingRight": 14,
-  "paddingBottom": 14,
-  "paddingLeft": 14,
-  "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row": {
   "color": "#e9edf6",

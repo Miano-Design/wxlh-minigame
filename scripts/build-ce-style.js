@@ -474,6 +474,7 @@ function setShorthandSafe(out, prop, val, map) {
 /* 页面标记不手写、也不另外维护一份：直接调**网页版界面层**的函数，
    走和小游戏运行时同一条翻译链（js/ce-html.js）。改网页版，重跑本脚本就跟着变。 */
 const PAGE_SPECS = [
+  { name: '开局（起名/选血统）', tab: 'setup' },
   { name: '灯阁（首页）', tab: 'home' },
   { name: '残域', tab: 'dungeon' },
   { name: '执灯者·队伍', tab: 'roster', fn: 'partyScreen' },
