@@ -185,15 +185,19 @@ CV.register('worlds', function () {
     const w = D.WORLDS.find(x => x.id === pr.worldId);
     L.row('继续上次副本', `${w ? w.name : pr.worldId} · 第 ${pr.stage}/12 关 · 第 ${(pr.wave || 0) + 1}/${(pr.waves || [1]).length} 波`, { id: 'resume_run', value: '继续' });
   }
-  L.title('深井', `当前第 ${s.corridor.floor} 层 · 最高 ${s.corridor.best}`);
-  L.btn('♾ 挑战深井第 ' + s.corridor.floor + ' 层', 'corridor_fight', { primary: true });
-  L.title(`残域（${D.WORLDS.length} 个世界）`);
+  L.title('深井挑战');
+  const corrLocked = !Core.isUnlocked('corridor');
+  L.row('深井', corrLocked ? '🔒 ' + Core.unlockTip('corridor') : `当前第 ${s.corridor.floor} 层 · 历史最高 ${s.corridor.best}`, {
+    icon: '♾', id: corrLocked ? null : 'corridor_fight', value: '›', disabled: corrLocked,
+  });
+  L.title(`残域（${D.WORLDS.length}）`);
+  const WORLD_ICONS = { bio: '🧟', ghost: '👻', mystic: '🏺', tech: '🛰', god: '👁' };
   D.WORLDS.forEach(w => {
     const st = s.worlds[w.id];
     const unlocked = st && st.unlocked;
     const prog = unlocked ? st.stages.normal.filter(x => x > 0).length : 0;
-    L.row(w.name, unlocked ? `进度 ${prog}/12 · ${w.mechanic}` : '🔒 通关上一世界解锁', {
-      id: unlocked ? 'open_world_' + w.id : null, value: unlocked ? '›' : '',
+    L.row(w.name, unlocked ? `进度 ${prog}/12 · ${w.mechanic.split('：')[0]}` : '🔒 通关上一世界解锁', {
+      icon: WORLD_ICONS[w.theme] || '🗺', id: unlocked ? 'open_world_' + w.id : null, value: unlocked ? '›' : '',
     });
   });
 });

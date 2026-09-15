@@ -203,9 +203,16 @@ const L = {
     // 卡片：网页版 .card 是浅渐变 + 1px 描边
     fillPanel(12, this.y, CV.W - 24, h, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
     const valueW = opt.value ? measure(opt.value, 13) + 12 : 0;
-    const labelW = CV.W - 48 - valueW;                    // 左右各留 24 的边距
-    drawText(fitText(label, labelW, 14, !!opt.bold), 24, this.y + (sub ? 20 : h / 2), { size: 14, bold: !!opt.bold, color: opt.disabled ? CV.C.dim : CV.C.text });
-    if (sub) drawText(fitText(sub, CV.W - 48, 11), 24, this.y + 38, { size: 11, color: CV.C.dim });
+    // opt.icon：左侧一个圆角方块图标（网页版世界行的 🧟👻 那种）
+    const iconW = opt.icon ? 40 : 0;
+    if (opt.icon) {
+      fillPanel(24, this.y + (h - 34) / 2, 34, 34, { fill: '#1a2230', line: CV.C.line, r: 8 });
+      drawText(opt.icon, 41, this.y + h / 2, { size: 18, align: 'center' });
+    }
+    const x0 = 24 + iconW;
+    const labelW = CV.W - 24 - x0 - valueW;              // 左右各留 24 的边距
+    drawText(fitText(label, labelW, 14, !!opt.bold), x0, this.y + (sub ? 20 : h / 2), { size: 14, bold: !!opt.bold, color: opt.disabled ? CV.C.dim : CV.C.text });
+    if (sub) drawText(fitText(sub, CV.W - 24 - x0, 11), x0, this.y + 38, { size: 11, color: CV.C.dim });
     if (opt.value) drawText(opt.value, CV.W - 24, this.y + (sub ? 20 : h / 2), { size: 13, align: 'right', color: opt.valueColor || CV.C.gold });
     if (opt.right) drawText(fitText(opt.right, CV.W - 48, 11), CV.W - 24, this.y + (sub ? 38 : h / 2), { size: 11, align: 'right', color: CV.C.dim });
     if (opt.id && !opt.disabled) addHit(opt.id, 12, this.y, CV.W - 24, h);
