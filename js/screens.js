@@ -91,7 +91,7 @@ CV.register('home', function () {
   // 挂机
   const bank = Core.idleBankGains();
   L.title('挂机', `离线效率 ${Math.round(Core.offlineEfficiency() * 100)}% · 上限 ${Core.offlineCapHours().toFixed(0)} 小时`);
-  L.fillPanel(12, L.y, CV.W - 24, 96);
+  CV.fillPanel(12, L.y, CV.W - 24, 96);
   CV.drawText(hhmmssLocal(bank.seconds), 26, L.y + 24, { size: 14, bold: true });
   CV.drawText(`◈${fmt(bank.points)} · EXP ${fmt(bank.exp)}${bank.otherworld ? ' · ◆' + bank.otherworld : ''}${bank.mat ? ' · ⚙️' + bank.mat : ''}`, 26, L.y + 50, { size: 12, color: CV.C.dim });
   const ready = bank.seconds >= 60;

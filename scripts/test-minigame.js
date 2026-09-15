@@ -80,7 +80,9 @@ async function main() {
     CV.reset(name, sample[name] || {});
     try {
       UI._draw();
-      if (!CV.hits.length && name !== 'stagefail') badRender.push(name + '(没有可点区域)');
+      // 注意：框架会把面板异常吞掉画成一行红字，所以必须查 lastError，不能只看有没有抛
+      if (CV.lastError) badRender.push(name + '(' + CV.lastError.message + ')');
+      else if (!CV.hits.length && name !== 'stagefail') badRender.push(name + '(没有可点区域)');
     } catch (e) { badRender.push(name + '(' + e.message + ')'); }
   });
   t(`${Object.keys(CV.panels).length - 4} 个界面全部渲染无异常`, badRender.length === 0, badRender.join('; '));

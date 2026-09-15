@@ -185,8 +185,23 @@ wxlh-minigame/
 │   └── ui-canvas.js     ← 入口层：初始化画布、注册全部按钮行为、主循环
 └── scripts/
     ├── sync-logic.js    ← 一键把网页版的逻辑层同步过来（改逻辑只改网页版那一份）
-    └── test-minigame.js ← 无头冒烟测试（假 wx + 假 Canvas），39 项全过
+    ├── test-minigame.js ← 无头冒烟测试（假 wx + 假 Canvas），51 项全过
+    └── preview-build.js ← 把 8 个模块打成一个包，供浏览器预览页使用
+├── preview.html         ← 浏览器预览页（不用装开发者工具也能看界面）
+└── preview-home.png     ← 首页预览截图
 ```
+
+### 不用开发者工具，也能先看界面
+
+```bash
+node scripts/preview-build.js     # 打一个包（小游戏环境有 require，浏览器没有，所以要包一层）
+open preview.html                 # 直接用浏览器打开，看到的界面与真机一致（尺寸按 375×812 模拟）
+```
+
+> 这个预览页是小游戏版的"照妖镜"：它用浏览器真实的 Canvas 渲染，
+> 抓出过一个真 bug——首页有一行把 `CV.fillPanel` 写成了 `L.fillPanel`，
+> 在真机上那一页会直接显示"界面出错"。现在框架会把面板异常记进 `CV.lastError`，
+> **51 项测试里专门有一条断言"36 个界面逐个渲染后 lastError 必须为空"**。
 
 ### 二期做完了什么（2026-09-15）
 

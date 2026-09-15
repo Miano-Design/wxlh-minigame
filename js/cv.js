@@ -201,7 +201,10 @@ CV.draw = function () {
     c.translate(0, -top.scroll);
     L.at(CV.TOP + 10);
     if (panel) {
+      CV.lastError = null;
       try { panel(top.params); } catch (e) {
+        // 界面出错不能静默：记下来（测试会断言它必须是 null），同时画在屏幕上让玩家看得见
+        CV.lastError = { panel: top.name, message: e && e.message, stack: e && e.stack };
         drawText('界面出错：' + (e && e.message), 16, CV.TOP + 30, { size: 12, color: CV.C.red });
         top.contentH = CV.TOP + 60;
       }
