@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.4';
+  const GAME_VER = '9.5.5';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -79,7 +79,6 @@ window.UI = (function () {
     }).join('')}</div>`;
   }
   /* 装备卡：主角与招募角色共用（只有数据属性名不一样），6 个槽用方块呈现。
-     一件装备只能一个人穿——换装时自动从原来那个人身上卸下（写在后端，这里只做提示）。
      点方块＝换装；方块右上角「卸下」＝脱掉（stopPropagation 写在外面的事件绑定里）。 */
   function equipCard(ownerId, slots, kind) {
     const S = C().S;
@@ -100,7 +99,7 @@ window.UI = (function () {
     }).join('');
     const filled = slots.filter(s => eq[s]).length;
     return `<div class="card">
-      <h3>🗡 装备 <span class="sub">${filled}/${slots.length} 件 · 点方块换装</span></h3>
+      <h3>🗡 装备 <span class="sub">${filled}/${slots.length} 件</span></h3>
       <div class="eq-grid">${tiles}</div>
     </div>`;
   }
@@ -1365,12 +1364,11 @@ window.UI = (function () {
           </div>
         </div>
         <div class="bar exp mt3"><i style="width:${lvlPct}%"></i></div>
-        <div class="hint mt1">EXP ${Math.floor(lvlPct)}% · 靠挂机与通关自动累积（当前 ${C().idleRates().expPerMin.toFixed(1)} EXP / 分），每升 1 级自动 +${D.ATTR_POINTS_PER_LV} 属性点与 1 技能点。</div>
+        <div class="hint mt1">EXP ${Math.floor(lvlPct)}% · 当前 ${C().idleRates().expPerMin.toFixed(1)} EXP / 分</div>
       </div>
       <div class="card">
         <h3>🎯 六维属性 <span class="sub">可用点数 ${S.player.attrPoints || 0}</span>
           <button class="btn small ghost hbtn" data-attrreset="1" ${spentAttr > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
-        <div class="hint mb2">每升 1 级获得 ${D.ATTR_POINTS_PER_LV} 点，每点 +${D.ATTR_POINT_VALUE} 维值；加错随时点右上角重置，不花任何东西。</div>
         ${D.ATTR_META.map(a => `
           <div class="list-row">
             <div class="grow"><div class="t1">${a.name} <span style="color:var(--dim);font-size:11px">${a.desc}</span></div>
@@ -1382,7 +1380,6 @@ window.UI = (function () {
       <div class="card">
         <h3>⚡ ${S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'} <span class="sub">可用技能点 ${S.player.skillPoints || 0}</span>
           <button class="btn small ghost hbtn" data-pskillreset="1" ${spentSkill > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
-        <div class="hint mb2">每升 1 级获得 1 点技能点${S.player.bloodline ? '' : '；选定血统后，技能栏会换成那条血统的技能'}；点错了点右上角重置退回全部技能点。</div>
         ${[P.s1, P.s2, P.ult].map((sk, i) => `
           <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [1, 1, 1])[i]}/10</span>
             <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [1, 1, 1])[i] < 10 ? '' : 'disabled'}>+1</button></div>
