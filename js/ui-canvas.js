@@ -308,6 +308,32 @@ on('save_export', () => {
   if (wx.setClipboardData) wx.setClipboardData({ data: json, success: () => CV.toast('存档已复制到剪贴板'), fail: () => CV.toast('复制失败') });
   else CV.toast('当前环境不支持复制');
 });
+on('save_import', () => {
+  if (!wx.getClipboardData) { CV.toast('当前环境不支持从剪贴板导入'); return; }
+  wx.getClipboardData({
+    success: res => {
+      const txt = String((res && res.data) || '').trim();
+      if (!txt || txt[0] !== '{') { CV.toast('剪贴板里没有存档内容（先去导出一次并复制）'); return; }
+      const r = Core.importSave(txt);
+      CV.toast(r.ok ? '导入成功，进度已覆盖' : (r.msg || '导入失败'));
+      if (r.ok) CV.reset('home');
+    },
+    fail: () => CV.toast('读取剪贴板失败'),
+  });
+});
+[1, 2, 3].forEach(v => on('speed_' + v, () => {
+  S().settings.speed = v;
+  Core.save();
+  CV.toast(`战斗速度 ${v}×`);
+}));
+[1, 2, 3].forEach(v => {
+  on('slot_save_' + v, () => { const ok = Core.saveSlot(v); CV.toast(ok ? `已保存到存档槽 ${v}` : '保存失败'); });
+  on('slot_load_' + v, () => {
+    const ok = Core.loadSlot(v);
+    CV.toast(ok ? `已读取存档槽 ${v}` : '这个槽是空的');
+    if (ok) CV.reset('home');
+  });
+});
 on('save_wipe', () => {
   const doIt = () => { Core.wipeSave(); if (wx.reLaunch) wx.reLaunch({}); };
   if (!wx.showModal) { doIt(); return; }

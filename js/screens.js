@@ -209,7 +209,13 @@ let stageRun = null;      // 一整关（1~3 波）的进度：血量继承、�
 function battleUnit(u, x, y, w) {
   const h = 78;
   const dead = u.hp <= 0;
-  CV.fillPanel(x, y, w, h, { fill: dead ? '#12161d' : CV.C.panel2, line: u.isBoss ? CV.C.accent : CV.C.line, r: 10 });
+  // 出手 / 挨打的高亮：让"这一下是谁打的、打在谁身上"在画面上一眼看得出
+  const now = Date.now();
+  const acting = battle && battle.actingUid === u.uid && now - (battle.actingAt || 0) < 420;
+  const hit = battle && battle.hitUid === u.uid && now - (battle.hitAt || 0) < 260;
+  const line = hit ? CV.C.red : acting ? CV.C.gold : (u.isBoss ? CV.C.accent : CV.C.line);
+  CV.fillPanel(x, y, w, h, { fill: hit ? '#2a1a20' : (dead ? '#12161d' : CV.C.panel2), line, r: 10 });
+  if (acting) { CV.ctx.strokeStyle = CV.C.gold; CV.ctx.lineWidth = 2; rrectL(x, y, w, h, 10); CV.ctx.stroke(); }
   const nm = u.name.length > 4 ? u.name.slice(0, 4) : u.name;
   CV.drawText(nm, x + w / 2, y + 14, { size: 11, align: 'center', color: dead ? CV.C.dim : (u.isBoss ? CV.C.accent : CV.C.text), bold: !!u.isBoss });
   const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
@@ -333,9 +339,11 @@ function applyFrame(b, f) {
   switch (f.type) {
     case 'round': b.round = f.n; if (f.n <= 3 || f.n % 5 === 0) pushLog(b, `—— 第 ${f.n} 回合 ——`); break;
     case 'attack': break;
-    case 'skill': pushLog(b, `✨ ${nmOf(b, f.actor)} 使用【${f.name}】`); break;
+    case 'skill': b.actingUid = f.actor; b.actingAt = Date.now(); pushLog(b, `✨ ${nmOf(b, f.actor)} 使用【${f.name}】`); break;
     case 'damage': {
       const u = U[f.target];
+      b.hitUid = f.target; b.hitAt = Date.now();
+      b.actingUid = f.source; b.actingAt = Date.now();
       if (u) u.hp = Math.max(0, u.hp - f.dmg);
       addFloater(b, f.target, (f.crit ? '暴击 ' : '-') + fmt(f.dmg), f.crit ? 'crit' : 'dmg');
       if (f.healed) { const s = U[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); addFloater(b, f.source, '+' + fmt(f.healed), 'heal'); } }
@@ -682,6 +690,10 @@ CV.register('protagonist', function () {
     L.row(a.name, a.desc, { id: 'attr_' + a.id, value: `+${s.player.attrs[a.id] || 0}`, valueColor: CV.C.gold });
   });
   L.btnRow([{ label: '洗点（免费）', id: 'reset_attrs', size: 12 }, { label: '加 5 点', id: 'attr_add5', size: 12 }]);
+  L.btnRow([
+    { label: '🔒 铭刻', id: 'open_genelock', size: 12 },
+    { label: '⚗️ 炼化台（血清）', id: 'open_refine', size: 12 },
+  ]);
   L.title('技能', `可用技能点 ${s.player.skillPoints}`);
   const sk = Core.protagonistSkills();
   ['s1', 's2', 'ult'].forEach((k, i) => {
@@ -1156,9 +1168,24 @@ CV.register('shop', function () {
   });
 });
 CV.register('guide', function () {
+  L.text('这一页讲清游戏怎么玩；看广告的规则也写在里面。', { size: 11, color: CV.C.dim });
   D.GUIDE_CHAPTERS.forEach(ch => {
     L.title(ch.t || ch.title || '章节');
     L.text(ch.body || ch.desc || '', { size: 12, color: CV.C.dim });
+  });
+  L.title('看广告说明');
+  L.text('本游戏的广告都是「激励视频」：你主动点、看完 15~30 秒才拿到奖励；不看也不影响正常玩。\n' +
+    '每个点位每天有次数上限（按钮上直接写着还剩几次），用完就变灰。\n' +
+    '如果广告暂时拉不到（网络或广告库存原因），我们照发奖励，每天最多补偿 2 次。\n' +
+    '广告不会打断战斗、不会强制弹出，也不会出现在加载和新手引导里。', { size: 11, color: CV.C.dim });
+  L.title('当前广告额度');
+  const AD_NAME = {
+    offline_double: '离线收益翻倍', idle_boost: '挂机加速 2 小时', sweep_plus: '扫荡次数 +3',
+    pre_buff: '战前增益 攻击 +25%', free_recruit: '普通池免费抽 1 次', recruit_adv: '高级池免费抽 1 次',
+    holy_pack: '✦圣洁晶石 ×30', otherworld_pack: '◆异界结晶 ×50', login_double: '签到奖励翻倍', revive: '阵亡复活（每关 1 次）',
+  };
+  Object.keys(G.AD.limits).forEach(k => {
+    L.row(AD_NAME[k] || k, '', { value: `${G.AD.left(k)}/${G.AD.limits[k]} 次` });
   });
   L.btn('💠 货币图鉴（每种货币干什么用）', 'open_curdoc');
 });
@@ -1206,8 +1233,22 @@ CV.register('settings', function () {
   sw('autoSellN', 'N 装自动分解');
   sw('autoSellR', 'R 装自动分解');
   L.title('存档');
-  L.btn('导出存档（复制到剪贴板）', 'save_export');
-  L.btn('删除进度并重开', 'save_wipe');
+  L.title('战斗速度', '和战斗界面右上角那个按钮同步');
+  L.btnRow([1, 2, 3].map(v => ({ label: v + '× 速度', id: 'speed_' + v, primary: (s.settings.speed || 1) === v, size: 12 })));
+  L.title('存档槽', '本地 3 个槽，互不覆盖');
+  Core.slotInfo().forEach(slot => {
+    const m = slot.meta;
+    L.row(`存档槽 ${slot.slot}`, m ? `Lv.${m.level} · 深井最高 ${m.floor} · ${new Date(m.time || Date.now()).toLocaleString('zh-CN')}` : '空槽',
+      { value: m ? '有存档' : '' });
+    L.btnRow([
+      { label: '保存到这一槽', id: 'slot_save_' + slot.slot, size: 11 },
+      { label: '读取', id: 'slot_load_' + slot.slot, size: 11, disabled: !slot.exists },
+    ]);
+  });
+  L.title('导出 / 导入');
+  L.btn('📤 导出存档到剪贴板', 'save_export', { size: 13 });
+  L.btn('📥 从剪贴板导入（会覆盖当前进度）', 'save_import', { size: 13 });
+  L.btn('🗑 删除进度并重开', 'save_wipe', { size: 13 });
   L.title('关于');
   L.text('残域（微信小游戏版）', { size: 12, color: CV.C.dim });
   L.text('个人开发 · 广告变现版 · 数据全部存在本机', { size: 11, color: CV.C.dim });
