@@ -33,6 +33,19 @@ function tileList(items) {
 function tileGrid3(items) {
   L.tiles(items.map(([id, name, sub, dot]) => ({ id, label: name, sub: sub || '', dot: !!dot })), 3);
 }
+function fitTextLocal(str, maxW, size) {
+  // 复用 cv 的宽度约束（超长截断加省略号）
+  const CVmod = CV;
+  return (CVmod.L && CVmod.L._fit) ? CVmod.L._fit(str, maxW, size, false) : str;
+}
+/* 网页版的养成/日常宫格：**已解锁的才铺成格子**，没解锁的折成一行灰字
+   （以前小游戏版把没解锁的也画成灰格子，和网页版观感差很多） */
+function tileGridWithLock(list) {
+  const open = list.filter(it => !it[4] || Core.isUnlocked(it[4]));
+  const locked = list.filter(it => it[4] && !Core.isUnlocked(it[4]));
+  if (open.length) tileGrid3(open);
+  if (locked.length) L.text(`还没解锁：${locked.map(x => x[1]).join(' / ')}（跟着关卡进度开，推图就会一个个亮起来）`, { size: 11, color: CV.C.dim });
+}
 /* 广告按钮的统一拼法：把"今天还剩几次"直接写在按钮上，玩家一眼知道还能薅几次 */
 function adBtn(slot, label, id, primary) {
   const left = G.AD.left(slot);
@@ -62,14 +75,24 @@ CV.register('welcome', function () {
 
 CV.register('home', function () {
   const s = S(), pst = Core.effectivePlayerStats();
-  CV.fillPanel(12, L.y, CV.W - 24, 104);
-  CV.drawText(`${s.player.name || '执灯者'}  Lv.${s.player.level}`, 26, L.y + 26, { size: 17, bold: true });
-  CV.drawText(`战力 ${fmt(Core.teamPower())}`, CV.W - 26, L.y + 26, { size: 12, align: 'right', color: CV.C.gold });
-  CV.drawText(curRow(), 26, L.y + 54, { size: 13, color: CV.C.gold });
-  CV.drawText(`攻 ${fmt(pst.atk)} · 生 ${fmt(pst.hp)} · 速 ${fmt(pst.spd)}`, 26, L.y + 78, { size: 12, color: CV.C.dim });
-  CV.drawText('▸ 主角详情', CV.W - 26, L.y + 78, { size: 11, align: 'right', color: CV.C.gold });
-  CV.addHit('open_protagonist', 12, L.y, CV.W - 24, 104);
-  L.y += 112;
+  /* 主角卡：照网页版做成"多行【标签】值"（不是大标题 + 三个数字）
+     【境界】血奴初期 / 【等级】Lv.2 / 【主角】六维待分 0·技能待加 0 / 【转生】0 世 */
+  const sp = s.player;
+  const rs = Core.realmState();
+  CV.fillPanel(12, L.y, CV.W - 24, 134, { grad: [CV.C.panel, '#0e1420'], line: CV.C.line });
+  const kv = (i, label, value, opt) => {
+    const y = L.y + 19 + i * 24;
+    CV.drawText(label, 24, y, { size: 12, color: (opt && opt.labelColor) || CV.C.dim });
+    if (value) CV.drawText(fitTextLocal(value, CV.W - 120 - 24, 12), 110, y, { size: 12, color: (opt && opt.color) || CV.C.text });
+    if (opt && opt.right) CV.drawText(opt.right, CV.W - 24, y, { size: 11, align: 'right', color: opt.rightColor || CV.C.dim });
+  };
+  kv(0, '【境界】', rs.curName || '未选血统', { color: CV.C.gold, right: '全属性 +' + (Core.realmBonusPct() * 100).toFixed(1) + '%', rightColor: CV.C.gold });
+  kv(1, '【等级】', 'Lv.' + sp.level, { right: '战力 ' + fmt(Core.teamPower()), rightColor: CV.C.gold });
+  kv(2, '【主角】', `六维待分 ${sp.attrPoints || 0} · 技能待加 ${sp.skillPoints || 0}`, { right: '加点 / 洗点 ›' });
+  kv(3, '【转生】', `${sp.reincarnations || 0} 世`, { right: '天赋 ›' });
+  CV.drawText(`攻 ${fmt(pst.atk)}  防 ${fmt(pst.def)}  生 ${fmt(pst.hp)}  速 ${fmt(pst.spd)}`, 24, L.y + 118, { size: 11, color: CV.C.dim });
+  CV.addHit('open_protagonist', 12, L.y, CV.W - 24, 134);
+  L.y += 142;
 
   // 主线
   const mq = Core.mainQuestState();
@@ -83,7 +106,7 @@ CV.register('home', function () {
   const sect = Core.sectInfo();
   const bLv = Object.values(s.buildings).reduce((a, b) => a + b, 0);
   L.title('养成');
-  tileGrid3([
+  tileGridWithLock([
     ['open_grow', '灯阁评级', `Lv.${sect.lv} · +${(sect.pct * 100).toFixed(1)}%`],
     ['open_keji', '秘术阁', `已修 ${D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0)} 级`],
     ['open_fabao', '法宝', `${Core.fabaoState().own.length}/${D.FABAO.length} 件`],
@@ -91,11 +114,11 @@ CV.register('home', function () {
     ['open_arena', '斗法台', `第 ${Core.arenaState().floor} 台 · 剩 ${Core.arenaState().left}`],
     ['open_mount', '坐骑', `${Core.mountState().own.length}/${D.MOUNTS.length} 匹`],
     ['open_refine', '炼化台', '材料 → 血清'],
-    ['open_authority', '灯阁权限', `Lv.${Core.authorityInfo().lv}/${Core.authorityInfo().max}`],
-    ['open_buildings', '基地建设', `合计 Lv.${bLv}`],
-    ['open_genelock', '铭刻', s.player.geneLock ? `${s.player.geneLock} 阶` : '未解锁'],
-    ['open_beast', '伴生体', Object.keys(s.beast.owned || {}).length + ' 只'],
-    ['open_reincarn', '转生天赋', `${s.player.reincarnations} 世`],
+    ['open_authority', '灯阁权限', `Lv.${Core.authorityInfo().lv}/${Core.authorityInfo().max}`, null, 'buildings'],
+    ['open_buildings', '基地建设', `合计 Lv.${bLv}`, null, 'buildings'],
+    ['open_genelock', '铭刻', s.player.geneLock ? `${s.player.geneLock} 阶` : '0 阶', null, 'geneLock'],
+    ['open_beast', '伴生体', Object.keys(s.beast.owned || {}).length + ' 只', null, 'beast'],
+    ['open_reincarn', '转生天赋', `${s.player.reincarnations} 世`, null, 'reincarn'],
     ['open_codex', '灯录', `${Core.codexState().owned}/${Core.codexState().total}`],
   ]);
 
@@ -132,15 +155,16 @@ CV.register('home', function () {
 
   const t = Core.todayState();
   L.title('日常');
-  tileGrid3([
+  tileGridWithLock([
     ['open_login', '今日签到', `七日登录 · 第 ${s.login.day || 0}/7 天`],
     ['open_bounty', '限时悬赏', '按进度生成 · 到点作废'],
-    ['open_tasks', '每日任务', `今日 ${t.dailyDone}/${t.dailyTotal}`],
+    ['open_tasks', '每日任务', `今日 ${t.dailyDone}/${t.dailyTotal}`, null, 'tasks'],
     ['open_achievements', '成就', `${t.achClaimable} 项可领`],
     ['open_sign', '求签', Core.signState().canDraw ? '今日还没求' : `今日【${Core.signState().tier}】`],
-    ['open_recruit', '招募伙伴', Core.freeRecruitAvailable() ? '今日免费 1 抽' : '攒碎片升星'],
-    ['open_shop', '兑换大厅', '三档商店'],
+    ['open_recruit', '招募伙伴', Core.freeRecruitAvailable() ? '今日免费 1 抽' : '攒碎片升星', null, 'recruit'],
+    ['open_shop', '兑换大厅', '三档商店', null, 'shop'],
   ]);
+  L.text('血统与境界属于主角自身：点上面【主角】那张卡，在里面选血统 / 渡劫。', { size: 11, color: CV.C.dim });
   L.title('其他');
   tileGrid3([
     ['open_chars', '伙伴一览', `${Object.keys(s.chars).length} 名`],
