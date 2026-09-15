@@ -41,7 +41,8 @@
     var q = location.search;
     var mh = q.match(/h=(\d+)/);
     var ms = q.match(/screen=(\w+)/);
-    var W = 390, H = mh ? parseInt(mh[1], 10) : 844;
+    var mw = q.match(/w=(\d+)/);
+    var W = mw ? parseInt(mw[1], 10) : 390, H = mh ? parseInt(mh[1], 10) : 844;
     var tab = ms ? ms[1] : 'home';
     var canvas = document.getElementById('c');
     canvas.width = W; canvas.height = H;

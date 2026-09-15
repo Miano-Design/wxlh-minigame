@@ -110,6 +110,10 @@ const DROP_PSEUDO = /::(before|after|first-line|placeholder)|:(hover|focus|focus
 function parseSelector(sel) {
   const raw = sel.trim();
   if (!raw) return { drop: '空' };
+  /* 任何 `::xxx` 都是伪元素（::-webkit-scrollbar / ::before / ::marker…）：
+     它不是元素本身！漏掉这一条会把 `.pill-tabs::-webkit-scrollbar{display:none}`
+     当成 `.pill-tabs`，整个容器被判 display:none → 宽高归零，兄弟全塌。 */
+  if (/::/.test(raw)) return { drop: '伪元素' };
   if (/::(before|after|first-line|placeholder)/.test(raw)) return { drop: '伪元素' };
   if (/\[/.test(raw)) return { drop: '属性选择器' };
   if (/:(hover|focus|focus-visible|focus-within|first-child|last-child|nth-child|not|checked|disabled|placeholder-shown)/.test(raw)) {
