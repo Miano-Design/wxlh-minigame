@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:48 */
+   生成时间：2026-09-15 16:49 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -1763,12 +1763,15 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-req": {
   "color": "#7a849b",
   "fontSize": 11,
+  "flex": 1,
+  "minWidth": 0,
   "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-buff": {
   "color": "#56c894",
   "fontSize": 11,
-  "flex": 1,
+  "flex": 0,
+  "whiteSpace": "nowrap",
   "marginRight": 6
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__view.fm-on": {
