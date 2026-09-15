@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:58 */
+   生成时间：2026-09-15 17:05 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -575,6 +575,13 @@ module.exports = {
   "marginBottom": 10,
   "marginLeft": 4
  },
+ "view#app__scrollview#view__view.screen__view.section-title__text.section-title-t": {
+  "color": "#b6bfd0",
+  "fontSize": 12,
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginRight": 10
+ },
  "view#app__scrollview#view__view.screen__view.card": {
   "color": "#e9edf6",
   "fontSize": 15,
@@ -619,11 +626,23 @@ module.exports = {
   "alignItems": "center",
   "flexWrap": "wrap"
  },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
   "marginTop": 3,
   "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__text.chev": {
   "color": "#7a849b",
@@ -660,11 +679,23 @@ module.exports = {
   "alignItems": "center",
   "flexWrap": "wrap"
  },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
  "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
   "marginTop": 3,
   "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__text.chev": {
   "color": "#7a849b",

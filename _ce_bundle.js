@@ -668,22 +668,22 @@ function setupMarkup() {
     const on = cur === k;
     return `<view class="list-row${on ? ' on' : ''}" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold)' : ''}">
       <view class="grow">
-        <view class="t1">${b.name || k} ${on ? '<text class="tag" style="color:var(--gold)">已选</text>' : ''}</view>
-        <view class="t2">${b.desc || ''}</view>
+        <view class="t1"><text class="t1-t" value="${b.name || k}"/>${on ? '<text class="tag" style="color:var(--gold)" value="已选"/>' : ''}</view>
+        <view class="t2"><text class="t2-t" value="${b.desc || '' }"/></view>
       </view>
       <text class="chev" value="${on ? '✓' : '›'}"/>
     </view>`;
   }).join('');
   const body = `
-    <view class="section-title">起名</view>
+    <view class="section-title"><text class="section-title-t" value="起名"/></view>
     <view class="card">
       <view class="list-row" data-name="roll" style="cursor:pointer">
-        <view class="grow"><view class="t1">${S.player.name || '未命名'}</view>
-        <view class="t2">点一下换一个名字</view></view>
+        <view class="grow"><view class="t1"><text class="t1-t" value="${S.player.name || '未命名'}"/></view>
+        <view class="t2"><text class="t2-t" value="点一下换一个名字"/></view></view>
         <text class="chev" value="🎲"/>
       </view>
     </view>
-    <view class="section-title">选一条血统</view>
+    <view class="section-title"><text class="section-title-t" value="选一条血统"/></view>
     <view class="card">${rows}</view>
     <text class="hint mt2 blk">血统决定走哪条境界线，选定后不可更改。</text>
     <view class="btn-row mt2"><view class="btn primary block" data-setup="ok"><text class="btn-t" value="${cur ? '开始游戏' : '先选一条血统'}"/></view></view>
