@@ -1,0 +1,16 @@
+{
+  "description": "《残域》微信小游戏版（个人主体 · 广告变现）",
+  "appid": "touristappid",
+  "projectname": "wxlh-minigame",
+  "compileType": "game",
+  "libVersion": "3.5.0",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "enhance": false,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true
+  },
+  "condition": {}
+}
