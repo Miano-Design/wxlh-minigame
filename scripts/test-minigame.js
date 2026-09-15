@@ -10,11 +10,16 @@ const fs = require('fs');
 /* ---------- 假的 wx 环境 ---------- */
 const store = {};
 const noopCtx = new Proxy({}, {
-  get: (t, k) => (k in t ? t[k] : (t[k] = () => {})),
+  get: (t, k) => (k in t ? t[k]
+    // 引擎要给文字量宽度：给个假的测量结果，够跑通"不抛异常"这一层
+    : (t[k] = (k === 'measureText' ? ((s) => ({ width: String(s).length * 8 })) : () => {}))),
   set: (t, k, v) => { t[k] = v; return true; },
 });
 global.GameGlobal = global;
 global.localStorage = null;          // 真机没有 localStorage，强制走适配层那套
+global.CE_SAMPLE = false;            // 这个测试跑的是原来的 Canvas 界面层；引擎版另有下面的冒烟测试
+global.requestAnimationFrame = global.requestAnimationFrame || ((cb) => setTimeout(cb, 16));
+global.cancelAnimationFrame = global.cancelAnimationFrame || clearTimeout;
 global.wx = {
   getStorageSync: k => (k in store ? store[k] : ''),
   setStorageSync: (k, v) => { store[k] = v; },
@@ -24,6 +29,7 @@ global.wx = {
   getSystemInfoSync: () => ({ windowWidth: 375, windowHeight: 812, pixelRatio: 3, safeArea: { top: 44 } }),
   createCanvas: () => ({ getContext: () => noopCtx, width: 0, height: 0 }),
   onTouchStart: () => {}, onTouchMove: () => {}, onTouchEnd: () => {}, onShow: () => {}, onHide: () => {},
+  onTouchCancel: () => {},
   setClipboardData: o => o.success && o.success(),
   showModal: o => o.success && o.success({ confirm: true }),
   // 故意不提供 createRewardedVideoAd：验证"广告拉不到也要有降级"这条路径
@@ -299,6 +305,37 @@ async function main() {
       const txt = fs.readFileSync(path.resolve(__dirname, '../js', f), 'utf8');
       return !bad.some(re => re.test(txt));
     });
+  })());
+
+  /* ---------- 路线 B（引擎渲染）冒烟 ---------- */
+  const CEHome = require(path.resolve(__dirname, '../js/ce-home.js'));
+  const CEContext = require(path.resolve(__dirname, '../js/ce-context.js'));
+  const CETpl = require(path.resolve(__dirname, '../js/ce-tpl-home.js'));
+  const CEHomeData = require(path.resolve(__dirname, '../js/ce-home-data.js'));
+  const CEStyle = require(path.resolve(__dirname, '../js/ce-style.js'));
+  const ceSample = CEHomeData.sample();
+  let ceOk = false, ceInfo = '';
+  try {
+    const out = CEHome.render(noopCtx, 375, 812, ceSample);
+    ceOk = !!out.Layout && !!out.root && out.root.children.length >= 3;
+    ceInfo = '元素 ' + (out.Layout.eleCount || 0) + ' 个';
+  } catch (e) { ceInfo = (e && e.message) + ' | ' + ((e && e.stack) || '').split('\n')[1]; }
+  t('路线B：引擎版首页整条链路能渲染（模板 → 上下文类名 → 编译样式表 → 引擎）', ceOk, ceInfo);
+  t('路线B：模板里每个元素的上下文类名都在样式表里（模板改了没重跑编译就会红）', (() => {
+    const prepared = CEContext.prepare(CETpl(ceSample));
+    const keys = Object.keys(CEStyle);
+    const miss = [];
+    CEContext.walk(prepared.xml, (node) => { if (keys.indexOf(node.path) < 0) miss.push(node.path.slice(-40)); });
+    ceInfo = miss.length ? miss.slice(0, 3).join(' / ') : '';
+    return miss.length === 0;
+  })());
+  t('路线B：真实存档也能拼出首页数据（js/ce-home-data.js 的 fromCore）', (() => {
+    try { const d = CEHomeData.fromCore(); ceInfo = d.player.name + ' Lv.' + d.player.lv + ' · 养成格 ' + d.grow.length; return !!(d.hero && d.idle && d.nav.length === 4); }
+    catch (e) { ceInfo = (e && e.message); return false; }
+  })());
+  t('路线B：真实数据也能渲染（不是只对样例管用）', (() => {
+    try { return !!CEHome.render(noopCtx, 375, 812, CEHomeData.fromCore()).Layout; }
+    catch (e) { ceInfo = (e && e.message); return false; }
   })());
 
   console.log(`\n${pass} passed, ${fail} failed`);

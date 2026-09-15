@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>CE 预览</title>
+<style>html,body{margin:0;background:#111}#c{display:block}</style>
+</head>
+<body>
+<!-- 路线 B 的浏览器预览壳：只为了迭代快（Chrome 无头截图几秒一张），
+     跑的还是小游戏里同一套代码（同一份模板 + 同一份样式表 + 同一个引擎）。
+     真机/模拟器验证仍以微信开发者工具为准。 -->
+<canvas id="c" width="390" height="844" style="width:390px;height:844px"></canvas>
+<pre id="err" style="color:#f66;font:12px monospace;white-space:pre-wrap"></pre>
+<script>window.module = { exports: {} }; window.exports = window.module.exports;</script>
+<script src="js/lib/canvas-engine.js"></script>
+<script>window.__ENGINE = window.module.exports; window.module = { exports: {} };</script>
+<script src="js/ce-context.js"></script>
+<script src="js/ce-fit.js"></script>
+<script src="js/ce-home-data.js"></script>
+<script src="js/ce-tpl-home.js"></script>
+<script>window.__TPL = window.module.exports; window.module = { exports: {} };</script>
+<script src="js/ce-style.js"></script>
+<script>
+window.__STYLE = window.module.exports;
+window.module = { exports: {} };
+/* 让 js/ce-home.js 在浏览器里也能 require：只映射它要的那几个兄弟模块 */
+window.require = function (p) {
+  var map = {
+    './lib/canvas-engine.js': window.__ENGINE,
+    './ce-context.js': window.CEContext,
+    './ce-fit.js': window.CEFit,
+    './ce-home-data.js': window.CEHomeData,
+    './ce-tpl-home.js': window.__TPL,
+    './ce-style.js': window.__STYLE,
+  };
+  if (!(p in map)) throw new Error('预览里没映射的 require: ' + p);
+  return map[p];
+};
+</script>
+<script src="js/ce-home.js"></script>
+<script>window.__HOME = window.module.exports; window.module = { exports: {} };</script>
+<script>
+(function () {
+  try {
+    var W = 390, H = 844;
+    var mh = location.search.match(/h=(\d+)/);
+    if (mh) { H = parseInt(mh[1], 10); }
+    var canvas = document.getElementById('c');
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    var ctx = canvas.getContext('2d');
+    var out = window.__HOME.render(ctx, W, H, window.CEHomeData.sample());
+    var Layout = out.Layout;
+    document.title = 'OK 元素 ' + (Layout.eleCount || 0);
+    if (location.search.indexOf('debug') >= 0) {
+      var lines = [];
+      (function dump(el, d) {
+        var lb = el.layoutBox || {};
+        lines.push(d + (el.type || '?') + ' [' + (el.className || '') + '] box=' + Math.round(lb.absoluteX || 0) + ',' + Math.round(lb.absoluteY || 0) + ' ' + Math.round(lb.width || 0) + 'x' + Math.round(lb.height || 0) + (el.value !== undefined ? ' value=' + JSON.stringify(String(el.value).slice(0, 18)) : ''));
+        (el.children || []).forEach(function (c) { dump(c, d + '  '); });
+      })(Layout.children[0], '');
+      document.getElementById('err').textContent = lines.join('\n');
+    }
+  } catch (e) {
+    document.title = 'ERR ' + e.message;
+    document.getElementById('err').textContent = (e && e.stack) || String(e);
+  }
+})();
+</script>
+</body>
+</html>

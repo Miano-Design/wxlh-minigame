@@ -12,9 +12,20 @@ require('./js/data.js');
 require('./js/core.js');
 require('./js/battle.js');
 require('./js/dungeon.js');
-require('./js/cv.js');        // Canvas 界面框架
-require('./js/screens.js');   // 全部界面
 
-const UI = require('./js/ui-canvas.js');
+/* 路线 B 样片开关（2026-09-15）：
+     true  = 用官方引擎 + 网页版样式渲染首页（js/ce-home.js，见 README「路线 B」一节）
+     false = 走原来的手绘 Canvas 界面层（js/cv.js + js/screens.js + js/ui-canvas.js）
+   Node 无头测试（scripts/test-minigame.js）会先把 globalThis.CE_SAMPLE 置成 false，
+   这样那 55 项旧测试仍然测的是原来的界面层。全量迁移完成后，本开关连同旧界面层一起删。 */
+const CE_SAMPLE = (typeof globalThis !== 'undefined' && globalThis.CE_SAMPLE !== undefined)
+  ? globalThis.CE_SAMPLE : true;
 
-UI.boot();
+const ceOk = CE_SAMPLE && !!require('./js/ce-home.js').boot();
+
+if (!ceOk) {
+  /* 没开开关、引擎没起来、或者还没有存档（首次进入要走起名 / 选血统）→ 交给原来的界面层 */
+  require('./js/cv.js');        // Canvas 界面框架
+  require('./js/screens.js');   // 全部界面
+  require('./js/ui-canvas.js').boot();
+}

@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>probe</title></head><body>
+<canvas id="c" width="300" height="200"></canvas>
+<pre id="out"></pre>
+<script>window.module={exports:{}};window.exports=window.module.exports;</script>
+<script src="js/lib/canvas-engine.js"></script>
+<script>
+var Eng = window.module.exports;
+var Layout = Eng.default || Eng.Layout || Eng;
+var style = { t: { width: 300, height: 200, backgroundColor: '#111' }, a: { fontSize: 16, color: '#fff' } };
+var tpl = '<view id="t" class="t"><text class="a">ABC 你好</text><text class="a" value="DEF"></text></view>';
+var tpl2 = '<view id="t2" class="t"><text class="a" value="A&amp;B &quot;x&quot; 中文 · 【标签】"/></view>';
+var out = [];
+try {
+  Layout.updateViewPort({ width: 300, height: 200 });
+  Layout.init(tpl, style);
+  Layout.layout(document.getElementById('c').getContext('2d'));
+  var root = Layout.children[0];
+  out.push('root type=' + root.type + ' children=' + root.children.length);
+  root.children.forEach(function (ch, i) {
+    out.push(i + ' type=' + ch.type + ' value=' + JSON.stringify(ch.value) + ' valuesrc=' + JSON.stringify(ch.valuesrc) +
+      ' box=' + Math.round(ch.layoutBox.width) + 'x' + Math.round(ch.layoutBox.height) +
+      ' keys=' + Object.keys(ch).filter(function (k) { return k.indexOf('text') >= 0 || k === '#text'; }).join(','));
+  });
+} catch (e) { out.push('ERR ' + e.message + '\n' + e.stack); }
+try {
+  Layout.clear();
+  Layout.updateViewPort({ width: 300, height: 200 });
+  Layout.init(tpl2, style);
+  Layout.layout(document.getElementById('c').getContext('2d'));
+  out.push('实体解码：' + JSON.stringify(Layout.children[0].children[0].value));
+} catch (e) { out.push('实体探测 ERR ' + e.message); }
+document.getElementById('out').textContent = out.join('\n');
+document.title = 'PROBE';
+</script></body></html>

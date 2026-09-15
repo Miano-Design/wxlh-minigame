@@ -1,0 +1,30 @@
+/* 路线 B（引擎渲染）专用补充样式
+   ------------------------------------------------------------------------------
+   全工程只有这一个 CSS 文件是本项目独有的，其余样式**全部来自网页版 ../wxlh-game/css/style.css**。
+   这里只写"网页版靠 fixed 定位 / 视口单位 / body 做到、而 canvas 里必须换写法"的那几条，
+   别把卡片、文字、按钮这些长相的东西抄进来（抄了就等于把"改一处全站生效"的好处丢了）。
+*/
+
+/* 网页版 body 上的三条（背景 / 文字色 / 基础字号）：canvas 里没有 body，挂到根节点上 */
+#app {
+  background: #07090e;
+  color: #e9edf6;
+  font-size: 15px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+/* 网页版外壳：顶栏 fixed 在顶部、正文靠上边距让位、底栏 fixed 在底部。
+   canvas 没有"视口滚动"，所以这里改成真实的三段列布局：顶栏 / 正文 / 底栏。 */
+#topbar { position: static; flex: 0 0 auto; }
+#view { flex: 1; flex-shrink: 1; padding: 0; }
+#view .screen { padding: 6px 12px 14px; }
+#navbar { position: static; flex: 0 0 auto; }
+
+/* 排版的"块级文字"：网页版里这些是 <div>，宽度占满父级、长了会自动换行。
+   引擎里的 <text> 不写宽度就按内容撑成一行，长句子会直接顶出屏幕，
+   所以这类文字在模板里多挂一个 blk（宽度交给 js/ce-fit.js 按画布宽折算）。 */
+.blk { width: 100%; }
