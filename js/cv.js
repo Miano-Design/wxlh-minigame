@@ -178,7 +178,12 @@ const L = {
       const cy = this.y + Math.floor(i / cols) * (h + gap);
       if (!cell) { fillPanel(cx, cy, w, h, { fill: '#0f141d' }); return; }
       fillPanel(cx, cy, w, h, { fill: cell.done ? '#1d2b22' : (cell.bg || CV.C.panel2), line: cell.boss ? CV.C.accent : CV.C.line });
-      drawText(cell.label, cx + w / 2, cy + h / 2 - (cell.sub ? 6 : 0), { size: cell.size || 15, bold: true, align: 'center', color: cell.color || CV.C.text });
+      // 名字太长就折两行（背包格子里很常见：初级经验模块）
+      const lines = String(cell.label).split('\n').slice(0, 2);
+      const baseY = cy + h / 2 - (cell.sub ? 6 : 0) - (lines.length > 1 ? 8 : 0);
+      lines.forEach((ln, i) => {
+        drawText(ln, cx + w / 2, baseY + i * 13, { size: cell.size || 15, bold: true, align: 'center', color: cell.color || CV.C.text });
+      });
       if (cell.sub) drawText(cell.sub, cx + w / 2, cy + h - 12, { size: 9, align: 'center', color: CV.C.gold });
       if (cell.id && !cell.disabled) addHit(cell.id, cx, cy, w, h);
     });

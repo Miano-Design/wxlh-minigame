@@ -700,28 +700,103 @@ CV.register('bag', function (p) {
   const stash = Core.stashCount();
   if (stash) L.row('📮 待领箱', `背包满时收到的 ${stash} 件，点一下领回`, { id: 'stash_claim', value: '领回' });
 
+  /* 三池都是格子制（与网页版一致）：5 列格子，最后一格是「＋扩容」。
+     装备在批量分解态下，格子本身就是勾选框。 */
   if (pool === 'equip') {
     const worn = {};
     Object.values(s.equipped || {}).forEach(sl => Object.values(sl || {}).forEach(uid => { if (uid) worn[uid] = 1; }));
-    const list = Core.inventoryEquips().filter(e => !worn[e.uid]).slice(0, 48);
-    if (!list.length) L.text('没有未穿戴的装备', { color: CV.C.dim });
-    list.forEach(eq => {
-      L.row(`${eq.name} +${eq.enhance}`, `${D.EQUIP_SLOTS[eq.slot]}${eq.set ? ' · ' + (D.SETS[eq.set] || {}).name : (eq.classSet ? ' · ' + (D.CLASS_SETS[eq.classSet] || {}).name : '')}${eq.lock ? ' · 🔒' : ''}`, {
-        id: 'equip_' + eq.uid, value: eq.rarity, valueColor: CV.rarityColor(eq.rarity),
-      });
+    const list = equipListFiltered(worn);
+    L.btnRow([
+      { label: `部位：${equipFilterLabel()}`, id: 'filter_slot', size: 11 },
+      { label: `类型：${equipCatLabel()}`, id: 'filter_cat', size: 11 },
+    ]);
+    if (batchMode) {
+      L.btnRow([
+        { label: `全选 ${list.length} 件`, id: 'batch_all', size: 11 },
+        { label: '清空', id: 'batch_clear', size: 11 },
+        { label: `分解已选 ${batchSel.size} 件`, id: 'batch_go', size: 11, primary: batchSel.size > 0, disabled: batchSel.size === 0 },
+        { label: '退出批量', id: 'batch_off', size: 11 },
+      ]);
+    } else {
+      L.btnRow([
+        { label: '🧹 批量分解', id: 'batch_on', size: 12 },
+        { label: '⚡ 一键最优装备', id: 'auto_equip', size: 12 },
+      ]);
+    }
+    if (!list.length) L.text('这个筛选下没有未穿戴的装备', { color: CV.C.dim });
+    const cells = list.slice(0, D.BAG_BASE_EQ_CAP + s.bag.eqExpands * D.BAG_EXPAND_SIZE).map(eq => {
+      const sel = batchSel.has(eq.uid);
+      return {
+        label: (eq.lock ? '🔒' : '') + eq.name.slice(0, 4),
+        sub: '+' + eq.enhance + (sel ? ' ✓' : ''),
+        color: sel ? CV.C.gold : CV.rarityColor(eq.rarity),
+        bg: sel ? '#2a2233' : (eq.lock ? '#1a1f28' : CV.C.panel2),
+        disabled: batchMode && eq.lock,
+        id: batchMode ? (eq.lock ? null : 'bq_' + eq.uid) : 'equip_' + eq.uid,
+      };
     });
-    L.btn(`扩容 +${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(s.bag.eqExpands))}）`, 'expand_equip');
+    while (cells.length < Math.min(u.eqCap, 30)) cells.push(null);
+    L.grid(5, cells, { h: 58 });
+    L.btn(`＋ 扩容 ${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(s.bag.eqExpands))}）`, 'expand_equip');
     return;
   }
   const isMat = k => (D.ITEMS[k] || {}).type === 'material';
   const list = Object.keys(s.items).filter(k => s.items[k] > 0 && (pool === 'mat' ? isMat(k) : !isMat(k)));
-  if (!list.length) L.text('（空）', { color: CV.C.dim });
-  list.forEach(k => {
+  if (!list.length) L.text('（这一池还是空的）', { color: CV.C.dim });
+  const cells = list.map(k => {
     const it = D.ITEMS[k];
-    L.row(it.name, `${it.desc || ''}`, { id: 'item_' + k, value: '×' + s.items[k] });
+    return {
+      label: it.name.length > 5 ? it.name.slice(0, 5) + '\n' + it.name.slice(5, 10) : it.name,
+      sub: '×' + s.items[k],
+      id: 'item_' + k,
+      size: 11,
+    };
   });
-  L.btn(`扩容 +${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(pool === 'mat' ? s.bag.matExpands : s.bag.itemExpands))}）`, 'expand_' + pool);
+  while (cells.length < Math.min(pool === 'mat' ? u.matCap : u.cap, 30)) cells.push(null);
+  L.grid(5, cells, { h: 58 });
+  L.btn(`＋ 扩容 ${D.BAG_EXPAND_SIZE} 格（◈${fmt(D.bagExpandCost(pool === 'mat' ? s.bag.matExpands : s.bag.itemExpands))}）`, 'expand_' + pool);
+  L.text('点格子看用途与用法（1 / 10 / 全部）', { size: 11, color: CV.C.dim });
 });
+
+/* 装备池的筛选与批量分解（与网页版的分类口径一致） */
+let bagSlotFilter = 'all', bagCatFilter = 'all', batchMode = false, batchSel = new Set();
+const SLOT_FILTERS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品'], ['SSR', 'SSR+']];
+const CAT_FILTERS = [['all', '全部'], ['normal', '普通'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
+function equipFilterLabel() { return (SLOT_FILTERS.find(x => x[0] === bagSlotFilter) || [])[1] || '全部'; }
+function equipCatLabel() { return (CAT_FILTERS.find(x => x[0] === bagCatFilter) || [])[1] || '全部'; }
+function equipListFiltered(worn) {
+  let list = Core.inventoryEquips().filter(e => !worn[e.uid]);
+  if (bagSlotFilter === 'SSR') list = list.filter(e => ['SSR', 'UR'].includes(e.rarity));
+  else if (bagSlotFilter !== 'all') list = list.filter(e => e.slot === bagSlotFilter);
+  if (bagCatFilter === 'normal') list = list.filter(e => !e.set && !e.classSet && !e.charId);
+  else if (bagCatFilter === 'world') list = list.filter(e => !!e.set);
+  else if (bagCatFilter === 'class') list = list.filter(e => !!e.classSet);
+  else if (bagCatFilter === 'sig') list = list.filter(e => !!e.charId);
+  return list;
+}
+CV.on('filter_slot', () => picker('按部位筛选', SLOT_FILTERS.map(([k, n]) => ({ label: n, id: 'set_slot_' + k, value: bagSlotFilter === k ? '✔' : '' }))));
+CV.on('filter_cat', () => picker('按类型筛选', CAT_FILTERS.map(([k, n]) => ({ label: n, id: 'set_cat_' + k, value: bagCatFilter === k ? '✔' : '' }))));
+onPrefixLocal('set_slot_', id => { bagSlotFilter = id.slice(9); CV.back(); });
+onPrefixLocal('set_cat_', id => { bagCatFilter = id.slice(8); CV.back(); });
+CV.on('batch_on', () => { batchMode = true; batchSel.clear(); });
+CV.on('batch_off', () => { batchMode = false; batchSel.clear(); });
+CV.on('batch_clear', () => { batchSel.clear(); });
+CV.on('batch_all', () => {
+  const worn = {};
+  Object.values(S().equipped || {}).forEach(sl => Object.values(sl || {}).forEach(u => { if (u) worn[u] = 1; }));
+  equipListFiltered(worn).forEach(e => { if (!e.lock) batchSel.add(e.uid); });
+});
+CV.on('batch_go', () => {
+  const r = Core.decomposeMany(Array.from(batchSel));
+  CV.toast(r.ok ? `分解 ${r.count} 件，获得 ◆${r.gain}` : '没有可分解的装备');
+  batchSel.clear();
+  batchMode = false;
+});
+CV.onPrefix('bq_', id => {
+  const uid = id.slice(3);
+  if (batchSel.has(uid)) batchSel.delete(uid); else batchSel.add(uid);
+});
+function onPrefixLocal(prefix, fn) { CV.onPrefix(prefix, fn); }
 
 CV.register('item', function (p) {
   const s = S(), id = p.id, it = D.ITEMS[id];
