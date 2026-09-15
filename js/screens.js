@@ -29,6 +29,10 @@ function tileList(items) {
     L.row(it[1], it[2] || '', { id: it[0], value: it[3] || '' });
   });
 }
+/* 网页版那套三列文字宫格（养成 / 日常 / 其他都是它）；items 是 [id, 名字, 状态, 是否红点] */
+function tileGrid3(items) {
+  L.tiles(items.map(([id, name, sub, dot]) => ({ id, label: name, sub: sub || '', dot: !!dot })), 3);
+}
 /* 广告按钮的统一拼法：把"今天还剩几次"直接写在按钮上，玩家一眼知道还能薅几次 */
 function adBtn(slot, label, id, primary) {
   const left = G.AD.left(slot);
@@ -79,12 +83,12 @@ CV.register('home', function () {
   const sect = Core.sectInfo();
   const bLv = Object.values(s.buildings).reduce((a, b) => a + b, 0);
   L.title('养成');
-  tileList([
-    ['open_grow', '灯阁评级', `Lv.${sect.lv} · 全队 +${(sect.pct * 100).toFixed(1)}%`],
+  tileGrid3([
+    ['open_grow', '灯阁评级', `Lv.${sect.lv} · +${(sect.pct * 100).toFixed(1)}%`],
     ['open_keji', '秘术阁', `已修 ${D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0)} 级`],
     ['open_fabao', '法宝', `${Core.fabaoState().own.length}/${D.FABAO.length} 件`],
     ['open_garden', '药园', `${Core.gardenState().filter(x => x.plot).length} 块在用`],
-    ['open_arena', '斗法台', `第 ${Core.arenaState().floor} 台 · 剩 ${Core.arenaState().left} 次`],
+    ['open_arena', '斗法台', `第 ${Core.arenaState().floor} 台 · 剩 ${Core.arenaState().left}`],
     ['open_mount', '坐骑', `${Core.mountState().own.length}/${D.MOUNTS.length} 匹`],
     ['open_refine', '炼化台', '材料 → 血清'],
     ['open_authority', '灯阁权限', `Lv.${Core.authorityInfo().lv}/${Core.authorityInfo().max}`],
@@ -92,7 +96,7 @@ CV.register('home', function () {
     ['open_genelock', '铭刻', s.player.geneLock ? `${s.player.geneLock} 阶` : '未解锁'],
     ['open_beast', '伴生体', Object.keys(s.beast.owned || {}).length + ' 只'],
     ['open_reincarn', '转生天赋', `${s.player.reincarnations} 世`],
-    ['open_codex', '灯录', `${Core.codexState().owned}/${Core.codexState().total} 名`],
+    ['open_codex', '灯录', `${Core.codexState().owned}/${Core.codexState().total}`],
   ]);
 
   // 游历（网页版这一段在「养成」与「挂机」之间）
@@ -128,7 +132,7 @@ CV.register('home', function () {
 
   const t = Core.todayState();
   L.title('日常');
-  tileList([
+  tileGrid3([
     ['open_login', '今日签到', `七日登录 · 第 ${s.login.day || 0}/7 天`],
     ['open_bounty', '限时悬赏', '按进度生成 · 到点作废'],
     ['open_tasks', '每日任务', `今日 ${t.dailyDone}/${t.dailyTotal}`],
@@ -138,7 +142,7 @@ CV.register('home', function () {
     ['open_shop', '兑换大厅', '三档商店'],
   ]);
   L.title('其他');
-  tileList([
+  tileGrid3([
     ['open_chars', '伙伴一览', `${Object.keys(s.chars).length} 名`],
     ['open_curdoc', '货币图鉴', `${D.CURRENCIES.length} 种货币`],
     ['open_alts', '多主角', `${Core.protagonistList().length} 个角色`],
@@ -950,7 +954,7 @@ CV.register('recruit', function () {
 /* ================= 通用小面板 ================= */
 CV.register('grow', function () {
   L.text('养成总览：一个功能一个入口', { size: 12, color: CV.C.dim });
-  tileList([
+  tileGrid3([
     ['open_keji', '秘术阁', '42 条百分比长线'],
     ['open_fabao', '法宝', '给效果：吸血 / 开场能量 / 减伤'],
     ['open_garden', '药园', '种材料，离线也计时'],

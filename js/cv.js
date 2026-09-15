@@ -212,6 +212,29 @@ const L = {
     this.y += Math.ceil(cells.length / cols) * (h + gap);
     return this;
   },
+  /* 文字宫格：与网页版 .text-menu / .tile 同款 —— 3 列、每格只有「名字 + 状态」、描边方块、右上角可带红点。
+     网页版首页的「养成 / 日常」就是这一套，不是一行一条的列表。 */
+  tiles(items, cols) {
+    const n = cols || 3, gap = 8, h = 56;
+    const w = (CV.W - 32 - gap * (n - 1)) / n;
+    items.forEach((it, i) => {
+      const x = 16 + (i % n) * (w + gap);
+      const y = this.y + Math.floor(i / n) * (h + gap);
+      fillPanel(x, y, w, h, { fill: CV.C.panel, line: CV.C.line2, r: 6 });
+      const sub = it.sub ? (it.sub.length > 12 ? it.sub.slice(0, 12) : it.sub) : '';
+      drawText(it.label, x + w / 2, y + (sub ? 21 : h / 2), { size: 13, bold: true, align: 'center', color: it.disabled ? CV.C.dim : CV.C.text });
+      if (sub) drawText(sub, x + w / 2, y + 38, { size: 10, align: 'center', color: CV.C.dim });
+      if (it.dot) {
+        CV.ctx.fillStyle = CV.C.accent;
+        CV.ctx.beginPath();
+        if (CV.ctx.arc) CV.ctx.arc(x + w - 11, y + 11, 3, 0, Math.PI * 2);
+        CV.ctx.fill();
+      }
+      if (it.id && !it.disabled) addHit(it.id, x, y, w, h);
+    });
+    this.y += Math.ceil(Math.max(1, items.length) / n) * (h + gap) + 2;
+    return this;
+  },
   /* 进度条 */
   meter(pct, label, opt) {
     opt = opt || {};
