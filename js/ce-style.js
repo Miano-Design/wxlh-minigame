@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 17:11 */
+   生成时间：2026-09-15 17:14 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -22,18 +22,6 @@ module.exports = {
   "fontSize": 12,
   "color": "#e9edf6"
  },
- "section-title": {
-  "flexDirection": "row",
-  "alignItems": "center",
-  "fontSize": 12,
-  "color": "#b6bfd0",
-  "fontWeight": "bold",
-  "letterSpacing": 1,
-  "marginTop": 18,
-  "marginRight": 4,
-  "marginBottom": 10,
-  "marginLeft": 4
- },
  "card": {
   "backgroundColor": "#111621",
   "borderWidth": 1,
@@ -49,6 +37,30 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14
  },
+ "t1": {
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "t2": {
+  "fontSize": 11,
+  "color": "#7a849b",
+  "marginTop": 3
+ },
+ "section-title": {
+  "flexDirection": "row",
+  "alignItems": "center",
+  "fontSize": 12,
+  "color": "#b6bfd0",
+  "fontWeight": "bold",
+  "letterSpacing": 1,
+  "marginTop": 18,
+  "marginRight": 4,
+  "marginBottom": 10,
+  "marginLeft": 4
+ },
  "list-row": {
   "flexDirection": "row",
   "alignItems": "center",
@@ -62,18 +74,6 @@ module.exports = {
  "grow": {
   "flex": 1,
   "minWidth": 0
- },
- "t1": {
-  "fontSize": 15,
-  "fontWeight": "bold",
-  "flexDirection": "row",
-  "alignItems": "center",
-  "flexWrap": "wrap"
- },
- "t2": {
-  "fontSize": 11,
-  "color": "#7a849b",
-  "marginTop": 3
  },
  "chev": {
   "flex": 0,
@@ -572,6 +572,49 @@ module.exports = {
   "paddingBottom": 14,
   "paddingLeft": 12
  },
+ "view#app__scrollview#view__view.screen__view.card": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
+ },
  "view#app__scrollview#view__view.screen__view.section-title": {
   "color": "#b6bfd0",
   "fontSize": 12,
@@ -590,23 +633,6 @@ module.exports = {
   "fontWeight": "bold",
   "letterSpacing": 1,
   "marginRight": 10
- },
- "view#app__scrollview#view__view.screen__view.card": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "backgroundColor": "#111621",
-  "borderWidth": 1,
-  "borderColor": "#232b3b",
-  "borderRadius": 10,
-  "borderTopLeftRadius": 10,
-  "borderTopRightRadius": 10,
-  "borderBottomRightRadius": 10,
-  "borderBottomLeftRadius": 10,
-  "paddingTop": 14,
-  "paddingRight": 14,
-  "paddingBottom": 14,
-  "paddingLeft": 14,
-  "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
   "color": "#e9edf6",
@@ -661,26 +687,37 @@ module.exports = {
   "lineHeight": 16,
   "marginRight": 14
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row": {
+ "view#app__scrollview#view__view.screen__view.blk.hint.mt2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 10,
+  "width": "100%",
+  "lineHeight": 19
+ },
+ "view#app__scrollview#view__view.screen__view.blk.hint.mt2__text.blk.hint-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 19,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "flexDirection": "row",
-  "alignItems": "center",
-  "paddingTop": 10,
-  "paddingRight": 4,
-  "paddingBottom": 10,
-  "paddingLeft": 4,
-  "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderColor": "#232b3b",
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "flex": 1,
-  "minWidth": 0,
-  "marginRight": 14
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t1": {
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
@@ -688,38 +725,23 @@ module.exports = {
   "alignItems": "center",
   "flexWrap": "wrap"
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t1__text.t1-t": {
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t1__text.t1-t": {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
   "marginRight": 6
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t2": {
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
   "marginTop": 3,
   "lineHeight": 18
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__view.grow__view.t2__text.t2-t": {
+ "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
   "lineHeight": 18,
   "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.card__view.isx1runjyx.list-row__text.chev": {
-  "color": "#7a849b",
-  "fontSize": 16,
-  "flex": 0,
-  "alignSelf": "center",
-  "lineHeight": 16,
-  "marginRight": 14
- },
- "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
-  "color": "#7a849b",
-  "fontSize": 11,
-  "marginTop": 10,
-  "width": "100%",
-  "lineHeight": 19
  },
  "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
   "color": "#e9edf6",
@@ -728,7 +750,7 @@ module.exports = {
   "flexDirection": "row",
   "flexWrap": "wrap"
  },
- "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary": {
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
   "flexDirection": "row",
@@ -759,7 +781,7 @@ module.exports = {
   "lineHeight": 16,
   "marginRight": 10
  },
- "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary__text.btn-t": {
+ "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary__text.btn-t": {
   "color": "#e9edf6",
   "fontSize": 13,
   "fontWeight": "bold",
@@ -767,6 +789,13 @@ module.exports = {
   "textAlign": "center",
   "whiteSpace": "normal",
   "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 10,
+  "width": "100%",
+  "lineHeight": 19
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",

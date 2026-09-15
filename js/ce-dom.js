@@ -37,11 +37,28 @@
     };
   }
 
+  /* 弹窗宿主：网页版把弹窗 appendChild 到 #modal-root。这里把它的 innerHTML 接住，
+     交给引擎画成底部抽屉（见 js/ce-app.js）。不接住的话，网页版的弹窗小游戏里全丢。 */
+  const capture = (root, bucket) => {
+    root.appendChild = function (child) {
+      try { bucket.push(child && child.innerHTML ? child.innerHTML : ''); } catch (e) {}
+      this.children.push(child);
+      return child;
+    };
+    return root;
+  };
+
   function install(g) {
     g = g || (typeof window !== 'undefined' ? window : global);
     const byId = {};
+    g.__CE_MODALS = g.__CE_MODALS || [];
+    g.__CE_TOASTS = g.__CE_TOASTS || [];
     const doc = {
-      getElementById(id) { return (byId[id] = byId[id] || makeEl('div')); },
+      getElementById(id) {
+        if (id === 'modal-root') return doc.__modalRoot;
+        if (id === 'toast-root') return doc.__toastRoot;
+        return (byId[id] = byId[id] || makeEl('div'));
+      },
       querySelector() { return null; },
       querySelectorAll() { return []; },
       createElement: makeEl,
@@ -49,6 +66,8 @@
       addEventListener() {}, removeEventListener() {},
       body: makeEl('body'),
       documentElement: makeEl('html'),
+      __modalRoot: capture(makeEl('div'), g.__CE_MODALS),
+      __toastRoot: capture(makeEl('div'), g.__CE_TOASTS),
       head: makeEl('head'),
       readyState: 'complete',
     };

@@ -52,30 +52,41 @@ const SETUP_NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾�
 function setupMarkup() {
   const D = window.DATA, Core = window.Core, S = Core.S;
   const cur = S.player.bloodline || '';
+  /* 三步照网页版来（文案就抄 ui.js 的 showTutorial / showCharCreate / bloodlineModal）：
+     ① 欢迎 + 签订灯阁契约  ② 起名（canvas 里没有输入框，用"换一个"代替打字）  ③ 选血统 */
   const rows = Object.keys(D.BLOODLINES).map((k) => {
     const b = D.BLOODLINES[k] || {};
     const on = cur === k;
-    return `<view class="list-row${on ? ' on' : ''}" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold)' : ''}">
-      <view class="grow">
-        <view class="t1"><text class="t1-t" value="${b.name || k}"/>${on ? '<text class="tag" style="color:var(--gold)" value="已选"/>' : ''}</view>
-        <view class="t2"><text class="t2-t" value="${b.desc || '' }"/></view>
-      </view>
-      <text class="chev" value="${on ? '✓' : '›'}"/>
+    return `<view class="card" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold)' : ''}">
+      <view class="t1"><text class="t1-t" value="${b.name || k}"/>${on ? '<text class="tag" style="color:var(--gold)" value="已选"/>' : ''}</view>
+      <view class="t2"><text class="t2-t" value="${b.desc || ''}"/></view>
     </view>`;
   }).join('');
+
   const body = `
-    <view class="section-title"><text class="section-title-t" value="起名"/></view>
+    <view class="card">
+      <view class="t1"><text class="t1-t" value="欢迎来到灯阁"/></view>
+      <view class="t2"><text class="t2-t" value="你被神秘存在选中，成为了「执灯者」。在这里，你将进入残域执行探索任务、招募伙伴组建五人小队（主角必上阵）、解锁血统与铭刻、挑战深井，寻找离开的方法。"/></view>
+      <view class="t2"><text class="t2-t" value="新手补给已发放：◈50,000 · ✦1,000 · 经验模块×20 · 治疗剂×10"/></view>
+    </view>
+
+    <view class="section-title"><text class="section-title-t" value="创建你的执灯者"/></view>
     <view class="card">
       <view class="list-row" data-name="roll" style="cursor:pointer">
-        <view class="grow"><view class="t1"><text class="t1-t" value="${S.player.name || '未命名'}"/></view>
-        <view class="t2"><text class="t2-t" value="点一下换一个名字"/></view></view>
+        <view class="grow">
+          <view class="t1"><text class="t1-t" value="${S.player.name || '未命名'}"/></view>
+          <view class="t2"><text class="t2-t" value="灯阁需要一个名字来记录你的行程（点一下换一个）"/></view>
+        </view>
         <text class="chev" value="🎲"/>
       </view>
     </view>
-    <view class="section-title"><text class="section-title-t" value="选一条血统"/></view>
-    <view class="card">${rows}</view>
-    <text class="hint mt2 blk">血统决定走哪条境界线，选定后不可更改。</text>
-    <view class="btn-row mt2"><view class="btn primary block" data-setup="ok"><text class="btn-t" value="${cur ? '开始游戏' : '先选一条血统'}"/></view></view>
+
+    <view class="section-title"><text class="section-title-t" value="选择血统"/></view>
+    <view class="hint mt2 blk"><text class="hint-t blk" value="境界线跟着血统走，选定后不可更改。"/></view>
+    ${rows}
+
+    <view class="btn-row mt2"><view class="btn primary block ${cur ? '' : 'off'}" data-setup="ok"><text class="btn-t" value="${cur ? '以这个名字进入残域' : '请先选一条血统'}"/></view></view>
+    <text class="hint mt2 blk" value=""/>
   `;
   return CEShell.shell('home', body, { noNav: true });
 }
