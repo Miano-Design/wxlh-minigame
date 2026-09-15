@@ -529,6 +529,16 @@ function loadMarkups() {
         window.UI.modal('弹窗标题', '弹窗内容', { center: true });
         out.push({ name: '首页 + 弹窗' + st.name, markup: CEApp.pageMarkup('home') });
         if (window.__CE_MODALS) window.__CE_MODALS.length = 0;
+        /* 二级页（网页版的 showPanel：page / page-head / back-x…）也要编：
+           点砖打开的那个"灯阁评级"面板就是它 */
+        try {
+          if (window.UI._panels.sectModal) {
+            window.UI._panels.sectModal();
+            out.push({ name: '首页 + 二级面板' + st.name, markup: CEApp.pageMarkup('home') });
+            if (window.__CE_MODALS) window.__CE_MODALS.length = 0;
+            if (window.__CE_MODALS_ELS) window.__CE_MODALS_ELS.length = 0;
+          }
+        } catch (e) { /* 面板打不开也不该让编译挂掉 */ }
         /* 战斗层同样要编：开一场真的战斗，把战斗画面的样式也枚举进来 */
         try {
           const worldId = Object.keys(Core.S.worlds)[0];

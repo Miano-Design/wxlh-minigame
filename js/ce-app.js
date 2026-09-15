@@ -113,6 +113,40 @@ function ensureSave() {
   try { return !!C.load(); } catch (e) { return false; }
 }
 
+
+/* ---------- 点击派发：小游戏的点击 → 网页版自己的处理函数 ----------
+   网页版 bindScreen() 把 onclick 绑在真实节点上（现在假 DOM 有树了，绑定真的生效）。
+   小游戏这边点到某个元素时，用它的 data-* 拼出选择器，在假 DOM 里找到同一个节点，
+   直接调它的 onclick() —— 于是"网页版能点的，小游戏也点得动"，不用康康逐个手接。 */
+function fakeRoots() {
+  const ids = ['view', 'modal-root', 'battle-root', 'navbar', 'topbar', 'curbar'];
+  const out = [];
+  ids.forEach((id) => {
+    try { const el = document.getElementById(id); if (el) out.push(el); } catch (e) {}
+  });
+  return out;
+}
+
+function findStub(el) {
+  const ds = el.dataset || {};
+  const keys = Object.keys(ds).filter((k) => k);
+  if (!keys.length) return null;
+  const sel = `[data-${keys[0]}="${String(ds[keys[0]]).replace(/"/g, '\\"')}"]`;
+  for (const root of fakeRoots()) {
+    const hit = root.querySelector(sel);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function fireClick(el) {
+  const stub = findStub(el);
+  if (!stub) return false;
+  if (typeof stub.onclick === 'function') { stub.onclick(); return true; }
+  if (typeof stub.click === 'function') { stub.click(); return true; }
+  return false;
+}
+
 function bind(app, out) {
   CEEngine.flatten(out.Layout).forEach((el) => {
     const ds = el.dataset || {};
@@ -147,7 +181,13 @@ function bind(app, out) {
         draw(app);
       });
     } else if (ds.act) {
-      el.on('click', () => console.log('[CE] 点了 ' + ds.act + '（页内交互还没接）'));
+      el.on('click', () => {
+        if (!fireClick(el)) console.log('[CE] 点了 ' + ds.act + '（网页版没有对应的处理函数）');
+        draw(app);
+      });
+    } else if (Object.keys(ds).length) {
+      /* 其它带 data-* 的（data-claim / data-ach / data-bagview / data-eqslot…）也一并接上 */
+      el.on('click', () => { if (fireClick(el)) draw(app); });
     }
   });
 }
