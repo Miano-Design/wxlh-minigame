@@ -33,6 +33,7 @@ CV.panels.titleOf = function (panel) {
     tasks: '任务与成就', bounty: '限时悬赏', shop: '兑换大厅', guide: '玩法指南',
     settings: '设置', create: '创建执灯者', bloodline: '选择血统',
     login: '七日登录',
+    curdoc: '货币图鉴', alts: '多主角', welcome: '欢迎来到灯阁', pullresult: '十连结果',
   };
   if (panel.name === 'picker') return (panel.params && panel.params.title) || '选择';
   return map[panel.name] || '';
@@ -94,6 +95,21 @@ on('open_recruit', () => CV.open('recruit'));
 on('open_chars', () => CV.open('chars'));
 on('open_achievements', () => CV.open('tasks'));
 on('open_login', () => CV.open('login'));
+on('open_curdoc', () => CV.open('curdoc'));
+on('open_alts', () => CV.open('alts'));
+on('welcome_ok', () => CV.reset('create'));
+CV.onPrefix('switch_protag_', id => {
+  const r = Core.switchProtagonist(+id.slice(14));
+  CV.toast(r.msg || (r.ok ? '已切换' : '切换失败'));
+  CV.reset('home');
+});
+on('new_protag', () => {
+  const nm = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常'][Math.floor(Math.random() * 8)];
+  const r = Core.createProtagonist(nm);
+  CV.toast(r.ok ? `新主角「${nm}」已创建，去选血统` : (r.msg || '创建失败'));
+  if (r.ok) CV.reset('bloodline');
+});
+on('nav_more', () => CV.open('grow'));
 ['sect', 'keji', 'fabao', 'mount', 'garden', 'arena', 'sign', 'authority', 'buildings',
   'genelock', 'beast', 'reincarn', 'codex', 'refine', 'idlelines', 'tasks', 'bounty', 'shop']
   .forEach(n => on('open_' + n, () => CV.open(n)));
@@ -418,7 +434,24 @@ onP('pull_', id => {
     if (r.error) { CV.toast(r.error); return; }
     const best = r.results.reduce((a, b) => (D.RARITIES.indexOf(b.rarity) > D.RARITIES.indexOf(a.rarity) ? b : a), r.results[0]);
     CV.toast(`十连完成：最高 ${best.rarity} ${best.name}${best.isNew ? '（新）' : ''}`);
+    lastPulls = r.results;
+    CV.open('pullresult');
   }
+});
+
+/* 十连结果：一条条列出来（网页版也是这个做法），高稀有度用颜色挑出来 */
+let lastPulls = [];
+CV.register('pullresult', function () {
+  const list = (lastPulls || []).slice().sort((a, b) => D.RARITIES.indexOf(b.rarity) - D.RARITIES.indexOf(a.rarity));
+  const newN = list.filter(x => x.isNew).length;
+  L.text(`这次十连：新伙伴 ${newN} 名`, { size: 15, bold: true, color: CV.C.gold });
+  L.text('重复的伙伴会自动转成碎片，碎片用来升星', { size: 11, color: CV.C.dim });
+  list.forEach((x, i) => {
+    L.row(`${i + 1}. ${x.name}`, x.isNew ? '新伙伴 ✨' : `转碎片 +${x.shards || 0}${x.isUp ? ' · 当期 UP' : ''}`, {
+      value: x.rarity, valueColor: D.RARITY_COLOR[x.rarity],
+    });
+  });
+  L.btn('继续招募', 'back', { primary: true });
 });
 onP('keji_', id => { const r = Core.kejiUp(id.slice(5), 1); CV.toast(r.msg); });
 onP('fabao_buy_', id => { const r = Core.buyFabao(id.slice(10)); CV.toast(r.msg); });
@@ -543,7 +576,8 @@ function boot() {
   if (!Core.load()) { Core.newGame(); }
   Core.ensureDaily();
   const off = Core.settleOffline();                // 离线收益由核心层入账
-  if (!S().player.name) CV.reset('create');
+  // 新档：欢迎页 → 起名 → 选血统 → 首页（与网页版的新手流程一致）
+  if (!S().player.name) CV.reset('welcome');
   else if (!S().player.bloodline) CV.reset('bloodline');
   else CV.reset('home');
   if (off && off.seconds >= 60) {

@@ -38,6 +38,24 @@ let preBuff = 0;   // 战前增益：看一次广告，下一关全队攻击 +25
 function takePreBuff() { const v = preBuff; preBuff = 0; return v; }
 
 /* ================= 灯阁（首页） ================= */
+/* 新手引导：照网页版那套"上手三件事"讲清楚（网页版是弹窗，这里做成第一屏） */
+CV.register('welcome', function () {
+  L.spacer(10);
+  L.text('欢迎来到灯阁', { size: 22, bold: true, align: 'center', color: CV.C.gold });
+  L.spacer(8);
+  L.text('你被神秘存在选中，成为了「执灯者」。\n在这里，你要进残域执行探索、招募伙伴、绕着灯阁一层层往上爬。', { size: 12, color: CV.C.dim, align: 'center' });
+  L.spacer(10);
+  L.title('上手就三件事');
+  L.row('① 选一条血统', '境界线跟着血统走，选定不能改', {});
+  L.row('② 点「一键收取」', '把挂机、任务、成就、悬赏一次领完', {});
+  L.row('③ 进残域打第 1 关', '通关后解锁招募，招募每天有一次免费', {});
+  L.spacer(6);
+  L.title('三张招募池花三种货币');
+  L.text('◈点数抽普通（攒碎片） · ✦圣洁晶石抽高级（补图鉴） · ◆异界结晶抽限定（定向出当期 UP）', { size: 11, color: CV.C.dim });
+  L.spacer(8);
+  L.btn('签订灯阁契约', 'welcome_ok', { primary: true });
+});
+
 CV.register('home', function () {
   const s = S(), pst = Core.effectivePlayerStats();
   CV.fillPanel(12, L.y, CV.W - 24, 104);
@@ -122,6 +140,8 @@ CV.register('home', function () {
   L.title('其他');
   tileList([
     ['open_chars', '伙伴一览', `${Object.keys(s.chars).length} 名`],
+    ['open_curdoc', '货币图鉴', `${D.CURRENCIES.length} 种货币`],
+    ['open_alts', '多主角', `${Core.protagonistList().length} 个角色`],
     ['open_settings', '设置与存档', ''],
     ['open_guide', '玩法指南', ''],
   ]);
@@ -648,6 +668,7 @@ CV.register('char', function (p) {
       valueColor: eq ? CV.rarityColor(eq.rarity) : CV.C.gold,
     });
   });
+  attributePanel(eff, '伙伴');
 });
 
 CV.register('protagonist', function () {
@@ -686,6 +707,23 @@ CV.register('protagonist', function () {
     L.row(D.EQUIP_SLOTS[slot], eq ? `${eq.name} +${eq.enhance}` : '空', { id: eq ? 'equip_' + uid : 'pequipnew_' + slot, value: eq ? '查看' : '穿上' });
   });
 });
+
+/* 十项属性面板（网页版那一屏总览，角色卡与主角卡共用） */
+function attributePanel(st, who) {
+  L.title('属性面板', who + '当前生效值');
+  const rows = [
+    ['攻击', fmt(st.atk)], ['防御', fmt(st.def)], ['生命', fmt(st.hp)], ['速度', fmt(st.spd)],
+    ['暴击率', (st.crit * 100).toFixed(1) + '%'], ['暴击伤害', (st.critDmg || 2).toFixed(2) + '×'],
+    ['闪避', (st.eva * 100).toFixed(1) + '%'], ['技能倍率', (st.skillMult || 1).toFixed(2)],
+    ['吸血', ((st.lifesteal || 0) * 100).toFixed(1) + '%'], ['异常抗性', ((st.resPct || 0) * 100).toFixed(1) + '%'],
+  ];
+  rows.forEach(([k, v]) => L.row(k, '', { value: v }));
+  if (st.attrs) {
+    L.title('六维');
+    const A = st.attrs;
+    L.text(D.ATTR_META.map(a => `${a.name} ${Math.round(A[a.id] || 0)}`).join('　'), { size: 12, color: CV.C.dim });
+  }
+}
 
 /* ================= 背包 ================= */
 CV.register('bag', function (p) {
@@ -829,6 +867,16 @@ CV.register('equip', function (p) {
   L.text(`攻 +${fmt(flat.atk)}　防 +${fmt(flat.def)}　生 +${fmt(flat.hp)}　速 +${fmt(flat.spd)}`, { size: 12 });
   const aff = Object.keys(st.affix);
   if (aff.length) L.text(aff.map(k => `${k} +${(st.affix[k] * (k.indexOf('Pct') >= 0 ? 100 : 1)).toFixed(1)}%`).join('　'), { size: 12, color: CV.C.gold });
+  // 与"这个部位现在穿在谁身上"的对比：换不换，看这一行就够
+  const cmpOwner = wearer || '@player';
+  const curUid = ((S().equipped[cmpOwner] || {})[eq.slot]) || null;
+  const curEq = curUid && S().equips[curUid];
+  if (curEq && curEq.uid !== eq.uid) {
+    const d = Math.round(Core.equipScore(eq) - Core.equipScore(curEq));
+    L.row(`对比 ${Core.charName(cmpOwner)} 的 ${curEq.name} +${curEq.enhance}`,
+      `对方 ${Math.round(Core.equipScore(curEq))} 分 · 这件 ${Math.round(Core.equipScore(eq))} 分`,
+      { value: (d >= 0 ? '+' : '') + d + ' 分', valueColor: d >= 0 ? CV.C.green : CV.C.red });
+  }
   L.title('强化', `+${eq.enhance}/20 · 成功率 ${Math.round(D.ENHANCE_RATE[eq.enhance] * 100)}%`);
   L.text(`消耗：◈${fmt(cost.points)} + ◆${cost.otherworld}${mat.has ? '' : `（无${D.ITEMS[mat.itemId].name}，用 ◈${mat.subPoints} 代用）`}`, { size: 12, color: CV.C.dim });
   L.btn(eq.enhance >= 20 ? '已满强化' : '强化一次', 'enh_' + eq.uid, { disabled: eq.enhance >= 20 });
@@ -858,6 +906,11 @@ CV.register('recruit', function () {
   });
   L.title('看广告免费抽', '每天都能薅几次');
   L.btnRow([adBtn('free_recruit', '🎴 普通池×1', 'ad_recruit'), adBtn('recruit_adv', '✦ 高级池×1', 'ad_recruit_adv', true)]);
+  L.title('保底进度');
+  const pN = Core.pityView('advanced'), pL = Core.pityView('limited');
+  L.text('普通池没有保底：出率固定，重复伙伴转碎片', { size: 11, color: CV.C.dim });
+  if (pN) { L.text(`高级池：SSR ${pN.ssr.n}/${pN.ssr.cap} · UR ${pN.ur.n}/${pN.ur.cap}（出更高稀有度会清空对应计数）`, { size: 11, color: CV.C.dim }); L.meter(pN.ssr.n / pN.ssr.cap, `SSR 保底 ${pN.ssr.n}/${pN.ssr.cap}`); }
+  if (pL) { L.text(`限定池：当期 UP ${pL.up.n}/${pL.up.cap}`, { size: 11, color: CV.C.dim }); L.meter(pL.up.n / pL.up.cap, `UP ${pL.up.n}/${pL.up.cap}`); }
   L.title('概率公示');
   Object.keys(D.RECRUIT_POOLS).forEach(pool => {
     const P = D.RECRUIT_POOLS[pool];
@@ -1107,6 +1160,40 @@ CV.register('guide', function () {
     L.title(ch.t || ch.title || '章节');
     L.text(ch.body || ch.desc || '', { size: 12, color: CV.C.dim });
   });
+  L.btn('💠 货币图鉴（每种货币干什么用）', 'open_curdoc');
+});
+
+/* 货币图鉴：顶栏点货币也是开这个 */
+const CUR_DOC = {
+  points: ['挂机、副本、扫荡、每日任务、悬赏、药园收获', '抽普通池、升伙伴等级、买商店、装备强化、扩背包、种药园、驯坐骑'],
+  story: ['深层副本、深井、故事商店相关产出', '故事商店（碎片、材料、技能芯片）'],
+  otherworld: ['分解装备、精英/Boss 掉落、斗法台、深井、悬赏', '抽限定池、买法宝、秘术阁、灯阁权限、异界商店'],
+  holy: ['高级招募、商店兑换、悬赏、周常、灯阁权限奖励', '抽高级池、灯阁权限（长线投资）'],
+  skillChip: ['副本掉落、商店、每日/周常、成就', '伙伴技能升级、主角技能升级'],
+  bloodCrystal: ['Boss 掉落、深井、悬赏、图鉴奖励', '血统强化、铭刻解锁'],
+  corridor: ['深井每层产出、斗法台', '深井商店、深井印记（每 10 层 +1.5% 深井内属性）'],
+  rp: ['转生获得（第 n 世给 100×n^1.15）', '四支转生天赋树（40 个节点）'],
+};
+CV.register('curdoc', function () {
+  L.text('顶栏点货币也能开这一个页面', { size: 11, color: CV.C.dim });
+  D.CURRENCIES.forEach(c => {
+    const doc = CUR_DOC[c.id] || ['—', '—'];
+    L.row(`${c.icon} ${c.name}`, `来源：${doc[0]}\n用途：${doc[1]}`, { value: fmt(S().cur[c.id] || 0), valueColor: CV.C.gold });
+  });
+});
+
+/* 多主角：一个人可以养几条不同的血统线，随时切换 */
+CV.register('alts', function () {
+  const list = Core.protagonistList();
+  L.text(`当前操盘的角色：${list.map(p => (p.current ? '【' + p.name + '】' : p.name)).join(' · ')}`, { size: 12, color: CV.C.dim });
+  L.text('换主角只换"主角本人"（等级/血统/境界/加点），货币、伙伴、装备都是同一个存档。', { size: 11, color: CV.C.dim });
+  list.forEach((p, i) => {
+    L.row(`${p.name}  Lv.${p.level}`, `${p.bloodline ? p.bloodline + ' · ' + (D.realmName ? '' : '') : '未选血统'}技能 Lv.${(p.skillLv || [1,1,1]).join('/')}`, {
+      id: p.current ? null : 'switch_protag_' + p.altIndex,
+      value: p.current ? '当前' : '切换',
+    });
+  });
+  L.btn('＋ 新建一个主角（不同血统重新练）', 'new_protag', { primary: true });
 });
 CV.register('settings', function () {
   const s = S();
