@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-15 16:35 */
+   生成时间：2026-09-15 16:37 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -383,12 +383,11 @@ module.exports = {
   "backgroundColor": "#00000022",
   "flexDirection": "column",
   "alignItems": "center",
-  "justifyContent": "center",
-  "padding": 3,
-  "paddingTop": 3,
-  "paddingRight": 3,
-  "paddingBottom": 3,
-  "paddingLeft": 3,
+  "justifyContent": "flex-start",
+  "paddingTop": 5,
+  "paddingRight": 6,
+  "paddingBottom": 5,
+  "paddingLeft": 6,
   "color": "#e9edf6",
   "textAlign": "center"
  },
@@ -2190,12 +2189,11 @@ module.exports = {
   "backgroundColor": "#161d2a",
   "flexDirection": "column",
   "alignItems": "center",
-  "justifyContent": "center",
-  "padding": 3,
-  "paddingTop": 3,
-  "paddingRight": 3,
-  "paddingBottom": 3,
-  "paddingLeft": 3,
+  "justifyContent": "flex-start",
+  "paddingTop": 5,
+  "paddingRight": 6,
+  "paddingBottom": 5,
+  "paddingLeft": 6,
   "textAlign": "center",
   ":active": {
    "backgroundColor": "#1d2534"
@@ -2206,17 +2204,18 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 13,
   "textAlign": "center",
+  "width": "100%",
   "fontWeight": "bold",
   "wordBreak": "break-all",
-  "maxHeight": 32,
+  "maxHeight": 33,
   "lineHeight": 16,
-  "marginBottom": 2,
-  "width": "100%"
+  "marginBottom": 2
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled__text.bg-count": {
   "color": "#e6b64c",
   "fontSize": 12,
   "textAlign": "center",
+  "marginTop": 0,
   "fontWeight": "bold",
   "marginBottom": 2,
   "width": "100%"
@@ -2235,12 +2234,11 @@ module.exports = {
   "backgroundColor": "#00000022",
   "flexDirection": "column",
   "alignItems": "center",
-  "justifyContent": "center",
-  "padding": 3,
-  "paddingTop": 3,
-  "paddingRight": 3,
-  "paddingBottom": 3,
-  "paddingLeft": 3,
+  "justifyContent": "flex-start",
+  "paddingTop": 5,
+  "paddingRight": 6,
+  "paddingBottom": 5,
+  "paddingLeft": 6,
   "textAlign": "center",
   "width": "20.0000%"
  },
@@ -2258,12 +2256,11 @@ module.exports = {
   "backgroundColor": "#ffd76a11",
   "flexDirection": "column",
   "alignItems": "center",
-  "justifyContent": "center",
-  "padding": 3,
-  "paddingTop": 3,
-  "paddingRight": 3,
-  "paddingBottom": 3,
-  "paddingLeft": 3,
+  "justifyContent": "flex-start",
+  "paddingTop": 5,
+  "paddingRight": 6,
+  "paddingBottom": 5,
+  "paddingLeft": 6,
   "textAlign": "center",
   ":active": {
    "backgroundColor": "#ffd76a22"
