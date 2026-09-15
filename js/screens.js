@@ -239,27 +239,35 @@ let stageRun = null;      // 一整关（1~3 波）的进度：血量继承、�
 
 /* 单位卡片：名字 + 血条 + 百分比（和网页版的战场格子一个意思） */
 function battleUnit(u, x, y, w) {
+  /* 单位样式照网页版战场：**圆形头像（名字首字）+ 名字在下 + 细血条 + 百分比**
+     Boss 用金色描边，出手描金、挨打泛红。 */
   const h = 78;
   const dead = u.hp <= 0;
-  // 出手 / 挨打的高亮：让"这一下是谁打的、打在谁身上"在画面上一眼看得出
   const now = Date.now();
   const acting = battle && battle.actingUid === u.uid && now - (battle.actingAt || 0) < 420;
   const hit = battle && battle.hitUid === u.uid && now - (battle.hitAt || 0) < 260;
-  const line = hit ? CV.C.red : acting ? CV.C.gold : (u.isBoss ? CV.C.accent : CV.C.line);
-  CV.fillPanel(x, y, w, h, { fill: hit ? '#2a1a20' : (dead ? '#12161d' : CV.C.panel2), line, r: 10 });
-  if (acting) { CV.ctx.strokeStyle = CV.C.gold; CV.ctx.lineWidth = 2; rrectL(x, y, w, h, 10); CV.ctx.stroke(); }
-  const nm = u.name.length > 4 ? u.name.slice(0, 4) : u.name;
-  CV.drawText(nm, x + w / 2, y + 14, { size: 11, align: 'center', color: dead ? CV.C.dim : (u.isBoss ? CV.C.accent : CV.C.text), bold: !!u.isBoss });
-  const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
-  const bw = w - 12, bh = 8;
+  const cx = x + w / 2, r = 22;
+  // 圆头像
+  CV.ctx.beginPath();
+  if (CV.ctx.arc) CV.ctx.arc(cx, y + r + 4, r, 0, Math.PI * 2);
+  CV.ctx.fillStyle = hit ? '#3a1620' : (dead ? '#151a22' : '#1b2330');
+  CV.ctx.fill();
+  CV.ctx.strokeStyle = hit ? CV.C.red : acting ? CV.C.gold : (u.isBoss ? CV.C.gold : CV.C.line2);
+  CV.ctx.lineWidth = acting || u.isBoss ? 2 : 1;
+  CV.ctx.stroke();
+  CV.drawText((u.name || '?')[0], cx, y + r + 4, { size: 18, bold: true, align: 'center', color: dead ? CV.C.dim : CV.C.text });
+  // 名字 + 血条 + 百分比
+  CV.drawText(fitText(u.name.length > 5 ? u.name.slice(0, 5) : u.name, w + 8, 10), cx, y + 52, { size: 10, align: 'center', color: dead ? CV.C.dim : CV.C.dim });
+  const bw = Math.max(30, w - 6), bh = 5, bx = x + (w - bw) / 2;
   CV.ctx.fillStyle = '#0f141d';
-  rrectL(x + 6, y + 26, bw, bh, 4); CV.ctx.fill();
-  CV.ctx.fillStyle = dead ? '#3a2027' : (pct < 0.35 ? CV.C.red : (u.side === 'enemy' ? '#e06666' : CV.C.green));
-  if (pct > 0) { rrectL(x + 6, y + 26, Math.max(2, bw * pct), bh, 4); CV.ctx.fill(); }
-  CV.drawText(`${Math.round(pct * 100)}%`, x + w / 2, y + 44, { size: 10, align: 'center', color: dead ? CV.C.dim : CV.C.dim });
-  if (dead) CV.drawText('倒下', x + w / 2, y + 62, { size: 10, align: 'center', color: CV.C.dim });
-  else if (u.side === 'ally') CV.drawText(u.position === 'front' ? '前排' : '后排', x + w / 2, y + 62, { size: 10, align: 'center', color: CV.C.dim });
-  if (battle) battle.rects[u.uid] = { x, y, w, h };      // 记下位置，飘字才知道往哪飘
+  rrectL(bx, y + 60, bw, bh, 3); CV.ctx.fill();
+  const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
+  if (pct > 0) {
+    CV.ctx.fillStyle = dead ? '#3a2027' : (u.side === 'enemy' ? CV.C.accent : CV.C.green);
+    rrectL(bx, y + 60, Math.max(2, bw * pct), bh, 3); CV.ctx.fill();
+  }
+  CV.drawText(Math.round(pct * 100) + '%', cx, y + 72, { size: 9, align: 'center', color: CV.C.dim });
+  if (battle) battle.rects[u.uid] = { x, y, w, h };
 }
 function rrectL(x, y, w, h, r) {
   const c = CV.ctx;
@@ -284,18 +292,18 @@ CV.register('battle', function () {
   // 敌方
   CV.drawText('敌方', 16, L.y + 8, { size: 11, color: CV.C.dim });
   L.y += 18;
-  const fw = Math.min(64, Math.floor((CV.W - 32 - (foes.length - 1) * 6) / Math.max(1, foes.length)));
+  const fw = Math.min(58, Math.floor((CV.W - 32 - (foes.length - 1) * 8) / Math.max(1, foes.length)));
   foes.forEach((uid, i) => battleUnit(b.units[uid], 16 + i * (fw + 6), L.y, fw));
-  L.y += 86;
+  L.y += 82;
   // 我方：后排在上、前排在下（和战场的视觉一致）
-  const aw = Math.min(64, Math.floor((CV.W - 32 - (allies.length - 1) * 6) / Math.max(1, allies.length)));
+  const aw = Math.min(58, Math.floor((CV.W - 32 - (allies.length - 1) * 8) / Math.max(1, allies.length)));
   ['back', 'front'].forEach(row => {
     const list = allies.filter(uid => (b.units[uid].position === 'front' ? 'front' : 'back') === row);
     if (!list.length) return;
     CV.drawText(row === 'front' ? '我方前排 · 挨打优先' : '我方后排', 16, L.y + 8, { size: 11, color: CV.C.dim });
     L.y += 18;
     list.forEach((uid, i) => battleUnit(b.units[uid], 16 + i * (aw + 6), L.y, aw));
-    L.y += 86;
+    L.y += 82;
   });
   // 飘字（在对应单位上方浮一会儿）
   const now = Date.now();
