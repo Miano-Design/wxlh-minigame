@@ -269,6 +269,19 @@ CV.register('battle', function () {
   const now = Date.now();
   b.floaters = b.floaters.filter(f => now - f.at < 900);
   b.rects = b.rects || {};
+  // 技能名：顶在出手单位头上（配合金边，看清「他放了什么」）
+  if (b.skillUid && now - (b.skillAt || 0) < 900) {
+    const rc = b.rects[b.skillUid];
+    if (rc) CV.drawText(`【${b.skillName}】`, rc.x + rc.w / 2, rc.y - 28, { size: 12, align: 'center', color: CV.C.gold, bold: true });
+  }
+  // Boss 阶段 / 复活：中间一条横幅
+  if (b.banner && now - (b.bannerAt || 0) < 2000) {
+    const bw = CV.W - 60, by = CV.TOP + 148;
+    CV.ctx.fillStyle = 'rgba(20,26,36,.92)';
+    rrectL(30, by, bw, 34, 10); CV.ctx.fill();
+    CV.ctx.strokeStyle = CV.C.accent; CV.ctx.stroke();
+    CV.drawText(b.banner, CV.W / 2, by + 17, { size: 13, align: 'center', color: CV.C.accent, bold: true });
+  }
   b.floaters.forEach(f => {
     const rc = b.rects[f.uid];
     if (!rc) return;
@@ -339,7 +352,11 @@ function applyFrame(b, f) {
   switch (f.type) {
     case 'round': b.round = f.n; if (f.n <= 3 || f.n % 5 === 0) pushLog(b, `—— 第 ${f.n} 回合 ——`); break;
     case 'attack': break;
-    case 'skill': b.actingUid = f.actor; b.actingAt = Date.now(); pushLog(b, `✨ ${nmOf(b, f.actor)} 使用【${f.name}】`); break;
+    case 'skill':
+      b.actingUid = f.actor; b.actingAt = Date.now();
+      b.skillUid = f.actor; b.skillName = f.name; b.skillAt = Date.now();
+      pushLog(b, `✨ ${nmOf(b, f.actor)} 使用【${f.name}】`);
+      break;
     case 'damage': {
       const u = U[f.target];
       b.hitUid = f.target; b.hitAt = Date.now();
@@ -358,7 +375,7 @@ function applyFrame(b, f) {
     case 'buff': addFloater(b, f.target, '↑ ' + f.name, 'heal'); break;
     case 'revive': { const u = U[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); pushLog(b, `♻ ${f.text}`); break; }
     case 'summon': if (f.enemy) { U[f.enemy.uid] = Object.assign({}, f.enemy); b.order.push(f.enemy.uid); } pushLog(b, `🕯 ${f.text}`); break;
-    case 'phase': pushLog(b, `🔥 ${f.text}`); break;
+    case 'phase': b.banner = f.text; b.bannerAt = Date.now(); pushLog(b, `🔥 ${f.text}`); break;
     case 'rule': pushLog(b, `👁 ${f.text}`); break;
     case 'nearDeath': addFloater(b, f.target, '⚠ 濒死', 'crit'); break;
     default: break;
