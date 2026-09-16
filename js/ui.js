@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.47';
+  const GAME_VER = '9.5.48';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1206,7 +1206,7 @@ window.UI = (function () {
     if (grabbedPos === null) return null;
     if (!to || to === grabbedPos) {
       hoverPos = null; dragging = false;
-      render();
+      repaintParty();
       return null;
     }
     const from = grabbedPos;
@@ -1214,7 +1214,7 @@ window.UI = (function () {
     const r = C().swapPositions(from, to);
     toast(r.msg, r.ok ? 1800 : 2400);
     sfx(r.ok ? 'success' : 'fail');
-    render();
+    repaintParty();
     return r;
   }
   // 把手里那一格放回原位（提示条上的「取消」/ 再点一次自己 / 离开队伍页；电脑上 Esc 也能用）
@@ -1292,7 +1292,7 @@ window.UI = (function () {
     w.querySelector('[data-swap]').onclick = () => { closeModal(w); pickPartyChar(idx); };
     w.querySelector('[data-off]').onclick = () => {
       S.party[idx] = null; C().save();
-      closeModal(w); render();
+      closeModal(w); repaintParty();
       toast(`${cname(id)} 已下阵`);
     };
     return w;
@@ -1373,8 +1373,9 @@ window.UI = (function () {
       <div class="card">
         <h3>🧩 阵型 <span class="sub">主角可补位（阵容上满 5 人才成阵）</span></h3>
         <div class="kv"><span class="k">当前构成</span><span>${fbCount || '—'}</span></div>
-        <div class="kv"><span class="k">成阵</span><span style="color:var(--green)">${fb.names.length ? fb.names.join(' · ') : '未成阵'}</span></div>
-        <div class="kv"><span class="k">加成</span><span style="color:var(--green)">${fbText.join(' · ') || '无'}</span></div>
+        <!-- V9.5.48（父亲大人）：没成阵 / 没加成就灰字，成了才绿 -->
+        <div class="kv"><span class="k">成阵</span><span style="color:${fb.names.length ? 'var(--green)' : 'var(--dim)'}">${fb.names.length ? fb.names.join(' · ') : '未成阵'}</span></div>
+        <div class="kv"><span class="k">加成</span><span style="color:${fbText.length ? 'var(--green)' : 'var(--dim)'}">${fbText.join(' · ') || '无'}</span></div>
         <div class="formation-list">${D.FORMATIONS.map(f => {
         const on = fb.hit.includes(f.id);
         return `<div class="fm-row ${on ? 'on' : ''}">
@@ -1554,7 +1555,7 @@ window.UI = (function () {
     const clearBtn = w.querySelector('[data-clear]');
     if (clearBtn) clearBtn.onclick = () => {
       C().S.party[slotIdx] = null; C().save();
-      closeModal(w); render();
+      closeModal(w); repaintParty();
       toast(`${curName} 已下阵`);
     };
     w.querySelectorAll('[data-pick]').forEach(el => {
@@ -1565,7 +1566,7 @@ window.UI = (function () {
         const sw = C().swapPartyMember(slotIdx, id);
         if (!sw.ok) { toast(sw.msg || '换不了'); return; }
         closeModal(w);
-        render();
+        repaintParty();
         toast(`${D.charById[id].name} 已上阵${sw.inheritLv ? `，继承 Lv.${sw.inheritLv}` : ''}`
           + `${sw.moved ? `，带走 ${sw.moved} 件装备` : ''}`
           + `${sw.outId ? `（${D.charById[sw.outId].name} 已下阵）` : ''}`, 2600);
@@ -4406,8 +4407,16 @@ window.UI = (function () {
   /* ================= 界面事件绑定 ================= */
   /* 队伍盘的交互绑定：主界面（执灯者页签）和「主页→养成→队伍」弹窗共用一套。
      root._partyRedraw 有值时（弹窗形态）就重画那一层，否则重画整页。 */
+  /* V9.5.48（父亲大人）：队伍盘可能开在主界面、也可能开在「主页→养成→队伍」弹窗里。
+     上阵 / 换将 / 下阵 / 拖拽 / 套用预设 之后都要重画**当前这一层**，
+     以前一律 render()（只重画主页面），所以在弹窗里操作完看不到变化。 */
+  let partyPanelRedraw = null;
+  function repaintParty() {
+    if (partyPanelRedraw) { partyPanelRedraw(); return; }
+    render();
+  }
   function bindPartyBoard(root) {
-    const repaint = () => (root._partyRedraw ? root._partyRedraw() : render());
+    const repaint = () => repaintParty();
     // 站位：长按抓起 → 拖到别的位置松手放下；点空位＝选人上阵，点已上阵＝换人/下阵，点主角＝看详情
     root.querySelectorAll('[data-pos]').forEach(el => {
       const pos = el.dataset.pos;
@@ -4433,7 +4442,13 @@ window.UI = (function () {
   /* 「主页 → 养成 → 队伍」用的弹窗：里面的操作原地重画这一层，不退出 */
   function openPartyPanel() {
     const w = showPanel(undefined, '队伍', partyScreen());
-    w._partyRedraw = () => { updateModal(w, '队伍', partyScreen()); bindPartyBoard(w); };
+    partyPanelRedraw = () => {
+      const root = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('modal-root') : null;
+      const alive = !!(root && typeof root.contains === 'function' && root.contains(w));   // 测试桩没有 contains，就当面板已关
+      if (!alive) { partyPanelRedraw = null; render(); return; }
+      updateModal(w, '队伍', partyScreen());
+      bindPartyBoard(w);
+    };
     bindPartyBoard(w);
     return w;
   }
@@ -4538,7 +4553,7 @@ window.UI = (function () {
           const r = C().autoEquipBest();
           toast(r.changed ? `已为 ${r.members} 名成员重新分配 ${r.changed} 处装备（含从没上阵的伙伴身上取下的）` : '当前已是最优配置', 2600);
           sfx('coin');
-          render(); renderTopbar();
+          repaintParty(); renderTopbar();
           break;
         }
         case 'open-corridor':
