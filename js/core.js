@@ -252,18 +252,9 @@ window.Core = (function () {
       (S.altPlayers || []).forEach(p => { if (p) p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
       S.skillZeroBased = true;
     }
-    /* V9.5.73（技能点规则换代）：技能点从"每 3 级 1 点"回到"每级 1 点"，
-       上限从 11 提到 35/35/30（合计 100）。
-       老档必须按**新规则**把该给的技能点补齐——否则一个已经 100 级的老档，
-       手上只有 33 点（旧规则），而技能要 100 点，他永远点不满（等级已经到顶，再也拿不到点）。
-       一次性标记 skillPointRuleV2，不会重复补。 */
-    if (!S.skillPointRuleV2) {
-      const earned = Math.floor((S.player.level || 0) / D.SKILL_POINT_EVERY_LV);
-      const spent = (S.player.skillLv || [0, 0, 0]).reduce((a, b) => a + b, 0);
-      const fixed = Math.max(0, earned - spent);
-      if (fixed > (S.player.skillPoints || 0)) S.player.skillPoints = fixed;
-      S.skillPointRuleV2 = true;
-    }
+    /* V9.5.78：技能点改成"按等级算"的纯函数（skillPointsForLevel），
+       老档与转生档都自动算对，不需要一次性标记，也不会重复发放。 */
+    S.player.skillPoints = skillPointsForLevel();
     S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3);
     if (S.player.skillPoints === undefined) {
       const spent = S.player.skillLv.reduce((s, x) => s + x, 0);     // 技能等级从 0 起，已花点数就是等级和
@@ -1801,16 +1792,23 @@ window.Core = (function () {
       S.player.exp -= D.EXP_TABLE[S.player.level];
       S.player.level++;
       S.player.attrPoints = (S.player.attrPoints || 0) + D.ATTR_POINTS_PER_LV;
-      /* V9.5.68（上限联动体检）：技能点原来是**每级 1 点**——Lv.100 一共 99 点，
-         而三条技能从 1 级点到 10 级只要 27 点，多出来的 72 点永远花不掉（界面一直挂着"待加 72"）。
-         现在改成**每 3 级 1 点**，并把技能上限提到 12 级：
-           Lv.100 供给 floor(100/3) = 33 点 = 3 条 × 11 次升级 = 33 点，正好点满。
-         上限 10→12 让技能倍率从 1.63 抬到 1.77（+7%/级 的公式不变，只多两级），
-         幅度小到不影响刚调好的副本/深井难度；换来的是"技能点不再泛滥"。 */
-      if (S.player.level % D.SKILL_POINT_EVERY_LV === 0) {
-        S.player.skillPoints = (S.player.skillPoints || 0) + 1;
-      }
     }
+    S.player.skillPoints = skillPointsForLevel();   // V9.5.78：技能点按等级重算（见上面的说明）
+  }
+
+  /* ================= 主角技能点：唯一算法 =================
+     V9.5.78（自审）：技能点的数量**只由一个公式决定**——
+       可用点 = min(当前等级, 三条技能点满所需的总点数) − 已经点掉的点
+     为什么不用"每升一级 +1"那种累加写法：
+       · 转生会把等级重置回 Lv.0，累加写法会在重练时**再发一遍** 100 点，
+         而技能早就点满了，于是界面上永远挂着"技能待加 100"；
+       · GM 改等级、老档迁移这些"跳过升级过程"的情况，累加写法也补不齐。
+     现在它是**状态的函数**而不是过程的产物，转生、改档、洗点之后都会自动算对。
+     （副作用：以后如果要从别处发技能点，得改成加项而不是覆盖，注释留在这里提醒。） */
+  function skillPointsForLevel() {
+    const cap = D.SKILL_MAX_BY_INDEX.reduce((a, b) => a + b, 0);
+    const spent = (S.player.skillLv || [0, 0, 0]).reduce((a, b) => a + b, 0);
+    return Math.max(0, Math.min(S.player.level || 0, cap) - spent);
   }
 
   /* ================= 主角技能加点 ================= */
@@ -2621,8 +2619,13 @@ window.Core = (function () {
     const rp = Math.floor(100 * Math.pow(n, 1.15));
     S.player.reincarnations = n;
     addCur('rp', rp);
-    // 重置：玩家等级、世界进度、部分建筑
-    S.player.level = 1; S.player.exp = 0;
+    /* 重置：玩家等级、世界进度。
+       V9.5.78（自审）：这里原来写的是 level = 1 —— 等级改 0 基之后，转生会把玩家"送"到 Lv.1。
+       改成回 Lv.0（和新建档同一个起点）。
+       另外：技能点不再随重练重复发放（见 addPlayerExp 里"按等级重算"的说明），
+       所以转生后一路练回 Lv.100 也不会多出 100 点没处花的技能点。 */
+    S.player.level = 0; S.player.exp = 0;
+    S.player.skillPoints = skillPointsForLevel();
     S.worlds = {};
     unlockWorld('W01');
     S.corridor.floor = 1;
@@ -3006,7 +3009,7 @@ window.Core = (function () {
     mountState, buyMount, wearMount, applyMount,
     signState, drawSign, signIdleMult,
     unlockWorld, worldCleared, stageComplete, stageUnlocked,
-    refreshUnlocks, isUnlocked, unlockTip,
+    refreshUnlocks, isUnlocked, unlockTip, skillPointsForLevel,
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
     buyShopItem, openBox, openBoxes, dailyDate, sweepLeft, enhanceMat,

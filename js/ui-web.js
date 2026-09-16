@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.77';
+  const GAME_VER = '9.5.78';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -3246,9 +3246,14 @@ window.UI = (function () {
     const w = showPanel(wrap, '转生', `
       <div class="card">
         <h3>转生 <span class="sub">已转生 ${S.player.reincarnations} 次</span></h3>
-  <div class="note">保留伙伴 / 装备 / 血统 / 铭刻 / 天赋</div>
+        <!-- V9.5.78（自审）：这段说明原来只写了一半（没提技能与货币），也没写"会重置什么"。
+             转生是不可逆的大动作，两件事都得说清楚，别让玩家按下去才发现少了东西。 -->
+        <div class="note">
+          <b>会重置</b>：玩家等级（回到 Lv.0）、残域世界进度、深井层数。<br>
+          <b>会保留</b>：伙伴（含等级与技能）、装备、主角技能与属性、血统、铭刻、天赋、全部货币。
+        </div>
         <div style="font-size:0.6875rem;margin-top:0.5rem;color:${can ? 'var(--green)' : 'var(--accent)'}">
-          条件：玩家Lv.${S.player.level}/100 · 铭刻${S.player.geneLock}/5 · 灯芯Lv.${S.buildings.core}/30
+          条件：玩家Lv.${S.player.level}/${D.PLAYER_MAX_LV} · 铭刻${S.player.geneLock}/${D.GENE_LOCKS.length} · 灯芯Lv.${S.buildings.core}/30
         </div>
         <button class="btn primary block" style="margin-top:0.625rem" data-reinc="1" ${can ? '' : 'disabled'}>开始转生</button>
       </div>
@@ -4669,11 +4674,16 @@ switch (act) {
         S.worlds[wid].stages.normal = Array(12).fill(3);
         Core.refreshUnlocks();
       } else if (act === 'lvup') {
-        Object.values(S.chars).forEach(c => { c.lv = Math.min(100, c.lv + 10); });
+        Object.values(S.chars).forEach(c => { c.lv = Math.min(D.PLAYER_MAX_LV, c.lv + 10); });
       } else if (act === 'plvup') {
-        S.player.level = Math.min(100, S.player.level + 10);
+        S.player.level = Math.min(D.PLAYER_MAX_LV, S.player.level + 10);
+        S.player.skillPoints = Core.skillPointsForLevel();   // V9.5.78：技能点按等级重算，GM 改等级也要跟上
       } else if (act === 'skill') {
-        Object.values(S.chars).forEach(c => { c.skillLv = [10, 10, 10]; });
+        /* V9.5.78（自审）：这里原来写死 [10,10,10]——技能上限早就改成 35/35/30 了，
+           点这一下等于没升满（还会让父亲大人误以为技能满了）。现在按上限表来，主角也一起升。 */
+        S.player.skillLv = D.SKILL_MAX_BY_INDEX.slice();
+        S.player.skillPoints = Core.skillPointsForLevel();
+        Object.values(S.chars).forEach(c => { c.skillLv = D.SKILL_MAX_BY_INDEX.slice(); });
       } else if (act === 'equip') {
         for (let i = 0; i < 5; i++) Core.grantEquip('W01', 'SSR');
       } else if (act === 'gene') {

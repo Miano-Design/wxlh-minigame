@@ -184,6 +184,11 @@ console.log('\n=== ⑧ 文案里的数量词要和数据表对得上 ===');
     [/(\d+)\s*名执灯者/, D.characters.length, '角色总数（含隐藏）'],
     [/图鉴内\s*(\d+)\s*名可招募/, D.characters.filter(c => !c.hidden).length, '可招募伙伴数'],
     [/(\d+)\s*条百分比/, D.KEJI.length, '秘术阁条数（另一处写法）'],
+    /* 这几条是"界面上写死的玩法数字"：改队伍格数 / 次数上限时，文案必须跟着改 */
+    [/上阵\s*(\d+)\s*格/, Core.rowOfSlots('front').length + Core.rowOfSlots('back').length, '上阵格数'],
+    [/前\s*(\d+)\s*格[、，]?\s*后\s*(\d+)\s*格/, Core.rowOfSlots('front').length, '前排格数'],
+    [/斗法台[^。]{0,24}?每天\s*(\d+)\s*次/, D.ARENA_DAILY, '斗法台每日次数'],
+    [/扫荡[^。]{0,20}?每天\s*(\d+)\s*次/, D.SWEEP_DAILY_CAP, '每日扫荡上限'],
   ];
   const sources = [['js/data.js', dataSrc], ['js/ui.js', uiSrc],
     ['README.md', fs.readFileSync('README.md', 'utf8')]];

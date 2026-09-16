@@ -603,6 +603,54 @@ setParty(['C021']);
   })());
 }
 
+/* ===== V9.5.78（自审）：状态迁移另开一组——跨天重置、转生资产清单 =====
+   这两块以前完全没验过，而它们恰恰是"玩家最容易觉得东西丢了"的地方。 */
+{
+  // ① 跨天：所有"每日"进度必须重置，但资产一分不能少
+  Core.newGame(); Core.setPlayerName('跨天');
+  Core.ensureDaily();
+  const OLD = '2000-01-01';
+  Core.S.tasks.date = OLD; Core.S.tasks.daily = { battle5: 5 }; Core.S.tasks.claimed = { battle5: true };
+  Core.S.recruit.free = { date: OLD, normal: { used: 3, at: 0 }, advanced: { used: 1, at: 0 } };
+  Core.S.sweep = { date: OLD, count: 60, bonus: 0 };
+  Core.S.arena = { floor: 7, best: 7, date: OLD, used: 5 };
+  Core.S.sign = { date: OLD, tier: '大吉', idlePct: 0.3, drawn: 1 };
+  Core.S.login.lastClaim = OLD;
+  Core.S.cur.points = 12345;
+  Core.S.player.bloodlineLv = 3;
+  Core.S.equips = { ux: { uid: 'ux', name: '测试剑', rarity: 'R', slot: 'weapon', enhance: 0, base: { atk: 10 }, affixes: [], lock: false } };
+  Core.ensureDaily();
+  t('跨天：每日任务进度清空', !Core.S.tasks.daily.battle5 && !Core.S.tasks.claimed.battle5);
+  t('跨天：免费抽次数恢复', Core.freeState('normal').left === 3 && Core.freeState('advanced').left === 1);
+  t('跨天：扫荡次数恢复满', Core.sweepLeft() === Core.sweepCap());
+  t('跨天：斗法台次数恢复', Core.arenaState().left === D.ARENA_DAILY);
+  t('跨天：求签可以再抽（昨天的签文作废）', Core.signState().canDraw && Core.signState().idlePct === 0);
+  t('跨天：登录奖励可以再领', !!Core.loginReward());
+  t('跨天不会丢资产（点数与血统等级、装备都在）', Core.S.cur.points >= 12345 && Core.S.player.bloodlineLv === 3 && !!Core.S.equips.ux);
+}
+{
+  // ② 转生：该保留的保留、该重置的重置，都不能含糊
+  Core.newGame(); Core.setPlayerName('转生');
+  Core.choosePlayerBloodline('修真');
+  Core.addPlayerExp(99999999);
+  let guard = 0;
+  while (Core.allocateSkill(0).ok && guard++ < 100) { /* 点满技能1 */ }
+  guard = 0; while (Core.allocateSkill(1).ok && guard++ < 100) { /* 技能2 */ }
+  guard = 0; while (Core.allocateSkill(2).ok && guard++ < 100) { /* 必杀 */ }
+  Core.S.player.geneLock = 5; Core.S.buildings.core = 30; Core.S.cur.bloodCrystal = 99999;
+  Core.addChar('C021'); Core.S.chars.C021.lv = 40;
+  Core.S.cur.points = 66666;
+  const before = { skills: Core.S.player.skillLv.join('/'), char: Core.S.chars.C021.lv, points: Core.S.cur.points };
+  const r = Core.reincarnate();
+  t('转生：等级回到 Lv.0（不是 Lv.1）', r.ok && Core.S.player.level === 0 && Core.S.player.exp === 0);
+  t('转生：世界进度重置（只剩刚解锁的 W01）', Object.keys(Core.S.worlds).join() === 'W01');
+  t('转生：技能等级保留，技能点不会重复发放', Core.S.player.skillLv.join('/') === before.skills && Core.S.player.skillPoints === 0);
+  t('转生：伙伴等级与点数保留', Core.S.chars.C021.lv === before.char && Core.S.cur.points === before.points);
+  t('转生：拿到转生点', Core.S.cur.rp > 0);
+  Core.addPlayerExp(99999999);       // 重练一遍
+  t('转生后重练到顶：技能点仍是 0（供给是"等级"不是"升级次数"）', Core.S.player.level === 100 && Core.S.player.skillPoints === 0);
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];
