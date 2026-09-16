@@ -91,11 +91,16 @@
       }, 0);
       const flexKids = kids.filter((k) => out[k].flex && typeof out[k].width !== 'number');
       if (flexKids.length) {
-        const totalFlex = flexKids.reduce((sum, k) => sum + (out[k].flex || 1), 0);
-        const spare = Math.max(0, innerW - fixedSum);
-        flexKids.forEach((k) => {
-          out[k].width = Math.max(24, Math.round((spare * (out[k].flex || 1)) / totalFlex));
-        });
+        const spare = innerW - fixedSum;
+        if (spare > 0) {
+          const totalFlex = flexKids.reduce((sum, k) => sum + (out[k].flex || 1), 0);
+          flexKids.forEach((k) => {
+            out[k].width = Math.max(24, Math.round((spare * (out[k].flex || 1)) / totalFlex));
+          });
+        }
+        /* spare <= 0：这一行本来就放不下 —— 千万不要硬塞宽度，
+           否则引擎永远认为"放得下"、就不会换行（网页版是放不下才折行的）。
+           交给引擎按各自宽度自然换行，跟浏览器一致。 */
       }
       kids.forEach((c) => walk(c, innerW, innerH));
     }
