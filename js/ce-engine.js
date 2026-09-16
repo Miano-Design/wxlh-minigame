@@ -89,7 +89,20 @@ function renderPage(ctx, W, H, markup) {
       }
     }
   };
-  missing.forEach(inheritFrom);
+  /* 兜底两层：
+     ① 上下文里带着行内样式类（isx…）而这一组合没编进去时，**把 isx 去掉再查一次**
+        —— 网页版里 `style=""`（空行内样式）会生成一个空 isx 类，
+        于是那一整行的样式（弹性、右对齐）全丢，看着就是"文字不贴右、也不居中"。
+     ② 还查不到，就按祖先继承文字样式。 */
+  missing.forEach((path) => {
+    const last = path.split('__').pop();
+    const stripped = last.split('.').filter((t) => t.indexOf('isx') !== 0).join('.');
+    if (stripped !== last) {
+      const alt = path.slice(0, path.length - last.length) + stripped;
+      if (styleSheet[alt]) { styleSheet[path] = Object.assign({}, styleSheet[alt]); return; }
+    }
+    inheritFrom(path);
+  });
   if (missing.length) {
     /* 兜底：把这些元素身上的行内样式（颜色 / 透明度这些）当场折一份挂到它们的类名上——
        上下文没了，但至少字是白的，不会"黑底黑字看不见"。 */
