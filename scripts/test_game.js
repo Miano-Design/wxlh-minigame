@@ -1221,7 +1221,7 @@ setParty(['C021']);
   // 挂机游历奇遇：攒满一条、领了归零
   Core.newGame();
   t('游历初始没有待领', !Core.pendingTravel());
-  Core.travelAccrue(D.TRAVEL_EVERY_SEC + 1);
+  Core.travelAccrue(Core.travelEverySec() + 1);
   const pend = Core.pendingTravel();
   t('挂机攒满会出一条游历', !!pend);
   const ptBefore = Core.S.cur.points;
@@ -1231,6 +1231,39 @@ setParty(['C021']);
   t('游历奖励真进账', Core.S.cur.points !== ptBefore || Core.S.travel.got === 1);
   t('游历池够厚（≥10 种）', D.TRAVELS.length >= 10);
   t('每种游历都有文案与效果', D.TRAVELS.every(x => x.name && x.desc && Object.keys(x.effect).length));
+
+  /* 游历的节奏（父亲大人定的）：进游戏第 5 分钟第一次 → 10 / 20 / 30 / 40 / 50 分钟 →
+     60 分钟封顶；领完才计下一轮；待领的时候不计时；跨天从头来。 */
+  Core.newGame();
+  t('游历第一轮等 5 分钟', Core.travelEverySec() === 300);
+  Core.travelAccrue(299);
+  t('差 1 秒不出奇遇', !Core.pendingTravel());
+  Core.travelAccrue(1);
+  t('第 5 分钟整出一条（不早不晚）', !!Core.pendingTravel());
+  Core.travelAccrue(3600);
+  t('待领期间不计时（不会闷头攒出第二条）', Core.S.travel.round === 0 && !Core.S.travel.bankSec);
+  Core.claimTravel();
+  t('领完才开始算下一轮：这一轮等 10 分钟', Core.travelEverySec() === 600 && Core.S.travel.bankSec === 0);
+  const steps = [];
+  for (let i = 0; i < 8; i++) {
+    steps.push(Math.round(Core.travelEverySec() / 60));
+    Core.travelAccrue(Core.travelEverySec());
+    Core.claimTravel();
+  }
+  t('间隔按 10/20/30/40/50 递增、60 分钟封顶', steps.join(',') === '10,20,30,40,50,60,60,60');
+  const keepDay = Core.S.travel.day, keepRound = Core.S.travel.round;
+  Core.S.travel.day = '2000-01-01';        // 把日期拨到"昨天"
+  Core.S.travel.round = 6;
+  Core.travelAccrue(1);
+  t('跨天重新从第一次（5 分钟）算', Core.travelEverySec() === 300 && Core.S.travel.round === 0);
+  Core.S.travel.day = keepDay; Core.S.travel.round = keepRound;
+  t('跨天才来领：领完也按新的一天从头算', (() => {
+    Core.newGame();
+    Core.travelAccrue(300);                 // 第 5 分钟出了一条，先不领
+    Core.S.travel.day = '2000-01-01';       // 挂到第二天才回来领
+    Core.claimTravel();
+    return Core.travelEverySec() === 300 && Core.S.travel.round === 0;
+  })());
 }
 
 // ---- V8.2 药园 / 斗法台 / 法宝（对标《道友修仙》的洞府药园 · 斗法 · 法宝） ----

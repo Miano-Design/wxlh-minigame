@@ -65,6 +65,14 @@ for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'j
   eval(fs.readFileSync(f, 'utf8'));
 }
 const UI = window.UI, Core = window.Core, D = window.DATA;
+
+/* 开局三步（签契约 → 起名 → 选血统）没走完时，render() 会**故意**把界面留空
+   （V9.5.23 修"没签契约点掉弹窗就能进游戏"的 bug）。boot() 里刚跑完 newGame，
+   档是全新的，所以测试要先替玩家把后两步走完，才看得到真正的首页。 */
+Core.setPlayerName('测试者');
+Core.choosePlayerBloodline('血族');
+UI.render();
+
 let pass = 0, fail = 0;
 function t(name, fn) {
   try { fn(); pass++; } catch (e) { fail++; console.log('FAIL:', name, '→', e.message); }
@@ -327,7 +335,11 @@ t('血统 / 境界不在首页放入口（属于角色卡，避免功能重复�
   ['open-bloodline', 'open-realm', '境界渡劫'].forEach(k => {
     if (html.indexOf(k) >= 0) throw new Error('首页还留着重复入口：' + k);
   });
-  if (html.indexOf('血统') < 0) throw new Error('首页应有一句话指引玩家去角色卡里找血统');
+  // 开局三步走完之后玩家已经有血统了：首页不再写"去选血统"，但境界要作为主角卡里的一行出现，
+  // 而且整张主角卡得能点（点进去才是血统 / 境界的入口）
+  if (html.indexOf('【境界】') < 0) throw new Error('首页主角卡缺【境界】那一行');
+  if (html.indexOf('data-protag="1"') < 0) throw new Error('首页主角卡不可点，境界就没入口了');
+  if (html.indexOf('点【主角】卡里选血统') >= 0) throw new Error('已经有血统了，首页还在提示去选血统');
   // 角色卡里必须真的能设置（否则就是"入口没了、功能也没了"）
   const pd = UI._panels.protagonistDetail().innerHTML;
   if (pd.indexOf('data-realm-open') < 0) throw new Error('主角卡里缺境界入口');
@@ -335,6 +347,44 @@ t('血统 / 境界不在首页放入口（属于角色卡，避免功能重复�
   if (pd.indexOf('🩸') < 0 || (pd.indexOf('data-pbl') < 0 && pd.indexOf('data-pblup') < 0)) {
     throw new Error('主角卡里缺血统设置入口');
   }
+});
+
+/* ==================================================================
+   V9.5.23：开局三步（签契约 → 起名 → 选血统）没走完，谁也进不去游戏。
+   起因：父亲大人报"没签契约、点掉弹窗就直接进游戏了"。
+   ================================================================== */
+t('开局契约弹窗关不掉：没有 × 键、遮罩点不掉、返回键也关不掉', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('function showTutorial');
+  if (src.slice(i, src.indexOf('function showCharCreate')).indexOf('sticky: true') < 0) {
+    throw new Error('契约弹窗不是 sticky，右上角还有 × 能点掉');
+  }
+  const j = src.indexOf('function showCharCreate');
+  if (src.slice(j, j + 700).indexOf('sticky: true') < 0) throw new Error('起名弹窗不是 sticky');
+  if (src.indexOf("wrap._sticky = !!opts.sticky") < 0) throw new Error('sticky 弹窗没打标记，返回键照样能关掉它');
+  if (src.indexOf('if (w._sticky) { toast') < 0) throw new Error('返回键还能关掉开局弹窗');
+});
+
+t('没签契约 / 没选血统时，游戏界面一页都渲染不出来', () => {
+  const keepName = Core.S.player.name, keepBl = Core.S.player.bloodline;
+  try {
+    Core.S.player.name = '';                    // 契约还没签，名字也没填
+    UI.render();
+    if (byId['view'].innerHTML !== '') throw new Error('没签契约时首页还是渲染出来了');
+    UI._setTab('bag');
+    if (byId['view'].innerHTML !== '') throw new Error('没签契约时还能切到背包页');
+    UI._setTab('dungeon');
+    if (byId['view'].innerHTML !== '') throw new Error('没签契约时还能切到残域页');
+    Core.S.player.name = keepName;
+    Core.S.player.bloodline = '';               // 名字有了、血统没选，一样不算开局完成
+    UI.render();
+    if (byId['view'].innerHTML !== '') throw new Error('没选血统时首页还是渲染出来了');
+  } finally {
+    Core.S.player.name = keepName;
+    Core.S.player.bloodline = keepBl;
+    UI._setTab('home');
+  }
+  if (byId['view'].innerHTML.indexOf('screen') < 0) throw new Error('补完开局之后界面没回来');
 });
 t('首页主线是一条横条（不再是"主线 + 今日"两枚匾额）', () => {
   const html = UI._panels._screens.homeScreen();
@@ -345,6 +395,15 @@ t('首页主线是一条横条（不再是"主线 + 今日"两枚匾额）', () 
 t('首页有游历奇遇条', () => {
   const html = UI._panels._screens.homeScreen();
   if (html.indexOf('游历奇遇') < 0) throw new Error('缺游历条');
+});
+t('游历条 / 游历面板都不写机制说明（只报"距下一次"和进度）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  ['挂机每 10 分钟出一次', '每累计', '分钟出一次奇遇'].forEach(k => {
+    if (src.indexOf(k) >= 0) throw new Error('游历又写机制说明了：' + k);
+  });
+  // 倒计时得有个锚点，tickIdle 才能每秒把它往下走
+  if (UI._panels.travelStrip().indexOf('id="travel-left"') < 0) throw new Error('游历倒计时缺可更新锚点');
+  if (src.indexOf("document.getElementById('travel-left')") < 0) throw new Error('tickIdle 没接游历倒计时');
 });
 panel('灯阁评级', () => UI._panels.sectModal());
 panel('秘术阁', () => UI._panels.kejiModal());

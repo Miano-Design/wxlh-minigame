@@ -16,15 +16,19 @@ const DST = path.resolve(__dirname, '../js');
 const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
 /* 路线 B 额外复用网页版的**界面层**（js/ui.js → js/ui-web.js）：同样逐字节一致。
    它当然会碰 DOM——那正是我们要复用的"界面字符串工厂"，
-   小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。 */
-const EXTRA = { 'ui.js': 'ui-web.js' };
+   小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。
+   js/ui.js 也一起刷（底包快照 index.html 引的就是它），免得两份界面层各老各的。 */
+const EXTRA = { 'ui.js': ['ui-web.js', 'ui.js'] };
 /* 网页版的"包"也一起搬一份（新工程以网页版为底）：入口页、样式、图标清单。
    注意：小游戏运行时用的是编译好的 js/ce-style.js，css/style.css 只是"底包快照"。 */
 const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],
   ['manifest.webmanifest', 'manifest.webmanifest'], ['sw.js', 'sw.js']];
 
 let changed = 0, same = 0;
-const JOBS = FILES.map(f => [f, f]).concat(Object.keys(EXTRA).map(k => [k, EXTRA[k]])).concat(PACK);
+const JOBS = [];
+FILES.forEach(f => JOBS.push([f, f]));
+Object.keys(EXTRA).forEach(k => [].concat(EXTRA[k]).forEach(out => JOBS.push([k, out])));
+PACK.forEach(([a, b]) => JOBS.push([a, b]));
 JOBS.forEach(([f, out]) => {
   const fromJs = FILES.indexOf(f) >= 0 || EXTRA[f] !== undefined;
   const a = path.join(fromJs ? SRC : WEB_ROOT, f), b = path.join(fromJs ? DST : PROJ, out);

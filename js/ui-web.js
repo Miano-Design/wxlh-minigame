@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.25';
+  const GAME_VER = '9.5.26';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -627,15 +627,15 @@ window.UI = (function () {
   /* 游历奇遇条（对标参考产品的游历事件）：挂满一段时间会亮起来，
      没有待领的奇遇时显示进度，有的时候就变成一条"点一下领走"的金条。
      它就是「游历奇遇」这一项**唯一**的入口——宫格里不再重复放第二个。 */
-  function travelStrip() {
+   function travelStrip() {
     const prog = C().travelProgress();
     const pend = C().pendingTravel();
     const left = Math.max(0, Math.round(prog.every - prog.sec));
     return `<div class="card text-rows" style="padding:2px var(--sp3)">
       <div class="row" data-act="open-travel">
         <span class="rk" style="${pend ? 'color:var(--gold)' : ''}">【游历奇遇】</span>
-        <span class="rv">${pend ? pend.name + '（待领）' : `距下一次 ${formatDuration(left)}`}</span>
-        <span class="rs">${pend ? C().rewardTextOf(pend.effect) : '挂机每 10 分钟出一次'}</span>
+        <span class="rv"${pend ? '' : ' id="travel-left"'}>${pend ? pend.name + '（待领）' : `距下一次 ${formatDuration(left)}`}</span>
+        <span class="rs">${pend ? C().rewardTextOf(pend.effect) : ''}</span>
       </div>
     </div>`;
   }
@@ -2502,7 +2502,6 @@ window.UI = (function () {
           <div class="event-desc">${pend.ico} <b>${pend.name}</b><br>${pend.desc}</div>
           <button class="btn primary block mt3" data-travel-claim>领取：${C().rewardTextOf(pend.effect)}</button>
         ` : `
-  <div class="note">每累计 ${Math.round(prog.every / 60)} 分钟出一次奇遇</div>
           <div class="bar mt3"><i style="width:${Math.round(prog.pct * 100)}%"></i></div>
           <div class="kv"><span class="k">距离下一次</span><span>${Math.max(0, Math.round(prog.every - prog.sec))} 秒</span></div>
         `}
@@ -4700,6 +4699,16 @@ window.UI = (function () {
           const t = C().todayState();
           btn.disabled = !t.claimable;
           btn.textContent = t.claimable ? `⚡ 一键收取（${t.claimable}）` : '⚡ 一键收取';
+        }
+      }
+      // 游历奇遇那条：倒计时每秒跟着走；走到点出了奇遇，就把这一段重画一次
+      // （只在这一下重画，不是每秒重画整页）
+      const tvLeft = document.getElementById('travel-left');
+      if (tvLeft) {
+        if (C().pendingTravel()) render();
+        else {
+          const p = C().travelProgress();
+          tvLeft.textContent = `距下一次 ${formatDuration(Math.max(0, Math.round(p.every - p.sec)))}`;
         }
       }
     },

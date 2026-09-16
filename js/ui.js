@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.22';
+  const GAME_VER = '9.5.26';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -225,6 +225,8 @@ window.UI = (function () {
     }
     if (modalStack.length) {
       const w = modalStack[modalStack.length - 1];
+      // 开局三步的弹窗返回键也关不掉：关了就等于"没签契约直接进游戏"
+      if (w._sticky) { toast('请先完成开局设置', 2000); armGuard(); return; }
       modalStack = modalStack.filter(x => x !== w);
       w.remove();
       if (w._onClose) w._onClose();
@@ -268,18 +270,20 @@ window.UI = (function () {
         </div>`
       : `<div class="modal-mask"></div>
         <div class="sheet center ${opts.sticky ? 'sticky' : ''}">
-          <div class="sheet-head"><h3>${title}</h3><button class="close-x" aria-label="关闭">${ICON_CLOSE}</button></div>
+          <div class="sheet-head"><h3>${title}</h3>${opts.sticky ? '' : `<button class="close-x" aria-label="关闭">${ICON_CLOSE}</button>`}</div>
           <div class="sheet-body">${bodyHtml}</div>
         </div>`;
     root.appendChild(wrap);
     modalStack.push(wrap);
     wrap._drawSeq = ++modalDrawSeq;
     wrap._onClose = opts.onClose || null;
+    wrap._sticky = !!opts.sticky;                 // 开局三步：× 没有、遮罩点不掉、返回键也关不掉
     if (isPage) {
       wrap.querySelector('.back-x').onclick = () => closeModal(wrap);
       // 整页也支持安卓/浏览器的返回键：交给 closeModal 统一处理（见 main.js 的 popstate）
     } else {
-      wrap.querySelector('.close-x').onclick = () => closeModal(wrap);
+      const x = wrap.querySelector('.close-x');
+      if (x) x.onclick = () => closeModal(wrap);      // sticky 的弹窗没有关闭键（开局三步）
       wrap.querySelector('.modal-mask').onclick = () => { if (!opts.sticky) closeModal(wrap); };
     }
     return wrap;
@@ -513,7 +517,28 @@ window.UI = (function () {
     render();
   }
   let screenEnter = false;
+  /* 开局三步：签契约 → 起名 → 选血统。这三步没走完之前，游戏界面一律不渲染、底栏不出现，
+     弹窗本身也没有任何关闭入口（右上角 × 去掉、遮罩点不掉、手机返回键关不掉）。
+     判断只看存档本身（没名字或没血统＝开局没走完），所以不管从哪条路漏进 render()
+     都会被挡住，不存在"某个入口忘了上锁"。起因：父亲大人报"没签契约、点掉弹窗就能
+     直接进游戏"（V9.5.23 修）。 */
+  function onboarded() {
+    const S0 = C().S;
+    return !!(S0 && S0.player && S0.player.name && S0.player.bloodline);
+  }
+  function showApp(on) {
+    const app = document.getElementById('app');
+    if (app) app.style.display = on ? '' : 'none';   // 藏的是整块界面，顶栏货币条也在里面
+    const nb = document.getElementById('navbar');
+    if (nb) nb.style.display = on ? '' : 'none';
+  }
   function render() {
+    if (!onboarded()) {                              // 开局没走完：界面留空，一个入口都不给
+      $view().innerHTML = '';
+      showApp(false);
+      return;
+    }
+    showApp(true);
     const fn = { home: homeScreen, dungeon: dungeonScreen, roster: rosterScreen, bag: bagScreen }[curTab];
     // 切页签回到顶部；同一页内的操作保留滚动位置，避免"点一下跳回顶部"
     const keepScroll = !screenEnter && pendingScroll === null;
@@ -602,15 +627,15 @@ window.UI = (function () {
   /* 游历奇遇条（对标参考产品的游历事件）：挂满一段时间会亮起来，
      没有待领的奇遇时显示进度，有的时候就变成一条"点一下领走"的金条。
      它就是「游历奇遇」这一项**唯一**的入口——宫格里不再重复放第二个。 */
-  function travelStrip() {
+   function travelStrip() {
     const prog = C().travelProgress();
     const pend = C().pendingTravel();
     const left = Math.max(0, Math.round(prog.every - prog.sec));
     return `<div class="card text-rows" style="padding:2px var(--sp3)">
       <div class="row" data-act="open-travel">
         <span class="rk" style="${pend ? 'color:var(--gold)' : ''}">【游历奇遇】</span>
-        <span class="rv">${pend ? pend.name + '（待领）' : `距下一次 ${formatDuration(left)}`}</span>
-        <span class="rs">${pend ? C().rewardTextOf(pend.effect) : '挂机每 10 分钟出一次'}</span>
+        <span class="rv"${pend ? '' : ' id="travel-left"'}>${pend ? pend.name + '（待领）' : `距下一次 ${formatDuration(left)}`}</span>
+        <span class="rs">${pend ? C().rewardTextOf(pend.effect) : ''}</span>
       </div>
     </div>`;
   }
@@ -2253,7 +2278,7 @@ window.UI = (function () {
           </div>
           ${active ? `<button class="btn small ghost" data-faceoff="1">摘下</button>`
             : owned ? `<button class="btn small gold" data-fwear="${f.id}">佩戴</button>`
-            : `<button class="btn small" data-fbuy="${f.id}" ${(C().S.cur.otherworld || 0) >= f.cost ? '' : 'disabled'}>◈→◆${fmt(f.cost)}</button>`}
+            : `<button class="btn small" data-fbuy="${f.id}" ${(C().S.cur.otherworld || 0) >= f.cost ? '' : 'disabled'}>◆${fmt(f.cost)}</button>`}
         </div>`;
       }).join('')}`;
     const w = showPanel(wrap, '法宝', body);
@@ -2477,7 +2502,6 @@ window.UI = (function () {
           <div class="event-desc">${pend.ico} <b>${pend.name}</b><br>${pend.desc}</div>
           <button class="btn primary block mt3" data-travel-claim>领取：${C().rewardTextOf(pend.effect)}</button>
         ` : `
-  <div class="note">每累计 ${Math.round(prog.every / 60)} 分钟出一次奇遇</div>
           <div class="bar mt3"><i style="width:${Math.round(prog.pct * 100)}%"></i></div>
           <div class="kv"><span class="k">距离下一次</span><span>${Math.max(0, Math.round(prog.every - prog.sec))} 秒</span></div>
         `}
@@ -2961,7 +2985,7 @@ window.UI = (function () {
         const list = st.list.filter(x => x.a.cat === cat);
         if (!list.length) return '';
         return `<div class="section-title">${cat}</div>` + list.map(({ a, done, claimed }) => `<div class="list-row" style="${claimed ? 'opacity:.5' : ''}">
-          <div class="grow"><div class="t1">${claimed ? '🏅' : done ? '✨' : '⬜'} ${a.name}</div>
+          <div class="grow"><div class="t1"${done ? '' : ' style="color:var(--dim)"'}>${claimed ? '🏅 ' : done ? '✨ ' : ''}${a.name}</div>
           <div class="t2">${a.desc} · 奖励 ${rewardText(a.reward)}</div></div>
           ${claimed ? '<button class="btn small" disabled>已领</button>'
             : done ? `<button class="btn small primary" data-ach="${a.id}">领取</button>`
@@ -3113,9 +3137,10 @@ window.UI = (function () {
         const texts = D.talentTexts(k);
         return `<div class="card mb2">
           <h3>${t.name} <span class="sub">Lv.${lv}/10 · ${t.desc}</span></h3>
-          ${lv > 0 ? `<div style="font-size:11px;color:var(--green);margin-bottom:6px">已激活：${texts.slice(0, lv).join('、')}</div>` : ''}
           ${lv < 10 ? `<button class="btn small" data-talent="${k}">下一级：${texts[lv]}（♾${cost}）</button>` : '<div style="color:var(--gold);font-size:12px">已满级</div>'}
-          <div style="font-size:10px;color:var(--dim);margin-top:6px">${texts.map((x, i) => `${i < lv ? '✅' : '⬜'}${i + 1}.${x}`).join('　')}</div>
+          <div style="font-size:11px;line-height:1.8;margin-top:8px">${texts.map((x, i) => i < lv
+            ? `<span style="color:var(--gold);font-weight:600">${i + 1}.${x}</span>`
+            : `<span style="color:var(--dim)">${i + 1}.${x}</span>`).join('　')}</div>
         </div>`;
       }).join('')}
     `);
@@ -4572,6 +4597,8 @@ window.UI = (function () {
       </div>`, { center: true });
   }
   function showTutorial() {
+    /* 开局第一步：**必须签契约**。sticky 让弹窗没有任何关掉的入口，
+       背后的界面本来就不渲染（render 的开局守卫，V9.5.23 修）。 */
     const w = modal('欢迎来到灯阁', `
       <div class="event-desc">
         你被神秘存在选中，成为了<b style="color:var(--accent)">执灯者</b>。<br><br>
@@ -4580,13 +4607,6 @@ window.UI = (function () {
         👥 招募伙伴，组建五人小队（主角必上阵）<br>
         🧬 解锁血统与铭刻，突破极限<br>
         ♾ 挑战深井，寻找离开的方法<br><br>
-        新手补给已发放：◈50,000 · ✦1,000 · 经验模块×20 · 治疗剂×10<br><br>
-        <b style="color:var(--gold)">上手就三件事：</b><br>
-        ① 先在「选择血统」里挑一条路——境界线跟着血统走，选定不能改；<br>
-        ② 首页最下面「挂机」那块点「一键收取」，把挂机、任务、成就、悬赏能领的一次全领；<br>
-        ③ 点「残域」选第 1 关，点进去就直接开打，通关后解锁招募；招募里每天有一次<b>免费</b>，别忘了领。<br><br>
-        三张招募池花的是<b>三种不同的货币</b>：◈点数抽普通（攒碎片）、✦圣洁晶石抽高级（补图鉴）、◆异界结晶抽限定（定向出当期 UP）。<br>
-        首页最下面「设置」里的「玩法指南」有完整说明（货币、套装、挂机分工、副本打法、血统与境界、限时悬赏、深井、周常都在里面）。<br><br>
         <b>如果下一场探索真的会死，你会带谁进去？</b>
       </div>
       <button class="btn primary block mt4" data-start>签订灯阁契约</button>
@@ -4679,6 +4699,16 @@ window.UI = (function () {
           const t = C().todayState();
           btn.disabled = !t.claimable;
           btn.textContent = t.claimable ? `⚡ 一键收取（${t.claimable}）` : '⚡ 一键收取';
+        }
+      }
+      // 游历奇遇那条：倒计时每秒跟着走；走到点出了奇遇，就把这一段重画一次
+      // （只在这一下重画，不是每秒重画整页）
+      const tvLeft = document.getElementById('travel-left');
+      if (tvLeft) {
+        if (C().pendingTravel()) render();
+        else {
+          const p = C().travelProgress();
+          tvLeft.textContent = `距下一次 ${formatDuration(Math.max(0, Math.round(p.every - p.sec)))}`;
         }
       }
     },

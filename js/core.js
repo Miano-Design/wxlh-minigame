@@ -41,7 +41,7 @@ window.Core = (function () {
       auth: 0,               // 灯阁权限等级（对标"洞府"：高级货币的一次性长线投资）
       sect: { lv: 1, exp: 0 },   // 灯阁评级（对标"宗门等级"：随关卡推进自动涨的全局长线）
       keji: {},                  // 秘术阁（对标"KeJi"）：id → 等级
-      travel: { bankSec: 0, pending: null, got: 0 },   // 挂机游历奇遇（对标"YouLi"）
+      travel: { bankSec: 0, pending: null, got: 0, round: 0, day: '' },   // 挂机游历奇遇（对标"YouLi"）
       garden: Array(4).fill(null),       // 药园（对标"洞府·药园"）：每块地 null 或 {kind, at}
       arena: { floor: 1, best: 1, date: '', used: 0 },   // 斗法台（对标"Arena"）
       fabao: { own: [], on: null },      // 法宝（对标"FaBao"）：own = 已拥有，on = 主角佩戴的那件
@@ -128,7 +128,7 @@ window.Core = (function () {
     // V8.0 新增的三块（灯阁评级 / 秘术阁 / 挂机游历）：老档补默认值，缺字段不会读出 undefined
     S.sect = Object.assign({ lv: 1, exp: 0 }, S.sect || {});
     S.keji = S.keji || {};
-    S.travel = Object.assign({ bankSec: 0, pending: null, got: 0 }, S.travel || {});
+    S.travel = Object.assign({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }, S.travel || {});
     S.garden = Object.assign(Array(def.garden.length).fill(null), S.garden || {});
     S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
     S.fabao = Object.assign({ own: [], on: null }, S.fabao || {});
@@ -1879,26 +1879,46 @@ window.Core = (function () {
   }
 
   /* ================= 挂机游历奇遇（对标《道友修仙》的 YouLi） =================
-     挂机的时间里会攒"游历"，攒满就出一条随机奇遇（停在待触发，不会过期丢东西）。
-     原来的挂机只有一条进度条，回家点"收取"就完了；补上这一池之后，
-     离线收益变成"有东西可看"，也更接近对标产品的挂机观感。 */
+     节奏（父亲大人定的）：进游戏后第 5 分钟出第一次，之后 10 / 20 / 30 / 40 / 50 分钟，
+     60 分钟封顶（再往后固定每小时一次）。**领完才开始算下一轮**，待领的时候不计时，
+     所以不会攒着一堆没领的；跨天（自然日）重新从第一次开始。
+     攒满停在"待触发"，不会过期丢东西。界面上不写这套说明，玩家看进度条就行。 */
   function travelBank() {
-    if (!S.travel) S.travel = { bankSec: 0, pending: null, got: 0 };
-    return S.travel;
+    if (!S.travel) S.travel = { bankSec: 0, pending: null, got: 0, round: 0, day: '' };
+    const t = S.travel;
+    if (typeof t.round !== 'number') t.round = 0;
+    if (typeof t.day !== 'string') t.day = '';
+    return t;
+  }
+  // 跨天：新的一天从第一次（5 分钟）重新计
+  function travelDayRoll(t) {
+    const today = dailyDate();
+    if (t.day === today) return false;
+    t.day = today;
+    t.round = 0;
+    t.bankSec = 0;
+    return true;
+  }
+  // 这一轮要等多久（秒）：按节奏表往后走，表走完就固定在最后一步
+  function travelEverySec() {
+    const t = travelBank();
+    const steps = D.TRAVEL_STEPS_SEC;
+    return steps[Math.min(t.round, steps.length - 1)];
   }
   function travelProgress() {
     const t = travelBank();
-    return { sec: t.bankSec, every: D.TRAVEL_EVERY_SEC, pct: Math.min(1, t.bankSec / D.TRAVEL_EVERY_SEC), pending: t.pending };
+    travelDayRoll(t);
+    const every = travelEverySec();
+    return { sec: t.bankSec, every, round: t.round, pct: Math.min(1, t.bankSec / every), pending: t.pending };
   }
-  // 累计挂机时长（在线 + 离线都算），攒满就摇一条奇遇挂起来
+  // 累计挂机时长（在线 + 离线都算）；有没领的压着就不计时（领完才重新计）
   function travelAccrue(sec) {
     if (!sec || sec <= 0) return;
     const t = travelBank();
+    travelDayRoll(t);
+    if (t.pending) return;
     t.bankSec += sec;
-    if (!t.pending && t.bankSec >= D.TRAVEL_EVERY_SEC) {
-      t.bankSec -= D.TRAVEL_EVERY_SEC;
-      t.pending = rollTravel();
-    }
+    if (t.bankSec >= travelEverySec()) { t.bankSec = 0; t.pending = rollTravel(); }
   }
   function rollTravel() {
     let r = Math.random() * D.TRAVEL_TOTAL_W;
@@ -1914,7 +1934,10 @@ window.Core = (function () {
     const tv = pendingTravel();
     if (!tv) return { ok: false, msg: '还没有新的游历' };
     applyRewardObj(tv.effect);
+    const rolled = travelDayRoll(t);      // 跨天才来领：这一轮按新的一天从头算
     t.pending = null;
+    t.round = rolled ? 0 : t.round + 1;   // 领完才开始算下一轮，间隔按节奏表往后走
+    t.bankSec = 0;
     t.got = (t.got || 0) + 1;
     save();
     return { ok: true, msg: `${tv.name}：${travelRewardText(tv)}`, travel: tv };
@@ -2815,7 +2838,7 @@ window.Core = (function () {
     upgradeBuilding, authority, authorityInfo, upgradeAuthority,
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
-    travelAccrue, travelTick, travelProgress, pendingTravel, claimTravel, rollTravel, rewardTextOf,
+    travelAccrue, travelTick, travelProgress, travelEverySec, pendingTravel, claimTravel, rollTravel, rewardTextOf,
     gardenState, plantGarden, harvestGarden, harvestAllGarden,
     arenaState, arenaSettle, fabaoState, buyFabao, wearFabao,
     mountState, buyMount, wearMount, applyMount,
