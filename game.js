@@ -4,12 +4,25 @@
    样式只有一处真源（网页版 css/style.css → 编译成 js/ce-style.js）。
    加载顺序：适配层（wx 存储/广告）→ 逻辑层 → 假 DOM → 网页版界面层 → 引擎应用层。
 */
+/* 路线开关（父亲大人要求"试 A"）：
+     'A' = 旧的 canvas 手写界面（js/cv.js + js/screens.js + js/ui-canvas.js，35 个界面手绘坐标）
+     'B' = 引擎渲染（网页版界面 + 编译样式 → 引擎画到 canvas）—— 现在默认 B
+   两套并存、随时切换，方便同机对比。 */
+const UI_ROUTE = 'A';
+
 require('./js/wx-adapter.js');   // wx 存储 / window 垫片 / 广告封装
 require('./js/data.js');
 require('./js/core.js');
 require('./js/battle.js');
 require('./js/dungeon.js');
+if (UI_ROUTE === 'A') {
+  /* 路线 A：手写 canvas 界面（逻辑层同一份，只是界面层换成手绘） */
+  require('./js/cv.js');
+  require('./js/screens.js');
+  require('./js/ui-canvas.js').boot();
+} else {
 require('./js/ce-dom.js').install();   // 假 DOM：让网页版界面代码在小游戏里跑（只取它的界面字符串）
 require('./js/ui-web.js');             // 网页版界面层（从 wxlh-game/js/ui.js 同步而来，逐字节一致）
 const app = require('./js/ce-app.js').boot();
 if (!app) console.error('[CE] 引擎版启动失败：请检查 js/ce-*.js 与 js/ce-style.js 是否齐全');
+}
