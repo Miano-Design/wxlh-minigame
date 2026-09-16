@@ -2348,5 +2348,59 @@ setParty(['C021']);
   }
 }
 
+/* ---- V9.5.89：界面上写的价钱，必须就是实际扣的钱（十七度自审） ----
+   原来：强化按钮只显示 enhanceCost，可实际扣款在"没材料"时还要加代用点数、
+   "有材料"时还要吃掉一块材料（实测 +12 那档写 ◈1640、实扣 ◈4640）；
+   血统按钮显示毛价，实际会打血统实验室的折扣（最高 -40%）。
+   现在两边都读同一份 quote，这一组用例锁住"报价 == 实扣"。 */
+{
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.newGame(); Core.setPlayerName('报价'); Core.choosePlayerBloodline('修真');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.addCur('points', 10000000); Core.addCur('otherworld', 1000000); Core.addCur('bloodCrystal', 1000000);
+  Core.S.bag.eqCap = 300;
+  Core.S.buildings.workshop = 40; Core.S.buildings.geneLab = 40;      // 两条折扣线都拉满
+  const uid = Core.grantEquip('W01', 'UR', null).equip.uid;
+
+  /* 无材料：报价把代用点数算进去，实扣必须一模一样 */
+  Core.S.equips[uid].enhance = 12;
+  {
+    const q = Core.enhanceQuote(uid);
+    const p0 = Core.S.cur.points, o0 = Core.S.cur.otherworld;
+    Core.enhance(uid);
+    t('强化（无材料）：报价 == 实扣的点数', q.points === p0 - Core.S.cur.points, `报价 ${q.points} 实扣 ${p0 - Core.S.cur.points}`);
+    t('强化（无材料）：报价 == 实扣的异界结晶', q.otherworld === o0 - Core.S.cur.otherworld);
+    t('强化（无材料）：报价里写明了"代用点数"有多少', q.substitute > 0 && q.points === q.basePoints + q.substitute);
+  }
+  /* 有材料：扣 1 块材料，点数按不含代用的价 */
+  {
+    Core.S.equips[uid].enhance = 0;
+    Core.S.items['mat_t1'] = 3;
+    const q = Core.enhanceQuote(uid);
+    const p0 = Core.S.cur.points, m0 = Core.S.items['mat_t1'];
+    Core.enhance(uid);
+    t('强化（有材料）：报价 == 实扣的点数（不再加代用）', q.points === p0 - Core.S.cur.points && q.substitute === 0);
+    t('强化（有材料）：材料正好扣 1 块，报价里也点名了是哪块材料', m0 - Core.S.items['mat_t1'] === 1 && !!q.itemName);
+  }
+  /* 血统：报价含折扣，实扣一致 */
+  {
+    const q = Core.bloodlineQuote('@player');
+    const b0 = Core.S.cur.bloodCrystal, p0 = Core.S.cur.points;
+    Core.upgradePlayerBloodline();
+    t('主角血统：报价 == 实扣（含血统实验室折扣）',
+      q.bloodCrystal === b0 - Core.S.cur.bloodCrystal && q.points === p0 - Core.S.cur.points,
+      `报价 ❥${q.bloodCrystal}/◈${q.points}`);
+    t('血统报价确实打了折（实验室 40 级 = -40%）', q.discount === 0.4);
+  }
+  {
+    Core.addChar('C021'); Core.S.chars.C021.bloodlineLv = 10;
+    const q = Core.bloodlineQuote('C021');
+    const b0 = Core.S.cur.bloodCrystal, p0 = Core.S.cur.points;
+    Core.bloodlineUpgrade('C021');
+    t('伙伴血统：报价 == 实扣（含折扣）',
+      q.bloodCrystal === b0 - Core.S.cur.bloodCrystal && q.points === p0 - Core.S.cur.points);
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -773,15 +773,33 @@ window.Core = (function () {
   }
 
   /* ================= 血统 / 铭刻 ================= */
+  /* V9.5.89（十七度自审）：血统升级的"报价"收成一份 ——
+     界面原来读 D.bloodlineCost()（毛价），而真正升级时会打血统实验室的折扣（最高 -40%）：
+     按钮写着"❥ 120 + ◈ 3000"、实际只扣 1800。玩家看到一个虚高的价钱就不敢点了。
+     charId 传 '@player' 或伙伴 id；返回 null 表示已经没得升。 */
+  function bloodlineQuote(charId) {
+    const discount = Math.min(0.4, S.buildings.geneLab * 0.01);
+    const apply = (cost) => ({
+      bloodCrystal: Math.ceil(cost.bloodCrystal * (1 - discount)),
+      points: Math.ceil(cost.points * (1 - discount)),
+      discount,
+    });
+    if (charId === '@player') {
+      if (!S.player.bloodline || S.player.bloodlineLv >= D.BLOODLINE_MAX) return null;
+      return apply(D.bloodlineCost(S.player.bloodlineLv));
+    }
+    const c = S.chars[charId];
+    if (!c || c.bloodlineLv >= D.BLOODLINE_MAX) return null;
+    return apply(D.bloodlineCost(c.bloodlineLv));
+  }
   function bloodlineUpgrade(charId) {
     const c = S.chars[charId];
     const base = D.charById[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
     if (c.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
-    let cost = D.bloodlineCost(c.bloodlineLv);
-    const discount = Math.min(0.4, S.buildings.geneLab * 0.01);
-    cost = { bloodCrystal: Math.ceil(cost.bloodCrystal * (1 - discount)), points: Math.ceil(cost.points * (1 - discount)) };
+    const q = bloodlineQuote(charId);            // 与界面同一份报价（已含血统实验室折扣）
+    const cost = { bloodCrystal: q.bloodCrystal, points: q.points };
     if (!spend(cost)) return { ok: false, msg: '血统结晶或点数不足' };
     c.bloodlineLv++;
     save();
@@ -998,9 +1016,8 @@ window.Core = (function () {
     // 起步时的"选血统"不受限——那是开局必经的一步）
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
     if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
-    let cost = D.bloodlineCost(S.player.bloodlineLv);
-    const discount = Math.min(0.4, S.buildings.geneLab * 0.01);
-    cost = { bloodCrystal: Math.ceil(cost.bloodCrystal * (1 - discount)), points: Math.ceil(cost.points * (1 - discount)) };
+    const q = bloodlineQuote('@player');         // 与界面同一份报价（已含血统实验室折扣）
+    const cost = { bloodCrystal: q.bloodCrystal, points: q.points };
     if (!spend(cost)) return { ok: false, msg: '血统结晶或点数不足' };
     S.player.bloodlineLv++;
     save();
@@ -1343,6 +1360,30 @@ window.Core = (function () {
     const discount = Math.min(0.4, S.buildings.workshop * 0.01);
     return { points: Math.ceil(base * (1 - discount)), otherworld: 2 + Math.floor(eq.enhance / 5) * 2 };
   }
+  /* V9.5.89（十七度自审）：**报价**和**实扣**必须是同一份数据。
+     原来界面只显示 enhanceCost（点数 + 结晶），而 enhance() 在没材料时还要把代用点数加进点数、
+     有材料时还要吃掉一块材料 —— 实测：无材料时按钮写 ◈200 实扣 ◈400，+12 那一档写 1640 实扣 4640；
+     有材料时按钮上一个字都没提"要消耗一块材料"。玩家按的不是他看到的那个价。
+     现在界面和扣款都读这一个 quote，结构上不允许再分叉。 */
+  function enhanceQuote(uid) {
+    const eq = S.equips[uid];
+    if (!eq) return null;
+    const cost = enhanceCost(eq);
+    const mat = enhanceMat(eq);
+    return {
+      maxed: eq.enhance >= 20,
+      points: cost.points + (mat.has ? 0 : mat.subPoints),   // 真正会扣的点数（含代用）
+      basePoints: cost.points,
+      substitute: mat.has ? 0 : mat.subPoints,
+      otherworld: cost.otherworld,
+      itemId: mat.itemId,
+      itemName: (D.ITEMS[mat.itemId] || {}).name || mat.itemId,
+      matHave: mat.has,
+      matOwned: S.items[mat.itemId] || 0,
+      tier: mat.tier,
+      rate: D.ENHANCE_RATE[Math.min(eq.enhance, D.ENHANCE_RATE.length - 1)],
+    };
+  }
   // 强化所需材料：无材料时按 tier 折算点数代用
   function enhanceMat(eq) {
     const tier = D.enhanceMatTier(eq.enhance);
@@ -1355,16 +1396,15 @@ window.Core = (function () {
     if (!eq) return { ok: false, msg: '装备不存在' };
     if (!isUnlocked('enhance')) return { ok: false, msg: `🔒 ${unlockTip('enhance')}` };
     if (eq.enhance >= 20) return { ok: false, msg: '已满强化' };
-    const cost = enhanceCost(eq);
-    const mat = enhanceMat(eq);
+    const q = enhanceQuote(uid);                 // 与界面同一份报价
+    const cost = { points: q.points, otherworld: q.otherworld };
     // 先判够不够，再扣材料——顺序反了会白吞材料（档案里的同类问题）
-    if (!mat.has) cost.points += mat.subPoints;
     if (!canAfford(cost)) {
-      return { ok: false, msg: mat.has ? '点数或异界结晶不足' : `点数不足（无${D.ITEMS[mat.itemId].name}，需代用 ◈ ${mat.subPoints}）` };
+      return { ok: false, msg: q.matHave ? '点数或异界结晶不足' : `点数不足（无${q.itemName}，需代用 ◈ ${q.substitute}）` };
     }
-    if (mat.has) {
-      S.items[mat.itemId]--;
-      if (S.items[mat.itemId] <= 0) delete S.items[mat.itemId];
+    if (q.matHave) {
+      S.items[q.itemId]--;
+      if (S.items[q.itemId] <= 0) delete S.items[q.itemId];
     }
     spend(cost);
     const rate = D.ENHANCE_RATE[eq.enhance];
@@ -3124,6 +3164,7 @@ window.Core = (function () {
     effectivePlayerStats, playerPower, choosePlayerBloodline, upgradePlayerBloodline,
     allocateAttr, resetAttrs, allocateSkill, resetSkills, protagonistSkills, protagonistList, createProtagonist, switchProtagonist,
     grantEquip, grantSignatureEquip, equipItem, canEquip, unequipItem, enhanceCost, enhance, decompose, decomposeMany, inventoryEquips,
+    enhanceQuote, bloodlineQuote,
     toggleEquipLock, autoEquipBest, equipScore, savePreset, applyPreset,
     unequipEverywhere, equipWearer, dedupeEquips,
     playerRow, setPlayerRow, swapPartySlots, moveMemberRow, rowLayout, ROW_NAME, rowOfSlots, normalizeParty,

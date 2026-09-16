@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.88';
+  const GAME_VER = '9.5.89';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -1338,7 +1338,8 @@ window.UI = (function () {
     const spentAttr = D.ATTR_META.reduce((s, a) => s + ((S.player.attrs && S.player.attrs[a.id]) || 0), 0);
     const spentSkill = (S.player.skillLv || [0, 0, 0]).reduce((s, x) => s + x, 0);   // V9.5.71：0 基口径
     const gl = S.player.geneLock;
-    const blCost = S.player.bloodline && S.player.bloodlineLv < D.BLOODLINE_MAX ? D.bloodlineCost(S.player.bloodlineLv) : null;
+    /* V9.5.89：血统按钮显示的是**打完折的实价**（血统实验室最高 -40%），以前显示毛价，玩家看着贵不敢点 */
+    const blCost = S.player.bloodline ? C().bloodlineQuote('@player') : null;
     const lvlPct = Math.min(100, S.player.exp / (D.EXP_TABLE[S.player.level] || 1) * 100);
     const w = showPanel(wrap, `${cname('@player')}（主角）`, `
       <div class="card">
@@ -1611,7 +1612,7 @@ window.UI = (function () {
     const starCost = D.STAR_COST[c.star];
     const maxStar = D.RARITY_MAXSTAR[ch.rarity];
     const bl = D.BLOODLINES[ch.bloodline];
-    const blCost = c.bloodlineLv < D.BLOODLINE_MAX ? D.bloodlineCost(c.bloodlineLv) : null;
+    const blCost = C().bloodlineQuote(id);      // V9.5.89：与扣款同一份报价（含血统实验室折扣）
     const skills = [ch.skills.s1, ch.skills.s2, ch.skills.ult];
     const skillNames = ['技能1', '技能2', '必杀技'];
     const expItems = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
@@ -1898,8 +1899,13 @@ window.UI = (function () {
     const S = C().S;
     const eq = S.equips[uid];
     if (!eq) return;
-    const cost = C().enhanceCost(eq);
-    const rate = eq.enhance < 20 ? Math.round(D.ENHANCE_RATE[eq.enhance] * 100) : 0;
+    /* V9.5.89（十七度自审）：按钮上写的价钱必须**就是**实际会扣的钱。
+       原来这里只显示 enhanceCost（点数+结晶），而实际扣款在"没材料"时还要加代用点数、
+       "有材料"时还要吃掉一块材料 —— 实测 +12 那档按钮写 ◈1640、实扣 ◈4640。
+       现在整块报价走 core 的 enhanceQuote（和扣款同一份数据），并把材料单独列一行说清楚。 */
+    const q = C().enhanceQuote(uid);
+    const rate = q.maxed ? 0 : Math.round(q.rate * 100);
+    const cost = { points: q.points, otherworld: q.otherworld };
     const set = D.SETS[eq.set];
     const cs = eq.classSet ? D.CLASS_SETS[eq.classSet] : null;
     const equippedBy = Object.entries(S.equipped).find(([cid, slots]) => Object.values(slots).includes(uid));
@@ -1959,6 +1965,9 @@ window.UI = (function () {
       ${setCard}
       ${eq.sigText ? `<div class="card mb3"><h3>📜 说明</h3><div class="note">${esc(eq.sigText)}</div></div>` : ''}
       <div class="section-title">强化（+${eq.enhance}/20）</div>
+      <div class="kv"><span class="k">强化材料</span><span>${q.matHave
+        ? `${q.itemName} ×1（现有 ${q.matOwned}）`
+        : `无${q.itemName} → 用 ◈ ${fmt(q.substitute)} 代用`}</span></div>
       <div class="btn-row">
         <button class="btn small" data-enh="1" ${eq.enhance >= 20 ? 'disabled' : ''}>强化（◈ ${fmt(cost.points)} + ◆ ${cost.otherworld} · ${rate}%）</button>
       </div>
@@ -2024,6 +2033,7 @@ window.UI = (function () {
         render();
       });
     };
+    return w;      // 返回弹窗元素：测试要读它的 HTML 断言"按钮上写的就是实价"（V9.5.89）
   }
 
   /* ================= 招募 ================= */

@@ -1585,23 +1585,21 @@ t('战斗：世界机制上的异常状态会飘字（中毒看得见）', () =>
   global.setTimeout = (fn) => { timers.push(fn); return timers.length; };
   try {
     Core.newGame(); Core.setPlayerName('飘字'); Core.choosePlayerBloodline('修真');
-    Core.S.player.level = 60; Core.S.player.attrPoints = 180;
-    D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 6));
-    ['C021', 'C022'].forEach(id => { try { Core.addChar(id); Core.S.chars[id].lv = 56; } catch (e) {} });
-    Core.S.party = ['@player', 'C021', 'C022', null, null];
-    const eff = Core.effectivePlayerStats();
-    const ally = Object.assign({
-      name: '测试', kind: 'warrior', faction: null, position: 'front',
-      skills: D.PROTAGONIST.skills, skillLv: [1, 1, 1],
-    }, eff, { hp: Math.round(eff.hp * 0.2), maxHp: eff.hp });   // 残血进场：挨得久，机制才触发得到
+    /* 造一个"打不死、也打不动"的沙包：攻击力 1 → 敌人不会死；血量极高 → 自己也不会死。
+       这样这一场必然打满回合，世界机制（W10 中毒 35%/次）一定触发得到 —— 用例才不会时灵时不灵。 */
+    const ally = {
+      name: '沙包', kind: 'warrior', faction: null, position: 'front',
+      skills: D.PROTAGONIST.skills, skillLv: [0, 0, 0],
+      maxHp: 1e9, hp: 1e9, atk: 1, def: 1e6, spd: 1, crit: 0, critDmg: 2, eva: 0, skillMult: 1,
+    };
     const enemy = window.Dungeon.makeEnemies('W10', 'normal', 12, 'boss');   // W10 = 中毒
-    let found = false;
     const realRandom = Math.random;
     let s = 20260917;
     Math.random = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+    let found = false;
     try {
-      UI._panels._startBattle({ title: '飘字', allies: [ally], enemies: enemy, worldId: 'W10', maxRounds: 40, onEnd: () => ({}) });
-      for (let i = 0; i < 900 && timers.length && !found; i++) {
+      UI._panels._startBattle({ title: '飘字', allies: [ally], enemies: enemy, worldId: 'W10', maxRounds: 30, onEnd: () => ({}) });
+      for (let i = 0; i < 4000 && timers.length && !found; i++) {
         const fn = timers.shift();
         fn();
         const kids = byId['battle-root'].children;
@@ -1612,8 +1610,26 @@ t('战斗：世界机制上的异常状态会飘字（中毒看得见）', () =>
         });
       }
     } finally { Math.random = realRandom; }
-    if (!found) throw new Error('打了 900 步都没在画面上看到状态飘字');
+    if (!found) throw new Error('整场打满都没在画面上看到状态飘字');
   } finally { global.setTimeout = realSet; }
+});
+
+/* ---- V9.5.89：装备详情里的"强化"按钮必须写着真实价钱 + 点明材料 ----
+   （以前按钮写 ◈1640、实扣 ◈4640，而且一个字没提材料） */
+t('装备详情：强化按钮写的是实价，并且列出材料/代用', () => {
+  Core.newGame(); Core.setPlayerName('实价'); Core.choosePlayerBloodline('修真');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.addCur('points', 10000000); Core.addCur('otherworld', 1000000);
+  Core.S.bag.eqCap = 300;
+  const uid = Core.grantEquip('W01', 'UR', null).equip.uid;
+  Core.S.equips[uid].enhance = 12;
+  const q = Core.enhanceQuote(uid);
+  const w = UI._panels.equipDetail(uid);   // 走真实 modal() 路径，返回的是弹窗元素
+  const html = (w && w.innerHTML) || '';
+  if (html.indexOf('强化材料') < 0) throw new Error('没列出强化材料这一行');
+  if (html.indexOf('代用') < 0) throw new Error('没说明"没有材料时代用点数"');
+  const shown = q.points >= 1e4 ? (q.points / 1e4).toFixed(1) + '万' : String(q.points);   // 和 fmt() 同口径
+  if (html.indexOf('◈ ' + shown) < 0) throw new Error('按钮上的点数不是实价（应为 ' + shown + '）');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
