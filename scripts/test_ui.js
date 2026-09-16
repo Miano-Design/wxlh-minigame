@@ -636,6 +636,49 @@ t('招募券在背包格子里能看见，点进详情有「去招募」', () =>
 });
 t('道具详情-招募券', () => UI._panels.itemDetail('ticket_lim'));
 
+/* ---- V9.5.65：探索消耗品的两条分支（产品体检抓到"道具拿不到用"） ----
+   V9.5.64 撤掉副本里的药剂条之后，这 9 种道具一度在界面上找不到入口。 */
+t('没在探索时：消耗品给的是"去残域开始探索"，不是假装能用', () => {
+  Core.newGame(); Core.setPlayerName('药剂');
+  UI._panels._clearRunStub();
+  Core.addItem('heal_s', 2);
+  const html = UI._panels.itemDetail('heal_s').innerHTML;
+  if (!html.includes('去残域开始探索')) throw new Error('没给去残域的入口');
+  if (html.includes('在本次探索中使用')) throw new Error('没在探索却出现了"在本次探索中使用"');
+  if (!html.includes('没在探索时用不上')) throw new Error('没说明这张卡什么时候能用');
+});
+t('探索进行中：消耗品能直接用（按钮写出当前波次）', () => {
+  Core.newGame(); Core.setPlayerName('药剂');
+  Core.addItem('heal_s', 2);
+  UI._panels._startRunStub('W01', 'normal', 3, { '@player': 0.4 });
+  const html = UI._panels.itemDetail('heal_s').innerHTML;
+  if (!html.includes('在本次探索中使用')) throw new Error('探索中没有使用入口');
+  if (!html.includes('波）')) throw new Error('按钮上没写当前波次');
+  UI._panels._clearRunStub();
+});
+t('药剂用在探索里真的扣道具、真的回血，且不复活阵亡成员', () => {
+  Core.newGame(); Core.setPlayerName('药剂');
+  Core.addItem('heal_s', 2);
+  const run = UI._panels._startRunStub('W01', 'normal', 3, { '@player': 0.4, 'C021': 0 });
+  const before = Core.S.items.heal_s;
+  const ok = UI._panels._usePotion('heal_s');
+  if (!ok) throw new Error('使用失败');
+  if (Core.S.items.heal_s !== before - 1) throw new Error('道具没扣');
+  if (Math.abs(run.hpPct['@player'] - 0.6) > 1e-6) throw new Error('回血不对：' + run.hpPct['@player']);
+  if (run.hpPct['C021'] !== 0) throw new Error('阵亡成员被复活了（星级评价会失去意义）');
+  UI._panels._clearRunStub();
+});
+t('背包里的"在本次探索中使用"走的是同一套逻辑（不再有两份实现）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const at = src.indexOf("const runUse = w.querySelector('[data-runuse]')");
+  if (at < 0) throw new Error('找不到 data-runuse 的处理');
+  const seg = src.slice(at, at + 700);
+  if (!seg.includes('usePotion(itemId)')) throw new Error('data-runuse 没走 usePotion，又抄了一份逻辑');
+  if (src.includes('function potionBarHtml') || src.includes('function bindPotionButtons')) {
+    throw new Error('副本药剂条的死代码还留着（potionBarHtml / bindPotionButtons）');
+  }
+});
+
 // ---- V8.2：胜利结算自动进下一关（5 秒倒计时） ----
 t('战斗界面按站位分前后两行（队伍页排的位在战斗里看得见）', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');

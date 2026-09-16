@@ -1,0 +1,61 @@
+/* 数值体检（策划用）：拿**真实战斗引擎**跑一遍，别拍脑袋调数值。
+   用法：node scripts/balance_check.js [玩家等级]
+   · 副本：新手队（主角 + 2 个伙伴，全白装）从 W01 第 1 关打到第 12 关，看卡在哪；
+   · 深井：同一支队从第 1 层往上推，看能推到几层。
+   输出每关：结果 / 回合数 / 我方剩余血量百分比。
+*/
+const fs = require('fs');
+const store = {};
+global.window = global;
+global.localStorage = {
+  getItem: (k) => (k in store ? store[k] : null),
+  setItem: (k, v) => { store[k] = String(v); },
+  removeItem: (k) => { delete store[k]; },
+};
+global.document = { readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({ style: {}, addEventListener() {}, appendChild() {} }), querySelector: () => null, querySelectorAll: () => [] };
+global.setTimeout = () => 0; global.setInterval = () => 0;
+global.Blob = function () {}; global.URL = { createObjectURL: () => '' }; global.FileReader = function () {};
+for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) {
+  eval(fs.readFileSync(f, 'utf8'));
+}
+const Core = window.Core, D = window.DATA, UI = window.UI, Battle = window.Battle, Dungeon = window.Dungeon;
+
+const LV = Number(process.argv[2] || 11);
+function newTeam() {
+  Core.newGame();
+  Core.setPlayerName('体检');
+  Core.choosePlayerBloodline('修真');
+  Core.S.player.level = LV;
+  // 主角六维按"平均分配"点掉（不攒着），伙伴取两个最早能拿到的
+  const p = Core.S.player;
+  p.attrPoints = LV * 4;
+  D.ATTR_META.forEach((a) => Core.allocateAttr(a.id, Math.floor(p.attrPoints / (D.ATTR_META.length * 10)) * 10));
+  ['C021', 'C022'].forEach((id) => { try { Core.addChar(id); Core.S.chars[id].lv = Math.max(1, LV - 4); } catch (e) {} });
+  Core.S.party = ['@player', 'C021', 'C022', null, null];
+}
+function fight(enemies, worldId) {
+  const allies = UI._panels.buildAllies({}, {});
+  const res = Battle.run({ allies, enemies, worldId, maxRounds: 60 });
+  return { win: res.win, rounds: res.rounds || 0 };
+}
+
+console.log(`\n=== 副本（W01 普通，等级 ${LV} 的新手队 主角+2伙伴，全白装） ===`);
+newTeam();
+for (let stage = 1; stage <= 12; stage++) {
+  const kind = stage === 12 ? 'boss' : (stage % 4 === 0 ? 'elite' : 'combat');
+  const r = fight(Dungeon.makeEnemies('W01', 'normal', stage, kind), 'W01');
+  console.log(`  第 ${String(stage).padStart(2)} 关（${kind}）：${r.win ? '胜' : '败'} · ${r.rounds} 回合`);
+}
+
+console.log(`\n=== 深井（同一支队往上推） ===`);
+newTeam();
+let floor = 1;
+for (; floor <= 120; floor++) {
+  const st = fight([D.corridorEnemy(floor)], null);
+  const tag = floor % 50 === 0 ? 'BOSS' : floor % 10 === 0 ? '精英' : '普通';
+  if (floor <= 12 || floor % 10 === 0 || !st.win) {
+    console.log(`  第 ${String(floor).padStart(3)} 层（${tag}）：${st.win ? '胜' : '败'} · ${st.rounds} 回合`);
+  }
+  if (!st.win) break;
+}
+console.log(`  → 这支队能推到第 ${floor} 层（首败处）`);

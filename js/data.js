@@ -41,13 +41,15 @@ window.DATA = (function () {
     { id: 'allfour',name: '四海阵',     reqText: '四个阵营各 1 人',            buff: { atkPct: 0.04, hpPct: 0.04, skillPct: 0.04 } },
   ];
 
-  // 经验表：Lv→Lv+1 所需 EXP = round(80 × Lv^1.32)；角色升级另耗点数 round(40 × 1.06^(Lv-1))
-  // 2026-09-12 调整：旧曲线（100×Lv^1.55 / 50×1.075）单人满级需纯挂机 ~200 小时点数 + ~1600 小时经验，
-  // 与挂机产出严重脱节；调整为 Lv1→100 累计 EXP 148.8 万 / 点数 21.3 万，纯挂机约 41 / 171 小时。
+  // 经验表：Lv→Lv+1 所需 EXP = round(70 × Lv^1.18)；伙伴升级另耗点数 round(40 × 1.06^(Lv-1))
+  /* 2026-09-17 再调（策划体检）：上一版 80×Lv^1.32 实测**纯挂机到 Lv.20 要 33 小时、满级要 345 小时**，
+     新手第一天等级几乎不动 → 境界/铭刻/转生全被堵在后面。指数从 1.32 降到 1.18、
+     底数 80→70，并同步把挂机经验（core.js idleBaseRates 8+0.5·Lv → 10+0.7·Lv）提上来。
+     实测（无领队为下限、带闭关领队为常态）：Lv.20 约 33→13 小时，Lv.100 约 345→68 小时。 */
   const EXP_TABLE = [0];
   const LEVEL_POINTS = [0];
   for (let lv = 1; lv <= 100; lv++) {
-    EXP_TABLE[lv] = Math.round(80 * Math.pow(lv, 1.32));
+    EXP_TABLE[lv] = Math.round(70 * Math.pow(lv, 1.18));
     LEVEL_POINTS[lv] = Math.round(40 * Math.pow(1.06, lv - 1));
   }
 
@@ -508,11 +510,13 @@ window.DATA = (function () {
     ticket_normal: { name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◈ 点数）', src: '副本战斗、扫荡、挂机、每日任务' },
     ticket_adv:    { name: '圣契招募令', type: 'ticket', where: 'recruit', pool: 'advanced', use: '在「招募伙伴」点高级池招募时自动先用它', desc: '高级招募 1 次（没券时会自动改花 ✦ 圣洁晶石）', src: '精英/Boss 掉落、限时悬赏、每周任务、兑换大厅' },
     ticket_lim:    { name: '异界征召令', type: 'ticket', where: 'recruit', pool: 'limited', use: '在「招募伙伴」点限定池招募时自动先用它', desc: '限定招募 1 次（没券时会自动改花 ◆ 异界结晶）', src: '深井、地狱难度、周常全清、异界商店' },
-    heal_s: { name: '小型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.2 }, use: '副本探索中，点探索界面的药剂按钮，全队回血', desc: '副本探索中使用：全队回复 20% 生命', src: '灯阁市集、副本战斗掉落' },
-    heal_m: { name: '中型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.4 }, use: '副本探索中，点探索界面的药剂按钮，全队回血', desc: '副本探索中使用：全队回复 40% 生命', src: '灯阁市集、副本战斗掉落' },
-    heal_l: { name: '大型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.7 }, use: '副本探索中，点探索界面的药剂按钮，全队回血', desc: '副本探索中使用：全队回复 70% 生命', src: '副本战斗掉落（第 5 关起）、周常奖励' },
-    buff_muscle: { name: '肌肉强化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.15 }, use: '副本探索中，点探索界面的增益按钮，本次探索全队攻击 +15%', desc: '副本探索中使用：本次探索全队攻击 +15%', src: '灯阁市集、精英/Boss 掉落' },
-    buff_nerve: { name: '神经刺激剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.20 }, use: '副本探索中，点探索界面的增益按钮，本次探索全队速度 +20%', desc: '副本探索中使用：本次探索全队速度 +20%', src: '灯阁市集、精英/Boss 掉落' },
+    /* V9.5.65（产品体检）：副本里的药剂条在 V9.5.64 撤掉了，这 5 条说明还写着"点探索界面的药剂按钮"——
+       玩家照做会找不到按钮。使用入口统一改成"探索进行中，回背包点这张卡"。 */
+    heal_s: { name: '小型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.2 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 20% 生命', src: '灯阁市集、副本战斗掉落' },
+    heal_m: { name: '中型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.4 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 40% 生命', src: '灯阁市集、副本战斗掉落' },
+    heal_l: { name: '大型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.7 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 70% 生命', src: '副本战斗掉落（第 5 关起）、周常奖励' },
+    buff_muscle: { name: '肌肉强化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.15 }, use: '探索进行中，回背包点这张卡：本次探索全队攻击 +15%', desc: '副本探索中使用：本次探索全队攻击 +15%', src: '灯阁市集、精英/Boss 掉落' },
+    buff_nerve: { name: '神经刺激剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.20 }, use: '探索进行中，回背包点这张卡：本次探索全队速度 +20%', desc: '副本探索中使用：本次探索全队速度 +20%', src: '灯阁市集、精英/Boss 掉落' },
     exp_s: { name: '初级经验模块', type: 'exp', where: 'character', exp: 500, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +500', src: '灯阁市集、副本战斗掉落、每日任务' },
     exp_m: { name: '中级经验模块', type: 'exp', where: 'character', exp: 2000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +2,000', src: '灯阁市集、副本战斗掉落、每日/周常奖励' },
     exp_l: { name: '高级经验模块', type: 'exp', where: 'character', exp: 10000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +10,000', src: '灯阁市集（通关 W04 后解锁）、精英/Boss 掉落、周常奖励' },
@@ -520,10 +524,10 @@ window.DATA = (function () {
     exp_xxl: { name: '究极经验模块', type: 'exp', where: 'character', exp: 200000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +200,000', src: '灯阁市集（通关 W15 后解锁）、W15+ 守关 Boss、周常全清、斗法台高阶' },
     /* 探索增益的"后三档"：治疗剂管回血，这三支管打出去（对标别人的"丹药"矩阵）。
        品质越高给得越多，但都只在一次探索里生效，不改变长期数值。 */
-    heal_x: { name: '全效治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 1.0 }, use: '副本探索中，点探索界面的药剂按钮，全队回血', desc: '副本探索中使用：全队完全恢复生命', src: '灯阁市集、W10+ 守关 Boss、斗法台、深井商店' },
-    def_shield: { name: '合金护盾剂', type: 'consumable', where: 'explore', effect: { defPct: 0.20 }, use: '副本探索中，点探索界面的增益按钮，本次探索全队防御 +20%', desc: '副本探索中使用：本次探索全队防御 +20%', src: '灯阁市集、精英/Boss 掉落' },
-    atk_surge: { name: '狂暴催化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.30 }, use: '副本探索中，点探索界面的增益按钮，本次探索全队攻击 +30%', desc: '副本探索中使用：本次探索全队攻击 +30%', src: '灯阁市集（通关 W06）、W06+ 精英/Boss' },
-    spd_surge: { name: '超频注射剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.35 }, use: '副本探索中，点探索界面的增益按钮，本次探索全队速度 +35%', desc: '副本探索中使用：本次探索全队速度 +35%', src: '异界商店（通关 W08）、W08+ 精英/Boss' },
+    heal_x: { name: '全效治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 1.0 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队完全恢复生命', src: '灯阁市集、W10+ 守关 Boss、斗法台、深井商店' },
+    def_shield: { name: '合金护盾剂', type: 'consumable', where: 'explore', effect: { defPct: 0.20 }, use: '探索进行中，回背包点这张卡：本次探索全队防御 +20%', desc: '副本探索中使用：本次探索全队防御 +20%', src: '灯阁市集、精英/Boss 掉落' },
+    atk_surge: { name: '狂暴催化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.30 }, use: '探索进行中，回背包点这张卡：本次探索全队攻击 +30%', desc: '副本探索中使用：本次探索全队攻击 +30%', src: '灯阁市集（通关 W06）、W06+ 精英/Boss' },
+    spd_surge: { name: '超频注射剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.35 }, use: '探索进行中，回背包点这张卡：本次探索全队速度 +35%', desc: '副本探索中使用：本次探索全队速度 +35%', src: '异界商店（通关 W08）、W08+ 精英/Boss' },
     mat_t1: { name: '基础金属', type: 'material', tier: 1, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +0~+4 时消耗（不足可用点数代用）', src: 'W01~W05 精英/Boss、灯阁市集、故事商店' },
     mat_t2: { name: '强化合金', type: 'material', tier: 2, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +5~+9 时消耗（不足可用点数代用）', src: 'W02~W06 精英/Boss、异界商店' },
     mat_t3: { name: '异界合金', type: 'material', tier: 3, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +10~+14 时消耗（不足可用点数代用）', src: 'W03~W07 精英/Boss、异界商店' },
@@ -605,7 +609,8 @@ window.DATA = (function () {
       '主线→推荐路线：灯阁领挂机 → 残域选世界 → 选关卡 → **直接开打** → 拿奖励回灯阁。没有"先选路线"这一层。',
       '每关是 1~3 波连续战斗：1~4 关 1 波、5~8 关 2 波、9~12 关 3 波；第 4/8 关最后一波是精英，第 12 关是守关 Boss。',
       '**一口气打到底**：点关卡就开打，一波打完自动接下一波，中间不插事件、不插补给箱，也不用你按"开打第 N 波"。',
-      '队伍血量在波与波之间继承，不会自动回满：波间结算页上就有血条和药剂，觉得吃紧就点一瓶。全队重伤算失败，已经拿到的奖励不会丢。',
+      // V9.5.65（产品体检）：副本里的药剂条已撤，指南不能再说"结算页上就有药剂"
+      '队伍血量在波与波之间继承，不会自动回满：结算页上会显示每条血线，觉得吃紧就回背包点治疗剂补给。全队重伤算失败，已经拿到的奖励不会丢。',
       '打不过就不要硬上：先回灯阁领挂机收益、用经验模块换伙伴经验、强化装备，再回来。',
     ] },
     { id: 'party', title: '② 队伍与站位', body: [
@@ -1404,6 +1409,9 @@ window.DATA = (function () {
       { shardRandom: 'SR', shardCount: 10, name: 'SR伙伴碎片×10', price: 100, stock: -1 },
       { shardRandom: 'SSR', shardCount: 5, name: 'SSR伙伴碎片×5', price: 300, stock: -1 },
       { currencyGain: { skillChip: 100 }, name: '技能芯片×100', price: 150, stock: -1 },
+      // V9.5.65（策划体检留档）：这条价一度想从 200 降到 100，原因是"铭刻要 8200 结晶"。
+      // 但血统结晶真正的大来源是可反复扫荡的守关 Boss（约 300/天），深井商店只是补充渠道，
+      // 降到 100 反而会把深井徽记这条线掏空（徽记日产量才 30~60）→ 维持 200。
       { currencyGain: { bloodCrystal: 100 }, name: '血统结晶×100', price: 200, stock: -1 },
       { item: 'exp_xl', name: '超级经验模块', price: 120, stock: -1 },
       { item: 'mat_t5', name: '灯阁残片×5', price: 150, count: 5, stock: -1 },

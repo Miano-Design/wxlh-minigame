@@ -693,6 +693,28 @@ setParty(['C021']);
   const r = Core.idleRates();
   t('满配挂机点数 ≥ 80/分', r.pointsPerMin >= 80);
   t('满配挂机经验 ≥ 120/分', r.expPerMin >= 120);
+  /* V9.5.65（策划体检）：光看"总量 < 200 万"不够——80×Lv^1.32 就是满足这条却要 345 小时。
+     挂机是这个游戏的主循环，**时间本身才是难度**，所以直接把"练到几级要多少小时"写成断言。 */
+  t('满级经验总量 < 90 万（比旧曲线 152 万砍掉四成）', expTotal < 900000);
+  const hoursTo = (target) => {
+    Core.newGame(); Core.setPlayerName('曲线');
+    let mins = 0;
+    while (Core.S.player.level < target && mins < 60 * 80) {
+      const L = Core.S.player.level;
+      Core.S.buildings.core = Math.min(50, Math.round(L / 2));
+      Core.S.buildings.training = Math.min(50, Math.round(L / 2));
+      const rr = Core.idleRates();
+      const leaderMult = 1 + Math.min(1.5, Math.max(0, (L - 5) / 40));
+      Core.S.player.exp += rr.expPerMin * leaderMult * 5;
+      const need = () => D.EXP_TABLE[Core.S.player.level] || 1;
+      while (Core.S.player.level < target && Core.S.player.exp >= need()) { Core.S.player.exp -= need(); Core.S.player.level++; }
+      mins += 5;
+    }
+    return mins / 60;
+  };
+  t('纯挂机 Lv.20 ≤ 16 小时（新手第一天能看到等级在动）', hoursTo(20) <= 16);
+  t('纯挂机 Lv.100 ≤ 80 小时（满级是月内目标，不是 345 小时）', hoursTo(100) <= 80);
+  Core.newGame(); Core.setPlayerName('曲线');
 }
 
 // 44. 死道具修复：高阶物品必须有来源

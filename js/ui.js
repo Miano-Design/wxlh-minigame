@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.64';
+  const GAME_VER = '9.5.65';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -85,7 +85,7 @@ window.UI = (function () {
        点卡片才弹窗看详情。卡片本来就只有一格宽，塞属性会挤成一片。 */
     const tiles = slots.map(slot => {
       const e = eq[slot] && S.equips[eq[slot]];
-      return `<div class="eq-tile${e ? '' : ' off'}" ${slotAttr}="${slot}" data-owner="${ownerId}">
+      return `<div class="eq-tile${e ? '' : ' off'}" ${slotAttr}="${slot}">
         <div class="eq-slot">${D.EQUIP_SLOTS[slot]}</div>
         ${e
           ? `<button class="eq-un" ${unAttr}="${slot}">卸下</button>
@@ -936,7 +936,7 @@ window.UI = (function () {
         ${D.DIFFICULTY.map(d => `<button class="btn small ${diff === d.id ? 'active' : ''}" data-diff="${d.id}" ${d.id !== 'normal' && !C().worldCleared(w.id, d.id === 'hard' ? 'normal' : 'hard') ? 'disabled' : ''}>${d.name}${d.id !== 'normal' ? ` ×${d.mult}` : ''}</button>`).join('')}
       </div>
       <div class="stage-grid">${cells}</div>
-      ${canSweep ? `<button class="btn block" style="margin-top:0.75rem" data-act="open-sweep" ${C().sweepLeft() <= 0 ? 'disabled' : ''}>⏩ 扫荡（可选关卡 · 今日剩余 ${C().sweepLeft()}/${D.SWEEP_DAILY_CAP} 次）</button>` : ''}
+      ${canSweep ? `<button class="btn block" style="margin-top:0.75rem" data-act="open-sweep" ${C().sweepLeft() <= 0 ? 'disabled' : ''}>⏩ 扫荡（可选关卡 · 今日剩余 ${C().sweepLeft()}/${C().sweepCap()} 次）</button>` : ''}
     `;
   }
   // 扫荡：可选关卡 + 可选次数
@@ -950,7 +950,7 @@ window.UI = (function () {
     const draw = () => {
       const left = C().sweepLeft();
       updateModal(w, '扫荡', `
-        <div class="kv"><span class="k">今日剩余次数</span><span>${left} / ${D.SWEEP_DAILY_CAP}</span></div>
+        <div class="kv"><span class="k">今日剩余次数</span><span>${left} / ${C().sweepCap()}</span></div>
         <div class="section-title">选择扫荡关卡（已通关）</div>
         <div class="stage-grid">${cleared.map(x => `<div class="stage-cell done" data-sstage="${x.i}" style="${x.i === sel ? 'border-color:var(--gold);color:var(--gold)' : ''}">${x.i + 1}<span class="st">${'★'.repeat(x.s)}</span></div>`).join('')}</div>
         <div class="section-title">扫荡次数</div>
@@ -1017,19 +1017,10 @@ window.UI = (function () {
       return `<div style="flex:1;min-width:0"><div style="font-size:0.625rem;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
     }).join('');
   }
-  // 探索中可用的消耗品：治疗剂（回血）与强化剂（本次探索增益）
-  function potionBarHtml() {
-    const items = C().S.items;
-    const list = Object.keys(D.ITEMS).filter(k => {
-      const it = D.ITEMS[k];
-      return it.type === 'consumable' && it.where === 'explore' && (items[k] || 0) > 0;
-    });
-    if (!list.length) return '';
-    const heal = list.filter(k => (D.ITEMS[k].effect || {}).healPct);
-    const buff = list.filter(k => !(D.ITEMS[k].effect || {}).healPct);
-    const btn = id => `<button class="btn small" data-potion="${id}">${(D.ITEMS[id].effect || {}).healPct ? '🧪' : '💉'} ${D.ITEMS[id].name} ×${items[id]}</button>`;
-    return `<div style="display:flex;gap:0.375rem;flex-wrap:wrap;justify-content:center">${heal.concat(buff).map(btn).join('')}</div>`;
-  }
+  /* V9.5.65（产品体检）：探索消耗品的**唯一**使用入口就是这张道具卡。
+     副本里的药剂条已在 V9.5.64 按父亲大人要求撤掉，那条渲染函数（potionBarHtml）
+     和它的按钮绑定（bindPotionButtons）都成了死代码，一并删掉——
+     留着会让下一个人以为"副本里还有一条补给条"。 */
   // 用一支探索消耗品。返回是否真的用掉了（由调用方决定要不要重画）
   // 药剂回血只治"活着的人"（hpPct > 0.01），阵亡的成员不复活——
   // 否则一支药就能把全队从灭团捞回来，星级评价里的"无人阵亡"就没意义了（V9.5 定死）。
@@ -1063,11 +1054,6 @@ window.UI = (function () {
     toast(`${eff.healPct ? '🧪' : '💉'} ${D.ITEMS[id].name}：${parts.join(' · ')}`);
     persistRun();
     return true;
-  }
-  function bindPotionButtons(root, after) {
-    root.querySelectorAll('[data-potion]').forEach(el => el.onclick = () => {
-      if (usePotion(el.dataset.potion) && after) after();
-    });
   }
   function runScreen() {
     if (!run) return worldsList();
@@ -1622,13 +1608,6 @@ window.UI = (function () {
     if (Object.keys(S.chars).length) return '<div class="empty" style="grid-column:1/-1">没有符合条件的伙伴</div>';
     return `<div class="empty" style="grid-column:1/-1">还没有招募到任何伙伴</div>
       <button class="btn primary block" style="grid-column:1/-1" data-act="open-recruit">✦ 去招募伙伴</button>`;
-  }
-  // 只重画网格：搜名字时输入框不会失焦，也不会整页闪
-  function paintCharGrid(root) {
-    const box = root.querySelector ? root.querySelector('#char-list') : null;
-    if (!box || !box.querySelectorAll) return;
-    box.innerHTML = charGridHtml();
-    box.querySelectorAll('[data-char]').forEach(el => el.onclick = () => charDetail(el.dataset.char));
   }
   function charsScreen() {
     const S = C().S;
@@ -3058,7 +3037,10 @@ window.UI = (function () {
       setTab('dungeon');
       dungeonView = { page: 'world', worldId: 'W01', diff: 'normal' };
       render();
-      coachmark('[data-stage="3"]', '每通关一关解锁下一关；一关是一口气打到底的，一波打完自动接下一波，血量会继承、不会自动回满。血线低了就在结算页点治疗剂。');
+      /* V9.5.65（产品体检）：这句原来写"血线低了就在结算页点治疗剂"——
+         V9.5.64 把副本里的药剂条撤掉之后，结算页已经没有治疗剂了，引导在教一个不存在的按钮。
+         消耗品现在统一从背包用，话术跟着改。 */
+      coachmark('[data-stage="3"]', '每通关一关解锁下一关；一关是一口气打到底的，一波打完自动接下一波，血量会继承、不会自动回满。血线低了就回背包，点治疗剂那一格补给（阵亡的伙伴救不回来）。');
       return;
     }
     if (qid === 'q04') {
@@ -3497,10 +3479,21 @@ window.UI = (function () {
         永久生效，不是临时增益。${sd.bloodline ? `只有「${sd.bloodline}」血统能用；` : '任何伙伴（含主角）都能用；'}每人每种上限 ${sd.max} 支。
       </div>`;
     } else if (it.type === 'consumable') {
+      /* V9.5.65（产品体检）：探索消耗品以前是个死路——
+         V9.5.64 按父亲大人要求撤掉了副本里的药剂条，结果这 9 种道具（商店里还要花点数买）
+         在界面上找不到任何使用入口：没在探索时点「进副本后使用」只是跳到残域首页，
+         到了副本里也没有入口，玩家会以为道具坏了。现在按"探索中回背包补给"这条链路写清楚，
+         并把当前波次直接写在按钮上，玩家知道自己正在第几波、点下去会发生什么。 */
+      const wv = run && run.waves ? run.waves.length : 0;
       actions = run
-        ? `<div class="btn-row"><button class="btn small gold" data-runuse="1">在本次探索中使用</button></div>`
-        : `<div class="btn-row"><button class="btn small" data-gotoexplore="1">进副本后使用 ›</button></div>
-           `;
+        ? `<div class="btn-row"><button class="btn small gold" data-runuse="1">在本次探索中使用（第 ${Math.min(run.wave + 1, wv)}/${wv} 波）</button></div>
+           <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
+             只对<b>本次探索</b>生效（回血 / 本关增益），探索结束就失效；阵亡的伙伴不会被救活。
+           </div>`
+        : `<div class="btn-row"><button class="btn small" data-gotoexplore="1">去残域开始探索 ›</button></div>
+           <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
+             探索<b>进行中</b>时回到背包点这张卡就能用；没在探索时用不上，先去残域选一关开打。
+           </div>`;
     } else if (it.type === 'material') {
       actions = `<div class="note">强化装备时自动优先消耗</div>`;
     } else if (it.type === 'ticket') {
@@ -3564,20 +3557,22 @@ window.UI = (function () {
     });
     const runUse = w.querySelector('[data-runuse]');
     if (runUse) runUse.onclick = () => {
+      /* V9.5.65（产品体检）：这里原来把 usePotion 的逻辑抄了一遍，而且抄漏了一条规矩——
+         抄的那版会把阵亡的成员也"奶活"（Math.min(1, hp + heal) 对 0 血也生效），
+         而 usePotion / applyPotionHp 明确不复活阵亡者（否则一支药能把灭团捞回来，三星评价就没意义了）。
+         同一个动作两套逻辑迟早会分叉，现在统一走 usePotion。 */
       const eff = it.effect || {};
-      if (!C().removeItem(itemId)) { toast('道具不足'); return; }
-      const parts = [];
-      if (eff.healPct) { Object.keys(run.hpPct).forEach(cid => { run.hpPct[cid] = Math.min(1, run.hpPct[cid] + eff.healPct); }); parts.push(`全队恢复 ${Math.round(eff.healPct * 100)}%`); }
-      ['atkPct', 'spdPct', 'defPct'].forEach(k => { if (eff[k]) { run.buffs[k] = (run.buffs[k] || 0) + eff[k]; parts.push(`${D.CONSUMABLE_TAG[k]}+${Math.round(eff[k] * 100)}%`); } });
-      persistRun();
-      C().task('item1', 1); C().save();
+      if (!usePotion(itemId)) return;
       sfx(eff.healPct ? 'success' : 'coin');
-      toast(`${it.name}：${parts.join(' · ')}`);
       render();
       afterChange();
     };
     const go = w.querySelector('[data-gotoexplore]');
-    if (go) go.onclick = () => { closeModal(w); setTab('dungeon'); };
+    if (go) go.onclick = () => {
+      closeModal(w);
+      setTab('dungeon');
+      toast('选一关开始探索，中途回背包就能用这张卡', 2600);
+    };
     return w;
   }
   // 经验道具：先选伙伴
@@ -4143,11 +4138,15 @@ window.UI = (function () {
         if (outcome.after) outcome.after();
       };
       // 结算页的快捷动作：不回到世界列表也能接着打（推图节奏不断）
+      /* V9.5.65（产品体检）：动作回调以前只认 a.run，深井结算写的是 a.fn →
+         点「继续第 N 层」只会把结算页关掉、什么都不发生（父亲大人报过的"无效按键"就是这一类）。
+         现在两个键都认，以后加动作不会因为写错键名静默失效。 */
+      const runActFn = a => { if (!a) return; const f = a.run || a.fn; if (typeof f === 'function') f(); };
       panel.querySelectorAll('[data-bact]').forEach(b => b.onclick = () => {
         clearAuto();
         const a = acts[+b.dataset.bact];
         overlay.remove();
-        if (a && a.run) a.run();
+        runActFn(a);
       });
       // 倒计时：走完自动点一次主按钮（默认「下一关」）。手动点了任意按钮就取消。
       if (autoIdx >= 0) {
@@ -4158,7 +4157,7 @@ window.UI = (function () {
             clearAuto();
             const auto = acts[autoIdx];
             overlay.remove();
-            if (auto && auto.run) auto.run();
+            runActFn(auto);
             return;
           }
           if (btn) btn.innerHTML = autoNextBtnHtml(acts[autoIdx].label, autoLeft);
@@ -4206,7 +4205,17 @@ window.UI = (function () {
       allies, enemies, worldId: run.worldId,
       onEnd(win, res, units) {
         if (!win) {
-          return { rewards: [], sub: '队伍全员重伤', after: () => endRun(false) };
+          /* V9.5.65（产品体检）：失败页以前**一个动作都没有**，只剩「返回」——
+             推图最需要"换个站位再来一次"的时刻，反而得退回世界列表重新点关。
+             现在和胜利页一样给动作：直接重打这一关（每个世界关卡开局满血，重打零成本）。 */
+          return {
+            rewards: [], sub: '队伍全员重伤',
+            actions: [
+              { label: '↻ 再打这一关', primary: true, run: () => leaveRunAndStart(run.worldId, run.diff, run.stageIdx) },
+            ],
+            closeLabel: '返回世界列表',
+            after: () => endRun(false),
+          };
         }
         const g = Dun.grantRewards(run.worldId, run.diff, run.stage, kind);
         window.Core.addCharExp(C().S.party.filter(Boolean), g.rewards.exp);
@@ -4335,7 +4344,15 @@ window.UI = (function () {
       allies, enemies, worldId: null,
       maxRounds: spec.isBoss ? 50 : 30,
       onEnd(win, res) {
-        if (!win) return { rewards: [], sub: `止步于第 ${floor} 层`, after: () => {} };
+        // V9.5.65（产品体检）：深井失败原来也是"没动作"，退回深井页才能再点一次 → 现在直接重挑这一层。
+        if (!win) {
+          return {
+            rewards: [], sub: `止步于第 ${floor} 层`,
+            actions: [{ label: `↻ 再挑第 ${floor} 层`, primary: true, fn: () => fightCorridor() }],
+            closeLabel: '返回深井',
+            after: () => {},
+          };
+        }
         const rw = D.corridorReward(floor);
         C().addCur('points', rw.points);
         C().addCur('story', rw.story);
@@ -4552,7 +4569,6 @@ switch (act) {
       if (!run || el.disabled) return;
       fightWave();
     });
-    bindPotionButtons(root, () => render());
     root.querySelectorAll('[data-resume-run]').forEach(el => el.onclick = () => {
       const pr = C().S.pendingRun;
       if (!pr || !pr.waves) { toast('没有可继续的副本'); return; }
@@ -4857,6 +4873,20 @@ switch (act) {
       _setEquipFilter: (f, cat) => { equipFilter = f || 'all'; equipCatFilter = cat || 'all'; },
       // 测试用：药剂回血（纯函数：阵亡成员不复活）
       applyPotionHp,
+      /* 测试用：探索消耗品的两条分支要分别验（有探索 / 没探索）。
+         run 是模块内私有状态，不开口子就测不到"探索中回背包使用"这条链路。 */
+      _usePotion: usePotion,
+      _startRunStub: (worldId, diff, stageIdx, hpPct) => {
+        const stage = stageIdx + 1;
+        run = {
+          worldId, diff, stage, stageIdx,
+          waves: window.Dungeon.wavePlan(stage),
+          wave: 0, hpPct: hpPct || {}, buffs: {}, kills: 0, deaths: 0,
+        };
+        C().S.party.filter(Boolean).forEach(id => { if (run.hpPct[id] === undefined) run.hpPct[id] = 1; });
+        return run;
+      },
+      _clearRunStub: () => { run = null; C().clearPendingRun(); },
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
       openPartyPanel, openGrowPanel, charListSorted, pickPartyChar, slotMenu,

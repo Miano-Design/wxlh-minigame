@@ -81,6 +81,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       base.story = Math.round(50 * rm);
       base.otherworld = Math.round(30 * rm);
       base.skillChip = 50 + tier * 8;
+      /* V9.5.65（策划体检留档）：一度想把这行从 5/15/30 翻倍，理由是"铭刻 5 阶要 8200 枚结晶"。
+         补上"扫荡"这一环后实测发现守关 Boss 是**可反复扫荡**的稳定来源：
+         每天 60 次扫荡 ≈ 300 枚/天，铭刻全解锁约 27 天、单伙伴血统满 8 天，供给本来就够。
+         所以维持原值——不要凭半张表去改经济。 */
       base.bloodCrystal = diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5;
       base.equipChance = 1;
       base.equipMin = diff === 'hell' ? 'SSR' : 'SR';

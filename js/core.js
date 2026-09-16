@@ -1565,7 +1565,7 @@ window.Core = (function () {
 
   /* ================= 挂机 ================= */
   // 2026-09-12 调整产出：点数 (10+0.3Lv) / 分、经验 (8+0.5Lv) / 分，
-  // 与新的等级曲线（Lv1→100 累计 EXP 148.8 万 / 点数 21.3 万）配套；天赋「灯阁恩赐」的挂机/经验节点在此生效。
+  // 与等级曲线（Lv1→100 累计 EXP 74.4 万 / 点数 22.6 万）配套；天赋「灯阁恩赐」的挂机/经验节点在此生效。
   function idleBaseRates() {
     const lv = S.player.level;
     const au = authority();
@@ -1573,7 +1573,9 @@ window.Core = (function () {
     const coreBonus = (1 + S.buildings.core * 0.02 + (S.player.geneLock >= 1 ? 0.10 : 0) + au.idlePct + kb.idlePct) * graceIdleMult() * signIdleMult();
     return {
       pointsPerMin: (10 + lv * 0.3) * coreBonus,
-      expPerMin: (8 + lv * 0.5) * (1 + S.buildings.training * 0.03 + au.expPct + kb.expPct) * graceExpMult(),
+      // V9.5.65（策划体检）：经验斜率 0.5 → 0.7、底数 8 → 10。
+      // 旧值配合 80×Lv^1.32 的经验表，纯挂机到 Lv.20 要 33 小时；现在约 13 小时。
+      expPerMin: (10 + lv * 0.7) * (1 + S.buildings.training * 0.03 + au.expPct + kb.expPct) * graceExpMult(),
       otherworldPer10Min: 1 + Math.floor(lv / 50),
       storyPer30Min: 1,
     };

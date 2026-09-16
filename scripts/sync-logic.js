@@ -23,16 +23,21 @@ const EXTRA = { 'ui.js': ['ui-web.js', 'ui.js'], 'main.js': 'main.js' };
    注意：小游戏运行时用的是编译好的 js/ce-style.js，css/style.css 只是"底包快照"。 */
 const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],
   ['manifest.webmanifest', 'manifest.webmanifest'], ['sw.js', 'sw.js']];
+/* 测试与体检脚本也一起同步（它们本来就和网页版逐字节一致，各留一份会各自变旧，
+   结果是小游戏这边跑的还是上一版的用例——2026-09-17 发现并补上）。 */
+const CHECKS = ['test_ui.js', 'test_game.js', 'balance_check.js', 'design_audit.js', 'product_audit.js'];
 
 let changed = 0, same = 0;
 const JOBS = [];
 FILES.forEach(f => JOBS.push([f, f]));
 Object.keys(EXTRA).forEach(k => [].concat(EXTRA[k]).forEach(out => JOBS.push([k, out])));
 PACK.forEach(([a, b]) => JOBS.push([a, b]));
+CHECKS.forEach(f => JOBS.push(['scripts/' + f, 'scripts/' + f]));
 JOBS.forEach(([f, out]) => {
-  const fromJs = FILES.indexOf(f) >= 0 || EXTRA[f] !== undefined;
+  const fromJs = FILES.indexOf(f) >= 0 || (EXTRA[f] !== undefined && !f.startsWith('scripts/'));
   const a = path.join(fromJs ? SRC : WEB_ROOT, f), b = path.join(fromJs ? DST : PROJ, out);
   if (!fs.existsSync(a)) { console.error('✗ 找不到源文件：' + a); process.exitCode = 1; return; }
+  if (f.startsWith('scripts/') && !fs.existsSync(path.dirname(b))) fs.mkdirSync(path.dirname(b), { recursive: true });
   const src = fs.readFileSync(a);
   const old = fs.existsSync(b) ? fs.readFileSync(b) : null;
   if (old && old.equals(src)) { same++; console.log('= ' + f + ' → ' + out + '（一致）'); return; }
