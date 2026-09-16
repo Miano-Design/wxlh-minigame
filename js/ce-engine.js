@@ -23,6 +23,7 @@ function setupCanvas(withDpr) {
   const W = info.windowWidth, H = info.windowHeight;
   const dpr = withDpr === false ? 1 : (info.pixelRatio || 1);
   const canvas = wx.createCanvas();
+  try { globalThis.CE_CANVAS = canvas; } catch (e) {}
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   const ctx = canvas.getContext('2d');

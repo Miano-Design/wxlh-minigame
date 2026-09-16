@@ -26,3 +26,30 @@ require('./js/ui-web.js');             // 网页版界面层（从 wxlh-game/js/
 const app = require('./js/ce-app.js').boot();
 if (!app) console.error('[CE] 引擎版启动失败：请检查 js/ce-*.js 与 js/ce-style.js 是否齐全');
 }
+
+/* 开发期截图：小游戏项目用不了 simulator_screenshot，也**没有** wx.canvasToTempFilePath，
+   但 devtools 里的画布是 HTMLCanvasElement → 直接 toDataURL + FileSystemManager 写成 PNG 文件，
+   把路径打到 console，康康读那个文件即可。 */
+(function () {
+  try {
+    const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    if (info.platform !== 'devtools') return;
+    setTimeout(() => {
+      const canvas = globalThis.CE_CANVAS;
+      if (!canvas || !canvas.toDataURL) { console.log('[CE-SHOT-FAIL] 画布不支持 toDataURL'); return; }
+      let url = '';
+      try { url = canvas.toDataURL('image/png'); } catch (e) { console.log('[CE-SHOT-FAIL] toDataURL: ' + e.message); return; }
+      const b64 = String(url).split(',')[1] || '';
+      const path = (wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : '/tmp') + '/ce-shot.png';
+      try {
+        const fs = wx.getFileSystemManager ? wx.getFileSystemManager() : null;
+        if (fs && fs.writeFileSync) {
+          fs.writeFileSync(path, b64, 'base64');
+          console.log('[CE-SHOT] ' + path + ' (' + Math.round(b64.length * 0.75 / 1024) + 'KB)');
+          return;
+        }
+      } catch (e) { console.log('[CE-SHOT-FAIL] 写文件: ' + e.message); }
+      console.log('[CE-SHOT-DATAURL] ' + url.slice(0, 200));
+    }, 2500);
+  } catch (e) { /* 截图失败不该影响游戏 */ }
+})();

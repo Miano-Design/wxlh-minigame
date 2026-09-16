@@ -577,6 +577,7 @@ function startCorridor() {
 /* ================= 启动 ================= */
 function boot() {
   const canvas = wx.createCanvas();               // 第一次创建 = 上屏 canvas
+  try { globalThis.CE_CANVAS = canvas; } catch (e) {}   // 导给开发期截图用
   CV.ctx = canvas.getContext('2d');
   let info = {};
   try { info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync(); } catch (e) { info = {}; }
