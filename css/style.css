@@ -285,6 +285,11 @@ body {
 /* 弹窗标题与面板标题同一套：左侧金色竖条，全站"匾额"感一致 */
 .sheet .sheet-head h3::before { content: ''; flex: 0 0 auto; width: 3px; height: 15px; border-radius: 2px; background: linear-gradient(180deg, var(--gold), #8a6a1e); }
 .sheet .sheet-body { overflow-y: auto; padding: var(--sp3) var(--sp4) var(--sp4); -webkit-overflow-scrolling: touch; }
+/* 电脑上正文一长就出现常驻滚动条：它占掉 15px 宽，正文（卡片 / 按钮）的右边
+   就比上面的标题行短一截，看着就是"没对齐"。手机上本来就不显示滚动条，
+   这里统一收掉——桌面上滚轮 / 触控板照样能滚。 */
+.sheet .sheet-body, .page .sheet-body { scrollbar-width: none; -ms-overflow-style: none; }
+.sheet .sheet-body::-webkit-scrollbar, .page .sheet-body::-webkit-scrollbar { width: 0; height: 0; }
 .sheet .close-x { width: 34px; height: 34px; flex: 0 0 auto; border-radius: var(--radius-sm); border: 1px solid var(--line2); background: var(--panel); color: var(--dim); font-size: 15px; cursor: pointer; }
 .sheet .close-x:active { background: var(--panel3); }
 /* 图标按钮（关闭 × / 返回 ‹）里的图形一律用**矢量 SVG**画：
