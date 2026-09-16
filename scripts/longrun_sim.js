@@ -11,6 +11,9 @@
      · 斗法台 5 场（赢了升台，输了退台，按战力估算）
      · 深井推进（按战力估算，打不过就停）
      · 每日任务全清 + 登录奖励 + 悬赏（能完成就领）
+     · **上满队伍 + 把掉落里最好的装备穿上**（十五度自审补：原版模拟的玩家从不补人、
+       也从不穿装备，于是它在 W08 卡住——那个"卡关"是模拟器的毛病，不是游戏的毛病。
+       补人/穿装备不是"高玩操作"，是任何玩家都会做的事）
    花钱优先级（模拟一个懂行的玩家）：铭刻 → 主角血统 → 建筑 → 境界 → 秘术阁 → 权限 → 伙伴
 
    只读。改完数值跑一下，看"多少天到顶 / 有没有堆积"。 */
@@ -21,6 +24,10 @@ global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem:
 global.document = { readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({ style: {}, addEventListener() {}, appendChild() {} }), querySelector: () => null, querySelectorAll: () => [] };
 global.setTimeout = () => 0; global.setInterval = () => 0;
 global.Blob = function () {}; global.URL = { createObjectURL: () => '' }; global.FileReader = function () {};
+/* V9.5.87（十五度自审）：锁随机种子 —— 这个模拟要拿来对比"改动前后"，报告本身必须是可复现的
+   （不锁种子时，第 1 天的深井层数在 2~15 之间乱跳，根本没法判断某次改动是好是坏）。 */
+let seed = 20260917;
+Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
 for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) eval(fs.readFileSync(f, 'utf8'));
 const Core = window.Core, D = window.DATA, Dun = window.Dungeon, UI = window.UI;
 
@@ -58,15 +65,20 @@ function addDay() {
     const win = need.hp < Core.teamPower() * 9;
     Core.arenaSettle(win);
   }
-  // ④ 深井：按战力估算，能过就上
+  /* ④ 深井：**用真实战斗引擎**打（十五度自审改）——
+     原来是"战力 ×9 估算"，可深井是父亲大人点名抱怨过的系统，估算出来的层数不等于真能打到。
+     这里和界面同口径：带上深井印记加成（历史最高每 10 层 +1.5%）。 */
   for (let i = 0; i < 30; i++) {
-    const e = D.corridorEnemy(S.corridor.floor);
-    if (e.hp > Core.teamPower() * 9) break;
-    const rw = D.corridorReward(S.corridor.floor);
+    const floor = S.corridor.floor;
+    const allies = UI._panels.buildAllies(null, null, { mult: 1 + Core.corridorMarkBonus() });
+    if (!allies.length) break;
+    const res = window.Battle.run({ allies, enemies: [D.corridorEnemy(floor)], worldId: null, maxRounds: 60 });
+    if (!res.win) break;
+    const rw = D.corridorReward(floor);
     Core.addCur('points', rw.points); Core.addCur('story', rw.story);
     Core.addCur('corridor', rw.corridor);
     if (rw.bloodCrystal) Core.addCur('bloodCrystal', rw.bloodCrystal);
-    S.corridor.best = Math.max(S.corridor.best, S.corridor.floor);
+    S.corridor.best = Math.max(S.corridor.best, floor);
     S.corridor.floor++;
   }
   // ⑤ 每日任务 + 登录 + 悬赏
@@ -76,6 +88,27 @@ function addDay() {
   Core.bountyState().list.forEach(b => { if (b.done && !b.claimed && !b.expired) Core.claimBounty(b.id); });
   // ⑥ 花钱：按优先级把能升的都升掉
   spendAll();
+  /* ⑦ 上阵 + 穿装备（十五度自审补）——
+     一个真玩家不会"抽到人就放在库里不练、掉一地装备不穿"。少了这两步，
+     模拟出来的战力会低一大截，然后得出"W08 就卡死了"这种把责任推给游戏的结论。 */
+  fillParty();
+  Core.autoEquipBest();
+}
+
+/* 上阵：主角必上，剩下 4 格按「等级 → 稀有度 → 星级」挑最强的（就是玩家会挑的顺序）。 */
+function fillParty() {
+  const order = { UR: 0, SSR: 1, SR: 2, R: 3, N: 4 };
+  const own = Object.keys(S.chars).sort((a, b) => {
+    const ca = S.chars[a], cb = S.chars[b];
+    if ((cb.lv || 0) !== (ca.lv || 0)) return (cb.lv || 0) - (ca.lv || 0);
+    const ra = (D.charById[a] || {}).rarity, rb = (D.charById[b] || {}).rarity;
+    if ((order[ra] ?? 9) !== (order[rb] ?? 9)) return (order[ra] ?? 9) - (order[rb] ?? 9);
+    return (cb.star || 1) - (ca.star || 1);
+  });
+  const party = ['@player'];
+  own.forEach(id => { if (party.length < 5 && !party.includes(id)) party.push(id); });
+  while (party.length < 5) party.push(null);
+  S.party = party;
 }
 
 function spendAll() {

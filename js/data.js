@@ -1484,7 +1484,12 @@ window.DATA = (function () {
     { id: 'a_world3', cat: '挑战', name: '走出巢穴', desc: '通关 3 个世界的普通难度', check: S => WORLDS.filter(w => S.worlds[w.id] && S.worlds[w.id].stages.normal.every(s => s > 0)).length >= 3, reward: { holy: 300 } },
     { id: 'a_floor50', cat: '挑战', name: '深井 50 层', desc: '深井历史最高 50 层', check: S => S.corridor.best >= 50, reward: { corridor: 100, points: 20000 } },
     { id: 'a_floor100', cat: '挑战', name: '深井 100 层', desc: '深井历史最高 100 层', check: S => S.corridor.best >= 100, reward: { corridor: 300, holy: 400 } },
-    { id: 'a_floor200', cat: '挑战', name: '深井守望者', desc: '深井历史最高 200 层', check: S => S.corridor.best >= 200, reward: { corridor: 800, holy: 800 } },
+    /* V9.5.87（十五度自审）：这条原本写"深井历史最高 200 层"——**这辈子到不了**。
+       实测量过：把一个账号每条养成线都点满（Lv.100 · 5 星 · 满血统/技能/铭刻5/境界36/秘术1505/建筑250 ·
+       W20 档 UR 装备 · 深井印记按上限 +45%），用真实战斗引擎打深井，天花板在第 130~134 层；
+       200 层要在此基础上再强 20 倍以上，而且深井按 1.035~1.045 无上限递增、玩家所有线都已封顶，
+       差距只会越拉越大。做成人拿不到的成就＝死内容，所以改成"再往前啃一段"的真实目标。 */
+    { id: 'a_floor120', cat: '挑战', name: '深井守望者', desc: '深井历史最高 120 层', check: S => S.corridor.best >= 120, reward: { corridor: 800, holy: 800 } },
     { id: 'a_reincarn', cat: '挑战', name: '转生不止', desc: '完成 1 次转生', check: S => S.player.reincarnations >= 1, reward: { holy: 300, bloodCrystal: 300 } },
     { id: 'a_codex20', cat: '收集', name: '图鉴过半', desc: '图鉴收集 20 名伙伴', check: S => S.codex.chars.length >= 20, reward: { points: 30000, holy: 200 } },
   ];
@@ -1647,16 +1652,29 @@ window.DATA = (function () {
   const talentTexts = branch => (TALENTS[branch] ? TALENTS[branch].nodes.map(n => n.text) : []);
 
   /* ================= 深井 ================= */
-  // 2026-09-12 调整：旧曲线第 1~100 层 HP 按 1.045 指数暴涨（100 层 46.8 万 HP / 攻 13501），
-  // 而玩家属性在 Lv100+铭刻5+血统30 就到顶 → 结果只有"碾压"和"断崖"两种状态。
-  // 新曲线放缓（1.032 / 1.026 / 1.020），并新增「深井印记」：每通 10 层永久 +1.5% 属性（仅深井内，上限 30 枚 +45%）。
+  /* 曲线一路的调整（V9.5.87 把这条注释与代码对齐 —— 上一版写的是 1.032/1.026/1.020，
+     代码早在 V9.5.64 就加陡成 1.060/1.045/1.035 了，注释留在旧数值上，谁看谁误判）：
+       2026-09-12：旧曲线第 1~100 层 HP 按 1.045 暴涨（100 层 46.8 万 HP / 攻 13501），
+                   而玩家属性在 Lv100+铭刻5+血统30 就到顶 → 只有"碾压"和"断崖"两种状态。
+       2026-09-17（V9.5.64，父亲大人：深井太简单、一下推好多层）：前 100 层加陡到 1.060，
+                   100 层之后 1.045、300 层之后 1.035 放缓。
+     另：「深井印记」历史最高每 10 层 +1.5%（仅深井内，上限 30 枚 = +45%）。 */
   function corridorEnemy(floor) {
-    let gHp, gAtk, gDef;
-    /* V9.5.64（父亲大人：深井太简单、一下推好多层）——前 100 层成长大幅加陡。 */
-    if (floor <= 100) { gHp = 1.060; gAtk = 1.045; gDef = 1.030; }
-    else if (floor <= 300) { gHp = 1.045; gAtk = 1.035; gDef = 1.022; }
-    else { gHp = 1.035; gAtk = 1.026; gDef = 1.018; }
-    const hpM = Math.pow(gHp, floor - 1), atkM = Math.pow(gAtk, floor - 1), defM = Math.pow(gDef, floor - 1);
+    /* 三段成长率：前 100 层最陡（父亲大人：深井太简单、一下推好多层，V9.5.64 加陡），
+       100 层之后放缓两档。
+       ⚠ V9.5.87（十五度自审）：这里原来是 `Math.pow(gHp, floor - 1)` —— **每一段都从第 0 层重新起算**，
+         于是段与段之间不是"接着涨"而是**倒扣**：
+           第 100 层基准 HP 800,241 → 第 101 层 203,971（掉 74%，倒退回第 88 层的强度）
+           第 300 层基准 1,299,304,230 → 第 301 层 75,865,609（掉 94%，倒退回第 248 层）
+         攻击 / 防御同理。玩家刚啃下一个 100 层 BOSS，下一层立刻比 88 层还软——曲线是断的。
+         现在按段**累乘**（每段接着上一段的乘积走），曲线单调递增。 */
+    const n = floor - 1;
+    const nA = Math.min(n, 99);                                        // 1~100 层：最陡
+    const nB = Math.max(0, Math.min(n, 299) - 99);                     // 101~300 层
+    const nC = Math.max(0, n - 299);                                   // 301 层起
+    const hpM = Math.pow(1.060, nA) * Math.pow(1.045, nB) * Math.pow(1.035, nC);
+    const atkM = Math.pow(1.045, nA) * Math.pow(1.035, nB) * Math.pow(1.026, nC);
+    const defM = Math.pow(1.030, nA) * Math.pow(1.022, nB) * Math.pow(1.018, nC);
     const isBoss = floor % 50 === 0, isElite = floor % 10 === 0;
     const mult = isBoss ? 2.4 : isElite ? 1.7 : 1;
     return {

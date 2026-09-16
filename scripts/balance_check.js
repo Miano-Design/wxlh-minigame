@@ -15,6 +15,10 @@ global.localStorage = {
 global.document = { readyState: 'complete', getElementById: () => null, addEventListener() {}, createElement: () => ({ style: {}, addEventListener() {}, appendChild() {} }), querySelector: () => null, querySelectorAll: () => [] };
 global.setTimeout = () => 0; global.setInterval = () => 0;
 global.Blob = function () {}; global.URL = { createObjectURL: () => '' }; global.FileReader = function () {};
+/* V9.5.87（十五度自审）：锁随机种子 —— 战斗里有暴击/闪避这类随机，不锁种子的话
+   同一支队跑五次能给出"首败在第 10 层"到"第 18 层"五种答案，这种体检报告没法用来做回归。 */
+let seed = 20260917;
+Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
 for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) {
   eval(fs.readFileSync(f, 'utf8'));
 }

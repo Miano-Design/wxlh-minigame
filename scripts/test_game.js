@@ -2228,5 +2228,26 @@ setParty(['C021']);
   t('跨天：免费次数全部重置', Core.freeState('normal').left === 3 && Core.freeState('advanced').left === 1);
 }
 
+/* ---- V9.5.87：深井难度曲线不许断档（十五度自审抓到） ----
+   深井分段成长（1~100 层 6% / 101~300 层 4.5% / 301 层起 3.5%），
+   旧写法每段都从第 0 层重新起算指数 → 第 101 层比第 100 层软 4 倍、第 301 层比第 300 层软 17 倍。
+   这种错不报错、不崩，只是数值静默地不合理，所以锁一条用例。 */
+{
+  const baseHp = f => { const e = D.corridorEnemy(f); return e.hp / (e.isBoss ? 2.4 : e.isElite ? 1.7 : 1); };
+  let mono = true, prev = baseHp(1), prevF = 1;
+  for (let f = 2; f <= 400; f++) {
+    const e = D.corridorEnemy(f);
+    if (e.isElite || e.isBoss) continue;
+    const cur = baseHp(f);
+    const perStep = Math.pow(cur / prev, 1 / (f - prevF));
+    if (perStep < 1.0 || perStep > 1.075) mono = false;
+    prev = cur; prevF = f;
+  }
+  t('深井 1~400 层 HP 单调递增、段界不断档', mono);
+  t('深井 101 层接着 100 层涨（不是掉回第 88 层）', baseHp(101) > baseHp(100));
+  t('深井 301 层接着 300 层涨', baseHp(301) > baseHp(300));
+  t('深井成就不再要求"这辈子到不了"的 200 层', !D.ACHIEVEMENTS.some(a => a.check && /best >= 200/.test(a.check.toString())));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

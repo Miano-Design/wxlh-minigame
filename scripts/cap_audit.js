@@ -166,4 +166,29 @@ console.log('\n=== 门槛 vs 上限（有没有"这辈子到不了"的解锁条�
 console.log(`  铭刻 5 阶要 Lv.${[1, 20, 40, 60, 80].slice(-1)[0]} · 境界 36 阶要 Lv.${D.REALMS[D.REALMS.length - 1].lv} · 转生要 Lv.100 + 铭刻 5 + 灯芯 30 · 评级上限 Lv.${D.SECT_MAX}`);
 console.log(gateFail.length ? '  ' + gateFail.map(x => '✗ ' + x).join('\n  ') : '  所有门槛都在上限之内 ✓');
 
-console.log(`\n结论：${warn === 0 ? '所有上限之间对得上 ✓' : '有 ' + warn + ' 处上限对不上，要调'}`);
+/* ---- 深井曲线单调性 + 段界连续性（V9.5.87 十五度自审新增） ----
+   起因：深井的成长是**分段**的（1~100 层 6%、101~300 层 4.5%、301 层起 3.5%），
+   而旧写法每段都从第 0 层重新起算指数，于是段界不是"接着涨"而是**倒扣**：
+   第 101 层比第 100 层软 4 倍、第 301 层比第 300 层软 17 倍 —— 玩家啃完 100 层 BOSS，
+   下一层比第 88 层还软。这种错不会报错、不会崩，只会让数值静默地不合理。 */
+let curveBad = 0;
+{
+  const baseHp = f => { const e = D.corridorEnemy(f); return e.hp / (e.isBoss ? 2.4 : e.isElite ? 1.7 : 1); };
+  const issues = [];
+  let prev = baseHp(1), prevF = 1;
+  for (let f = 2; f <= 400; f++) {
+    const e = D.corridorEnemy(f);
+    if (e.isElite || e.isBoss) continue;                 // 精英/Boss 是倍率，跨类型比单调没意义
+    const cur = baseHp(f);
+    const perStep = Math.pow(cur / prev, 1 / (f - prevF));   // 摊到每一层的平均增幅
+    if (perStep < 1.0) issues.push(`第 ${f} 层反而比第 ${prevF} 层软（${Math.round(prev)} → ${Math.round(cur)}）`);
+    else if (perStep > 1.075) issues.push(`第 ${prevF}→${f} 层平均每层 ×${perStep.toFixed(3)}（最陡的一段才 1.060，说明段界没接上）`);
+    prev = cur; prevF = f;
+  }
+  console.log('\n=== 深井曲线：单调递增 + 段界不许断档（1~400 层）===');
+  console.log(issues.length ? '  ' + issues.slice(0, 5).map(x => '✗ ' + x).join('\n  ') : '  ✓ 1~400 层单调递增，100 / 300 层段界都接得上');
+  curveBad = issues.length;
+}
+
+console.log(`\n结论：${warn === 0 && !curveBad ? '所有上限之间对得上、曲线也没断档 ✓'
+  : (warn ? '有 ' + warn + ' 处上限对不上' : '') + (curveBad ? (warn ? '、' : '') + '深井曲线有 ' + curveBad + ' 处断档' : '') + '，要调'}`);
