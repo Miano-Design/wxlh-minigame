@@ -679,7 +679,6 @@ window.UI = (function () {
       <div class="row">
         <span class="rk">【主角】</span>
         <span class="rv" style="${(S.player.attrPoints || S.player.skillPoints) ? 'color:var(--gold)' : ''}">六维待分 ${S.player.attrPoints || 0} · 技能待加 ${S.player.skillPoints || 0}</span>
-        <span class="rs">点开：加点 / 洗点 / 血统 / 境界 ›</span>
       </div>
       <div class="row">
         <span class="rk">【转生】</span>

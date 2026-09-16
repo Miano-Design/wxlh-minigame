@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-16 12:12 */
+   生成时间：2026-09-16 12:13 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
