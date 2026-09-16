@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.55';
+  const GAME_VER = '9.5.56';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2131,12 +2131,14 @@ window.UI = (function () {
         <!-- V9.5.54（父亲大人）：这两个按钮位置固定（矮内容贴底、长内容滚到底也停在可视区底部），
              不再跟着"抽了 1 张还是 10 张"上下跳 -->
         <div class="btn-row result-actions">
-          <button class="btn primary" data-again>继续招募</button>
+          ${again && again.free ? '' : '<button class="btn primary" data-again>继续招募</button>'}
           <button class="btn ghost" data-back>返回</button>
         </div>
         </div>`);
       // 继续招募＝同一池子再来一次（十连继续十连）；返回＝回"招募伙伴"界面
-      w.querySelector('[data-again]').onclick = () => { if (again) runPull(again.pid, again.n); else recruitModal(w); };
+      // 免费抽那一次不给「继续招募」（父亲大人：白拿的那一下不该顺手再花钱）
+      const againBtn = w.querySelector('[data-again]');
+      if (againBtn) againBtn.onclick = () => { if (again) runPull(again.pid, again.n); else recruitModal(w); };
       w.querySelector('[data-back]').onclick = () => recruitModal(w);
       refresh();
     };
@@ -2145,7 +2147,7 @@ window.UI = (function () {
       if (b.dataset.free1) {                            // 有免费就先免费抽（不弹确认、不扣钱）
         const r = C().freeRecruit(pid);
         if (r.error) { failToast(r.error); return; }
-        showResults([r], { pid, n: 1 });
+        showResults([r], { pid, n: 1, free: true });    // 免费抽：结果页只给"返回"
         return;
       }
       runPull(pid, 1, b);

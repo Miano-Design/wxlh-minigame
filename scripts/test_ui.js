@@ -1228,6 +1228,13 @@ t('文字不出格：卡片与关键文字行都有断行 / 省略兜底', () =>
   });
   if (!css.includes('flex-wrap: wrap')) throw new Error('按钮行没有换行兜底');
 });
+t('免费抽的结果页只有「返回」，用券/货币抽才有「继续招募」', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('const showResults');
+  const seg = src.slice(i, i + 2200);
+  if (seg.indexOf("again && again.free ? '' :") < 0) throw new Error('免费抽没把「继续招募」去掉');
+  if (seg.indexOf("free: true") < 0 && src.indexOf("free: true") < 0) throw new Error('免费那一抽没打标记');
+});
 t('招募结果页：继续招募＝同池同次数再来一次；返回＝回「招募伙伴」界面', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
   const i = src.indexOf('const showResults');
