@@ -518,6 +518,9 @@ body {
 .bg-slot.add {
   /* V9.5.16（父亲大人）：不做金色高亮，就是一个灰虚线空框、中间一个 ＋ */
   border: 1px dashed var(--line2); background: transparent; color: var(--dim);
+  /* 继承来的格内边距是"上 5 / 下 11"（那是给有名字+数量的格子用的），
+     用在只有一个 ＋ 的空格上会把 ＋ 顶得偏上 → 这里必须归零，让它真正居中 */
+  padding: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 1.375rem; line-height: 1;
 }
