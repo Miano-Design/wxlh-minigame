@@ -146,7 +146,11 @@ function devtoolsLog(LayoutInst) {
     }
     (el.children || []).forEach(walk);
   })(LayoutInst.children[0]);
-  console.log('[CE-DUMP] ' + rows.join(' '));
+  /* 分片打印：console 单条日志会截断，130 个元素必须分几条才拿得全 */
+  const per = 40;
+  for (let i = 0; i < rows.length; i += per) {
+    console.log('[CE-DUMP' + (i / per) + '] ' + rows.slice(i, i + per).join(' '));
+  }
 }
 
 function isDevtools() {
