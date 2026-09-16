@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.58';
+  const GAME_VER = '9.5.59';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -393,19 +393,26 @@ window.UI = (function () {
         </div>`).join('')}
       </div>
       <div class="section-title">全部伙伴（${cs.total}）</div>
-      <div class="char-grid">
-        ${D.characters.map(ch => {
-          const got = S.codex.chars.includes(ch.id);
-          if (!got) return `<div class="char-card" style="opacity:.35;filter:grayscale(1)">
-            <div class="avatar">？</div><div class="cname">未获得</div><div class="cmeta">${ch.rarity}</div>
+      <!-- V9.5.59（父亲大人）：图鉴按**阵营分开**，每个阵营里**从低稀有度排到高稀有度** -->
+      ${D.FACTIONS.concat(['支援']).map(fac => {   /* 支援是第五类阵营，别让它掉队 */
+        const list = D.characters.filter(ch => ch.faction === fac)
+          .sort((a, b) => D.RARITIES.indexOf(a.rarity) - D.RARITIES.indexOf(b.rarity));
+        if (!list.length) return '';
+        return `<div class="codex-fac">${fac}<span>${list.filter(ch => S.codex.chars.includes(ch.id)).length}/${list.length}</span></div>
+          <div class="char-grid">
+          ${list.map(ch => {
+            const got = S.codex.chars.includes(ch.id);
+            if (!got) return `<div class="char-card" style="opacity:.35;filter:grayscale(1)">
+              <div class="avatar">？</div><div class="cname">未获得</div><div class="cmeta">${ch.rarity}</div>
+            </div>`;
+            return `<div class="char-card rarity-${ch.rarity}">
+              ${charAvatar(ch.id)}
+              <div class="cname">${esc(ch.name)}</div>
+              <div class="cmeta">${ch.role} · ${ch.faction}</div>
+            </div>`;
+          }).join('')}
           </div>`;
-          return `<div class="char-card rarity-${ch.rarity}">
-            ${charAvatar(ch.id)}
-            <div class="cname">${esc(ch.name)}</div>
-            <div class="cmeta">${ch.role} · ${ch.faction}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
+      }).join('')}`;
     const w = showPanel(wrap, '伙伴图鉴', body);
     w.querySelectorAll('[data-codex]').forEach(b => b.onclick = () => {
       const r = C().claimCodexReward(+b.dataset.codex);

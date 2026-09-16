@@ -1289,6 +1289,16 @@ t('GM 门禁：线上默认关；带 ?gm=1 开一次就在这台设备记住', (
   global.location = prevLoc;
   global.localStorage = prevStore;
 });
+t('图鉴：按阵营分开，每个阵营里从低稀有度排到高稀有度', () => {
+  const html = UI._panels.codexModal().innerHTML;
+  ['先锋', '策略', '科技', '异能', '支援'].forEach(f => {
+    if (html.indexOf('class="codex-fac">' + f) < 0) throw new Error('缺阵营分组：' + f);
+  });
+  const seg = html.split('class="codex-fac">先锋')[1].split('codex-fac">')[0];
+  const idx = [...seg.matchAll(/cmeta">(N|R|SR|SSR|UR)/g)].map(m => D.RARITIES.indexOf(m[1]));
+  if (!idx.length) throw new Error('先锋组里没读到卡片');
+  for (let i = 1; i < idx.length; i++) if (idx[i] < idx[i - 1]) throw new Error('阵营内不是从低稀有度到高稀有度：' + idx.join(','));
+});
 t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   const i = css.indexOf('.reward-chips {');

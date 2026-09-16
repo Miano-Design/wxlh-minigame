@@ -96,6 +96,14 @@ body {
 /* 结算页：内容在上、返回键固定在底部（和招募结果页同一套） */
 .loot-result { display: flex; flex-direction: column; min-height: 100%; }
 
+/* 图鉴：阵营小标题（V9.5.59） */
+.codex-fac {
+  display: flex; align-items: center; gap: 0.5rem; margin: 0.75rem 2px 0.5rem;
+  font-size: var(--fs-md); font-weight: 700; color: var(--text2); letter-spacing: .5px;
+}
+.codex-fac::before { content: ''; width: 3px; height: 13px; border-radius: 2px; background: linear-gradient(180deg, var(--gold), #8a6a1e); }
+.codex-fac span { margin-left: auto; font-size: var(--fs-xs); font-weight: 400; color: var(--dim); }
+
 /* 概率公示页：纯文字排版（V9.5.53 父亲大人：不分卡片，卡片会把字裁掉） */
 .rate-block { font-size: var(--fs-sm); color: var(--text2); line-height: 1.9; padding: 0 2px 2px; }
 .rate-line { display: flex; gap: 0.5rem; align-items: baseline; }
