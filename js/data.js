@@ -29,11 +29,14 @@ window.DATA = (function () {
   // 「阵法要求：3 个巨剑门和 3 个无极门道友组队」），玩家一眼知道自己现在站的是哪一阵、还差什么。
   // 这里照这个思路做：每一档都写清"需要几个人、加成是多少"，由 core.formationState 判定命中。
   // 主角不属于任何阵营，但在编阵时是"万能补位"——可以顶任意一个阵营的人数，凑不出 5 人同营时它就是那个第 5 人。
+  /* V9.5.44（父亲大人）：
+     ① 删掉「双子阵」——主角是万能补位，同一阵营 2 人在满编时几乎必成，等于白送；
+     ② 阵型**必须上满 5 人**才可能激活（在 core.formationState 里统一卡）；
+     ③「主角可补位」不再写在行里，挪到卡片右上角的小字。 */
   const FORMATIONS = [
-    { id: 'twin',   name: '双子阵',     reqText: '同一阵营 2 人',              buff: { atkPct: 0.03 } },
     { id: 'tri',    name: '三才阵',     reqText: '同一阵营 3 人',              buff: { atkPct: 0.06, hpPct: 0.06 } },
     { id: 'quad',   name: '四象阵',     reqText: '同一阵营 4 人',              buff: { atkPct: 0.10, hpPct: 0.10, skillPct: 0.05 } },
-    { id: 'penta',  name: '五行归元阵', reqText: '同一阵营 5 人（主角可补位）', buff: { atkPct: 0.14, hpPct: 0.14, skillPct: 0.08 } },
+    { id: 'penta',  name: '五行归元阵', reqText: '同一阵营 5 人',              buff: { atkPct: 0.14, hpPct: 0.14, skillPct: 0.08 } },
     { id: 'pillar', name: '双柱阵',     reqText: '两个阵营各 2 人',            buff: { atkPct: 0.04, hpPct: 0.04 } },
     { id: 'allfour',name: '四海阵',     reqText: '四个阵营各 1 人',            buff: { atkPct: 0.04, hpPct: 0.04, skillPct: 0.04 } },
   ];

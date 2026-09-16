@@ -882,6 +882,8 @@ window.Core = (function () {
   // 规则只有两条：①「同阵营」那一族只取命中的最高档，不重复叠；② 主角是万能补位（顶人数最多的那个阵营）。
   function formationState(partyIds) {
     const ids = (partyIds || []).filter(Boolean);
+    // V9.5.44（父亲大人）：阵型只有**上满 5 人**才可能激活（不满编一律算未成阵）
+    const full = ids.length >= 5;
     const count = {};
     ids.forEach(id => { const c = D.charById[id]; if (c) count[c.faction] = (count[c.faction] || 0) + 1; });
     let top = '';
@@ -893,10 +895,10 @@ window.Core = (function () {
     const twoPlus = vals.filter(n => n >= 2).length;
     const kinds = Object.keys(count).length;
     const has = {
-      twin: maxN >= 2, tri: maxN >= 3, quad: maxN >= 4, penta: maxN >= 5,
-      pillar: twoPlus >= 2, allfour: kinds >= 4,
+      tri: full && maxN >= 3, quad: full && maxN >= 4, penta: full && maxN >= 5,
+      pillar: full && twoPlus >= 2, allfour: full && kinds >= 4,
     };
-    const SAME_FAMILY = ['penta', 'quad', 'tri', 'twin'];
+    const SAME_FAMILY = ['penta', 'quad', 'tri'];
     const bestSame = SAME_FAMILY.find(x => has[x]) || null;
     const hit = [];
     const buff = { atkPct: 0, hpPct: 0, skillPct: 0 };
@@ -913,6 +915,7 @@ window.Core = (function () {
       active: hit.map(id => D.FORMATIONS.find(f => f.id === id)),
       // 界面用：现在命中的阵型名，没命中就是"未成阵"
       names: hit.map(id => (D.FORMATIONS.find(f => f.id === id) || {}).name).filter(Boolean),
+      full,
     };
   }
   function factionBuffs(partyIds) { return formationState(partyIds); }

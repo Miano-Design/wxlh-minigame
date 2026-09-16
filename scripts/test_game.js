@@ -1146,36 +1146,45 @@ setParty(['C021']);
 
   const empty = Core.formationState([]);
   t('空队伍不成阵', empty.names.length === 0 && empty.atkPct === 0);
+  t('已经没有「双子阵」这一档', !D.FORMATIONS.some(f => f.id === 'twin' || f.name === '双子阵'));
+
+  // V9.5.44（父亲大人）：**不满编（不满 5 人）一律不成阵**
+  const half = byFac[F[0]].slice(0, 4);
+  half.forEach(id => Core.addChar(id));
+  const halfSt = Core.formationState(half);
+  t('只上 4 人（哪怕同营 4 个）也不成阵', halfSt.hit.length === 0 && halfSt.atkPct === 0);
+  t('formationState 会回报"是否满编"', halfSt.full === false);
 
   // 4 个同阵营 + 主角补位 = 5 人同营 → 五行归元阵
   const mono = byFac[F[0]].slice(0, 4);
   mono.forEach(id => Core.addChar(id));
-  const st5 = Core.formationState(mono);
-  t('4 同阵营 + 主角补位 = 五行归元阵', st5.hit.includes('penta'));
-  t('同阵营一族只取最高档（不同时给三才/四象）', !st5.hit.includes('quad') && !st5.hit.includes('tri') && !st5.hit.includes('twin'));
+  const mono5 = mono.concat(byFac[F[1]][0]);           // 第 5 位随便补一个，队伍满编
+  const st5 = Core.formationState(mono5);
+  t('满编 5 人 + 4 同营同伴（主角补位）= 五行归元阵', st5.hit.includes('penta'));
+  t('同阵营一族只取最高档（不同时给三才/四象）', !st5.hit.includes('quad') && !st5.hit.includes('tri'));
   t('五行归元阵给攻击/生命/技能', st5.atkPct > 0 && st5.hpPct > 0 && st5.skillPct > 0);
 
-  // 3 + 1 → 四象阵（主角补到 4）
-  const three = byFac[F[0]].slice(0, 3).concat(byFac[F[1]].slice(0, 1));
+  // 3 同营 + 满编 → 四象阵（主角补到 4）
+  const three = byFac[F[0]].slice(0, 3).concat(byFac[F[1]].slice(0, 2));
   const st4 = Core.formationState(three);
-  t('3+1（主角补位）成四象阵', st4.hit.includes('quad') && !st4.hit.includes('penta'));
+  t('满编 + 3 同营（主角补位）成四象阵', st4.hit.includes('quad') && !st4.hit.includes('penta'));
 
-  // 2 + 2 → 三才阵 + 双柱阵（主角补到 3+2）
-  const two2 = byFac[F[0]].slice(0, 2).concat(byFac[F[1]].slice(0, 2));
+  // 2 + 2 + 1 → 三才阵 + 双柱阵（主角补到 3+2）
+  const two2 = byFac[F[0]].slice(0, 2).concat(byFac[F[1]].slice(0, 2)).concat(byFac[F[2]].slice(0, 1));
   const st22 = Core.formationState(two2);
-  t('2+2 成双柱阵', st22.hit.includes('pillar'));
+  t('满编 2+2+1 成双柱阵', st22.hit.includes('pillar'));
   t('2+2 时主角补位让最高的那营成三才', st22.hit.includes('tri'));
 
-  // 四个阵营各 1 人 → 四海阵
-  const four = F.map(f => byFac[f][0]);
+  // 四个阵营各 1 人 + 第 5 位（同营）→ 四海阵
+  const four = F.map(f => byFac[f][0]).concat(byFac[F[0]][1]);
   const stF = Core.formationState(four);
-  t('四阵营各 1 人成四海阵', stF.hit.includes('allfour') && stF.skillPct > 0);
+  t('满编 + 四阵营各 1 人成四海阵', stF.hit.includes('allfour') && stF.skillPct > 0);
 
   // 加成真的进战斗：3 人同阵营的队伍攻击高于单带一人
   const solo = Core.formationState([mono[0]]);
-  t('阵型加成会进战斗属性', st4.atkPct > solo.atkPct);
+  t('阵型加成会进战斗属性（满编才有加成）', st4.atkPct > solo.atkPct);
   t('factionBuffs 仍返回旧字段（战斗侧不用改）', (() => {
-    const fb = Core.factionBuffs(mono);
+    const fb = Core.factionBuffs(mono5);
     return typeof fb.atkPct === 'number' && typeof fb.hpPct === 'number' && typeof fb.skillPct === 'number' && fb.count;
   })());
   t('每个阵型都有名字与人数要求', D.FORMATIONS.every(f => f.name && f.reqText && Object.keys(f.buff).length));

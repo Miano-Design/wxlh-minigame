@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.43';
+  const GAME_VER = '9.5.44';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1289,7 +1289,8 @@ window.UI = (function () {
       const grabCls = grabbed === String(i) ? ' grabbing' : '';
       if (!id) {
         const freeHint = grabbed !== null && grabbed !== String(i) ? '放这里' : '＋ 上阵';
-        return `<div class="pslot${grabCls}" data-pos="${i}"><span class="pos-tag">${pos}</span><div style="text-align:center;color:var(--dim);padding-top:2.125rem;font-size:0.75rem">${freeHint}</div></div>`;
+        // V9.5.44（父亲大人）：空格子的「＋ 上阵」要真居中 —— 以前靠写死 padding-top 硬顶下来，必然偏
+        return `<div class="pslot${grabCls}" data-pos="${i}"><span class="pos-tag">${pos}</span><div class="pslot-ph">${freeHint}</div></div>`;
       }
       if (id === '@player') {
         return `<div class="pslot filled protag-slot${grabCls}" data-pos="${i}" data-protag="1">
@@ -1366,7 +1367,7 @@ window.UI = (function () {
           <button class="btn primary block mt3" data-act="open-recruit">✦ 去招募伙伴</button>`}
       </div>
       <div class="card">
-        <h3>🧩 阵型</h3>
+        <h3>🧩 阵型 <span class="sub">主角可补位（阵容上满 5 人才成阵）</span></h3>
         <div class="kv"><span class="k">当前构成</span><span>${fbCount || '—'}</span></div>
         <div class="kv"><span class="k">成阵</span><span style="color:var(--green)">${fb.names.length ? fb.names.join(' · ') : '未成阵'}</span></div>
         <div class="kv"><span class="k">加成</span><span style="color:var(--green)">${fbText.join(' · ') || '无'}</span></div>

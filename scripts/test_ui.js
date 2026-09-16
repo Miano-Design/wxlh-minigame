@@ -1230,7 +1230,10 @@ t('主角也吃阵型加成（以前只有招募角色吃得到，队伍页却�
   const pair = Object.values(byFac).find(list => list.length >= 2);
   if (!pair) throw new Error('找不到同阵营的两名伙伴');
   Core.addChar(pair[0]); Core.addChar(pair[1]);
-  Core.S.party = ['@player', pair[0], pair[1], null, null];
+  // V9.5.44：阵型要满编才成阵，所以这里把 5 个位置都排满
+  const extra = D.characters.filter(c => !c.hidden && c.id !== pair[0] && c.id !== pair[1]).slice(0, 2).map(c => c.id);
+  extra.forEach(id => Core.addChar(id));
+  Core.S.party = ['@player', pair[0], pair[1], extra[0], extra[1]];
   const fb = Core.factionBuffs(Core.S.party);
   if (!(fb.atkPct > 0)) throw new Error('这组队伍没成阵，用例前提不成立');
   const allies = UI._panels.buildAllies({}, {});
