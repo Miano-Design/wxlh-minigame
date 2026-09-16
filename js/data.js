@@ -1146,8 +1146,8 @@ window.DATA = (function () {
     normal: {
       name: '普通招募', short: '普通', currency: 'points',
       rates: { N: 0.46, R: 0.36, SR: 0.18 },
-      // 招募单抽价**不参与**这次"整体压慢"：它已经在上一轮定过（45000 十连），
-      // 而且招募是"攒碎片"的日常循环，涨价会让新手期直接卡住
+      // 招募单抽价**不参与**"整体压慢"：它是"攒碎片"的日常循环，涨价会让新手期直接卡住
+      // （V9.5.73 起单抽 500 / 十连 4500）
       // V9.5.73（父亲大人）：单抽 5000 → 500（5000 点等于挂机 8 小时，抽一次太肉了）；
       // 十连按原来的关系（9 次单抽的价）同步降到 4500，不然会出现"十连比单抽贵 90 倍"的倒挂
       cost: { points: 500 }, ten: { points: 4500 },
@@ -1402,8 +1402,8 @@ window.DATA = (function () {
       { currencyGain: { skillChip: 10 }, name: '技能芯片×10', price: 2000, stock: -1 },
       { item: 'box_r', name: '随机R装备', price: 5000, stock: -1 },
       { item: 'box_sr', name: '随机SR装备', price: 30000, stock: -1 },
-      // V9.5.73：券的价值 = 1 次普通招募，单抽降到 500 之后这里必须跟着降（原来比直接抽还贵 12 倍）
-      { item: 'ticket_normal', name: '引灯招募券', price: 600, stock: 3 },
+      // V9.5.74（自审）：同货币买券不能比直接抽贵。单抽 500 → 券卖 450（便宜 10%，货架才有意义）
+      { item: 'ticket_normal', name: '引灯招募券', price: 450, stock: 3 },
     ] },
     otherworld: { name: '异界商店', currency: 'otherworld', items: [
       { item: 'box_sr', name: 'SR装备箱', price: 100, stock: -1 },
@@ -1416,7 +1416,8 @@ window.DATA = (function () {
       { item: 'exp_l', name: '高级经验模块', price: 150, stock: -1, req: { world: 'W04' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 4200, stock: -1, req: { world: 'W15' } },
       { item: 'ticket_adv', name: '圣契招募令', price: 120, stock: 2 },
-      { item: 'ticket_lim', name: '异界征召令', price: 180, stock: 2 },
+      // V9.5.74（自审）：限定池单抽只要 ◆60，这张券却卖 ◆180（贵 3 倍）——同货币倒挂，改成 ◆50
+      { item: 'ticket_lim', name: '异界征召令', price: 50, stock: 2 },
     ] },
     story: { name: '故事商店', currency: 'story', items: [
       { shardRandom: 'R', shardCount: 10, name: '随机R伙伴碎片×10', price: 100, stock: -1 },
