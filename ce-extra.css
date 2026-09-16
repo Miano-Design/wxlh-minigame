@@ -20,8 +20,8 @@
 /* 网页版外壳：顶栏 fixed 在顶部、正文靠上边距让位、底栏 fixed 在底部。
    canvas 没有"视口滚动"，所以这里改成真实的三段列布局：顶栏 / 正文 / 底栏。 */
 #topbar { position: static; flex: 0 0 auto; }
-#view { flex: 1; flex-shrink: 1; padding: 0; }
-#view .screen { padding: 6px 12px 14px; }
+#view { flex: 1; flex-shrink: 1; padding: 6px 12px 14px; }   /* 内边距放在 #view 上：跟网页版同一层，.screen 宽度才与网页版一致 */
+#view .screen { padding: 0; }
 #navbar { position: static; flex: 0 0 auto; }
 
 /* 排版的"块级文字"：网页版里这些是 <div>，宽度占满父级、长了会自动换行。

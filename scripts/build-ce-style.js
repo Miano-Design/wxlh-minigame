@@ -668,7 +668,8 @@ function main() {
       const s = styles[a.path].style;
       INHERIT.forEach((k) => { if (s[k] !== undefined) inherited[k] = s[k]; });
     });
-    const own = Object.assign({}, inherited, conv.inline || {}, conv.style);
+    // 优先顺序照 CSS：继承 < 类名规则 < 行内样式（行内最高）——之前反了，行内会被类名盖上
+    const own = Object.assign({}, inherited, conv.style, conv.inline || {});
     conv.style = own;
     if (conv.meta.lineHeightUnitless) own.lineHeight = Math.round((own.fontSize || 12) * conv.meta.lineHeightUnitless);
   });

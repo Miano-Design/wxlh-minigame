@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-16 11:25 */
+   生成时间：2026-09-16 12:03 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -665,21 +665,21 @@ module.exports = {
  "view#app__scrollview#view": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "paddingTop": 0,
-  "paddingRight": 0,
-  "paddingBottom": 0,
-  "paddingLeft": 0,
+  "paddingTop": 6,
+  "paddingRight": 12,
+  "paddingBottom": 14,
+  "paddingLeft": 12,
   "flex": 1,
-  "flexShrink": 1,
-  "padding": 0
+  "flexShrink": 1
  },
  "view#app__scrollview#view__view.screen": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "paddingTop": 6,
-  "paddingRight": 12,
-  "paddingBottom": 14,
-  "paddingLeft": 12
+  "padding": 0,
+  "paddingTop": 0,
+  "paddingRight": 0,
+  "paddingBottom": 0,
+  "paddingLeft": 0
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",
@@ -771,16 +771,16 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderWidth": 0,
-  "padding": 0,
-  "paddingTop": 10,
-  "paddingRight": 4,
-  "paddingBottom": 10,
-  "paddingLeft": 4,
   "flexDirection": "row",
   "alignItems": "center",
+  "paddingTop": 0,
+  "paddingRight": 0,
+  "paddingBottom": 0,
+  "paddingLeft": 0,
   "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
+  "borderBottomColor": "#ffffff0d",
+  "borderWidth": 0,
+  "padding": 0
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow": {
   "color": "#e9edf6",
@@ -947,10 +947,6 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "paddingTop": 14,
-  "paddingRight": 14,
-  "paddingBottom": 14,
-  "paddingLeft": 14,
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -959,6 +955,10 @@ module.exports = {
   "borderTopRightRadius": 10,
   "borderBottomRightRadius": 10,
   "borderBottomLeftRadius": 10,
+  "paddingTop": 2,
+  "paddingRight": 14,
+  "paddingBottom": 2,
+  "paddingLeft": 14,
   "marginBottom": 14
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row": {
@@ -1061,7 +1061,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-k.isxmg8sha": {
   "color": "#7a849b",
   "fontSize": 12,
-  "flex": 0,
+  "flex": 1,
   "marginRight": 10,
   "__textW": 48
  },
@@ -1418,9 +1418,9 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderColor": "#232b3b",
   "backgroundColor": "#111621",
   "borderWidth": 1,
+  "borderColor": "#ffd76a55",
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
   "borderTopRightRadius": 10,
@@ -1826,15 +1826,15 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "padding": 0,
-  "paddingTop": 10,
-  "paddingRight": 4,
-  "paddingBottom": 10,
-  "paddingLeft": 4,
   "flexDirection": "row",
   "alignItems": "center",
+  "paddingTop": 0,
+  "paddingRight": 0,
+  "paddingBottom": 0,
+  "paddingLeft": 0,
   "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
+  "borderBottomColor": "#ffffff0d",
+  "padding": 0
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow": {
   "color": "#e9edf6",
@@ -1937,10 +1937,9 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderColor": "#232b3b",
-  "opacity": 0.55,
   "backgroundColor": "#111621",
   "borderWidth": 1,
+  "borderColor": "#8be9e955",
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
   "borderTopRightRadius": 10,
@@ -1952,7 +1951,8 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14,
   "flexDirection": "row",
-  "alignItems": "center"
+  "alignItems": "center",
+  "opacity": 0.55
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.world-ico": {
   "color": "#e9edf6",
@@ -2106,7 +2106,6 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "opacity": 0.45,
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2121,7 +2120,8 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14,
   "flexDirection": "row",
-  "alignItems": "center"
+  "alignItems": "center",
+  "opacity": 0.45
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.world-ico": {
   "color": "#e9edf6",
@@ -2238,7 +2238,7 @@ module.exports = {
   "marginRight": 10
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.isxmq1bso.pos-tag": {
-  "color": "#7a849b",
+  "color": "#e6b64c",
   "fontSize": 11,
   "position": "absolute",
   "top": 6,
@@ -2248,7 +2248,6 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.avatar.isx1nwqca7": {
   "color": "#e6b64c",
   "fontSize": 17.6,
-  "borderColor": "#e6b64c",
   "width": 40,
   "height": 40,
   "backgroundColor": "#232c42",
@@ -2261,6 +2260,7 @@ module.exports = {
   "marginRight": 0,
   "marginBottom": 4,
   "marginLeft": 0,
+  "borderColor": "#e6b64c",
   "borderRadius": 20
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.pname": {
@@ -2426,7 +2426,6 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderColor": "#e6b64c55",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 10,
@@ -2434,7 +2433,8 @@ module.exports = {
   "paddingBottom": 10,
   "paddingLeft": 4,
   "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
+  "borderBottomColor": "#ffffff0d",
+  "borderColor": "#e6b64c55"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__text.avatar.isx1nwqca7": {
   "color": "#e6b64c",
@@ -2467,11 +2467,11 @@ module.exports = {
   "__textW": 30
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.isxc4hjzl.tag": {
-  "color": "#b6bfd0",
+  "color": "#e6b64c",
   "fontSize": 11,
   "fontWeight": "normal",
-  "borderColor": "#333e55",
   "borderWidth": 1,
+  "borderColor": "#e6b64c",
   "borderRadius": 7,
   "borderTopLeftRadius": 7,
   "borderTopRightRadius": 7,
@@ -3280,9 +3280,9 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderColor": "#232b3b",
   "backgroundColor": "#111621",
   "borderWidth": 1,
+  "borderColor": "#8be9e955",
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
   "borderTopRightRadius": 10,
@@ -3388,7 +3388,7 @@ module.exports = {
   "__textW": 154
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.isxmq1bso.rk": {
-  "color": "#7a849b",
+  "color": "#e6b64c",
   "fontSize": 12,
   "flex": 0,
   "marginRight": 10,
@@ -3413,9 +3413,9 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "borderColor": "#232b3b",
-  "backgroundColor": "#111621",
+  "backgroundColor": "#e6b64c14",
   "borderWidth": 1,
+  "borderColor": "#e6b64c",
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
   "borderTopRightRadius": 10,
@@ -3430,15 +3430,15 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "padding": 0,
-  "paddingTop": 10,
-  "paddingRight": 4,
-  "paddingBottom": 10,
-  "paddingLeft": 4,
   "flexDirection": "row",
   "alignItems": "center",
+  "paddingTop": 0,
+  "paddingRight": 0,
+  "paddingBottom": 0,
+  "paddingLeft": 0,
   "borderBottomWidth": 1,
-  "borderBottomColor": "#ffffff0d"
+  "borderBottomColor": "#ffffff0d",
+  "padding": 0
  },
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow": {
   "color": "#e9edf6",
