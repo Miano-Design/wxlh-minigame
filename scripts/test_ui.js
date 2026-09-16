@@ -402,8 +402,26 @@ t('游历条 / 游历面板都不写机制说明（只报"距下一次"和进度
     if (src.indexOf(k) >= 0) throw new Error('游历又写机制说明了：' + k);
   });
   // 倒计时得有个锚点，tickIdle 才能每秒把它往下走
-  if (UI._panels.travelStrip().indexOf('id="travel-left"') < 0) throw new Error('游历倒计时缺可更新锚点');
+  if (src.indexOf('id="travel-left"') < 0) throw new Error('游历倒计时缺可更新锚点');
   if (src.indexOf("document.getElementById('travel-left')") < 0) throw new Error('tickIdle 没接游历倒计时');
+});
+t('游历：倒计时点进二级页；出了奇遇就在条上点一下直接领', () => {
+  const keep = JSON.stringify(Core.S.travel);
+  try {
+    Core.S.travel = { bankSec: 0, pending: null, got: 0, round: 0, day: Core.dailyDate() };
+    const wait = UI._panels.travelStrip();
+    if (wait.indexOf('data-act="open-travel"') < 0) throw new Error('倒计时阶段点不进去二级页面');
+    if (wait.indexOf('id="travel-left"') < 0) throw new Error('倒计时阶段缺倒计时锚点');
+    Core.travelAccrue(Core.travelEverySec());          // 把倒计时走完
+    const got = UI._panels.travelStrip();
+    if (!Core.pendingTravel()) throw new Error('用例前提不成立：没出奇遇');
+    if (got.indexOf('待领') >= 0) throw new Error('条上还写着「待领」');
+    if (got.indexOf('data-act="claim-travel"') < 0) throw new Error('出了奇遇却不能点一下直接领');
+    if (got.indexOf('data-act="open-travel"') >= 0) throw new Error('出了奇遇还往二级页面走');
+    if (got.indexOf(Core.pendingTravel().name) < 0) throw new Error('条上没写这次遇到的奇遇名');
+  } finally {
+    Core.S.travel = JSON.parse(keep);
+  }
 });
 panel('灯阁评级', () => UI._panels.sectModal());
 panel('秘术阁', () => UI._panels.kejiModal());

@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.28';
+  const GAME_VER = '9.5.29';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -627,15 +627,28 @@ window.UI = (function () {
   /* 游历奇遇条（对标参考产品的游历事件）：挂满一段时间会亮起来，
      没有待领的奇遇时显示进度，有的时候就变成一条"点一下领走"的金条。
      它就是「游历奇遇」这一项**唯一**的入口——宫格里不再重复放第二个。 */
-   function travelStrip() {
+  function travelStrip() {
     const prog = C().travelProgress();
     const pend = C().pendingTravel();
     const left = Math.max(0, Math.round(prog.every - prog.sec));
+    /* 两种状态两种点法（父亲大人定的）：
+       ① 还在倒计时 → 点一下进二级页面（看进度、看可能遇到什么）；
+       ② 倒计时走完、奇遇已经出来了 → 条上直接就是这次奇遇的名字，**点一下当场领走**，
+          不再写"待领"、也不用再进页面点一次。 */
+    if (pend) {
+      return `<div class="card text-rows" style="padding:2px var(--sp3)">
+        <div class="row" data-act="claim-travel">
+          <span class="rk" style="color:var(--gold)">【游历奇遇】</span>
+          <span class="rv" style="color:var(--gold)">${pend.name}</span>
+          <span class="rs">${C().rewardTextOf(pend.effect)}</span>
+        </div>
+      </div>`;
+    }
     return `<div class="card text-rows" style="padding:2px var(--sp3)">
       <div class="row" data-act="open-travel">
-        <span class="rk" style="${pend ? 'color:var(--gold)' : ''}">【游历奇遇】</span>
-        <span class="rv"${pend ? '' : ' id="travel-left"'}>${pend ? pend.name + '（待领）' : `距下一次 ${formatDuration(left)}`}</span>
-        <span class="rs">${pend ? C().rewardTextOf(pend.effect) : ''}</span>
+        <span class="rk">【游历奇遇】</span>
+        <span class="rv" id="travel-left">距下一次 ${formatDuration(left)}</span>
+        <span class="rs"></span>
       </div>
     </div>`;
   }
@@ -4324,6 +4337,15 @@ window.UI = (function () {
         case 'open-sect': sectModal(); break;
         case 'open-keji': kejiModal(); break;
         case 'open-travel': travelModal(); break;
+        // 首页游历条上的奇遇已经出来了：点一下直接领走（不再进二级页面）
+        case 'claim-travel': {
+          const tvr = C().claimTravel();
+          if (!tvr.ok) { toast(tvr.msg); break; }
+          toast(`🎁 ${tvr.msg}`, 2600);
+          sfx('coin');
+          render(); renderTopbar();
+          break;
+        }
         case 'open-bloodline': bloodlineModal(); break;
         case 'open-garden': gardenModal(); break;
         case 'open-refine': refineModal(); break;

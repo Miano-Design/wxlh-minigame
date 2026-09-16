@@ -242,8 +242,9 @@
     const th = 46;
     card(CV.y, th);
     CV.text('【游历奇遇】', PAD + 14, CV.y + th / 2, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim });
-    CV.text(pend ? pend.name + '（待领）' : '距下一次 ' + Math.round(Math.max(0, tv.every - tv.sec)) + ' 秒', CV.W - PAD - 14, CV.y + th / 2, { size: CV.FS.lg, bold: true, align: 'right' });
-    CV.hit('open_travel', PAD, CV.y, CV.W - PAD * 2, th);
+    CV.text(pend ? pend.name : '距下一次 ' + Math.round(Math.max(0, tv.every - tv.sec)) + ' 秒', CV.W - PAD - 14, CV.y + th / 2, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim, align: 'right' });
+    // 出了奇遇 → 点一下直接领；还在倒计时 → 点进二级页面（跟网页版一致）
+    CV.hit(pend ? 'claim_travel' : 'open_travel', PAD, CV.y, CV.W - PAD * 2, th);
     CV.y += th + GAP;
 
     /* ⑤ 挂机（网页版 idleBlock：三行 + 两个按钮） */
@@ -283,6 +284,12 @@
 
   /* ---------- 首页动作 ---------- */
   CV.on('claim_all', () => { const r = Core.claimEverything(); CV.toast(r && r.total ? '已领取' : '暂时没有可领的'); CV.render(); });
+  // 首页游历条上的奇遇已经出来了：点一下直接领走（不再进二级页面）
+  CV.on('claim_travel', () => {
+    const r = Core.claimTravel();
+    CV.toast(r && r.ok ? '🎁 ' + r.msg : (r && r.msg) || '还没有新的游历');
+    CV.render();
+  });
   CV.on('goto_quest', () => CV.toast('主线任务：点右侧按钮领取'));
   CV.on('claim_quest', () => { const r = Core.claimMainQuest && Core.claimMainQuest(); CV.toast((r && r.msg) || '已领取'); CV.render(); });
   ['open_protag', 'open_travel', 'open_idlelines', 'open_guide', 'open_curdoc', 'open_settings',
