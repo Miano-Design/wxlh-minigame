@@ -373,7 +373,13 @@ body {
   fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
 }
 /* 居中弹窗：手机键盘弹出时（--kb = 被键盘占掉的高度）整体上移，否则会被键盘盖住看不见 */
-.sheet.center { top: calc(50% - var(--kb, 0px) / 2); bottom: auto; transform: translate(-50%, -50%); border-radius: 1.125rem; border: 1px solid var(--line); max-height: min(80%, calc(100vh - var(--kb, 0px) - 1.5rem)); animation: pop .18s ease; width: min(calc(100% - 1.5rem), 31rem); }
+.sheet.center { top: calc(50% - var(--kb, 0px) / 2); bottom: auto; transform: translate(-50%, -50%); border-radius: 1.125rem; border: 1px solid var(--line);
+  /* V9.5.82（自审·网页版）：居中弹窗的高度上限用 100vh 在 iOS Safari 上会算高
+     （地址栏收起时 vh 仍是"最大视口高"），弹窗底部会被顶出屏幕。加一行 dvh 覆盖，
+     老浏览器读不懂 dvh 就自动用上面那行 100vh。 */
+  max-height: min(80%, calc(100vh - var(--kb, 0px) - 1.5rem));
+  max-height: min(80%, calc(100dvh - var(--kb, 0px) - 1.5rem));
+  animation: pop .18s ease; width: min(calc(100% - 1.5rem), 31rem); }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(.92); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
 /* ---------- 整页面板（二级内容各占一页，左上角返回） ---------- */

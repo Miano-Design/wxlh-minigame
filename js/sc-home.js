@@ -15,7 +15,7 @@
     /* ① 主角卡 .card.text-rows：四行【标签】值，行间虚线；整块都能点进角色页 */
     const st = Core.realmState(), au = Core.authorityInfo(), sect = Core.sectInfo();
     const rows = [
-      ['【境界】', st.curName || '未定血统', st.hasBloodline ? ('第 ' + Math.min(st.realm + 1, D.REALM_STAGE_COUNT) + ' / ' + D.REALM_STAGE_COUNT + ' 阶') : '点【主角】卡里选血统'],
+      ['【境界】', st.curName || '未定血统', st.hasBloodline ? ('已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶') : ''],
       ['【等级】', 'Lv.' + S.player.level, 'EXP ' + Math.floor((S.player.exp / (D.EXP_TABLE[S.player.level] || 1)) * 100) + '%'],
       ['【主角】', '六维待分 ' + (S.player.attrPoints || 0) + ' · 技能待加 ' + (S.player.skillPoints || 0), ''],
       ['【转生】', S.player.reincarnations + ' 世', '权限 Lv.' + au.lv + ' · 评级 Lv.' + sect.lv],
@@ -139,7 +139,8 @@
       const y2 = top + lh;
       const dur = G.formatDuration ? G.formatDuration(bank.seconds) : (bank.seconds + '秒');
       CV.text('【已挂】', U.pad(), y2 + lh / 2, { size: CV.FS.md, color: dim });
-      CV.text(dur, U.pad() + 62 * CV.SCALE, y2 + lh / 2, { size: CV.FS.md, color: txt });
+      // V9.5.82：挂满上限时补一个「已满」（和网页版一致），免得玩家以为收益卡住了
+      CV.text(dur + (Core.idleFull && Core.idleFull() ? '（已满）' : ''), U.pad() + 62 * CV.SCALE, y2 + lh / 2, { size: CV.FS.md, color: txt });
       const gainTxt = '◈ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
         + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '') + (bank.story ? ' · ❖ ' + bank.story : '');
       CV.text('【待领】', U.pad() + U.cw() - CV.measure(gainTxt, CV.FS.md) - 70 * CV.SCALE, y2 + lh / 2, { size: CV.FS.md, color: dim });

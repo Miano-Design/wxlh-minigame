@@ -173,7 +173,7 @@
 
     /* ② 等级：共享的伙伴经验池 + 升 1 级 / 升 10 级 / 重生（V9.5.46/47） */
     U.card(function () {
-      U.h3('等级', 'Lv.' + c.lv + ' / 100');
+      U.h3('等级', 'Lv.' + c.lv + ' / ' + D.PLAYER_MAX_LV);
       U.kv('伙伴经验', fmt(Core.partnerExp()), CV.C.gold);
       U.space(CV.SP[2]);
       U.btnRow([
@@ -207,8 +207,8 @@
       U.h3('⚡ 技能', '芯片 ▣ ' + fmt(S.cur.skillChip || 0));
       [ch.skills.s1, ch.skills.s2, ch.skills.ult].forEach(function (sk, i) {
         if (!sk) return;
-        const lv = (c.skillLv || [1, 1, 1])[i];
-        CV.text(['技能', '技能', '必杀'][i] + '·' + sk.name + '（Lv.' + lv + '/10）', U.pad(), U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        const lv = (c.skillLv || [0, 0, 0])[i];   // V9.5.82：技能从 0 级起
+        CV.text(['技能', '技能', '必杀'][i] + '·' + sk.name + '（Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i] + '）', U.pad(), U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true });
         U.y += 20 * CV.SCALE;
         U.hint(sk.desc || '', 0);
         U.space(CV.SP[1]);
@@ -257,7 +257,7 @@
   CV.on('lv1', () => { const r = Core.levelUp(cur, 1); CV.toast(r.msg); CV.render(); });
   CV.on('lv10', () => { const r = Core.levelUp(cur, 10); CV.toast(r.msg); CV.render(); });
   CV.on('reborn', function () {
-    U.confirm('伙伴重生', '把「' + nm(cur) + '」重置回 Lv.1，返还 ' + fmt(Core.expSpentOn(cur)) + ' 伙伴经验（点数不返还）。星级 / 血统 / 装备 / 血清都不动。', function () {
+    U.confirm('伙伴重生', '把「' + nm(cur) + '」重置回 Lv.0，返还 ' + fmt(Core.expSpentOn(cur)) + ' 伙伴经验（点数不返还）。星级 / 血统 / 装备 / 血清都不动。', function () {
       const r = Core.rebornChar(cur);
       CV.toast(r.msg || '已重生');
       CV.render();

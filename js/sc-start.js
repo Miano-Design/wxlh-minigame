@@ -48,7 +48,7 @@
     U.space(CV.SP[3]);
     U.btnRow([{ label: '以这个名字进入残域', style: 'primary', id: 'name_ok' }]);
     U.y += CV.SP[1];
-    U.hint('名字定完紧接着选血统：境界线跟着血统走，所以这一步不能拖到 Lv.10');
+    U.hint('名字定完紧接着选血统：境界线跟着血统走，所以开局就得定下来（选完不可更改）');
   });
   CV.on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });
   CV.on('name_type', function () {
