@@ -181,8 +181,10 @@ const L = {
   text(str, opt) {
     opt = opt || {};
     const size = opt.size || 13;
-    const x = opt.x || 16;
-    const maxW = (opt.maxW || (CV.W - 16 - x));
+    // 居中要按**屏幕中心**，不能按左边距——旧版这里 `align:'center'` 是拿 x=16 当中心，
+    // 于是名字这类居中文字被画到屏幕左边外面去了（父亲大人截图里的「白泽」）。
+    const x = opt.x !== undefined ? opt.x : (opt.align === 'center' ? CV.W / 2 : 16);
+    const maxW = (opt.maxW || (CV.W - 16 - (opt.align === 'center' ? 16 : x)));
     const lines = wrapText(str, maxW, size, opt.bold);   // 折行，不再画出屏幕
     lines.forEach(ln => {
       drawText(ln, x, this.y + size / 2 + 2, { size, color: opt.color || CV.C.text, bold: opt.bold, align: opt.align });
