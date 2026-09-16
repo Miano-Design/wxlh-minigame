@@ -85,6 +85,13 @@ body {
 #topbar .tb-spacer { flex: 1; }
 #curbar { display: flex; gap: 0.375rem; overflow-x: auto; padding: 2px 0.75rem var(--sp2); scrollbar-width: none; }
 #curbar::-webkit-scrollbar { display: none; }
+/* 概率公示页：纯文字排版（V9.5.53 父亲大人：不分卡片，卡片会把字裁掉） */
+.rate-block { font-size: var(--fs-sm); color: var(--text2); line-height: 1.9; padding: 0 2px 2px; }
+.rate-line { display: flex; gap: 0.5rem; align-items: baseline; }
+.rate-line .rl-k { flex: 0 0 3.25rem; color: var(--dim); }
+.rate-line .rl-v { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.rate-note { color: var(--dim); font-size: var(--fs-xs); line-height: 1.85; margin-top: 2px; }
+
 /* 池子右上角的「ⓘ」：点开看概率与保底（V9.5.52 父亲大人：不要专门一个按钮写那么详细） */
 .info-i {
   margin-left: auto; flex: 0 0 auto; width: 1.25rem; height: 1.25rem; padding: 0;
@@ -94,6 +101,15 @@ body {
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .info-i:active { background: var(--panel3); color: var(--text); }
+/* 放在整页标题栏右上角时：占位和左边返回键一样宽（2.5rem），里面的小圆圈居中，标题因此仍然真居中 */
+.page-head .info-i { width: 2.5rem; height: 2.5rem; border: none; background: none; position: relative; }
+.page-head .info-i::after {
+  content: 'i'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 1px solid var(--line2);
+  background: var(--panel2); color: var(--dim); display: grid; place-items: center;
+  font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 0.75rem; font-weight: 700;
+}
+.page-head .info-i:active::after { background: var(--panel3); color: var(--text); }
 
 .cur-chip { flex: 0 0 auto; display: flex; align-items: center; gap: 0.3125rem; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.3125rem 0.6875rem; min-height: 2.5rem; font-size: var(--fs-md); color: var(--text); font-family: inherit; cursor: pointer; position: relative; }
 .cur-chip.more { color: var(--dim); border-style: dashed; }

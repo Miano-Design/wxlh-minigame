@@ -587,14 +587,17 @@ t('招募页：有券才显示那行券；标签/机制说明都不写（父亲�
   });
   if (html.indexOf('本期 UP') < 0) throw new Error('定向 UP 那条要保留');
 });
-t('招募页：每个池子右上角一个 ⓘ（不再有单独的"概率公示"按钮）', () => {
+t('招募页：概率入口只有整页右上角一个 ⓘ；卡面上不再有保底注释', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('function recruitModal');
+  const seg = src.slice(i, i + 7000);
+  if (seg.indexOf('info-i page-info') < 0) throw new Error('整页右上角没有 ⓘ');
+  if (/<button class="info-i" data-rates="\$\{pid\}"/.test(seg)) throw new Error('每个池子还各挂着一个 ⓘ');
   const html = UI._panels.recruitModal().innerHTML;
-  if (html.indexOf('class="info-i"') < 0) throw new Error('缺 ⓘ 图标入口');
-  const n = (html.match(/class="info-i"/g) || []).length;
-  if (n < 3) throw new Error('三个池子都该有 ⓘ，实际 ' + n + ' 个');
   if (html.indexOf('概率公示') >= 0) throw new Error('单独那个"概率公示"按钮还在');
   if (html.indexOf('没有保底') >= 0 || html.indexOf('SSR 保底') >= 0) throw new Error('卡面上的保底注释还在');
   if (html.indexOf('保底SR') >= 0) throw new Error('十连按钮里的"保底SR"还在');
+  if (html.indexOf('用 点数') >= 0) throw new Error('池名后面的"用 X 货币"小字还在');
 });
 t('概率公示列出每一档出率', () => {
   const html = UI._panels.recruitRatesModal().innerHTML;
@@ -1235,10 +1238,13 @@ t('招募页：没有「每日免费」卡片，免费次数显示在单抽按�
   const html = UI._panels.recruitModal().innerHTML;
   if (html.indexOf('每日免费') >= 0) throw new Error('「每日免费」那张卡还在');
   if (html.indexOf('免费抽 1 次') < 0) throw new Error('单抽按钮上没显示免费次数');
-  // 抽掉普通池的 1 次后，按钮应该变成带倒计时的形态
+  // 抽掉普通池的 1 次后：还有免费次数 → 按钮保持"免费抽"形态，后面跟倒计时（不切付费文案）
   Core.freeRecruit('normal');
   const html2 = UI._panels.recruitModal().innerHTML;
-  if (html2.indexOf('免费抽（还剩 2 次 ·') < 0) throw new Error('冷却中没显示倒计时');
+  if (!/免费抽（还剩 2 次 · \d\d:\d\d）/.test(html2)) {
+    throw new Error('冷却中的按钮没保持"免费抽（还剩 N 次 · mm:ss）"');
+  }
+  if (/免费还差/.test(html2)) throw new Error('又切回付费文案了（父亲大人要求有免费就一直用免费形态）');
   // 高级池还留着 1 次免费
   if (html2.indexOf('免费抽 1 次（今日还剩 1 次）') < 0) throw new Error('高级池的免费没显示');
 });

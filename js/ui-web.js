@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.52';
+  const GAME_VER = '9.5.53';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2103,14 +2103,16 @@ window.UI = (function () {
       // 按钮文案如实反映"这次到底扣什么"：够券就写券，不够才写货币
       const fst = C().freeState(pid);
       const freeNow = fst.left > 0 && fst.ready;
-      const freeLabel = fst.left > 0
+      /* V9.5.53（父亲大人）：只要还有免费次数，按钮就一直是"免费抽"这个形态
+         （冷却中就把倒计时挂在后面），不再切成付费文案——不然两个形态来回跳。 */
+      const payLabel = tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`;
+      const oneLabel = fst.left > 0
         ? (fst.ready ? `免费抽 1 次（今日还剩 ${fst.left} 次）` : `免费抽（还剩 ${fst.left} 次 · ${mmss(fst.waitSec)}）`)
-        : '';
-      const oneLabel = freeLabel || (tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`);
+        : payLabel;
       const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}）`;
       return `<div class="card pool-card mb3">
         <!-- V9.5.50（父亲大人）：池名后面的"攒碎片/补图鉴/定向UP"标签、以及那一大段机制说明都不要了 -->
-        <h3>${p.name} <button class="info-i" data-rates="${pid}" aria-label="概率与保底">i</button></h3>
+        <h3>${p.name}</h3>
         ${tk && tk.n > 0 ? `<div class="ticket-row has">
           <span>🎫 ${tkName} ×<b>${tk.n}</b></span>
         </div>` : ''}
@@ -2118,12 +2120,13 @@ window.UI = (function () {
         ${up ? (() => {
           const left = D.upTimeLeft();
           const dLeft = Math.floor(left / 86400e3), hLeft = Math.floor(left % 86400e3 / 3600e3);
-          return `<div class="up-banner">本期 UP：<b>${esc(up.name)}</b> · 「${up.faction}」阵营（SSR 里一半是他，50 抽必出）
+          return `<div class="up-banner">本期 UP：<b>${esc(up.name)}</b> · 「${up.faction}」阵营
             <span style="float:right;color:var(--dim)">剩 ${dLeft} 天 ${hLeft} 小时</span></div>`;
         })() : ''}
 
         <div class="btn-row">
-          <button class="btn small ${freeNow ? 'gold' : ''}" data-pull1="${pid}" data-free1="${freeNow ? 1 : ''}" data-freelabel="${fst.left > 0 ? pid : ''}">${oneLabel}</button>
+          <button class="btn small ${freeNow ? 'gold' : ''}" data-pull1="${pid}" data-free1="${freeNow ? 1 : ''}"
+            data-freelabel="${fst.left > 0 && !fst.ready ? pid : ''}" data-freepool="${pid}">${oneLabel}</button>
           <button class="btn small gold" data-pull10="${pid}">${tenLabel}</button>
         </div>
       </div>`;
@@ -2172,6 +2175,11 @@ window.UI = (function () {
         showResults([r], { pid, n: 1 });
         return;
       }
+      const stNow = C().freeState(pid);
+      if (stNow.left > 0) {                             // 还有免费次数但在冷却 → 只提示，不抢着收费
+        failToast(`免费还差 ${String(Math.floor(stNow.waitSec / 60)).padStart(2, '0')}:${String(stNow.waitSec % 60).padStart(2, '0')}`);
+        return;
+      }
       runPull(pid, 1, b);
     });
     // 冷却倒计时：每秒只改那几个按钮上的文字（不整页重画）
@@ -2186,49 +2194,60 @@ window.UI = (function () {
         if (st.left <= 0) {                                  // 次数用完 → 整层重画一次，回到正常按钮
           clearInterval(w._freeTimer); w._freeTimer = null; recruitModal(w); return;
         }
-        else if (st.ready) { el.dataset.free1 = '1'; el.classList.add('gold'); el.textContent = `免费抽 1 次（今日还剩 ${st.left} 次）`; }
-        else { el.dataset.free1 = ''; el.classList.remove('gold'); el.textContent = `免费抽（还剩 ${st.left} 次 · ${String(Math.floor(st.waitSec / 60)).padStart(2, '0')}:${String(Math.max(0, st.waitSec % 60)).padStart(2, '0')}）`; }
+        else if (st.ready) { el.dataset.free1 = '1'; el.dataset.freelabel = ''; el.classList.add('gold'); el.textContent = `免费抽 1 次（今日还剩 ${st.left} 次）`; }
+        else {
+          el.dataset.free1 = ''; el.classList.remove('gold');
+          const sec = st.waitSec;
+          el.textContent = `免费抽（还剩 ${st.left} 次 · ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}）`;
+        }
       });
     }, 1000);
     w.querySelectorAll('[data-pull10]').forEach(b => b.onclick = () => runPull(b.dataset.pull10, 10, b));
     const tk = w.querySelector('[data-ssrpick]');
     if (tk) tk.onclick = () => ssrPickModal(w);
+    // 概率/保底入口只有整页右上角那一个 ⓘ（父亲大人：不要每个池子都放）
+    const head = w.querySelector('.page-head');
+    if (head) {
+      const pad = head.querySelector('.page-pad');
+      if (pad) pad.outerHTML = '<button class="info-i page-info" data-rates="1" aria-label="概率与保底">i</button>';
+    }
     w.querySelectorAll('[data-rates]').forEach(b => b.onclick = () => recruitRatesModal(w));
     return w;
   }
   // 概率公示（对标《道友修仙》：它在招募界面直接把"37% 血脉 5%、25% 血脉 15%…"写出来）。
   // 本页所有数字都从 D.RECRUIT_POOLS.rates / D.PITY 派生，和真正抽卡用的那份数据同源。
   function recruitRatesModal(wrap) {
-    const rows = Object.entries(D.RECRUIT_POOLS).map(([pid, p]) => {
+    /* V9.5.53（父亲大人）：这一页改成**纯文字排版**——不再一排卡片、也不截断文字。
+       内容：每个池子的出率、单抽/十连花什么、保底规则与当前进度。 */
+    const line = (label, text) => `<div class="rate-line"><span class="rl-k">${label}</span><span class="rl-v">${text}</span></div>`;
+    const body = Object.entries(D.RECRUIT_POOLS).map(([pid, p]) => {
       const pv = C().pityView(pid);
       const tk = C().ticketOf(pid);
       const tkName = tk ? (D.ITEMS[tk.id] || {}).name || tk.id : '';
       const rate = D.RARITIES.filter(r => p.rates[r])
-        .map(r => `<span class="rtext-${r}">${r} ${(p.rates[r] * 100).toFixed(1)}%</span>`).join('');
+        .map(r => `<span class="rtext-${r}">${r} ${(p.rates[r] * 100).toFixed(1)}%</span>`).join('　');
       const cost = Object.entries(p.cost).map(([k, v]) => `${curIcon(k)}${fmt(v)}`).join(' + ');
       const ten = Object.entries(p.ten || p.cost).map(([k, v]) => `${curIcon(k)}${fmt(v)}`).join(' + ');
-      const left = pv ? `<div class="pity-row">
-        <span>SSR 还差 <b>${Math.max(0, pv.ssr.cap - pv.ssr.n)}</b> 抽</span>
-        <span>UR 还差 <b>${Math.max(0, pv.ur.cap - pv.ur.n)}</b> 抽</span>
-        ${pv.up ? `<span style="color:var(--gold)">UP 还差 <b>${Math.max(0, pv.up.cap - pv.up.n)}</b> 抽</span>` : ''}
-      </div>` : '';
-      return `<div class="card mb3">
-        <h3>${p.name} <span class="sub">${p.tag} · 用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
-        <div class="rate-row">${rate}</div>
-        <div class="kv"><span class="k">单抽</span><span>${cost}${tk ? ` · 或 🎫 ${tkName}×1（现有 ${tk.n} 张）` : ''}</span></div>
-        <div class="kv"><span class="k">十连</span><span>${ten}${tk ? ` · 或 🎫 ${tkName}×10` : ''} · 保底至少 1 个 SR</span></div>
-        <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7;margin-top:0.375rem">${D.pityText(pid)}</div>
-        ${left}
-      </div>`;
+      const left = pv
+        ? `SSR 还差 ${Math.max(0, pv.ssr.cap - pv.ssr.n)} 抽 · UR 还差 ${Math.max(0, pv.ur.cap - pv.ur.n)} 抽`
+          + (pv.up ? ` · UP 还差 ${Math.max(0, pv.up.cap - pv.up.n)} 抽` : '')
+        : '';
+      return `<div class="section-title">${p.name}</div>
+        <div class="rate-block">
+          <div class="rate-line"><span class="rl-v">${rate}</span></div>
+          ${line('单抽', `${cost}${tk ? ` · 或 🎫 ${tkName}×1（现有 ${tk.n} 张）` : ''}`)}
+          ${line('十连', `${ten}${tk ? ` · 或 🎫 ${tkName}×10` : ''} · 保底至少 1 个 SR`)}
+          <div class="rate-note">${D.pityText(pid)}</div>
+          ${left ? `<div class="rate-note" style="color:var(--gold)">${left}</div>` : ''}
+        </div>`;
     }).join('');
     const w = showPanel(wrap, '概率公示', `
-      <div class="card mb3" style="border-color:#ffd76a55">
-      </div>
-      ${rows}
-      <button class="btn ghost block" style="margin-top:0.25rem" data-back>‹ 返回招募</button>`);
+      ${body}
+      <button class="btn ghost block mt3" data-back>‹ 返回招募</button>`);
     w.querySelector('[data-back]').onclick = () => recruitModal(w);
     return w;
   }
+
   function ssrPickModal(wrap) {
     const ssrs = D.characters.filter(c => c.rarity === 'SSR' && !c.hidden);
     const w = showPanel(wrap, 'SSR 自选（剩 ' + C().S.ssrTicket + ' 张）', `
@@ -3118,7 +3137,7 @@ window.UI = (function () {
       <div class="card mt3">
         <h3>本周全清奖励</h3>
         <div class="note mb2">${rewardText(D.WEEKLY_ALL_REWARD)}</div>
-        <button class="btn gold block" data-wclaimall="1" ${allDone && !claimedAll ? '' : 'disabled'}>${claimedAll ? '已领取' : '一键领取'}</button>
+        <button class="btn gold block" data-wclaimall="1" ${allDone && !claimedAll ? '' : 'disabled'}>${claimedAll ? '已领取' : '领取'}</button>
       </div>`;
   }
   // 成就：四条线（战斗 / 养成 / 收集 / 挑战），达成后手动领取
@@ -3177,8 +3196,9 @@ window.UI = (function () {
       }).join('')}
       <div class="card mt3">
         <h3>全部完成奖励</h3>
-        <div class="note mb2">${Object.entries(D.DAILY_ALL_REWARD).map(([k, v]) => `${curIcon(k)}${v}`).join(' · ')}</div>
-        <button class="btn gold block" data-claimall="1" ${allDone && !S.tasks.allClaimed ? '' : 'disabled'}>${S.tasks.allClaimed ? '已领取' : '一键领取'}</button>
+        <!-- V9.5.53：统一走 rewardText（以前直接打印 reward 的 key，item 会显示成 ticket_normal 这种 id） -->
+        <div class="note mb2">${rewardText(D.DAILY_ALL_REWARD)}</div>
+        <button class="btn gold block" data-claimall="1" ${allDone && !S.tasks.allClaimed ? '' : 'disabled'}>${S.tasks.allClaimed ? '已领取' : '领取'}</button>
       </div>`;
     const w = showPanel(wrap, '任务', `
       <div class="pill-tabs">
@@ -3220,7 +3240,7 @@ window.UI = (function () {
       sfx(r.ok ? 'level' : 'fail');
       tasksModal(taskTab, w); renderTopbar();
     });
-    // 注意：只有"日常"页签才有一键领取按钮，其它页签下这里必须是 null 安全的
+    // 注意：只有"日常"页签才有"领取全部"按钮，其它页签下这里必须是 null 安全的
     const claimAllBtn = w.querySelector('[data-claimall]');
     if (claimAllBtn) claimAllBtn.onclick = () => {
       const r = C().claimAllTasks();
