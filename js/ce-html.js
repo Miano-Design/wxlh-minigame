@@ -127,17 +127,38 @@
       return `<text${clsAttr}${styleAttr} value=${attrValue(value)}/>`;
     }
 
-    /* 容器：文字段各自成 text，子元素递归 */
+    /* 容器：**行内的东西要并回一行**。
+       网页版里 `完成奖励：<span>◈</span>500` 这种是行内混排，
+       早先按"每段一个 text"翻译 → 引擎里每段各占一行（那格凭空变成 3 行、卡片变高）。
+       现在：把"纯文字 + 行内标签（span/b/i/em/strong/small，且它们自己没有元素子节点）"
+       攒成一段，遇到块级子元素才断行。 */
+    const INLINE = /^(span|b|strong|i|em|small|u|code|br)$/;
+    const onlyText = (n) => !(n.children || []).some((c) => c.tag);
+    const textOf = (n) => (n.children || []).filter((c) => c.text !== undefined).map((c) => c.text).join('');
+    /* 只并"纯格式"的行内片段：它自己不带 class / id / data-*。
+       带类名的行内元素（如 <b class="il-v"> 的值、 .tag 标签）必须保留成独立元素——
+       否则颜色层级会丢（看着乱），带 data-* 的还会把点击目标并掉（点了没反应）。
+       这正是康康上一版改坏的地方。 */
+    const inlineText = (n) => {
+      if (!INLINE.test(n.tag) || !onlyText(n)) return null;
+      const at = n.attrs || {};
+      if (at.class || at.id) return null;
+      if (Object.keys(at).some((k) => k.indexOf('data-') === 0)) return null;
+      return textOf(n);
+    };
+
     const inner = [];
     const nextCtx = { ancestorClasses: (ctx.ancestorClasses || []).concat([classes.join(' ')]) };
+    let buf = '';
+    const flush = () => { if (buf.trim()) inner.push(`<text value=${attrValue(buf.trim())}/>`); buf = ''; };
     kids.forEach((child) => {
-      if (child.text !== undefined) {
-        const v = child.text.trim();
-        if (v) inner.push(`<text value=${attrValue(v)}/>`);
-      } else {
-        inner.push(serialize(child, nextCtx));
-      }
+      if (child.text !== undefined) { buf += child.text; return; }
+      const inl = inlineText(child);
+      if (inl !== null) { buf += inl; return; }
+      flush();
+      inner.push(serialize(child, nextCtx));
     });
+    flush();
     const head = outAttrs.length ? ' ' + outAttrs.join(' ') : '';
     return inner.length ? `<view${head}>${inner.join('')}</view>` : `<view${head}/>`;
   }

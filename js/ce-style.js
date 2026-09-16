@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-16 11:11 */
+   生成时间：2026-09-16 11:21 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -836,12 +836,6 @@ module.exports = {
   "lineHeight": 18,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t2__text.isxh5spr3": {
-  "color": "#ffd76a",
-  "fontSize": 11,
-  "lineHeight": 18,
-  "width": "100%"
- },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
@@ -1470,11 +1464,6 @@ module.exports = {
   "borderBottomRightRadius": 6,
   "borderBottomLeftRadius": 6
  },
- "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.bar.exp.mt3__view.isx1mfx3mc": {
-  "color": "#e9edf6",
-  "fontSize": 15,
-  "width": "0%"
- },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.kv": {
   "color": "#e9edf6",
   "fontSize": 13,
@@ -1545,12 +1534,6 @@ module.exports = {
   "marginRight": 10,
   "__textW": 175
  },
- "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text.isxmq1bso": {
-  "color": "#e6b64c",
-  "fontSize": 13,
-  "marginRight": 10,
-  "__textW": 41
- },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
@@ -1563,13 +1546,6 @@ module.exports = {
   "marginBottom": 10,
   "lineHeight": 19,
   "width": "100%"
- },
- "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text.isx184nt68": {
-  "color": "#e9edf6",
-  "fontSize": 13,
-  "whiteSpace": "nowrap",
-  "marginRight": 10,
-  "__textW": 124
  },
  "view#app__view#battle-root": {
   "color": "#e9edf6",
@@ -2233,7 +2209,7 @@ module.exports = {
   "fontSize": 12,
   "fontWeight": "bold",
   "marginRight": 6,
-  "__textW": 236
+  "__textW": 275
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots": {
   "color": "#e9edf6",
@@ -2596,12 +2572,6 @@ module.exports = {
  },
  "view#app__scrollview#view__view.screen__view.card__view.kv__text": {
   "color": "#e9edf6",
-  "fontSize": 13,
-  "marginRight": 10,
-  "__textW": 8
- },
- "view#app__scrollview#view__view.screen__view.card__view.kv__text.isx13m278j": {
-  "color": "#56c894",
   "fontSize": 13,
   "marginRight": 10,
   "__textW": 15
