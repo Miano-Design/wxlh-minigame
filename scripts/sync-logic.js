@@ -18,7 +18,7 @@ const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
    它当然会碰 DOM——那正是我们要复用的"界面字符串工厂"，
    小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。
    js/ui.js 也一起刷（底包快照 index.html 引的就是它），免得两份界面层各老各的。 */
-const EXTRA = { 'ui.js': ['ui-web.js', 'ui.js'] };
+const EXTRA = { 'ui.js': ['ui-web.js', 'ui.js'], 'main.js': 'main.js' };
 /* 网页版的"包"也一起搬一份（新工程以网页版为底）：入口页、样式、图标清单。
    注意：小游戏运行时用的是编译好的 js/ce-style.js，css/style.css 只是"底包快照"。 */
 const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],

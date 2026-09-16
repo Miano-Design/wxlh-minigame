@@ -30,7 +30,10 @@
   function queueLoginReward() {
     const busy = () => {
       const root = document.getElementById('modal-root');
-      return !!(root && root.children && root.children.length);
+      if (root && root.children && root.children.length) return true;
+      // 开局三步没走完也算"忙"：起名弹窗关掉、血统弹窗还没起来的那半秒里弹窗栈是空的，
+      // 只看弹窗栈的话，七日登录会先跳出来再被血统弹窗盖住（父亲大人报的）
+      return !!(UI.needsOnboarding && UI.needsOnboarding());
     };
     const attempt = (left) => {
       if (busy() && left > 0) { setTimeout(() => attempt(left - 1), 1000); return; }
