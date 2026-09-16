@@ -505,6 +505,57 @@ setParty(['C021']);
   })());
 }
 
+// 33b. 上限联动（V9.5.68 父亲大人问的："技能等级总数是不是应该跟等级一样"）
+{
+  Core.newGame(); Core.setPlayerName('上限');
+  const SKILL_BARS = 3;
+  t('技能上限有单一出处', D.SKILL_MAX >= 10 && D.SKILL_POINT_EVERY_LV >= 1);
+  t('Lv.100 给的技能点正好点满三条技能', (() => {
+    const supply = Math.floor(100 / D.SKILL_POINT_EVERY_LV);
+    const need = (D.SKILL_MAX - 1) * SKILL_BARS;
+    return supply === need;
+  })());
+  t('升级真的按"每 N 级 1 点"发', (() => {
+    Core.newGame(); Core.setPlayerName('上限2');
+    let got = 0;
+    for (let i = 0; i < 30; i++) {
+      const before = Core.S.player.skillPoints || 0;
+      Core.addPlayerExp(D.EXP_TABLE[Core.S.player.level] || 1);
+      got += (Core.S.player.skillPoints || 0) - before;
+    }
+    // 30 次升级（Lv.1→Lv.31）应发 floor(31/3) = 10 点
+    return got === Math.floor(Core.S.player.level / D.SKILL_POINT_EVERY_LV);
+  })());
+  t('技能能升到上限、到顶才说已满级', (() => {
+    Core.newGame(); Core.setPlayerName('上限3');
+    Core.S.player.skillPoints = 999;
+    let n = 0;
+    while (Core.allocateSkill(0).ok && n < 50) n++;
+    return Core.S.player.skillLv[0] === D.SKILL_MAX;
+  })());
+  t('伙伴技能上限与主角一致', (() => {
+    Core.newGame(); Core.setPlayerName('上限4');
+    Core.addChar('C021');
+    Core.S.cur.skillChip = 999999;
+    let n = 0;
+    while (Core.skillUp('C021', 0).ok && n < 50) n++;
+    return Core.S.chars.C021.skillLv[0] === D.SKILL_MAX;
+  })());
+  t('芯片价目表覆盖全部等级', Core.SKILL_CHIP_COST.length >= D.SKILL_MAX - 1);
+  t('老档按新口径补技能点（Lv.100 → 33 点）', (() => {
+    Core.newGame(); Core.setPlayerName('上限5');
+    Core.S.player.level = 100; Core.S.player.skillLv = [1, 1, 1];
+    delete Core.S.player.skillPoints;
+    Core.migrate();
+    return Core.S.player.skillPoints === Math.floor(100 / D.SKILL_POINT_EVERY_LV);
+  })());
+  t('灯阁评级上限是够得着的（累计需求 ≤ 40 万评级经验）', (() => {
+    let cum = 0;
+    for (let lv = 1; lv < D.SECT_MAX; lv++) cum += D.sectExpNeed(lv);
+    return cum <= 400000;
+  })());
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];
@@ -784,8 +835,10 @@ setParty(['C021']);
     const uid = res.frames[0].allies[0].uid;
     return res.frames.filter(f => f.type === 'damage' && f.target === uid).reduce((s, f) => s + f.dmg, 0);
   };
-  const plain = Battle.run({ allies: mk(), enemies: foe(), worldId: null, maxRounds: 8 });
-  const reduced = Battle.run({ allies: mk({ dmgReduce: 0.5 }), enemies: foe(), worldId: null, maxRounds: 8 });
+  /* V9.5.68：这一对比原来跑 8 回合，战斗有随机性，偶尔两边累计伤害太接近会**偶发失败**
+     （实测 5 次里挂 1 次）。改成 16 回合：样本多了，50% 减伤一定压得住噪声。 */
+  const plain = Battle.run({ allies: mk(), enemies: foe(), worldId: null, maxRounds: 16 });
+  const reduced = Battle.run({ allies: mk({ dmgReduce: 0.5 }), enemies: foe(), worldId: null, maxRounds: 16 });
   t('减伤字段真的减伤', takenTotal(plain) > 0 && takenTotal(reduced) < takenTotal(plain) * 0.8);
   const energy = Battle.run({ allies: mk({ initEnergy: 100 }), enemies: foe(), worldId: null, maxRounds: 4 });
   t('开场能量让第一回合就放必杀', energy.frames.slice(0, 14).some(f => f.type === 'skill' && f.ult));

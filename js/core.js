@@ -243,7 +243,8 @@ window.Core = (function () {
     S.player.skillLv = (S.player.skillLv || [1, 1, 1]).slice(0, 3);
     if (S.player.skillPoints === undefined) {
       const spent = S.player.skillLv.reduce((s, x) => s + (x - 1), 0);
-      S.player.skillPoints = Math.max(0, (S.player.level - 1) - spent);
+      // V9.5.68：技能点改成每 3 级 1 点，老档按同一口径补算，避免"老档凭空多出几十点"
+      S.player.skillPoints = Math.max(0, Math.floor(S.player.level / D.SKILL_POINT_EVERY_LV) - spent);
     }
     S.altPlayers = Array.isArray(S.altPlayers) ? S.altPlayers : [];
     S.altPlayers.forEach(p => {
@@ -252,7 +253,7 @@ window.Core = (function () {
       p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3);
       if (p.skillPoints === undefined) {
         const spent = p.skillLv.reduce((s, x) => s + (x - 1), 0);
-        p.skillPoints = Math.max(0, (p.level - 1) - spent);
+        p.skillPoints = Math.max(0, Math.floor(p.level / D.SKILL_POINT_EVERY_LV) - spent);
       }
     });
     // 背包从"道具+装备一个池子"改成三池分开（V9.2：道具 / 材料 / 装备）。
@@ -712,12 +713,13 @@ window.Core = (function () {
     save();
     return { ok: true, msg: `升到 ${c.star}★` };
   }
-  const SKILL_CHIP_COST = [10, 20, 35, 55, 80, 110, 150, 200, 260];
+  // V9.5.68：技能上限 10 → 12，所以芯片价目表补两级（沿用原来的涨幅）
+  const SKILL_CHIP_COST = [10, 20, 35, 55, 80, 110, 150, 200, 260, 340, 430];
   function skillUp(charId, idx) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     const lv = c.skillLv[idx];
-    if (lv >= 10) return { ok: false, msg: '已满级' };
+    if (lv >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
     const cost = SKILL_CHIP_COST[lv - 1];
     if (S.cur.skillChip < cost) return { ok: false, msg: `技能芯片不足（${S.cur.skillChip}/${cost}）` };
     S.cur.skillChip -= cost;
@@ -1769,7 +1771,15 @@ window.Core = (function () {
       S.player.exp -= D.EXP_TABLE[S.player.level];
       S.player.level++;
       S.player.attrPoints = (S.player.attrPoints || 0) + D.ATTR_POINTS_PER_LV;
-      S.player.skillPoints = (S.player.skillPoints || 0) + 1;
+      /* V9.5.68（上限联动体检）：技能点原来是**每级 1 点**——Lv.100 一共 99 点，
+         而三条技能从 1 级点到 10 级只要 27 点，多出来的 72 点永远花不掉（界面一直挂着"待加 72"）。
+         现在改成**每 3 级 1 点**，并把技能上限提到 12 级：
+           Lv.100 供给 floor(100/3) = 33 点 = 3 条 × 11 次升级 = 33 点，正好点满。
+         上限 10→12 让技能倍率从 1.63 抬到 1.77（+7%/级 的公式不变，只多两级），
+         幅度小到不影响刚调好的副本/深井难度；换来的是"技能点不再泛滥"。 */
+      if (S.player.level % D.SKILL_POINT_EVERY_LV === 0) {
+        S.player.skillPoints = (S.player.skillPoints || 0) + 1;
+      }
     }
   }
 
@@ -1781,7 +1791,7 @@ window.Core = (function () {
   function allocateSkill(idx) {
     const lv = S.player.skillLv || (S.player.skillLv = [1, 1, 1]);
     if (idx < 0 || idx > 2) return { ok: false, msg: '技能不存在' };
-    if (lv[idx] >= 10) return { ok: false, msg: '已满级' };
+    if (lv[idx] >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
     if ((S.player.skillPoints || 0) < 1) return { ok: false, msg: '没有可用技能点' };
     S.player.skillPoints--;
     lv[idx]++;

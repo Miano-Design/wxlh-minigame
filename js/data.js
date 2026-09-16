@@ -64,6 +64,10 @@ window.DATA = (function () {
   ];
   const ATTR_POINTS_PER_LV = 3;   // 每升 1 级获得的属性点
   const ATTR_POINT_VALUE = 2;     // 每点属性点增加的六维值
+  /* V9.5.68（上限联动体检）：技能点改为每 3 级给 1 点，配合 SKILL_MAX=12，
+     Lv.100 的 33 点正好把三条技能点满（以前每级 1 点 = 99 点，多出 72 点没处花）。 */
+  const SKILL_POINT_EVERY_LV = 3;
+  const SKILL_MAX = 12;           // 主角与伙伴统一的技能等级上限
   const BLOODLINE_UNLOCK_LV = 1;  // 开局第一件事就是选血统（境界线跟着血统走，所以不能拖到 Lv.10）
 
   /* ================= 背包容量 ================= */
@@ -682,7 +686,9 @@ window.DATA = (function () {
     { id: 'sect', title: '⑫ 灯阁评级 · 秘术阁 · 游历奇遇', body: [
       '这三条是照着别人的「宗门等级 / 秘术 / 游历」做的，作用各不相同：',
       '**灯阁评级**（对标宗门等级）：不用你点。打关卡首通 +12/+26/+48（普通/困难/地狱），重复刷减半，每打赢一场 +2，挂机每分钟 +1.2。升一级全队（含主角）全属性 +0.5%，永久生效、转生保留。等价于"推图顺便变强"。',
-      '**秘术阁**（对标 KeJi）：12 条线，每条每级只加 0.2%~0.5%，但可以一直修到顶（合 550 级）。前 8 条加战斗（攻/生/防/速/暴击/暴伤/技能/闪避），后 4 条加挂机经济（产出/经验/掉落/离线效率）。升级只花 ◆ 异界结晶——这是给高级货币的第二条长线出口，抽卡之外的钱有地方放。',
+      // V9.5.68（文案体检）：这段原来写"12 条线、合 550 级"——那是早期版本的规模，
+      // 现在实际是 42 条线、合计 1505 级（前 38 条加战斗，后 4 条加挂机经济）。
+      '**秘术阁**（对标 KeJi）：42 条线，每条每级只加 0.1%~0.8%，但可以一直修到顶（合计 1505 级）。33 条加战斗（攻/生/防/速/暴击/暴伤/技能/闪避…），9 条加挂机经济（产出/经验/掉落/离线效率）。升级只花 ◆ 异界结晶——这是给高级货币的第二条长线出口，抽卡之外的钱有地方放。',
       '**游历奇遇**（对标 YouLi）：挂机路上会不定时冒一次随机奇遇（在线、离线都算），有捡材料、遇前辈、挖矿脉、得招募令等。攒满会挂在首页「游历」那一段的进度条上，**不会过期丢东西**，回来点一下就行。',
       '入口：首页「养成」那一组里的「灯阁评级」「秘术阁」，游历奇遇在首页「游历」那一组的进度条上，点名字就是完整面板。',
     ] },
@@ -849,7 +855,13 @@ window.DATA = (function () {
      它的"宗门等级"不是手动点的按钮，而是**随主线 / 副本推进自动涨**的一条全局长线：
      321 级，每级都在抬全队属性。意义在于：打关卡除了掉装备之外，还有一条看得见的长线回报。
      我们照这个机制做，名字沿用我们的世界观（"灯阁评级"），机制一模一样。 */
-  const SECT_MAX = 120;
+  /* V9.5.68（上限联动体检）：原来是 120 级。但评级经验的曲线是 300×1.075^(lv-1)——
+     从 1 级练到 120 级要 **2170 万** 评级经验，按"每分钟 1.2 + 每场战斗"的真实产出算是 **27 年**，
+     等于界面上写着 "Lv.1 / 120" 却永远到不了（玩家只会觉得这条线是假的）。
+     曲线不动（动曲线会把前中期的强度整体抬起来，刚调好的副本/深井难度就白调了），
+     只把**天花板改成本来就够得着的 60 级**：约 132 天点满，满级全队 +30%。
+     中期数值与原来逐级完全一致，改动只发生在"原本永远到不了的那一段"。 */
+  const SECT_MAX = 60;
   const SECT_PCT_PER_LV = 0.005;                                   // 每级：全队全属性 +0.5%
   const sectExpNeed = lv => Math.round(300 * Math.pow(1.075, lv - 1));
   const sectBonusPct = lv => Math.max(0, lv - 1) * SECT_PCT_PER_LV;
@@ -1654,7 +1666,7 @@ window.DATA = (function () {
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES,
-    ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
+    ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV, SKILL_POINT_EVERY_LV, SKILL_MAX,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
     BLOODLINE_SKILLS, KIND_NAMES, CLASS_SETS, SIGNATURE_EQUIPS, makeSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,

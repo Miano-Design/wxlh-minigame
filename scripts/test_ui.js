@@ -1521,6 +1521,16 @@ t('底栏：执灯者不再有红点（那里没有待领的东西），背包�
   const bagSeg = withStash.slice(withStash.indexOf('data-tab="bag"'));
   if (!bagSeg.slice(0, 120).includes('class="dot"')) throw new Error('待领箱有东西却没提示');
 });
+t('主页功能格只留功能名，没有任何状态小字（V9.5.68 父亲大人）', () => {
+  Core.newGame(); Core.setPlayerName('主页');
+  Core.choosePlayerBloodline('修真');
+  window.DATA.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });   // 全解锁，才有全部格子可查
+  const html = UI._panels._screens.homeScreen();
+  const tiles = html.match(/<button class="tile"[^>]*>[\s\S]*?<\/button>/g) || [];
+  if (tiles.length < 20) throw new Error('主页功能格数量不对：' + tiles.length);
+  const withSub = tiles.filter(x => x.includes('tt-sub'));
+  if (withSub.length) throw new Error('还有格子在带小字：' + withSub[0].replace(/\s+/g, ' ').slice(0, 80));
+});
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

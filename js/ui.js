@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.67';
+  const GAME_VER = '9.5.68';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -784,61 +784,44 @@ window.UI = (function () {
      日常类的入口（悬赏 / 每日 / 成就 / 求签 / 招募 / 兑换）也收在这一段里，
      用一行小字「日常」隔开——首页的「游历」只放游历奇遇本身。 */
   function growBlock() {
-    const S = C().S;
-    const sect = C().sectInfo();
-    const kejiTotal = D.KEJI.reduce((s, k) => s + C().kejiLv(k.id), 0);
-    const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
-    const au = C().authorityInfo();
-    const gl = S.player.geneLock > 0 ? `${S.player.geneLock} 阶` : '未解锁';
-    const beasts = Object.keys(S.beast.owned || {}).length;
-    const fbOwn = C().fabaoState().own.length;
-    const gardenBusy = C().gardenState().filter(p => p.plot).length;
-    const arena = C().arenaState();
-    const mountOwn = C().mountState().own.length;
     const achDot = C().achievementSummary().list.filter(x => x.done && !x.claimed).length > 0;
     const signSt = C().signState();
-    const signToday = signSt.canDraw ? null : signSt;
-    // 一条入口 = [动作, 名字, 状态文字, 解锁条件(可空), 是否亮红点]
+    const signReady = !!signSt.canDraw;         // 今天还没求签 → 这一格亮红点
+    /* 一条入口 = [动作, 名字, 状态文字(一律 null), 解锁条件(可空), 是否亮红点]
+       V9.5.68（父亲大人）：「主页的功能，啥小字都不要，只保留功能名称就行了」——
+       养成 / 日常 两排格子里原来每条都挂一行状态小字（"1 人上阵""Lv.1""0/20 件""第 1 台 · 剩 5 次"…），
+       整屏看着全是小字。现在全部去掉：**格子里只有功能名**；
+       真正需要提醒的事（有奖励可领、有待领箱）用红点表达，点进去自然看得到数。 */
     const lines = [
-      ['open-party', '队伍', `${C().S.party.filter(Boolean).length} 人上阵`],
+      ['open-party', '队伍'],
       ['open-grow', '成长'],
-      ['open-sect', '灯阁评级', `Lv.${sect.lv}`],
-      ['open-keji', '秘术阁', `${kejiTotal} 级`],
-      /* V9.5.66（父亲大人）：这条元组的第 3 位是**状态**，不是说明——
-         以前「每日任务」写成 'tasks'、「兑换大厅」写成 'shop'（把解锁条件的 key 塞进了状态位），
-         界面上就直接把内部名字画出来了（父亲大人截图里那两处怪字就是这个）。
-         统一规矩：第 3 位只准放"当前状态"，没状态就留空。 */
-      ['open-fabao', '法宝', `${fbOwn}/${D.FABAO.length} 件`],
-      ['open-garden', '药园', `${gardenBusy} 块在用`],
-      ['open-arena', '斗法台', `第 ${arena.floor} 台 · 剩 ${arena.left} 次`],
-      ['open-mount', '坐骑', `${mountOwn}/${D.MOUNTS.length} 匹`],
+      ['open-sect', '灯阁评级'],
+      ['open-keji', '秘术阁'],
+      ['open-fabao', '法宝'],
+      ['open-garden', '药园'],
+      ['open-arena', '斗法台'],
+      ['open-mount', '坐骑'],
       ['open-refine', '炼化台'],
-      ['open-authority', '灯阁权限', `Lv.${au.lv}/${au.max}`, 'buildings'],
-      ['open-buildings', '基地建设', `合计 Lv.${bLv}`, 'buildings'],
-      ['open-genelock', '铭刻', gl, 'geneLock'],
-      ['open-beast', '伴生体', beasts ? `${beasts} 只` : '未孵化', 'beast'],
-      ['open-reincarn', '转生天赋', `${S.player.reincarnations} 世`, 'reincarn'],
-      ['open-codex', '灯录', `${C().codexState().owned}/${C().codexState().total} 名`, 'recruit'],
+      ['open-authority', '灯阁权限', null, 'buildings'],
+      ['open-buildings', '基地建设', null, 'buildings'],
+      ['open-genelock', '铭刻', null, 'geneLock'],
+      ['open-beast', '伴生体', null, 'beast'],
+      ['open-reincarn', '转生天赋', null, 'reincarn'],
+      ['open-codex', '灯录', null, 'recruit'],
     ];
     const daily = [
       /* V9.5.67（红点体检）：悬赏的红点原来只判 "done && !claimed"，**漏了 expired**——
          悬赏过期之后再也领不出来（点击只会提示"已经过期"），可这个红点却永远亮着。
          红点必须和"真的能领"同源，这里改成直接用 bountyState() 已经算好的 claimable。 */
       ['open-bounty', '限时悬赏', null, null, C().bountyState().claimable > 0],
-      /* 状态 = 今天完成了几项（以前这里误写成解锁 key 'tasks'，界面上直接露出英文）；
-         红点 = 有做完但没领的（日常或周常）——以前这颗格**完全没有点**，
+      /* 红点 = 有做完但没领的（日常或周常）——以前这颗格**完全没有点**，
          做完了每日任务却什么提示都没有，属于"该亮不亮"（V9.5.67 红点体检）。 */
-      ['open-tasks', '每日任务', (() => {
-        const st = C().todayState();
-        return st && st.dailyTotal ? `${st.dailyDone}/${st.dailyTotal} 项` : null;
-      })(), null, (() => { const st = C().todayState(); return st.dailyClaimable + st.weeklyClaimable > 0; })()],
+      ['open-tasks', '每日任务', null, null, (() => { const st = C().todayState(); return st.dailyClaimable + st.weeklyClaimable > 0; })()],
       ['open-ach', '成就', null, null, achDot],
-      ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
-      // V9.5.52（父亲大人）：这一格的说明文字改成"本期 UP 是谁 · 什么阵营"，比堆免费次数有用
-      ['open-recruit', '招募伙伴', (() => {
-        const up = D.recruitUpChar();
-        return up ? `本期 UP：${up.name} · ${up.faction}` : '去招募伙伴';
-      })(), 'recruit', C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
+      /* 求签今天没求也算"有东西可领"，所以给它一个红点，而不是在小字里写"今日还没求" */
+      ['open-sign', '求签', null, null, signReady],
+      ['open-recruit', '招募伙伴', null, 'recruit',
+        C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
       ['open-shop', '兑换大厅'],
     ];
     return `<div class="section-title" data-sec="grow">养成</div>
@@ -1397,7 +1380,7 @@ window.UI = (function () {
         <h3>⚡ ${S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'} <span class="sub">可用技能点 ${S.player.skillPoints || 0}</span>
           <button class="btn small ghost hbtn" data-pskillreset="1" ${spentSkill > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
         ${[P.s1, P.s2, P.ult].map((sk, i) => `
-          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [1, 1, 1])[i]}/10</span>
+          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [1, 1, 1])[i]}/${D.SKILL_MAX}</span>
             <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [1, 1, 1])[i] < 10 ? '' : 'disabled'}>+1</button></div>
           <div class="sdesc">${sk.desc}</div></div>`).join('')}
         <div class="skill-row"><div class="sname">被动·${P.passive.name}</div><div class="sdesc">${P.passive.desc}</div></div>
@@ -1666,7 +1649,7 @@ window.UI = (function () {
         ${skills.map((sk, i) => `
           <div class="skill-row">
             <div class="sname">${skillNames[i]}·${sk.name} <span class="tag">Lv.${c.skillLv[i]}</span>
-              <button class="btn small ghost" style="margin-left:auto" data-skillup="${i}" ${c.skillLv[i] >= 10 ? 'disabled' : ''}>升级</button></div>
+              <button class="btn small ghost" style="margin-left:auto" data-skillup="${i}" ${c.skillLv[i] >= D.SKILL_MAX ? 'disabled' : ''}>升级</button></div>
             <div class="sdesc">${sk.desc}（每级 +7% 效果 · 下级需 ▣ ${C().SKILL_CHIP_COST[c.skillLv[i] - 1] || '—'}）</div>
           </div>`).join('')}
         <div class="skill-row">
