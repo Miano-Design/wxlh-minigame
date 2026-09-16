@@ -235,6 +235,19 @@ console.log('\n=== ⑦ 边界状态：同一批界面在极端档位下是否还
       Core.S.unlocks = {};
       Core.S.worlds = { W01: { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } } };
     }],
+    ['脏存档（未知 id / NaN / 脏名字 —— 导入被改过的档）', () => {
+      Core.newGame(); Core.setPlayerName('脏'); Core.choosePlayerBloodline('修真');
+      Core.S.player.name = '<b>超长名字超长名字超长名字超长名字</b>';
+      Core.S.items = { 不存在的道具: 5, exp_s: 3 };
+      Core.S.chars = { 不存在的人: { lv: 1, skillLv: [0, 0, 0] }, C021: { lv: NaN, skillLv: [90, 0, 0], bloodlineLv: NaN, star: NaN, shards: NaN } };
+      Core.S.party = ['@player', '不存在的人', 'C021', null, null];
+      Core.S.cur.points = NaN; Core.S.cur.holy = -5;
+      Core.S.equips = { bad: { uid: 'bad', name: '?', rarity: 'ZZ', slot: 'weapon', enhance: -5, base: {}, affixes: [] } };
+      Core.S.equipped['@player'].weapon = 'bad';
+      Core.S.beast.owned.B001 = { lv: NaN, soul: NaN };
+      Core.S.sect = { lv: NaN, exp: NaN };
+      Core.migrate();      // 导入存档走的就是这条路径
+    }],
   ];
   const P2 = UI._panels;
   /* 扫荡面板在"一关都没通关"时会**故意**返回空并弹一句提示（不是 bug），

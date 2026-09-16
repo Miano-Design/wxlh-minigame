@@ -710,6 +710,42 @@ setParty(['C021']);
   })());
 }
 
+/* ===== V9.5.83（自审·网页版）：导入/手改的脏档不能把界面搞崩 =====
+   游戏有「导入存档」入口，粘进一份被改过的档（未知 id、NaN、负数）会让渲染直接抛异常，
+   界面整片白、玩家又没有任何入口去修（连设置页都进不去）。migrate 里现在会"洗净"。 */
+{
+  Core.newGame(); Core.setPlayerName('脏'); Core.choosePlayerBloodline('修真');
+  Core.S.player.name = '<b>脏名字</b>';
+  Core.S.items = { 不存在的道具: 5, exp_s: 3 };
+  Core.S.chars = { 不存在的人: { lv: 1 }, C021: { lv: NaN, star: NaN, shards: NaN, skillLv: [90, 0, 0] } };
+  Core.S.party = ['@player', '不存在的人', 'C021', null, null];
+  Core.S.cur.points = NaN; Core.S.cur.holy = -5;
+  Core.S.equips = { bad: { uid: 'bad', name: '?', rarity: 'ZZ', slot: 'weapon', enhance: -5, base: {}, affixes: [] } };
+  Core.S.equipped['@player'].weapon = 'bad';
+  Core.S.beast.owned['bs01'] = { lv: NaN, soul: NaN };
+  Core.S.beast.owned['不存在的伴生体'] = { lv: 3, soul: 1 };
+  Core.S.sect = { lv: NaN, exp: NaN };
+  Core.migrate();
+  t('脏档：未知伙伴被清掉', Core.S.chars['不存在的人'] === undefined && !!Core.S.chars.C021);
+  t('脏档：队伍里不留幽灵伙伴（否则渲染会崩）', Core.S.party.indexOf('不存在的人') < 0);
+  t('脏档：未知道具被清掉', Core.S.items['不存在的道具'] === undefined && Core.S.items.exp_s === 3);
+  t('脏档：非法装备被清掉、穿戴引用也跟着清', Core.S.equips.bad === undefined && !Core.S.equipped['@player'].weapon);
+  t('脏档：NaN / 负数收敛成合法值', Number.isFinite(Core.S.cur.points) && Core.S.cur.points >= 0
+    && Core.S.cur.holy === 0 && Number.isFinite(Core.S.chars.C021.lv) && Core.S.chars.C021.lv >= 0
+    && Core.S.chars.C021.star >= 1 && Number.isFinite(Core.S.sect.lv));
+  t('脏档：技能等级被夹到上限内', Core.S.chars.C021.skillLv[0] === D.SKILL_MAX_BY_INDEX[0]);
+  t('脏档：伴生体的 NaN 也收敛', Number.isFinite(Core.S.beast.owned['bs01'].lv) && Core.S.beast.owned['bs01'].lv >= 0);
+  t('脏档：未知伴生体 id 被清掉', Core.S.beast.owned['不存在的伴生体'] === undefined);
+  t('脏名字：HTML 特殊字符被清掉', Core.S.player.name.indexOf('<') < 0 && Core.S.player.name.indexOf('>') < 0);
+}
+{
+  Core.newGame();
+  t('起名就清洗：<img> 之类进不去', (() => { Core.setPlayerName('<img src=x onerror=boo>'); return Core.S.player.name.indexOf('<') < 0; })());
+  t('起名清洗不影响正常名字', (() => { Core.setPlayerName('夜行者'); return Core.S.player.name === '夜行者'; })());
+  t('名字仍然限长 12 字', (() => { Core.setPlayerName('一二三四五六七八九十十一十二十三'); return Core.S.player.name.length === 12; })());
+  t('全是非法字符的名字会被拒绝', Core.setPlayerName('<<<>>>') === false);
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];

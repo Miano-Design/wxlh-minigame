@@ -240,6 +240,9 @@ window.Core = (function () {
     dedupeEquips();
     S.player.bloodline = S.player.bloodline || null;
     S.player.bloodlineLv = S.player.bloodlineLv || 0;
+    // V9.5.83：老档里可能存着带 HTML 特殊字符的名字（名字会拼进界面模板）→ 读档时清一遍
+    S.player.name = cleanName(S.player.name);
+    (S.altPlayers || []).forEach(p => { if (p) p.name = cleanName(p.name); });
     S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs || {});
     S.player.attrPoints = S.player.attrPoints || 0;
     /* V9.5.69：技能等级从 1 起改成 0 起。老档一次性把已点等级整体减 1（Lv.1→Lv.0），
@@ -256,6 +259,9 @@ window.Core = (function () {
        老档与转生档都自动算对，不需要一次性标记，也不会重复发放。 */
     S.player.skillPoints = skillPointsForLevel();
     S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3);
+    /* V9.5.83：脏档洗净放**最后**跑——前面还有「技能 1 基→0 基」这类一次性换算，
+       先洗会把越界的值夹住、再被换算改一次（实测技能等级会差 1 级）。洗净永远该是最后一道。 */
+    sanitizeSave();
     if (S.player.skillPoints === undefined) {
       const spent = S.player.skillLv.reduce((s, x) => s + x, 0);     // 技能等级从 0 起，已花点数就是等级和
       // 技能点每 3 级 1 点，老档按同一口径补算，避免"老档凭空多出几十点"
@@ -325,10 +331,18 @@ window.Core = (function () {
     unlockWorld('W01');
     save();
   }
+  /* V9.5.83（自审·网页版）：名字要**在源头清洗**，不能只在显示处转义。
+     起因：队伍盘/主角详情/装备指派弹窗等 5 处模板都是 `${cname('@player')}` 直接拼 HTML，
+     玩家把名字打成 `<img src=x onerror=…>` 就会被浏览器当真标签解析（自己的档自己搞坏，
+     但界面会直接烂掉）。在这里把 HTML 特殊字符去掉，所有渲染点（现在和以后）都安全。 */
+  const NAME_BAD = /[<>&"'`\\]/g;
+  function cleanName(n) {
+    return String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+  }
   function setPlayerName(name) {
-    name = String(name || '').trim().slice(0, 12);
-    if (!name) return false;
-    S.player.name = name;
+    const clean = cleanName(name);
+    if (!clean) return false;
+    S.player.name = clean;
     save();
     return true;
   }
@@ -1126,6 +1140,67 @@ window.Core = (function () {
   }
   // 清掉"一件装备多人穿"的脏数据：主角优先，其次队伍顺序，最后其余角色
   // （老存档读档时跑一次，改完之后的存档不会再出现这种数据）
+  /* ================= 脏档洗净（V9.5.83 自审） =================
+     游戏有「导入存档」入口，玩家可能粘进一份被改过 / 半截的档（未知 id、NaN、负数）。
+     不清洗的话，渲染时会在 `D.charById[id].rarity`、`D.ITEMS[k].name` 这类地方直接抛异常——
+     界面整片白，而玩家又没有任何入口去修（连设置页都进不去）。
+     这里在**读档的唯一入口**（migrate）做一次收敛：
+       · 未知伙伴 / 未知道具 / 未知或残缺装备 → 丢掉（已穿戴的引用交给 dedupeEquips 清）
+       · 货币、等级、星级、技能等级、碎片、建筑、评级、深井、斗法台、伴生体 → 收敛到合法区间
+     原则：**宁可少一点，也绝不崩**。 */
+  function numOr(v, dft) { const n = Number(v); return Number.isFinite(n) ? n : dft; }
+  function clampNum(v, min, max, dft) { return Math.min(max, Math.max(min, numOr(v, dft === undefined ? min : dft))); }
+  function sanitizeSave() {
+    ['chars', 'items', 'equips', 'serums'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
+    Object.keys(S.chars).forEach(id => { if (!D.charById[id]) delete S.chars[id]; });
+    Object.keys(S.items).forEach(k => { if (!D.ITEMS[k]) delete S.items[k]; });
+    Object.keys(S.equips).forEach(uid => {
+      const e = S.equips[uid];
+      const ok = e && typeof e === 'object' && !!D.EQUIP_SLOTS[e.slot] && !!D.EQUIP_RARITY_MULT[e.rarity];
+      if (!ok) delete S.equips[uid];
+    });
+    Object.keys(S.cur || {}).forEach(k => { S.cur[k] = Math.max(0, numOr(S.cur[k], 0)); });
+    S.player.level = clampNum(S.player.level, 0, D.PLAYER_MAX_LV);
+    S.player.exp = Math.max(0, numOr(S.player.exp, 0));
+    S.player.attrPoints = Math.max(0, numOr(S.player.attrPoints, 0));
+    S.player.skillPoints = Math.max(0, numOr(S.player.skillPoints, 0));
+    S.player.bloodlineLv = clampNum(S.player.bloodlineLv, 0, D.BLOODLINE_MAX);
+    S.player.realm = clampNum(S.player.realm, 0, D.REALM_STAGE_COUNT);
+    S.player.geneLock = clampNum(S.player.geneLock, 0, D.GENE_LOCKS.length);
+    S.player.reincarnations = Math.max(0, numOr(S.player.reincarnations, 0));
+    S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
+    while (S.player.skillLv.length < 3) S.player.skillLv.push(0);
+    S.player.attrs = S.player.attrs || {};
+    D.ATTR_META.forEach(a => { S.player.attrs[a.id] = Math.max(0, numOr(S.player.attrs[a.id], 0)); });
+    D.BUILDINGS.forEach(b => { S.buildings[b.id] = clampNum(S.buildings[b.id], 0, 99); });
+    S.auth = clampNum(S.auth, 0, D.AUTHORITY_MAX);
+    S.sect = { lv: clampNum(S.sect && S.sect.lv, 0, D.SECT_MAX), exp: Math.max(0, numOr(S.sect && S.sect.exp, 0)) };
+    S.corridor = { floor: clampNum(S.corridor && S.corridor.floor, 1, 9999), best: clampNum(S.corridor && S.corridor.best, 0, 9999) };
+    S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
+    S.arena.floor = clampNum(S.arena.floor, 1, 9999);
+    S.arena.used = Math.max(0, numOr(S.arena.used, 0));
+    Object.keys(S.keji || {}).forEach(k => { if (!D.kejiById(k)) delete S.keji[k]; });
+    Object.values(S.chars).forEach(c => {
+      c.lv = clampNum(c.lv, 0, D.PLAYER_MAX_LV);
+      c.star = clampNum(c.star, 1, D.RARITY_MAXSTAR[D.charById[c.id] && D.charById[c.id].rarity] || 6);
+      c.shards = Math.max(0, numOr(c.shards, 0));
+      c.bloodlineLv = clampNum(c.bloodlineLv, 0, D.BLOODLINE_MAX);
+      c.skillLv = (c.skillLv || [0, 0, 0]).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
+      while (c.skillLv.length < 3) c.skillLv.push(0);
+    });
+    Object.keys((S.beast && S.beast.owned) || {}).forEach(id => {
+      const b = S.beast.owned[id];
+      if (!D.beastById(id)) { delete S.beast.owned[id]; return; }
+      b.lv = clampNum(b.lv, 0, D.BEAST_MAX_LV);
+      b.soul = Math.max(0, numOr(b.soul, 0));
+    });
+    if (S.beast && S.beast.active && !S.beast.owned[S.beast.active]) S.beast.active = null;
+    dedupeEquips();
+    /* 队伍最后再归一化一次：上面刚把"不在册的伙伴"删掉了，队伍里可能还留着他们的 id
+       （normalizeParty 在 migrate 的前半段跑过，那时这些 id 还在）——不补这一步，
+       渲染队伍盘时就会在 D.charById[id].rarity 上崩。 */
+    S.party = normalizeParty(S.party);
+  }
   function dedupeEquips() {
     const seen = new Set();
     let fixed = 0;
