@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.51';
+  const GAME_VER = '9.5.52';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -822,12 +822,10 @@ window.UI = (function () {
       ['open-tasks', '每日任务', '主线 / 日常 / 周常', 'tasks'],
       ['open-ach', '成就', '长线目标', null, achDot],
       ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
+      // V9.5.52（父亲大人）：这一格的说明文字改成"本期 UP 是谁 · 什么阵营"，比堆免费次数有用
       ['open-recruit', '招募伙伴', (() => {
-        const a = C().freeState('normal'), b = C().freeState('advanced');
-        const left = a.left + b.left;
-        if (!left) return '今日免费已用完';
-        if (!a.ready && !b.ready) return `免费冷却中（还剩 ${left} 次）`;
-        return `免费抽：普通 ${a.left} 次 · 高级 ${b.left} 次`;
+        const up = D.recruitUpChar();
+        return up ? `本期 UP：${up.name} · ${up.faction}` : '去招募伙伴';
       })(), 'recruit', C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
       ['open-shop', '兑换大厅', '三档商店', 'shop'],
     ];
@@ -2109,10 +2107,10 @@ window.UI = (function () {
         ? (fst.ready ? `免费抽 1 次（今日还剩 ${fst.left} 次）` : `免费抽（还剩 ${fst.left} 次 · ${mmss(fst.waitSec)}）`)
         : '';
       const oneLabel = freeLabel || (tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`);
-      const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}·保底SR）`;
+      const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}）`;
       return `<div class="card pool-card mb3">
         <!-- V9.5.50（父亲大人）：池名后面的"攒碎片/补图鉴/定向UP"标签、以及那一大段机制说明都不要了 -->
-        <h3>${p.name} <span class="sub">用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
+        <h3>${p.name} <button class="info-i" data-rates="${pid}" aria-label="概率与保底">i</button></h3>
         ${tk && tk.n > 0 ? `<div class="ticket-row has">
           <span>🎫 ${tkName} ×<b>${tk.n}</b></span>
         </div>` : ''}
@@ -2123,18 +2121,13 @@ window.UI = (function () {
           return `<div class="up-banner">本期 UP：<b>${esc(up.name)}</b> · 「${up.faction}」阵营（SSR 里一半是他，50 抽必出）
             <span style="float:right;color:var(--dim)">剩 ${dLeft} 天 ${hLeft} 小时</span></div>`;
         })() : ''}
-        ${pv ? `<div class="pity-row">
-          <span>SSR 保底 <b>${pv.ssr.n}</b>/${pv.ssr.cap}</span>
-          <span>UR 保底 <b>${pv.ur.n}</b>/${pv.ur.cap}</span>
-          ${pv.up ? `<span style="color:var(--gold)">UP 保底 <b>${pv.up.n}</b>/${pv.up.cap}</span>` : ''}
-        </div>` : `<div class="pity-row"><span>没有保底，纯攒碎片</span></div>`}
+
         <div class="btn-row">
           <button class="btn small ${freeNow ? 'gold' : ''}" data-pull1="${pid}" data-free1="${freeNow ? 1 : ''}" data-freelabel="${fst.left > 0 ? pid : ''}">${oneLabel}</button>
           <button class="btn small gold" data-pull10="${pid}">${tenLabel}</button>
         </div>
       </div>`;
     }).join('')}
-      <button class="btn ghost block mb3" data-rates="1">📊 招募概率公示（每一档出率与保底规则）</button>
       ${S.ssrTicket > 0 ? `<button class="btn gold block" data-ssrpick="1">🎫 使用SSR自选券（剩 ${S.ssrTicket}）</button>` : ''}
     `);
     /* V9.5.49（父亲大人）：
@@ -2200,8 +2193,7 @@ window.UI = (function () {
     w.querySelectorAll('[data-pull10]').forEach(b => b.onclick = () => runPull(b.dataset.pull10, 10, b));
     const tk = w.querySelector('[data-ssrpick]');
     if (tk) tk.onclick = () => ssrPickModal(w);
-    const rb = w.querySelector('[data-rates]');
-    if (rb) rb.onclick = () => recruitRatesModal(w);
+    w.querySelectorAll('[data-rates]').forEach(b => b.onclick = () => recruitRatesModal(w));
     return w;
   }
   // 概率公示（对标《道友修仙》：它在招募界面直接把"37% 血脉 5%、25% 血脉 15%…"写出来）。

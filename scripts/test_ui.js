@@ -587,9 +587,14 @@ t('招募页：有券才显示那行券；标签/机制说明都不写（父亲�
   });
   if (html.indexOf('本期 UP') < 0) throw new Error('定向 UP 那条要保留');
 });
-t('招募页有概率公示入口', () => {
+t('招募页：每个池子右上角一个 ⓘ（不再有单独的"概率公示"按钮）', () => {
   const html = UI._panels.recruitModal().innerHTML;
-  if (!html.includes('概率公示')) throw new Error('缺公示入口');
+  if (html.indexOf('class="info-i"') < 0) throw new Error('缺 ⓘ 图标入口');
+  const n = (html.match(/class="info-i"/g) || []).length;
+  if (n < 3) throw new Error('三个池子都该有 ⓘ，实际 ' + n + ' 个');
+  if (html.indexOf('概率公示') >= 0) throw new Error('单独那个"概率公示"按钮还在');
+  if (html.indexOf('没有保底') >= 0 || html.indexOf('SSR 保底') >= 0) throw new Error('卡面上的保底注释还在');
+  if (html.indexOf('保底SR') >= 0) throw new Error('十连按钮里的"保底SR"还在');
 });
 t('概率公示列出每一档出率', () => {
   const html = UI._panels.recruitRatesModal().innerHTML;

@@ -85,6 +85,16 @@ body {
 #topbar .tb-spacer { flex: 1; }
 #curbar { display: flex; gap: 0.375rem; overflow-x: auto; padding: 2px 0.75rem var(--sp2); scrollbar-width: none; }
 #curbar::-webkit-scrollbar { display: none; }
+/* 池子右上角的「ⓘ」：点开看概率与保底（V9.5.52 父亲大人：不要专门一个按钮写那么详细） */
+.info-i {
+  margin-left: auto; flex: 0 0 auto; width: 1.25rem; height: 1.25rem; padding: 0;
+  border-radius: 50%; border: 1px solid var(--line2); background: var(--panel2);
+  color: var(--dim); font-family: Georgia, "Times New Roman", serif; font-style: italic;
+  font-size: 0.75rem; font-weight: 700; line-height: 1; display: grid; place-items: center;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.info-i:active { background: var(--panel3); color: var(--text); }
+
 .cur-chip { flex: 0 0 auto; display: flex; align-items: center; gap: 0.3125rem; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.3125rem 0.6875rem; min-height: 2.5rem; font-size: var(--fs-md); color: var(--text); font-family: inherit; cursor: pointer; position: relative; }
 .cur-chip.more { color: var(--dim); border-style: dashed; }
 .cur-chip b { font-weight: 600; }
