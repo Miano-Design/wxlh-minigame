@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.42';
+  const GAME_VER = '9.5.43';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1915,9 +1915,12 @@ window.UI = (function () {
     const equippedBy = Object.entries(S.equipped).find(([cid, slots]) => Object.values(slots).includes(uid));
     /* 套装信息单独出一张卡片（父亲大人：别只留一排小字在名字下面） */
     const setOwner = ownerId || (equippedBy ? equippedBy[0] : null);
+    /* V9.5.43（父亲大人）：套装件数**只算真穿在这个人身上的**。
+       没穿在人身上（在背包里看）＝ 0 件，不给任何"已激活"。
+       以前这里写了"没主人就按拥有的件数算"，于是背包里看会显示 13/6 件、全激活，是错的。 */
     const wornOf = (which, key) => setOwner
       ? Object.values(S.equipped[setOwner] || {}).filter(u => S.equips[u] && S.equips[u][key] === which).length
-      : Object.values(S.equips).filter(e2 => e2[key] === which).length;
+      : 0;
     const catLine = eq.charId
       ? `专属装备 · 仅限 ${cname(eq.charId)} 装备${eq.sigText ? ' · ' + eq.sigText : ''}`
       : cs ? `职业套装 · 限${D.KIND_NAMES[eq.classSet]}定位激活`
@@ -1933,7 +1936,7 @@ window.UI = (function () {
           return `<div class="kv"><span class="k"${on ? ' style="color:var(--gold)"' : ''}>${part.slice(0, i + 1)}</span>`
             + `<span style="color:${on ? 'var(--gold)' : 'var(--dim)'}">${part.slice(i + 1)}${on ? ' · 已激活' : ''}</span></div>`;
         }).join('')}
-        ${setOwner ? '' : '<div class="hint">还没穿在某个人身上，这里按你拥有的件数算。</div>'}
+        ${setOwner ? '' : '<div class="hint">这件还没穿在人身上 —— 套装件数只算真穿着的装备，穿上才算。</div>'}
       </div>`;
       if (cs) return mk('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
       if (set) return mk('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
