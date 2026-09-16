@@ -17,8 +17,10 @@ window.Core = (function () {
   /* ================= 存档 ================= */
   const ATTR_ZERO = () => ({ muscle: 0, immune: 0, cell: 0, nerve: 0, intelligence: 0, spirit: 0 });
   // row：主角站前排还是后排（V8.3 新增）。默认前排——和旧存档的战场表现一致。
+  /* V9.5.69（父亲大人）：**所有等级从 0 起算**——数字就是"已经升过几次"。
+     主角 Lv.0 / 技能 Lv.0 / 建筑 0 级 / 评级 Lv.0 / 伴生体 0 级（血统、铭刻、境界、权限本来就是 0 起）。 */
   function freshProtagonist(name) {
-    return { name: name || '', level: 1, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0, attrs: ATTR_ZERO(), skillPoints: 0, skillLv: [1, 1, 1], row: 'front' };
+    return { name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0, attrs: ATTR_ZERO(), skillPoints: 0, skillLv: [0, 0, 0], row: 'front' };
   }
   function defaultState() {
     return {
@@ -37,9 +39,9 @@ window.Core = (function () {
       equipped: { '@player': { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null } },
       items: {},            // itemId → count
       serums: {},           // charId（或 '@player'）→ { serumId: 已服支数 }
-      buildings: { core: 1, training: 1, medical: 1, workshop: 1, geneLab: 1 },
+      buildings: { core: 0, training: 0, medical: 0, workshop: 0, geneLab: 0 },   // 建筑从 0 级起（0 级 = 没升过）
       auth: 0,               // 灯阁权限等级（对标"洞府"：高级货币的一次性长线投资）
-      sect: { lv: 1, exp: 0 },   // 灯阁评级（对标"宗门等级"：随关卡推进自动涨的全局长线）
+      sect: { lv: 0, exp: 0 },   // 灯阁评级（从 0 起：打关卡自动涨的全局长线）
       keji: {},                  // 秘术阁（对标"KeJi"）：id → 等级
       travel: { bankSec: 0, pending: null, got: 0, round: 0, day: '' },   // 挂机游历奇遇（对标"YouLi"）
       charExp: 0,               // 伙伴经验池（V9.5.46）：所有伙伴共用这一份，升级从这里扣、重生返还回来
@@ -240,19 +242,29 @@ window.Core = (function () {
     S.player.bloodlineLv = S.player.bloodlineLv || 0;
     S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs || {});
     S.player.attrPoints = S.player.attrPoints || 0;
-    S.player.skillLv = (S.player.skillLv || [1, 1, 1]).slice(0, 3);
+    /* V9.5.69：技能等级从 1 起改成 0 起。老档一次性把已点等级整体减 1（Lv.1→Lv.0），
+       这样"实际强度"和"已花点数"都保持不变，不会因为改口径白送或白扣。
+       用 skillZeroBased 这个一次性标记，避免每次读档都减。 */
+    if (!S.skillZeroBased) {
+      const conv = v => Math.max(0, (v || 1) - 1);
+      S.player.skillLv = (S.player.skillLv || [1, 1, 1]).slice(0, 3).map(conv);
+      Object.values(S.chars || {}).forEach(c => { if (c) c.skillLv = (c.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
+      (S.altPlayers || []).forEach(p => { if (p) p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
+      S.skillZeroBased = true;
+    }
+    S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3);
     if (S.player.skillPoints === undefined) {
-      const spent = S.player.skillLv.reduce((s, x) => s + (x - 1), 0);
-      // V9.5.68：技能点改成每 3 级 1 点，老档按同一口径补算，避免"老档凭空多出几十点"
+      const spent = S.player.skillLv.reduce((s, x) => s + x, 0);     // 技能等级从 0 起，已花点数就是等级和
+      // 技能点每 3 级 1 点，老档按同一口径补算，避免"老档凭空多出几十点"
       S.player.skillPoints = Math.max(0, Math.floor(S.player.level / D.SKILL_POINT_EVERY_LV) - spent);
     }
     S.altPlayers = Array.isArray(S.altPlayers) ? S.altPlayers : [];
     S.altPlayers.forEach(p => {
       p.attrs = Object.assign(ATTR_ZERO(), p.attrs || {});
       p.attrPoints = p.attrPoints || 0;
-      p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3);
+      p.skillLv = (p.skillLv || [0, 0, 0]).slice(0, 3);
       if (p.skillPoints === undefined) {
-        const spent = p.skillLv.reduce((s, x) => s + (x - 1), 0);
+        const spent = p.skillLv.reduce((s, x) => s + x, 0);
         p.skillPoints = Math.max(0, Math.floor(p.level / D.SKILL_POINT_EVERY_LV) - spent);
       }
     });
@@ -527,7 +539,7 @@ window.Core = (function () {
       S.chars[id].shards += gain;
       return { isNew: false, shards: gain };
     }
-    S.chars[id] = { lv: 1, exp: 0, star: 1, shards: 0, skillLv: [1, 1, 1], bloodlineLv: 0 };
+    S.chars[id] = { lv: 0, exp: 0, star: 1, shards: 0, skillLv: [0, 0, 0], bloodlineLv: 0 };   // 伙伴也从 0 级起
     S.equipped[id] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
     if (!S.codex.chars.includes(id)) S.codex.chars.push(id);
     return { isNew: true };
@@ -538,7 +550,7 @@ window.Core = (function () {
   }
   function levelCost(charId) {
     const c = S.chars[charId];
-    if (!c || c.lv >= 100) return null;
+    if (!c || c.lv >= D.PLAYER_MAX_LV) return null;
     return { exp: D.EXP_TABLE[c.lv], points: D.LEVEL_POINTS[c.lv] };
   }
   /* V9.5.46（父亲大人）：伙伴升级统一吃**共享的伙伴经验池**（S.charExp）——
@@ -578,7 +590,7 @@ window.Core = (function () {
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     let ups = 0;
     for (let i = 0; i < times; i++) {
-      if (c.lv >= 100) break;
+      if (c.lv >= D.PLAYER_MAX_LV) break;
       const cost = levelCost(charId);
       if ((S.charExp || 0) < cost.exp || S.cur.points < cost.points) break;
       S.charExp -= cost.exp; S.cur.points -= cost.points;
@@ -587,22 +599,23 @@ window.Core = (function () {
     save();
     return { ok: ups > 0, ups, msg: ups > 0 ? `升到 Lv.${c.lv}` : (S.charExp < 1 ? '伙伴经验不够（用经验模块补）' : '点数不够') };
   }
-  // 一个伙伴从 Lv.1 练到此刻，一共吃掉多少伙伴经验（重生就返还这么多）
+  // 一个伙伴从 Lv.0 练到此刻，一共吃掉多少伙伴经验（重生就返还这么多）
+  // V9.5.69：等级从 0 起，所以累加的是 EXP_TABLE[0 .. lv-1]（第 k 项 = 从 k 级升到 k+1 级的代价）
   function expSpentOn(charId) {
     const c = S.chars[charId];
     if (!c) return 0;
     let sum = (c.exp || 0);
-    for (let lv = 1; lv < c.lv; lv++) sum += D.EXP_TABLE[lv] || 0;
+    for (let lv = 0; lv < c.lv; lv++) sum += D.EXP_TABLE[lv] || 0;
     return sum;
   }
-  /* 伙伴重生：等级回到 Lv.1，把这级路上吃掉的伙伴经验全数退回池子（点数不返还）。
+  /* 伙伴重生：等级回到 Lv.0，把这级路上吃掉的伙伴经验全数退回池子（点数不返还）。
      装备 / 星级 / 血统 / 血清 都不动 —— 只重置"等级"这一条线。 */
   function rebornChar(charId) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
-    if (c.lv <= 1 && !c.exp) return { ok: false, msg: '已经是 Lv.1 了' };
+    if (c.lv <= 0 && !c.exp) return { ok: false, msg: '已经是 Lv.0 了' };
     const refund = expSpentOn(charId);
-    c.lv = 1; c.exp = 0;
+    c.lv = 0; c.exp = 0;
     S.charExp = (S.charExp || 0) + refund;
     save();
     return { ok: true, refund, msg: `重生完成：返还 ${fmtNum(refund)} 伙伴经验` };
@@ -720,7 +733,7 @@ window.Core = (function () {
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     const lv = c.skillLv[idx];
     if (lv >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
-    const cost = SKILL_CHIP_COST[lv - 1];
+    const cost = SKILL_CHIP_COST[lv];      // V9.5.69：技能从 0 级起，价目表也跟着 0 起
     if (S.cur.skillChip < cost) return { ok: false, msg: `技能芯片不足（${S.cur.skillChip}/${cost}）` };
     S.cur.skillChip -= cost;
     c.skillLv[idx]++;
@@ -780,7 +793,7 @@ window.Core = (function () {
     const c = S.chars[charId];
     const base = D.charById[charId];
     if (!c || !base) return null;
-    const lvMult = 1 + (c.lv - 1) * 0.035;
+    const lvMult = 1 + c.lv * 0.035;      // V9.5.69：等级从 0 起，Lv.0 = 基准 1.0
     const starMult = D.STAR_MULT[c.star - 1];
     const a = {};
     Object.keys(base.attrs).forEach(k => { a[k] = base.attrs[k] * lvMult * starMult; });
@@ -857,7 +870,7 @@ window.Core = (function () {
   /* ================= 主角（玩家）独立属性 ================= */
   function effectivePlayerStats() {
     const P = D.PROTAGONIST;
-    const lvMult = 1 + (S.player.level - 1) * 0.035;
+    const lvMult = 1 + S.player.level * 0.035;   // V9.5.69：同上
     const a = {};
     Object.keys(P.baseAttrs).forEach(k => { a[k] = P.baseAttrs[k] * lvMult; });
     // 六维属性点加成（每点 +ATTR_POINT_VALUE）
@@ -1734,7 +1747,7 @@ window.Core = (function () {
   }
   // 采集产线产出的材料按玩家等级换成对应档位（越往后材料越高级，但数量按 2 的幂递减）
   function idleMatItem() {
-    const tier = Math.min(5, 1 + Math.floor((S.player.level - 1) / 20));
+    const tier = Math.min(5, 1 + Math.floor(S.player.level / 20));
     return { item: 'mat_t' + tier, tier };
   }
   // 折算并入库；背包满就整批跳过（宁可少收，也不吞玩家的东西）
@@ -1767,7 +1780,7 @@ window.Core = (function () {
   function addPlayerExp(n) {
     if (!n) return;
     S.player.exp += n;
-    while (S.player.level < 100 && S.player.exp >= D.EXP_TABLE[S.player.level]) {
+    while (S.player.level < D.PLAYER_MAX_LV && S.player.exp >= D.EXP_TABLE[S.player.level]) {
       S.player.exp -= D.EXP_TABLE[S.player.level];
       S.player.level++;
       S.player.attrPoints = (S.player.attrPoints || 0) + D.ATTR_POINTS_PER_LV;
@@ -2824,7 +2837,7 @@ window.Core = (function () {
         cur.soul = (cur.soul || 0) + 2;
         got.push({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: true, soul: cur.soul });
       } else {
-        S.beast.owned[b.id] = { lv: 1, soul: 0 };
+        S.beast.owned[b.id] = { lv: 0, soul: 0 };   // V9.5.69：伴生体也从 0 级起
         got.push({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: false });
       }
     }
@@ -2844,11 +2857,11 @@ window.Core = (function () {
     const cur = S.beast.owned[id];
     const b = D.beastById(id);
     if (!cur || !b) return { ok: false, msg: '还没有这只伴生体' };
-    if ((cur.lv || 1) >= D.BEAST_MAX_LV) return { ok: false, msg: '已经是满级' };
-    const need = D.BEAST_SOUL_PER_LV * (cur.lv || 1);
-    if ((cur.soul || 0) < need) return { ok: false, msg: `兽魂不足：升到 Lv.${(cur.lv || 1) + 1} 需要 ${need} 兽魂（现有 ${cur.soul || 0}）` };
+    if ((cur.lv || 0) >= D.BEAST_MAX_LV) return { ok: false, msg: '已经是满级' };
+    const need = D.BEAST_SOUL_PER_LV * ((cur.lv || 0) + 1);
+    if ((cur.soul || 0) < need) return { ok: false, msg: `兽魂不足：升到 Lv.${(cur.lv || 0) + 1} 需要 ${need} 兽魂（现有 ${cur.soul || 0}）` };
     cur.soul -= need;
-    cur.lv = (cur.lv || 1) + 1;
+    cur.lv = (cur.lv || 0) + 1;
     save();
     return { ok: true, msg: `${b.name} 升到 Lv.${cur.lv}`, lv: cur.lv };
   }
@@ -2858,7 +2871,7 @@ window.Core = (function () {
   function realmState() {
     const realm = S.player.realm || 0;
     const next = D.REALMS[realm] || null;
-    const tier = next ? Math.min(5, 1 + Math.floor((next.lv - 1) / 20)) : 5;
+    const tier = next ? Math.min(5, 1 + Math.floor(next.lv / 20)) : 5;
     const matItem = 'mat_t' + tier;
     return {
       realm, next,

@@ -45,12 +45,19 @@ window.DATA = (function () {
   /* 2026-09-17 再调（策划体检）：上一版 80×Lv^1.32 实测**纯挂机到 Lv.20 要 33 小时、满级要 345 小时**，
      新手第一天等级几乎不动 → 境界/铭刻/转生全被堵在后面。指数从 1.32 降到 1.18、
      底数 80→70，并同步把挂机经验（core.js idleBaseRates 8+0.5·Lv → 10+0.7·Lv）提上来。
-     实测（无领队为下限、带闭关领队为常态）：Lv.20 约 33→13 小时，Lv.100 约 345→68 小时。 */
-  const EXP_TABLE = [0];
-  const LEVEL_POINTS = [0];
-  for (let lv = 1; lv <= 100; lv++) {
-    EXP_TABLE[lv] = Math.round(70 * Math.pow(lv, 1.18));
-    LEVEL_POINTS[lv] = Math.round(40 * Math.pow(1.06, lv - 1));
+     实测（无领队为下限、带闭关领队为常态）：Lv.20 约 33→13 小时，Lv.100 约 345→68 小时。
+
+     V9.5.69（父亲大人）：**全部等级改成从 0 开始数**——数字就是"已经升过几次"，
+     不再出现"Lv.1 是起点"和"0/36 阶"两套口径混用。
+       旧：EXP_TABLE[lv] = 从 lv 级升到 lv+1 级要多少（lv 从 1 起）
+       新：EXP_TABLE[lv] = 从 lv 级升到 lv+1 级要多少（lv 从 0 起，[0] 就是 0→1 的代价）
+     数组内容整体平移一格，**曲线一个数没动**（0→100 的累计经验与旧版完全相同）。 */
+  const PLAYER_MAX_LV = 100;
+  const EXP_TABLE = [];
+  const LEVEL_POINTS = [];
+  for (let lv = 0; lv < PLAYER_MAX_LV; lv++) {
+    EXP_TABLE[lv] = Math.round(70 * Math.pow(lv + 1, 1.18));
+    LEVEL_POINTS[lv] = Math.round(40 * Math.pow(1.06, lv));
   }
 
   /* ================= 主角六维（V5 §2.1） ================= */
@@ -64,11 +71,15 @@ window.DATA = (function () {
   ];
   const ATTR_POINTS_PER_LV = 3;   // 每升 1 级获得的属性点
   const ATTR_POINT_VALUE = 2;     // 每点属性点增加的六维值
-  /* V9.5.68（上限联动体检）：技能点改为每 3 级给 1 点，配合 SKILL_MAX=12，
-     Lv.100 的 33 点正好把三条技能点满（以前每级 1 点 = 99 点，多出 72 点没处花）。 */
+  /* V9.5.68（上限联动体检）：技能点改为每 3 级给 1 点（以前每级 1 点 = Lv.100 发 99 点，
+     而三条技能点满只要 27 点，多出 72 点没处花）。 */
   const SKILL_POINT_EVERY_LV = 3;
-  const SKILL_MAX = 12;           // 主角与伙伴统一的技能等级上限
-  const BLOODLINE_UNLOCK_LV = 1;  // 开局第一件事就是选血统（境界线跟着血统走，所以不能拖到 Lv.10）
+  /* 技能从 0 级起（0 = 没点过）：上限 11 级 = 每条 11 次升级，
+     3 条合计 33 点 = Lv.100 的技能点总量（floor(100/3)）。
+     技能倍率公式 1 + lv×0.07 跟着改成从 0 起算，所以 Lv.11 的强度与旧版 Lv.12 完全一致。 */
+  const SKILL_MAX = 11;
+  // V9.5.69：等级从 0 起之后，这个门槛必须跟着改成 0——否则开局第一件事（选血统）会被自己挡住
+  const BLOODLINE_UNLOCK_LV = 0;  // 开局第一件事就是选血统（境界线跟着血统走，所以不能拖到后面）
 
   /* ================= 背包容量 ================= */
   // V9.2：背包分三池——道具 / 材料 / 装备，各 50 格起、各自扩容。
@@ -848,7 +859,8 @@ window.DATA = (function () {
   ];
   const buildingCost = (id, lv) => {
     const b = BUILDINGS.find(x => x.id === id);
-    return Math.round(b.base * Math.pow(1.12, lv - 1));
+    // V9.5.69：建筑等级也从 0 起（0 级 = 没升过，还没有加成）；曲线本身没动，只把指数平移一格
+    return Math.round(b.base * Math.pow(1.12, lv));
   };
 
   /* ================= 宗门等级（对标《道友修仙》的 ZongMenLevel · 321 级） =================
@@ -1354,7 +1366,8 @@ window.DATA = (function () {
     .map(([k, v]) => `${BEAST_PCT_NAME[k] || k} +${(v * 100).toFixed(1)}%`).join(' · ');
   // 满级时的最终加成
   const beastPctAt = (b, lv) => {
-    const m = 1 + (Math.max(1, lv) - 1) * BEAST_LV_PCT;
+    // V9.5.69：伴生体等级也从 0 起（0 级 = 刚孵化，只有基础加成）
+    const m = 1 + Math.max(0, lv) * BEAST_LV_PCT;
     const out = {};
     Object.entries(b.pct).forEach(([k, v]) => { out[k] = v * m; });
     return out;
@@ -1665,7 +1678,7 @@ window.DATA = (function () {
 
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
-    FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES,
+    FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV, SKILL_POINT_EVERY_LV, SKILL_MAX,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
     BLOODLINE_SKILLS, KIND_NAMES, CLASS_SETS, SIGNATURE_EQUIPS, makeSignatureEquip,

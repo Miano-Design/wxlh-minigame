@@ -73,12 +73,12 @@ function row(name, cap, cost, note) {
 }
 
 /* ---- ① 主角自己 ---- */
-const expAll = D.EXP_TABLE.slice(1).reduce((a, b) => a + b, 0);
-row('主角等级', `Lv.${D.EXP_TABLE.length - 1}`, { exp: expAll });
+const expAll = D.EXP_TABLE.reduce((a, b) => a + b, 0);   // V9.5.69：等级从 0 起，全表就是 0→满级
+row('主角等级', `Lv.${D.PLAYER_MAX_LV}`, { exp: expAll });
 const SKILL_MAX = D.SKILL_MAX;                       // 技能等级上限（主角与伙伴共用）
 const SKILL_BARS = 3;                                // 主角技能固定 3 条
 const skillSupply = Math.floor((D.EXP_TABLE.length - 1) / D.SKILL_POINT_EVERY_LV);   // 每 N 级 +1 点
-const skillNeed = (SKILL_MAX - 1) * SKILL_BARS;
+const skillNeed = SKILL_MAX * SKILL_BARS;   // 技能从 0 级起：上限值就是要点几次
 {
   const ratio = skillSupply / skillNeed;
   const verdict = ratio > 1.25 ? `⚠ 多出 ${skillSupply - skillNeed} 点没处花（供给是需求的 ${ratio.toFixed(1)} 倍）`
@@ -87,12 +87,12 @@ const skillNeed = (SKILL_MAX - 1) * SKILL_BARS;
   rows.push(`  ${'主角技能点'.padEnd(22, '　')} 上限 3 条×Lv.${SKILL_MAX}   需要 ${skillNeed} 点 / Lv.100 给 ${skillSupply} 点   ${verdict}`);
 }
 {
-  const pts = (D.EXP_TABLE.length - 1 - 1) * D.ATTR_POINTS_PER_LV;
+  const pts = D.PLAYER_MAX_LV * D.ATTR_POINTS_PER_LV;   // Lv.0→Lv.100 共 100 次升级
   rows.push(`  ${'主角六维点'.padEnd(22, '　')} 上限 无（可堆一维）  Lv.100 共 ${pts} 点 → 六维值 +${pts * D.ATTR_POINT_VALUE}   △ 没有硬上限，靠装备/血统/境界制衡`);
 }
 
 /* ---- ② 伙伴（一名） ---- */
-row('伙伴等级', `Lv.${D.EXP_TABLE.length - 1}`, { charExp: expAll, points: D.LEVEL_POINTS.slice(1).reduce((a, b) => a + b, 0) });
+row('伙伴等级', `Lv.${D.PLAYER_MAX_LV}`, { charExp: expAll, points: D.LEVEL_POINTS.reduce((a, b) => a + b, 0) });
 row('伙伴技能 3 条', `Lv.${SKILL_MAX}`, { skillChip: Core.SKILL_CHIP_COST.reduce((a, b) => a + b, 0) * 3 });
 {
   let bc = 0, pt = 0;
@@ -120,4 +120,27 @@ console.log(`=== 上限联动体检（样例存档：玩家 Lv.${LV} · 进度 W
 console.log('  日收入（估）：' + ['points', 'otherworld', 'holy', 'skillChip', 'bloodCrystal', 'exp', 'charExp', 'sectExp'].map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
 console.log('');
 rows.forEach(x => console.log(x));
+
+/* ---- 每级的消耗 vs 获取：曲线形状对不对（父亲大人："每级的消耗与获取与游戏进程是否合理"）
+   只看"点满要几天"会漏掉一种病：前期白给、后期卡死（或者反过来）。
+   所以把每条线的**分段耗时**打出来，看它是不是平滑地变长。 ---- */
+console.log('\n=== 每一级要花多久（看曲线形状，不是只看总天数） ===');
+function ladder(name, lvTo, costOf, unit, marks) {
+  let cum = 0;
+  const out = [];
+  const maxLv = Math.max(...marks);
+  for (let lv = 0; lv < maxLv; lv++) {
+    cum += costOf(lv) / (day[unit] || 1);
+    if (marks.includes(lv + 1)) out.push(`Lv.${lv + 1} ${cum < 1 ? cum.toFixed(2) : Math.round(cum)} 天`);
+  }
+  console.log(`  ${name.padEnd(14, '　')} ${out.join(' · ')}`);
+}
+ladder('主角等级', 100, lv => D.EXP_TABLE[lv], 'exp', [1, 5, 10, 25, 50, 75, 100]);
+ladder('伙伴等级', 100, lv => D.EXP_TABLE[lv], 'charExp', [1, 5, 10, 25, 50, 75, 100]);
+ladder('建筑（单座）', 50, lv => D.buildingCost('core', lv), 'points', [1, 5, 10, 20, 35, 50]);
+ladder('主角血统', D.BLOODLINE_MAX, lv => D.bloodlineCost(lv).points, 'points', [1, 5, 10, 20, 30]);
+ladder('灯阁评级', D.SECT_MAX, lv => D.sectExpNeed(lv), 'sectExp', [1, 5, 10, 20, 40, 60]);
+ladder('秘术阁（攻伐诀）', D.KEJI[0].max, lv => D.kejiCost(D.KEJI[0], lv + 1), 'otherworld', [1, 5, 10, 20, 30, 60]);
+console.log('\n  读法：每一段都是"到这里累计花了几天"。前期（前 10 级）应该以分钟~小时计，');
+console.log('        中段线性变长，末段最长但仍在同一条曲线上——中间突然跳档就是数值没接好。');
 console.log(`\n结论：${warn === 0 ? '所有上限之间对得上 ✓' : '有 ' + warn + ' 处上限对不上，要调'}`);

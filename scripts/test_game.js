@@ -244,7 +244,7 @@ setParty(['C021']);
 {
   const oldName = Core.S.player.name;
   const r = Core.createProtagonist('第二世');
-  t('新建角色', r.ok && Core.S.player.name === '第二世' && Core.S.player.level === 1 && !Core.S.player.bloodline);
+  t('新建角色', r.ok && Core.S.player.name === '第二世' && Core.S.player.level === 0 && !Core.S.player.bloodline);
   t('旧角色保留', Core.protagonistList().length === 2 && Core.protagonistList()[1].name === oldName);
   Core.S.player.level = 5;
   t('切换角色', Core.switchProtagonist(0).ok && Core.S.player.name === oldName);
@@ -512,7 +512,7 @@ setParty(['C021']);
   t('技能上限有单一出处', D.SKILL_MAX >= 10 && D.SKILL_POINT_EVERY_LV >= 1);
   t('Lv.100 给的技能点正好点满三条技能', (() => {
     const supply = Math.floor(100 / D.SKILL_POINT_EVERY_LV);
-    const need = (D.SKILL_MAX - 1) * SKILL_BARS;
+    const need = D.SKILL_MAX * SKILL_BARS;   // 技能从 0 级起：上限值就是要点几次
     return supply === need;
   })());
   t('升级真的按"每 N 级 1 点"发', (() => {
@@ -553,6 +553,36 @@ setParty(['C021']);
     let cum = 0;
     for (let lv = 1; lv < D.SECT_MAX; lv++) cum += D.sectExpNeed(lv);
     return cum <= 400000;
+  })());
+}
+
+// 33c. 等级口径统一（V9.5.69 父亲大人）：所有"等级"都从 0 起，数字 = 已经升过几次
+{
+  Core.newGame(); Core.setPlayerName('口径');
+  const S = Core.S;
+  t('主角 Lv.0 起', S.player.level === 0);
+  t('技能 Lv.0 起（三条都是 0）', (S.player.skillLv || []).length === 3 && S.player.skillLv.every(v => v === 0));
+  t('建筑 0 级起', Object.values(S.buildings).every(v => v === 0));
+  t('灯阁评级 Lv.0 起', S.sect.lv === 0);
+  t('血统 / 铭刻 / 权限 / 境界 都是 0 起', S.player.bloodlineLv === 0 && S.player.geneLock === 0 && S.auth === 0 && (S.player.realm || 0) === 0);
+  t('伙伴 Lv.0 起', (() => { Core.addChar('C021'); return S.chars.C021.lv === 0 && S.chars.C021.skillLv.every(v => v === 0); })());
+  t('开局就能选血统（门槛跟着等级口径一起降到 0）', (() => {
+    Core.newGame(); Core.setPlayerName('口径2');
+    return Core.choosePlayerBloodline('修真').ok === true;
+  })());
+  t('建筑 0 级不加成、升到 1 级才拿第一档加成', (() => {
+    Core.newGame(); Core.setPlayerName('口径3');
+    const before = Core.idleRates().pointsPerMin;
+    Core.S.buildings.core = 1;
+    return Core.idleRates().pointsPerMin > before;
+  })());
+  t('伴生体 0 级起（刚孵化没有强化加成）', (() => {
+    Core.newGame(); Core.setPlayerName('口径4');
+    Core.S.items.beast_egg = 50;
+    const r = Core.hatchBeast(1);
+    const ids = Object.keys(Core.S.beast.owned);
+    const b = r && r.ok && ids.length ? Core.S.beast.owned[ids[0]] : null;
+    return !!b && b.lv === 0;
   })());
 }
 
@@ -1889,11 +1919,11 @@ setParty(['C021']);
   Core.addChar('C021');
   const need = Core.levelCost('C021').exp;
   const up = Core.levelUp('C021', 1);
-  t('升级从共享池扣经验', up.ok && Core.S.chars.C021.lv === 2 && Core.partnerExp() === per * 10 - need);
+  t('升级从共享池扣经验', up.ok && Core.S.chars.C021.lv === 1 && Core.partnerExp() === per * 10 - need);
   t('这个伙伴已投入的经验算得对', Core.expSpentOn('C021') === need);
   const rb = Core.rebornChar('C021');
-  t('重生：回到 Lv.1 并把经验全数退回池子', rb.ok && Core.S.chars.C021.lv === 1 && Core.partnerExp() === per * 10);
-  t('Lv.1 不能重生（没东西可退）', Core.rebornChar('C021').ok === false);
+  t('重生：回到 Lv.0 并把经验全数退回池子', rb.ok && Core.S.chars.C021.lv === 0 && Core.partnerExp() === per * 10);
+  t('Lv.0 不能重生（没东西可退）', Core.rebornChar('C021').ok === false);
   t('经验不够时升不动（不会扣成负数）', (() => {
     Core.S.charExp = 0;
     const r2 = Core.levelUp('C021', 1);

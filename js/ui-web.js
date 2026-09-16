@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.68';
+  const GAME_VER = '9.5.69';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -710,7 +710,8 @@ window.UI = (function () {
         <span class="rk">【境界】</span>
         <span class="rv" style="color:${st.hasBloodline ? 'var(--gold)' : 'var(--accent)'}">${st.curName || '未定血统'}</span>
         <!-- V9.5.67：血统是开局必经的一步，"点主角卡里选血统"这句永远不该出现（而且指错了入口） -->
-        <span class="rs">${st.hasBloodline ? `第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶` : ''}</span>
+        <!-- V9.5.69：等级/阶数一律从 0 起算，"已突破 N 阶"比"第 N+1 阶"好算 -->
+        <span class="rs">${st.hasBloodline ? `已突破 ${st.realm} / ${D.REALM_STAGE_COUNT} 阶` : ''}</span>
       </div>
       <div class="row">
         <span class="rk">【等级】</span>
@@ -1399,7 +1400,7 @@ window.UI = (function () {
         `}
       </div>
       <div class="card">
-        <h3>🌌 境界 <span class="sub">第 ${Math.min(C().realmState().realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶</span></h3>
+        <h3>🌌 境界 <span class="sub">已突破 ${C().realmState().realm} / ${D.REALM_STAGE_COUNT} 阶</span></h3>
         <div class="kv"><span class="k">当前境界</span><span>${S.player.realm ? C().realmState().curName : '未突破'}</span></div>
         <div class="kv"><span class="k">境界加成</span><span class="green">全属性 +${Math.round(C().realmBonusPct() * 100)}%</span></div>
         <button class="btn small block mt3" data-realm-open="1">查看境界 · 渡劫 ›</button>
@@ -2530,7 +2531,7 @@ window.UI = (function () {
       <div class="card" style="border-color:#e6b64c66">
         <h3>${cur}血统 <span class="sub">Lv.${S.player.bloodlineLv} / ${D.BLOODLINE_MAX}</span></h3>
         <div class="note">${D.BLOODLINES[cur].desc}</div>
-        <div class="kv mt2"><span class="k">当前境界</span><span style="color:var(--gold)">${st.curName}（第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶）</span></div>
+        <div class="kv mt2"><span class="k">当前境界</span><span style="color:var(--gold)">${st.curName}（已突破 ${st.realm} / ${D.REALM_STAGE_COUNT} 阶）</span></div>
         <div class="kv"><span class="k">境界加成</span><span style="color:var(--gold)">+${(st.bonusPct * 100).toFixed(1)}%</span></div>
       </div>
       <div class="card">
@@ -2931,7 +2932,7 @@ window.UI = (function () {
     }).join('');
     const body = `
       <div class="card">
-        <h3>${st.bloodline} · ${st.curName} <span class="sub">第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶</span></h3>
+        <h3>${st.bloodline} · ${st.curName} <span class="sub">已突破 ${st.realm} / ${D.REALM_STAGE_COUNT} 阶</span></h3>
   <div class="note">当前境界加成：+${(C().realmBonusPct() * 100).toFixed(1)}%</div>
       </div>
       ${st.next ? `<div class="card" style="border-color:#ffd76a66">
@@ -3669,7 +3670,7 @@ window.UI = (function () {
             <div class="t2">Lv.${p.level} · ${p.bloodline ? p.bloodline + '血统 Lv.' + p.bloodlineLv : '未觉醒血统'}</div></div>
             ${p.current ? '' : `<button class="btn small" data-switchprotag="${p.altIndex}">切换</button>`}
           </div>`).join('')}
-        <div style="font-size:0.6875rem;color:var(--dim);margin:0.5rem 0">新建主角从 Lv.1 开始，可体验不同血统路线；世界进度、货币、队伍不受影响</div>
+        <div style="font-size:0.6875rem;color:var(--dim);margin:0.5rem 0">新建主角从 Lv.0 开始，可体验不同血统路线；世界进度、货币、队伍不受影响</div>
         <button class="btn small block" data-newprotag="1">➕ 新建主角</button>
       </div>
       <div class="card">
@@ -3774,7 +3775,7 @@ window.UI = (function () {
     w.querySelector('[data-newprotag]').onclick = () => {
       closeModal(w);
       const nw = modal('新建主角', `
-        <div class="note mb3">新主角从 Lv.1 开始（当前主角保留）</div>
+        <div class="note mb3">新主角从 Lv.0 开始（当前主角保留）</div>
         <input id="np-input" maxlength="12" placeholder="输入新主角名字（12字内）" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.75rem;font-size:0.9375rem;outline:none;margin-bottom:0.75rem" />
         <button class="btn primary block" data-ok>创建并开始探索</button>`, { center: true });
       nw.querySelector('[data-ok]').onclick = () => {
