@@ -85,8 +85,8 @@
         const c = out[k];
         // 已定宽的按宽度算；没定宽的用"文字宽度提示"（__textW）估，别当 0——
         // 当 0 的话弹性兄弟会分到整个空余宽度，右边的东西就飘了。
-        const cw = typeof c.width === 'number' ? c.width
-          : ((intrinsic && intrinsic[k]) || c.__textW || 0);   // 优先用运行时实测的内在宽度
+        // 先用编译期的文字宽度提示（这一版实测被证明会把宫格撑坏，实测那条路留在 measureText 里备用）
+        const cw = typeof c.width === 'number' ? c.width : (c.__textW || 0);
         return sum + cw + (c.marginLeft || 0) + (c.marginRight || 0);
       }, 0);
       const flexKids = kids.filter((k) => out[k].flex && typeof out[k].width !== 'number');
