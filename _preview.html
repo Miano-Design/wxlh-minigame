@@ -54,8 +54,10 @@
 <script src="js/uiw.js"></script>
 <script src="js/sc-start.js"></script>
 <script src="js/sc-home.js"></script>
+<script src="js/sc-roster.js"></script>
 <script>
   const CV = window.CV, Core = window.Core;
+  CV.NAV_TABS.forEach(function (t) { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
   CV.setup(wx.getWindowInfo());
   CV.bindTouch();
   Core.newGame();
@@ -63,6 +65,11 @@
   Core.choosePlayerBloodline('修真');
   Core.S.player.level = 11;
   Core.S.cur.points = 999999;
+  /* 预览用：给几个伙伴 + 几件装备，好把各个界面都看出来 */
+  ['C021', 'C022', 'C023', 'C024', 'C025', 'C026'].forEach(function (id) { try { Core.addChar(id); } catch (e) {} });
+  try { ['W01', 'W02', 'W03'].forEach(function (w) { ['weapon', 'head', 'armor'].forEach(function (sl) { Core.grantEquip(w, 'SR', sl); }); }); } catch (e) {}
+  Object.keys(Core.S.equips).slice(0, 3).forEach(function (u) { try { Core.equipItem('C021', u); } catch (e) {} });
+  Core.S.party = ['@player', 'C021', 'C022', null, null];
   // ?p=xxx 直接落到哪一页（不写就按存档走开机流程）
   const page = (location.search.match(/p=(\w+)/) || [])[1];
   if (page) CV.reset(page);

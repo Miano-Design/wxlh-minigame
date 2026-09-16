@@ -12,9 +12,14 @@ require('./js/cv.js');           // canvas 界面框架（配色/字号/圆角�
 require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫格/按钮…每块对应网页版一个 CSS 类）
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
 require('./js/sc-home.js');      // 灯阁（首页）
+require('./js/sc-roster.js');    // 执灯者：伙伴总览 + 伙伴详情
 
 const CV = globalThis.CV, Core = globalThis.Core;
 const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+/* 底栏四个页签 → 对应页面（网页版 #navbar） */
+CV.NAV_TABS.forEach(function (t) {
+  CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); });
+});
 CV.setup(info);
 CV.bindTouch();
 /* 开机：没有存档 → 欢迎（网页版 main.js 的流程）；有存档 → 首页 */
