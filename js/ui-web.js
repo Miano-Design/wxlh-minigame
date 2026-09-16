@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.24';
+  const GAME_VER = '9.5.25';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2278,7 +2278,7 @@ window.UI = (function () {
           </div>
           ${active ? `<button class="btn small ghost" data-faceoff="1">摘下</button>`
             : owned ? `<button class="btn small gold" data-fwear="${f.id}">佩戴</button>`
-            : `<button class="btn small" data-fbuy="${f.id}" ${(C().S.cur.otherworld || 0) >= f.cost ? '' : 'disabled'}>◈→◆${fmt(f.cost)}</button>`}
+            : `<button class="btn small" data-fbuy="${f.id}" ${(C().S.cur.otherworld || 0) >= f.cost ? '' : 'disabled'}>◆${fmt(f.cost)}</button>`}
         </div>`;
       }).join('')}`;
     const w = showPanel(wrap, '法宝', body);
@@ -2986,7 +2986,7 @@ window.UI = (function () {
         const list = st.list.filter(x => x.a.cat === cat);
         if (!list.length) return '';
         return `<div class="section-title">${cat}</div>` + list.map(({ a, done, claimed }) => `<div class="list-row" style="${claimed ? 'opacity:.5' : ''}">
-          <div class="grow"><div class="t1">${claimed ? '🏅' : done ? '✨' : '⬜'} ${a.name}</div>
+          <div class="grow"><div class="t1"${done ? '' : ' style="color:var(--dim)"'}>${claimed ? '🏅 ' : done ? '✨ ' : ''}${a.name}</div>
           <div class="t2">${a.desc} · 奖励 ${rewardText(a.reward)}</div></div>
           ${claimed ? '<button class="btn small" disabled>已领</button>'
             : done ? `<button class="btn small primary" data-ach="${a.id}">领取</button>`
@@ -3138,9 +3138,10 @@ window.UI = (function () {
         const texts = D.talentTexts(k);
         return `<div class="card mb2">
           <h3>${t.name} <span class="sub">Lv.${lv}/10 · ${t.desc}</span></h3>
-          ${lv > 0 ? `<div style="font-size:11px;color:var(--green);margin-bottom:6px">已激活：${texts.slice(0, lv).join('、')}</div>` : ''}
           ${lv < 10 ? `<button class="btn small" data-talent="${k}">下一级：${texts[lv]}（♾${cost}）</button>` : '<div style="color:var(--gold);font-size:12px">已满级</div>'}
-          <div style="font-size:10px;color:var(--dim);margin-top:6px">${texts.map((x, i) => `${i < lv ? '✅' : '⬜'}${i + 1}.${x}`).join('　')}</div>
+          <div style="font-size:11px;line-height:1.8;margin-top:8px">${texts.map((x, i) => i < lv
+            ? `<span style="color:var(--gold);font-weight:600">${i + 1}.${x}</span>`
+            : `<span style="color:var(--dim)">${i + 1}.${x}</span>`).join('　')}</div>
         </div>`;
       }).join('')}
     `);
