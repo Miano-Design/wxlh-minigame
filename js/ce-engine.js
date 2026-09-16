@@ -121,13 +121,19 @@ function renderPage(ctx, W, H, markup) {
 
 /* 开发期（开发者工具里）打一张"版块位置小地图"：迁移期间靠它核对间距 */
 function devtoolsLog(LayoutInst) {
-  const screen = screenOf(LayoutInst, 'screen');
-  if (!screen) return;
-  const map = screen.children
-    .filter((c) => c.type === 'View' || c.type === 'ScrollView')
-    .map((c) => `${(c.className || '').split(/\s+/)[0]}@${Math.round(c.layoutBox.absoluteY)}+${Math.round(c.layoutBox.height)}`)
-    .join(' ');
-  console.log('[CE] 版块位置 ' + map);
+  /* 开发期把"每个元素的真实坐标"打到 console（一行），
+     用来和网页版同一页的坐标逐个做差——这比在 Node 里估算准得多（引擎的字体度量只有真机才对）。
+     格式：class|x,y,wxh 用空格分隔，和 Node 那边的 dump 一致，方便直接对差。 */
+  const rows = [];
+  (function walk(el) {
+    const b = el.layoutBox || {};
+    const cls = (el.className || el.type || '').split(' ')[0];
+    if (b.width > 0 || b.height > 0) {
+      rows.push(cls + '|' + Math.round(b.absoluteX || 0) + ',' + Math.round(b.absoluteY || 0) + ',' + Math.round(b.width || 0) + 'x' + Math.round(b.height || 0));
+    }
+    (el.children || []).forEach(walk);
+  })(LayoutInst.children[0]);
+  console.log('[CE-DUMP] ' + rows.join(' '));
 }
 
 function isDevtools() {
