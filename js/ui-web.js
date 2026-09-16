@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.33';
+  const GAME_VER = '9.5.34';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -198,10 +198,10 @@ window.UI = (function () {
     if (!big || S.settings.confirmBig === false) { onOk(); return; }
     const detail = Object.entries(cost).map(([k, v]) => `${curIcon(k)}${fmt(v)} ${curName(k)}`).join(' + ');
     const mine = Object.keys(cost).map(k => `${curIcon(k)}${fmt(S.cur[k] || 0)}`).join(' · ');
-    confirmBox(title, `<div style="margin-bottom:6px">将花费 <b style="color:var(--gold)">${detail}</b></div>
-      <div style="font-size:12px">当前持有：${mine}</div>
-      ${text ? `<div style="font-size:12px;margin-top:6px">${text}</div>` : ''}
-      <div style="font-size:11px;color:var(--dim);margin-top:10px">设置存档 → 大额消费二次确认，可以关掉这个提示。</div>`, onOk);
+    confirmBox(title, `<div style="margin-bottom:0.375rem">将花费 <b style="color:var(--gold)">${detail}</b></div>
+      <div style="font-size:0.75rem">当前持有：${mine}</div>
+      ${text ? `<div style="font-size:0.75rem;margin-top:0.375rem">${text}</div>` : ''}
+      <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.625rem">设置存档 → 大额消费二次确认，可以关掉这个提示。</div>`, onOk);
   }
 
   /* ================= 返回键接管（手机手势/返回键先退面板、再退页面） ================= */
@@ -320,7 +320,7 @@ window.UI = (function () {
   }
   function confirmBox(title, text, onOk) {
     const w = modal(title, `
-      <div style="color:var(--dim);font-size:13px;line-height:1.7;margin-bottom:14px">${text}</div>
+      <div style="color:var(--dim);font-size:0.8125rem;line-height:1.7;margin-bottom:0.875rem">${text}</div>
       <div class="btn-row"><button class="btn ghost" data-x>取消</button><button class="btn primary" data-ok>确定</button></div>
     `, { center: true });
     w.querySelector('[data-x]').onclick = () => closeModal(w);
@@ -331,7 +331,7 @@ window.UI = (function () {
   function currencyModal(focusId, wrap, backFn) {
     const S = C().S;
     const body = `
-      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:10px">
+      <div style="font-size:0.75rem;color:var(--dim);line-height:1.7;margin-bottom:0.625rem">
         每种货币只干一件事。拿不准该花哪个，就看下面这张表——「用途」写的是它能买什么，「来源」写的是去哪刷。
       </div>
       ${D.CURRENCIES.map(c => {
@@ -339,8 +339,8 @@ window.UI = (function () {
         return `<div class="card" id="cur-${c.id}" style="${focusId === c.id ? 'border-color:' + c.color : ''}">
           <h3><span style="color:${c.color}">${c.icon}</span> ${c.name}
             <span class="sub">持有 ${fmt(S.cur[c.id] || 0)}</span></h3>
-          <div style="font-size:12px;line-height:1.75"><b style="color:var(--gold)">用途</b>：${info.use || '—'}</div>
-          <div style="font-size:12px;line-height:1.75;color:var(--dim)"><b>来源</b>：${info.gain || '—'}</div>
+          <div style="font-size:0.75rem;line-height:1.75"><b style="color:var(--gold)">用途</b>：${info.use || '—'}</div>
+          <div style="font-size:0.75rem;line-height:1.75;color:var(--dim)"><b>来源</b>：${info.gain || '—'}</div>
         </div>`;
       }).join('')}`;
     const w = showPanel(wrap, '货币图鉴', body + `<button class="btn ghost block mt1" data-back>‹ 返回</button>`);
@@ -358,7 +358,7 @@ window.UI = (function () {
     const body = D.GUIDE_CHAPTERS.map(ch => `
       <div class="card" id="guide-${ch.id}">
         <h3>${ch.title}</h3>
-        ${ch.body.map(line => `<div style="font-size:12px;line-height:1.85;color:var(--text)">· ${md(line)}</div>`).join('')}
+        ${ch.body.map(line => `<div style="font-size:0.75rem;line-height:1.85;color:var(--text)">· ${md(line)}</div>`).join('')}
       </div>`).join('')
       + `<div class="card" style="background:var(--panel2)"><h3>📖 看不懂就点这里</h3>
         <div class="note">任何一屏里有「?」或小字说明的地方，都可以点开看解释；货币、道具也都能点开看用途。</div>
@@ -378,7 +378,7 @@ window.UI = (function () {
     const body = `
       <div class="card mb3">
         <h3>收集进度 <span class="sub">${cs.owned} / ${cs.total}</span></h3>
-        <div class="bar exp" style="margin:6px 0 10px"><i style="width:${Math.min(100, cs.owned / cs.total * 100)}%"></i></div>
+        <div class="bar exp" style="margin:0.375rem 0 0.625rem"><i style="width:${Math.min(100, cs.owned / cs.total * 100)}%"></i></div>
         ${cs.rewards.map(r => `<div class="list-row" style="${r.claimed ? 'opacity:.5' : ''}">
           <div class="grow"><div class="t1">收集 ${r.n} 名伙伴</div>
           <div class="t2">${rewardText(r.reward)}</div></div>
@@ -454,7 +454,7 @@ window.UI = (function () {
     syncTopbarHeight();
   }
   /* 顶栏高度用 JS 量出来交给 CSS：不同机型的系统字号 / 刘海高度不一样，
-     原来正文上边距写死 92px，遇到"系统字号调大"的机就会钻到顶栏底下。 */
+     原来正文上边距写死 5.75rem，遇到"系统字号调大"的机就会钻到顶栏底下。 */
   function syncTopbarHeight() {
     const root = (typeof document !== 'undefined' && document.documentElement) || null;
     const tb = document.getElementById ? document.getElementById('topbar') : null;
@@ -493,7 +493,7 @@ window.UI = (function () {
         ov.innerHTML = `
           <div class="coach-box" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
           <div class="coach-tip" style="left:${Math.max(12, Math.min(r.left, innerWidth - 292))}px;top:${Math.max(12, tipTop)}px">
-            <div style="font-size:13px;line-height:1.6">${text}</div>
+            <div style="font-size:0.8125rem;line-height:1.6">${text}</div>
             <button class="btn small primary mt3">知道了</button>
           </div>`;
         ov.onclick = () => ov.remove();
@@ -901,7 +901,7 @@ window.UI = (function () {
     const pr = S0.pendingRun;
     const resume = pr && pr.worldId ? (() => {
       const w = D.WORLDS.find(x => x.id === pr.worldId);
-      return `<div class="card" style="border-color:#ffd76a88;margin-bottom:10px">
+      return `<div class="card" style="border-color:#ffd76a88;margin-bottom:0.625rem">
         <h3>继续上次副本 <span class="sub">${w ? w.name : pr.worldId} · 第 ${pr.stage}/12 关 · 第 ${Math.min((pr.wave || 0) + 1, (pr.waves || [1]).length)}/${(pr.waves || [1]).length} 波</span></h3>
         <div class="btn-row">
           <button class="btn small primary" data-resume-run="1">继续探索</button>
@@ -930,7 +930,7 @@ window.UI = (function () {
       <button class="btn ghost small mb3" data-act="back-worlds">‹ 返回世界列表</button>
       <div class="card">
         <h3>${WORLD_ICONS[w.theme]} ${w.name}</h3>
-        <div style="font-size:12px;color:var(--dim);line-height:1.6">${w.desc}</div>
+        <div style="font-size:0.75rem;color:var(--dim);line-height:1.6">${w.desc}</div>
         <div class="kv mt2"><span class="k">世界机制</span><span style="color:var(--accent)">${w.mechanic}</span></div>
         <div class="kv"><span class="k">守关Boss</span><span>${w.boss}</span></div>
       </div>
@@ -938,7 +938,7 @@ window.UI = (function () {
         ${D.DIFFICULTY.map(d => `<button class="btn small ${diff === d.id ? 'active' : ''}" data-diff="${d.id}" ${d.id !== 'normal' && !C().worldCleared(w.id, d.id === 'hard' ? 'normal' : 'hard') ? 'disabled' : ''}>${d.name}${d.id !== 'normal' ? ` ×${d.mult}` : ''}</button>`).join('')}
       </div>
       <div class="stage-grid">${cells}</div>
-      ${canSweep ? `<button class="btn block" style="margin-top:12px" data-act="open-sweep" ${C().sweepLeft() <= 0 ? 'disabled' : ''}>⏩ 扫荡（可选关卡 · 今日剩余 ${C().sweepLeft()}/${D.SWEEP_DAILY_CAP} 次）</button>` : ''}
+      ${canSweep ? `<button class="btn block" style="margin-top:0.75rem" data-act="open-sweep" ${C().sweepLeft() <= 0 ? 'disabled' : ''}>⏩ 扫荡（可选关卡 · 今日剩余 ${C().sweepLeft()}/${D.SWEEP_DAILY_CAP} 次）</button>` : ''}
     `;
   }
   // 扫荡：可选关卡 + 可选次数
@@ -960,7 +960,7 @@ window.UI = (function () {
           ${[1, 5, 10].map(k => `<button class="btn small" data-stimes="${k}" ${left <= 0 ? 'disabled' : ''}>扫荡 ×${k}</button>`).join('')}
           <button class="btn small gold" data-stimes="0" ${left <= 0 ? 'disabled' : ''}>全部剩余（${left}）</button>
         </div>
-        <div style="font-size:11px;color:var(--dim);margin-top:8px">奖励按所选关卡结算：Boss 关按 Boss 掉落，精英关按精英掉落。</div>`);
+        <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.5rem">奖励按所选关卡结算：Boss 关按 Boss 掉落，精英关按精英掉落。</div>`);
       bind();
     };
     const bind = () => {
@@ -1016,7 +1016,7 @@ window.UI = (function () {
   function partyHpHtml() {
     return C().S.party.filter(Boolean).map(id => {
       const pct = run && run.hpPct[id] !== undefined ? run.hpPct[id] : 1;
-      return `<div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
+      return `<div style="flex:1;min-width:0"><div style="font-size:0.625rem;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
     }).join('');
   }
   // 探索中可用的消耗品：治疗剂（回血）与强化剂（本次探索增益）
@@ -1030,7 +1030,7 @@ window.UI = (function () {
     const heal = list.filter(k => (D.ITEMS[k].effect || {}).healPct);
     const buff = list.filter(k => !(D.ITEMS[k].effect || {}).healPct);
     const btn = id => `<button class="btn small" data-potion="${id}">${(D.ITEMS[id].effect || {}).healPct ? '🧪' : '💉'} ${D.ITEMS[id].name} ×${items[id]}</button>`;
-    return `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">${heal.concat(buff).map(btn).join('')}</div>`;
+    return `<div style="display:flex;gap:0.375rem;flex-wrap:wrap;justify-content:center">${heal.concat(buff).map(btn).join('')}</div>`;
   }
   // 用一支探索消耗品。返回是否真的用掉了（由调用方决定要不要重画）
   // 药剂回血只治"活着的人"（hpPct > 0.01），阵亡的成员不复活——
@@ -1077,8 +1077,8 @@ window.UI = (function () {
     const total = run.waves.length;
     const prog = Array.from({ length: total }, (_, i) => `<i class="${i < run.wave ? 'done' : ''}"></i>`).join('');
     const potionBar = potionBarHtml()
-      ? `<div class="mt2">${potionBarHtml()}<div style="font-size:10px;color:var(--dim);margin-top:5px">副本内使用 · 本场探索全程有效</div></div>`
-      : `<div style="font-size:10px;color:var(--dim);margin-top:8px">背包里还没有探索用道具（灯阁市集可买治疗剂 / 强化剂）</div>`;
+      ? `<div class="mt2">${potionBarHtml()}<div style="font-size:0.625rem;color:var(--dim);margin-top:0.3125rem">副本内使用 · 本场探索全程有效</div></div>`
+      : `<div style="font-size:0.625rem;color:var(--dim);margin-top:0.5rem">背包里还没有探索用道具（灯阁市集可买治疗剂 / 强化剂）</div>`;
     // 波次列表（纯文字）：打过的划掉，当前的高亮，后面的等着
     const waveList = run.waves.map((k, i) => {
       const done = i < run.wave, cur = i === run.wave;
@@ -1092,12 +1092,12 @@ window.UI = (function () {
       <div class="card">
         <h3>${w.name} · ${{ normal: '普通', hard: '困难', hell: '地狱' }[run.diff]} · 第 ${run.stage}/12 关 <span class="sub">共 ${total} 波</span></h3>
         <div class="route-progress">${prog}</div>
-        <div style="display:flex;gap:6px">${partyHpHtml()}</div>
+        <div style="display:flex;gap:0.375rem">${partyHpHtml()}</div>
         ${potionBar}
-        ${Object.keys(run.buffs).length ? `<div style="margin-top:8px;font-size:11px;color:var(--green)">本关增益：${Object.entries(run.buffs).map(([k, v]) => `${D.CONSUMABLE_TAG[k] || k}+${Math.round(v * 100)}%`).join(' ')}</div>` : ''}
+        ${Object.keys(run.buffs).length ? `<div style="margin-top:0.5rem;font-size:0.6875rem;color:var(--green)">本关增益：${Object.entries(run.buffs).map(([k, v]) => `${D.CONSUMABLE_TAG[k] || k}+${Math.round(v * 100)}%`).join(' ')}</div>` : ''}
       </div>
       <div class="card"><h3>本关波次</h3>${waveList}</div>
-      <div style="height:84px"></div>
+      <div style="height:5.25rem"></div>
       <div class="run-bar">
         <div class="btn-row">
           <button class="btn ghost small" data-act="abandon-run">撤离</button>
@@ -1283,7 +1283,7 @@ window.UI = (function () {
       const grabCls = grabbed === String(i) ? ' grabbing' : '';
       if (!id) {
         const freeHint = grabbed !== null && grabbed !== String(i) ? '放这里' : '＋ 上阵';
-        return `<div class="pslot${grabCls}" data-pos="${i}"><span class="pos-tag">${pos}</span><div style="text-align:center;color:var(--dim);padding-top:34px;font-size:12px">${freeHint}</div></div>`;
+        return `<div class="pslot${grabCls}" data-pos="${i}"><span class="pos-tag">${pos}</span><div style="text-align:center;color:var(--dim);padding-top:2.125rem;font-size:0.75rem">${freeHint}</div></div>`;
       }
       if (id === '@player') {
         return `<div class="pslot filled protag-slot${grabCls}" data-pos="${i}" data-protag="1">
@@ -1391,7 +1391,7 @@ window.UI = (function () {
     const lvlPct = Math.min(100, S.player.exp / (D.EXP_TABLE[S.player.level] || 1) * 100);
     const w = showPanel(wrap, `${cname('@player')}（主角）`, `
       <div class="card">
-        <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="display:flex;gap:0.75rem;align-items:flex-start">
           ${charAvatar('@player', 56)}
           <div style="flex:1;min-width:0">
             <div><b>${cname('@player')}</b> <span class="tag" style="color:var(--gold);border-color:var(--gold)">执灯者本人</span></div>
@@ -1399,7 +1399,7 @@ window.UI = (function () {
             <div class="hint">铭刻 ${gl > 0 ? D.GENE_LOCKS[gl - 1].name : '未解锁'} · 六维待分 ${S.player.attrPoints || 0} 点</div>
           </div>
           <div style="text-align:right;flex:0 0 auto">
-            <div style="font-size:20px;font-weight:700;color:var(--gold)">${fmt(C().playerPower())}</div>
+            <div style="font-size:1.25rem;font-weight:700;color:var(--gold)">${fmt(C().playerPower())}</div>
             <div class="hint">战力</div>
           </div>
         </div>
@@ -1411,7 +1411,7 @@ window.UI = (function () {
           <button class="btn small ghost hbtn" data-attrreset="1" ${spentAttr > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
         ${D.ATTR_META.map(a => `
           <div class="list-row">
-            <div class="grow"><div class="t1">${a.name} <span style="color:var(--dim);font-size:11px">${a.desc}</span></div>
+            <div class="grow"><div class="t1">${a.name} <span style="color:var(--dim);font-size:0.6875rem">${a.desc}</span></div>
             <div class="t2">已分配 ${(S.player.attrs && S.player.attrs[a.id]) || 0} 点 → +${((S.player.attrs && S.player.attrs[a.id]) || 0) * D.ATTR_POINT_VALUE}</div></div>
             <button class="btn small" data-attr="${a.id}" data-n="1" ${(S.player.attrPoints || 0) > 0 ? '' : 'disabled'}>+1</button>
             <button class="btn small ghost" data-attr="${a.id}" data-n="10" ${(S.player.attrPoints || 0) >= 1 ? '' : 'disabled'}>+10</button>
@@ -1431,12 +1431,12 @@ window.UI = (function () {
         <h3>🩸 血统 <span class="sub">${S.player.bloodline ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒'}</span></h3>
         ${S.player.bloodline ? `
           <div class="hint mb2">${S.player.bloodline}：${D.BLOODLINES[S.player.bloodline].desc}</div>
-          ${blCost ? `<button class="btn small block" data-pblup="1">血统升级（❥ ${blCost.bloodCrystal} + ◈ ${fmt(blCost.points)}）</button>` : '<div class="gold" style="font-size:12px">已满级</div>'}
+          ${blCost ? `<button class="btn small block" data-pblup="1">血统升级（❥ ${blCost.bloodCrystal} + ◈ ${fmt(blCost.points)}）</button>` : '<div class="gold" style="font-size:0.75rem">已满级</div>'}
         ` : S.player.level < D.BLOODLINE_UNLOCK_LV ? `
           <div class="note">🔒 主角 Lv.${D.BLOODLINE_UNLOCK_LV} 觉醒血统（当前 Lv.${S.player.level}）</div>
         ` : `
           
-          <div class="grid2">${Object.entries(D.BLOODLINES).map(([id, bl]) => `<button class="btn small" data-pbl="${id}">${id}<br><span style="font-size:10px;font-weight:400;color:var(--dim)">${bl.desc.split('。')[0]}</span></button>`).join('')}</div>
+          <div class="grid2">${Object.entries(D.BLOODLINES).map(([id, bl]) => `<button class="btn small" data-pbl="${id}">${id}<br><span style="font-size:0.625rem;font-weight:400;color:var(--dim)">${bl.desc.split('。')[0]}</span></button>`).join('')}</div>
         `}
       </div>
       <div class="card">
@@ -1505,7 +1505,7 @@ window.UI = (function () {
     w.querySelector('[data-rename]').onclick = () => {
       closeModal(w);
       const rw = modal('修改名字', `
-        <input id="rn-input" maxlength="12" value="${esc(S.player.name)}" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none;margin-bottom:12px" />
+        <input id="rn-input" maxlength="12" value="${esc(S.player.name)}" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.75rem;font-size:0.9375rem;outline:none;margin-bottom:0.75rem" />
         <button class="btn primary block" data-ok>确认修改</button>`, { center: true });
       rw.querySelector('[data-ok]').onclick = () => {
         if (C().setPlayerName(rw.querySelector('#rn-input').value)) {
@@ -1616,7 +1616,7 @@ window.UI = (function () {
         <input id="char-search" class="search-input" type="text" placeholder="🔍 搜名字" value="${esc(charQuery)}" />
         <button class="btn small ghost" data-act="open-codex">📕 图鉴</button>
       </div>
-      <div style="font-size:11px;color:var(--dim);margin:0 2px 8px">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
+      <div style="font-size:0.6875rem;color:var(--dim);margin:0 2px 0.5rem">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
       <div class="char-grid" id="char-list">${charGridHtml()}</div>`;
   }
   function charDetail(id, scrollTop, wrap) {
@@ -1634,7 +1634,7 @@ window.UI = (function () {
     const expItems = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
     const w = showPanel(wrap, `${cname(id)}`, `
       <div class="card">
-        <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="display:flex;gap:0.75rem;align-items:flex-start">
           ${charAvatar(id, 56)}
           <div style="flex:1;min-width:0">
             <div>${rarityTag(ch.rarity)} <b>${cname(id)}</b> <span class="stars">${stars(c.star, maxStar)}</span></div>
@@ -1642,7 +1642,7 @@ window.UI = (function () {
             <div class="hint">Lv.${c.lv} · 碎片 ${c.shards} · 血统 Lv.${c.bloodlineLv}</div>
           </div>
           <div style="text-align:right;flex:0 0 auto">
-            <div style="font-size:20px;font-weight:700;color:var(--gold)">${fmt(C().power(id))}</div>
+            <div style="font-size:1.25rem;font-weight:700;color:var(--gold)">${fmt(C().power(id))}</div>
             <div class="hint">战力</div>
           </div>
         </div>
@@ -1872,7 +1872,7 @@ window.UI = (function () {
   function equipBatchBar() {
     if (!batchMode) return '';
     return `
-      <div style="height:104px"></div>
+      <div style="height:6.5rem"></div>
       <div class="batch-bar">
         <div class="bb-row mb2">
           <span class="note">快选：</span>
@@ -1880,7 +1880,7 @@ window.UI = (function () {
           <button class="btn small ghost" data-bclear>清空</button>
         </div>
         <div class="bb-row">
-          <span style="font-size:12px" data-binfo></span>
+          <span style="font-size:0.75rem" data-binfo></span>
           <button class="btn small primary" data-bgo>⚡ 分解</button>
           <button class="btn small ghost" data-batchoff>取消</button>
         </div>
@@ -1909,11 +1909,11 @@ window.UI = (function () {
       : '普通装备';
     const w = showPanel(wrap, `${eq.name}`, `
       <div class="mb3">
-        <span class="rtext-${eq.rarity}" style="font-size:17px;font-weight:800">${eq.rarity}</span>
-        <b style="font-size:17px"> ${eq.name} <span style="color:var(--gold)">+${eq.enhance}</span></b>
+        <span class="rtext-${eq.rarity}" style="font-size:1.0625rem;font-weight:800">${eq.rarity}</span>
+        <b style="font-size:1.0625rem"> ${eq.name} <span style="color:var(--gold)">+${eq.enhance}</span></b>
         <div class="hint mt1">${D.EQUIP_SLOTS[eq.slot]} · ${catLine}${equippedBy ? ` · ${cname(equippedBy[0])}装备中` : ''}</div>
       </div>
-      <div class="skill-row"><div class="sdesc" style="font-size:12px;color:var(--text)">${equipBrief(eq)}</div></div>
+      <div class="skill-row"><div class="sdesc" style="font-size:0.75rem;color:var(--text)">${equipBrief(eq)}</div></div>
       <div class="section-title">强化（+${eq.enhance}/20）</div>
       <div class="btn-row">
         <button class="btn small" data-enh="1" ${eq.enhance >= 20 ? 'disabled' : ''}>强化（◈ ${fmt(cost.points)} + ◆ ${cost.otherworld} · ${rate}%）</button>
@@ -2003,7 +2003,7 @@ window.UI = (function () {
       return `<div class="card pool-card mb3">
         <h3>${p.name} <span class="tag" style="color:var(--gold);border-color:var(--gold)">${p.tag}</span>
           <span class="sub">用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
-        <div style="font-size:11px;color:var(--dim);line-height:1.75;margin-bottom:8px">${p.desc}</div>
+        <div style="font-size:0.6875rem;color:var(--dim);line-height:1.75;margin-bottom:0.5rem">${p.desc}</div>
         ${tk ? `<div class="ticket-row ${tk.n > 0 ? 'has' : ''}">
           <span>🎫 ${tkName} ×<b>${tk.n}</b></span>
           <span class="ticket-hint">${tk.n > 0 ? '有券先用券，货币不动' : `没券了，本次会花 ${Object.keys(p.cost).map(curName).join(' / ')}`}</span>
@@ -2091,7 +2091,7 @@ window.UI = (function () {
         <div class="rate-row">${rate}</div>
         <div class="kv"><span class="k">单抽</span><span>${cost}${tk ? ` · 或 🎫 ${tkName}×1（现有 ${tk.n} 张）` : ''}</span></div>
         <div class="kv"><span class="k">十连</span><span>${ten}${tk ? ` · 或 🎫 ${tkName}×10` : ''} · 保底至少 1 个 SR</span></div>
-        <div style="font-size:11px;color:var(--dim);line-height:1.7;margin-top:6px">${D.pityText(pid)}</div>
+        <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7;margin-top:0.375rem">${D.pityText(pid)}</div>
         ${left}
       </div>`;
     }).join('');
@@ -2099,7 +2099,7 @@ window.UI = (function () {
       <div class="card mb3" style="border-color:#ffd76a55">
       </div>
       ${rows}
-      <button class="btn ghost block" style="margin-top:4px" data-back>‹ 返回招募</button>`);
+      <button class="btn ghost block" style="margin-top:0.25rem" data-back>‹ 返回招募</button>`);
     w.querySelector('[data-back]').onclick = () => recruitModal(w);
     return w;
   }
@@ -2117,8 +2117,8 @@ window.UI = (function () {
       refresh(); renderTopbar();
       const left = C().S.ssrTicket;
       updateModal(w, 'SSR 自选', `
-        <div class="reward-chips" style="margin:16px 0;justify-content:center"><span class="reward-chip" style="font-size:14px">${esc(r.msg)}</span></div>
-        <div style="text-align:center;font-size:12px;color:var(--dim);margin-bottom:12px">剩余自选券 ${left} 张</div>
+        <div class="reward-chips" style="margin:1rem 0;justify-content:center"><span class="reward-chip" style="font-size:0.875rem">${esc(r.msg)}</span></div>
+        <div style="text-align:center;font-size:0.75rem;color:var(--dim);margin-bottom:0.75rem">剩余自选券 ${left} 张</div>
         <button class="btn primary block" data-back>返回招募</button>`);
       w.querySelector('[data-back]').onclick = () => recruitModal(w);
     });
@@ -2134,7 +2134,7 @@ window.UI = (function () {
     const info = D.CURRENCY_INFO[shop.currency] || {};
     const w = showPanel(wrap, '兑换大厅', `
       <div class="pill-tabs">${Object.entries(D.SHOPS).map(([k, s]) => `<div class="pill ${shopTab === k ? 'active' : ''}" data-shoptab="${k}">${s.name}（${curIcon(s.currency)}${fmt(S.cur[s.currency])}）</div>`).join('')}</div>
-      <div style="font-size:11px;color:var(--dim);line-height:1.7;margin:2px 2px 8px">
+      <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7;margin:2px 2px 0.5rem">
         本店用 ${curIcon(shop.currency)}${curName(shop.currency)} 结算 · 用途：${info.use || '—'}
       </div>
       ${shop.items.map((it, i) => {
@@ -2528,7 +2528,7 @@ window.UI = (function () {
       </div>
       <div class="section-title">可能遇到什么（${D.TRAVELS.length} 种）</div>
       ${D.TRAVELS.map(t => `<div class="list-row">
-        <span style="font-size:19px">${t.ico}</span>
+        <span style="font-size:1.1875rem">${t.ico}</span>
         <div class="grow"><div class="t1">${t.name}</div><div class="t2">${t.desc}</div></div>
         <span class="hint">${C().rewardTextOf(t.effect)}</span>
       </div>`).join('')}`;
@@ -2566,7 +2566,7 @@ window.UI = (function () {
         const next = cost === null ? cur : (k.rate * (lv + 1) * 100);
         const can = cost !== null && coin >= cost;
         return `<div class="list-row">
-          <span style="font-size:19px">${k.ico}</span>
+          <span style="font-size:1.1875rem">${k.ico}</span>
           <div class="grow">
             <div class="t1">${k.name} <span class="tag">Lv.${lv} / ${k.max}</span></div>
             <div class="t2">${k.info} 当前 <b style="color:var(--gold)">+${cur.toFixed(1)}%</b>
@@ -2627,7 +2627,7 @@ window.UI = (function () {
         <div class="note mb2">${info.nextDesc}</div>
         <div class="kv"><span class="k">✦ 圣洁晶石</span><span style="color:${hl >= cost.holy ? 'var(--green)' : 'var(--accent)'}">${fmt(hl)} / ${fmt(cost.holy)}</span></div>
         <div class="kv"><span class="k">◆ 异界结晶</span><span style="color:${ow >= cost.otherworld ? 'var(--green)' : 'var(--accent)'}">${fmt(ow)} / ${fmt(cost.otherworld)}</span></div>
-        <button class="btn primary block" style="margin-top:10px" data-auth="1" ${afford ? '' : 'disabled'}>⚡ 提升灯阁权限</button>
+        <button class="btn primary block" style="margin-top:0.625rem" data-auth="1" ${afford ? '' : 'disabled'}>⚡ 提升灯阁权限</button>
       </div>`}
       <div class="section-title">权限一览（${info.max} 级）</div>
       ${info.rows.map(r => `<div class="list-row" style="${r.lv <= info.lv ? '' : 'opacity:.6'}">
@@ -2653,7 +2653,7 @@ window.UI = (function () {
     const rows = C().idleLines();
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const body = `
-      <div style="font-size:12px;color:var(--dim);line-height:1.75;margin-bottom:10px">
+      <div style="font-size:0.75rem;color:var(--dim);line-height:1.75;margin-bottom:0.625rem">
         4 条产线各派 <b>1 名领队</b>：领队战力越高，这条线产出越高（最高 +150%）。
         上阵主力不能派去挂机，「板凳上的伙伴」在这里发挥作用；没派领队的产线不产出。
       </div>
@@ -2663,7 +2663,7 @@ window.UI = (function () {
         <h3>${r.line.ico} ${r.line.name} <span class="sub">${r.per}</span></h3>
         <div class="hint mb2">${r.line.desc}${leader ? ` · 领队【${r.line.attrName}】${r.attrValue} → 加成 +${Math.round(r.bonus * 100)}%` : ''}</div>
         ${leader
-          ? `<div class="list-row" style="border:none;padding:4px 0">
+          ? `<div class="list-row" style="border:none;padding:0.25rem 0">
                ${charAvatar(leader, 34)}
                <div class="grow"><div class="t1">${cname(leader)}</div><div class="t2">${r.line.attrName} ${r.attrValue} · 战力 ${fmt(C().power(leader))}</div></div>
                <button class="btn small ghost" data-idleclear="${r.line.id}">撤下</button>
@@ -2671,7 +2671,7 @@ window.UI = (function () {
           : `<button class="btn small block" data-idlepick="${r.line.id}" ${bench.length ? '' : 'disabled'}>${bench.length ? '＋ 派一名领队' : '没有可派的伙伴（先去招募）'}</button>`}
       </div>`;
     }).join('')}
-      <div style="font-size:11px;color:var(--dim);line-height:1.7">可派伙伴：${bench.length} 名（未上阵的伙伴）。产出的收益和挂机收益一起，在首页「收取奖励」里结算。</div>`;
+      <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7">可派伙伴：${bench.length} 名（未上阵的伙伴）。产出的收益和挂机收益一起，在首页「收取奖励」里结算。</div>`;
     const w = showPanel(wrap, '挂机分工', body);
     w.querySelectorAll('[data-idlepick]').forEach(b => b.onclick = () => pickIdleLeader(b.dataset.idlepick, w));
     w.querySelectorAll('[data-idleclear]').forEach(b => b.onclick = () => {
@@ -2713,7 +2713,7 @@ window.UI = (function () {
   function bountyModal(wrap) {
     const st = C().bountyState();
     const body = `
-      <div style="font-size:12px;color:var(--dim);line-height:1.75;margin-bottom:10px">
+      <div style="font-size:0.75rem;color:var(--dim);line-height:1.75;margin-bottom:0.625rem">
         限时悬赏：<b>到点作废</b>，达成才有奖励。每条按自己的截止时间算，全部结束后可以开新一期。
       </div>
       ${st.list.map(({ b, leftMs, expired, done, claimed }) => {
@@ -2753,7 +2753,7 @@ window.UI = (function () {
       return `<div class="card" style="border-color:var(--gold)">
         <h3>🐾 随行中 · ${st.activeBeast.name}
           <span class="sub">${st.activeBeast.rarity} · ${elemIcon(st.activeBeast.elem)} · Lv.${a ? a.lv : 1}</span></h3>
-        <div style="font-size:11px;color:var(--dim);line-height:1.8">
+        <div style="font-size:0.6875rem;color:var(--dim);line-height:1.8">
           ${D.beastDesc(st.activeBeast)}（全队生效，主角也吃）<br>
           五行：<b style="color:var(--gold)">${st.activeBeast.elem}</b> 克 <b>${ctr}</b> —— 进「${ctr}」属性的世界，全队伤害 +${Math.round(D.ELEMENT_BONUS * 100)}%；
           遇到克你的世界则 -${Math.round(D.ELEMENT_PENALTY * 100)}%。
@@ -2762,10 +2762,10 @@ window.UI = (function () {
       </div>`;
     })() : `<div class="card" style="border-style:dashed">
       <h3>🐾 还没有随行伴生体</h3>
-      <div style="font-size:11px;color:var(--dim)">孵化一只并让它随行，全队立刻吃到加成。</div>
+      <div style="font-size:0.6875rem;color:var(--dim)">孵化一只并让它随行，全队立刻吃到加成。</div>
     </div>`;
     const body = `
-      <div style="font-size:12px;color:var(--dim);line-height:1.8;margin-bottom:10px">
+      <div style="font-size:0.75rem;color:var(--dim);line-height:1.8;margin-bottom:0.625rem">
         伴生体是<b>第二条养成线</b>：上阵 1 只，给<b>全队</b>加属性 + 五行克制。孵化花兽魂石，
         重复获得转<b>兽魂</b>，兽魂用来升阶。兽魂石从副本 Boss（必掉 1~3 颗）和精英怪出。
       </div>
@@ -2783,15 +2783,15 @@ window.UI = (function () {
       const counter = D.ELEMENT_COUNTER[x.b.elem];
       const need = D.BEAST_SOUL_PER_LV * x.lv;
       return `<div class="card" style="${x.active ? 'border-color:var(--gold)' : ''}">
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <div class="bico" style="font-size:24px">${elemIcon(x.b.elem)}</div>
+        <div style="display:flex;align-items:flex-start;gap:0.625rem">
+          <div class="bico" style="font-size:1.5rem">${elemIcon(x.b.elem)}</div>
           <div class="grow">
             <div><span class="rtext-${x.b.rarity}">${x.b.rarity}</span> <b>${x.b.name}</b>
               <span class="tag">Lv.${x.lv}/${D.BEAST_MAX_LV}</span>${x.active ? ' <span class="tag" style="color:var(--gold);border-color:var(--gold)">随行中</span>' : ''}</div>
             <div class="hint mt1">${D.beastDesc(x.b)}（全队）</div>
-            <div style="font-size:11px;color:var(--dim);margin-top:2px">克 ${counter} · 兽魂 ${x.soul}${x.maxLv ? ' · 已满级' : ` / 升阶需 ${need}`}</div>
+            <div style="font-size:0.6875rem;color:var(--dim);margin-top:2px">克 ${counter} · 兽魂 ${x.soul}${x.maxLv ? ' · 已满级' : ` / 升阶需 ${need}`}</div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:0.375rem">
             ${x.active ? '' : `<button class="btn small" data-beaston="${x.id}">随行</button>`}
             <button class="btn small ${x.soul >= need && !x.maxLv ? 'gold' : ''}" data-beastup="${x.id}" ${x.maxLv || x.soul < need ? 'disabled' : ''}>升阶</button>
           </div>
@@ -2799,7 +2799,7 @@ window.UI = (function () {
       </div>`;
     }).join('') || '<div class="empty">还没有伴生体，去孵化一只</div>'}
       <div class="section-title">五行相克</div>
-      <div class="card" style="font-size:11px;line-height:1.9;color:var(--dim)">
+      <div class="card" style="font-size:0.6875rem;line-height:1.9;color:var(--dim)">
         ${D.ELEMENTS.map(e => `${D.ELEMENT_ICON[e]}${e} 克 ${D.ELEMENT_ICON[D.ELEMENT_COUNTER[e]]}${D.ELEMENT_COUNTER[e]}`).join('　')}
         <div class="mt2">各世界的属性：${D.WORLDS.map(w => { const e = D.worldElement(w.id); return `${w.name.slice(0, 2)}${D.ELEMENT_ICON[e]}${e}`; }).join(' · ')}</div>
       </div>`;
@@ -2869,7 +2869,7 @@ window.UI = (function () {
         <div class="kv"><span class="k">等级要求</span><span style="color:${st.levelOk ? 'var(--green)' : 'var(--accent)'}">Lv.${st.next.lv}（当前 Lv.${S.player.level}）</span></div>
         <div class="kv"><span class="k">渡劫材料</span><span style="color:${st.haveMat >= st.matN ? 'var(--green)' : 'var(--accent)'}">${D.ITEMS[st.matItem].name} ${st.haveMat} / ${st.matN}</span></div>
         <div class="kv"><span class="k">点数</span><span style="color:${(S.cur.points || 0) >= st.points ? 'var(--green)' : 'var(--accent)'}">◈ ${fmt(st.points)}</span></div>
-        <button class="btn primary block" style="margin-top:10px" data-realm="1" ${st.levelOk && st.haveMat >= st.matN && (S.cur.points || 0) >= st.points ? '' : 'disabled'}>⚡ 渡劫（成功率 ${Math.round(st.rate * 100)}%）</button>
+        <button class="btn primary block" style="margin-top:0.625rem" data-realm="1" ${st.levelOk && st.haveMat >= st.matN && (S.cur.points || 0) >= st.points ? '' : 'disabled'}>⚡ 渡劫（成功率 ${Math.round(st.rate * 100)}%）</button>
         <div class="hint mt1">失败也扣材料与点数（等级不掉）</div>
       </div>` : '<div class="card"><h3>已至大圆满</h3><div class="note">当前境界已是这条血统的终点。</div></div>'}
       <div class="section-title">${st.bloodline}境界线 · ${majors.length} 大境 × ${D.REALM_TIERS.length} 小阶</div>
@@ -2981,7 +2981,7 @@ window.UI = (function () {
     const allDone = st.every(x => x.done);
     const claimedAll = C().S.tasks.weeklyAllClaimed;
     return `
-      <div style="font-size:11px;color:var(--dim);margin:2px 2px 8px">本周 ${C().weekKey()} 起算 · 进度与每日任务通用，周一自动重置。</div>
+      <div style="font-size:0.6875rem;color:var(--dim);margin:2px 2px 0.5rem">本周 ${C().weekKey()} 起算 · 进度与每日任务通用，周一自动重置。</div>
       ${st.map(({ t, prog, done, claimed }) => `<div class="list-row">
         <div class="grow"><div class="t1">${t.name}</div>
         <div class="t2">${Math.min(prog, t.target)}/${t.target} · 奖励 ${rewardText(t.reward)}</div></div>
@@ -3118,9 +3118,9 @@ window.UI = (function () {
           <h3>${i + 1}阶 · ${g.name} ${unlocked ? '<span class="sub" style="color:var(--green)">已解锁</span>' : ''}</h3>
           <div class="note">${g.desc}</div>
           ${isNext && !info.max ? `
-            <div style="font-size:11px;color:var(--gold);margin-top:6px">条件：${g.req} · ❥ ${g.cost.bloodCrystal}</div>
-            ${info.reqs.length ? `<div style="font-size:11px;color:var(--accent);margin-top:4px">未满足：${info.reqs.join('；')}</div>` : ''}
-            <button class="btn primary block" style="margin-top:8px" data-glunlock="1" ${info.can ? '' : 'disabled'}>突破铭刻</button>` : ''}
+            <div style="font-size:0.6875rem;color:var(--gold);margin-top:0.375rem">条件：${g.req} · ❥ ${g.cost.bloodCrystal}</div>
+            ${info.reqs.length ? `<div style="font-size:0.6875rem;color:var(--accent);margin-top:0.25rem">未满足：${info.reqs.join('；')}</div>` : ''}
+            <button class="btn primary block" style="margin-top:0.5rem" data-glunlock="1" ${info.can ? '' : 'disabled'}>突破铭刻</button>` : ''}
         </div>`;
       }).join('')}
     `);
@@ -3142,13 +3142,13 @@ window.UI = (function () {
       <div class="card">
         <h3>转生 <span class="sub">已转生 ${S.player.reincarnations} 次</span></h3>
   <div class="note">保留伙伴 / 装备 / 血统 / 铭刻 / 天赋</div>
-        <div style="font-size:11px;margin-top:8px;color:${can ? 'var(--green)' : 'var(--accent)'}">
+        <div style="font-size:0.6875rem;margin-top:0.5rem;color:${can ? 'var(--green)' : 'var(--accent)'}">
           条件：玩家Lv.${S.player.level}/100 · 铭刻${S.player.geneLock}/5 · 灯芯Lv.${S.buildings.core}/30
         </div>
-        <button class="btn primary block" style="margin-top:10px" data-reinc="1" ${can ? '' : 'disabled'}>开始转生</button>
+        <button class="btn primary block" style="margin-top:0.625rem" data-reinc="1" ${can ? '' : 'disabled'}>开始转生</button>
       </div>
       <div class="section-title">永久天赋（♾ ${fmt(S.cur.rp)}）</div>
-      <div style="font-size:11px;color:var(--dim);line-height:1.7;margin:0 2px 8px">
+      <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7;margin:0 2px 0.5rem">
         四支天赋点满各需 ♾ 6200（10/20/40/80/150/300/600/1000/1500/2500）。加成对全队生效，转生后保留。
       </div>
       ${Object.entries(D.TALENTS).map(([k, t]) => {
@@ -3157,8 +3157,8 @@ window.UI = (function () {
         const texts = D.talentTexts(k);
         return `<div class="card mb2">
           <h3>${t.name} <span class="sub">Lv.${lv}/10 · ${t.desc}</span></h3>
-          ${lv < 10 ? `<button class="btn small" data-talent="${k}">下一级：${texts[lv]}（♾ ${cost}）</button>` : '<div style="color:var(--gold);font-size:12px">已满级</div>'}
-          <div style="font-size:11px;line-height:1.8;margin-top:8px">${texts.map((x, i) => i < lv
+          ${lv < 10 ? `<button class="btn small" data-talent="${k}">下一级：${texts[lv]}（♾ ${cost}）</button>` : '<div style="color:var(--gold);font-size:0.75rem">已满级</div>'}
+          <div style="font-size:0.6875rem;line-height:1.8;margin-top:0.5rem">${texts.map((x, i) => i < lv
             ? `<span style="color:var(--gold);font-weight:600">${i + 1}.${x}</span>`
             : `<span style="color:var(--dim)">${i + 1}.${x}</span>`).join('　')}</div>
         </div>`;
@@ -3200,7 +3200,7 @@ window.UI = (function () {
      玩家看到的就是"按了返回没反应"。所以这里加了兜底：回调要是没重画也没关掉，就由面板自己关。 */
   function lootPanel(title, chipsHtml, backFn, wrap) {
     const w = showPanel(wrap, title, `
-      <div class="reward-chips" style="margin:10px 0">${chipsHtml || '<span class="reward-chip">没有变化</span>'}</div>
+      <div class="reward-chips" style="margin:0.625rem 0">${chipsHtml || '<span class="reward-chip">没有变化</span>'}</div>
       <button class="btn block" data-back>‹ 返回</button>`);
     w.querySelector('[data-back]').onclick = () => {
       const seq = w._drawSeq;
@@ -3374,7 +3374,7 @@ window.UI = (function () {
         <button class="btn small" data-serum="10" ${n >= 10 ? '' : 'disabled'}>用 10 支</button>
         <button class="btn small gold" data-serum="0" ${n >= 1 ? '' : 'disabled'}>全部用（${n}）</button>
       </div>
-      <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.7">
+      <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
         永久生效，不是临时增益。${sd.bloodline ? `只有「${sd.bloodline}」血统能用；` : '任何伙伴（含主角）都能用；'}每人每种上限 ${sd.max} 支。
       </div>`;
     } else if (it.type === 'consumable') {
@@ -3388,13 +3388,13 @@ window.UI = (function () {
       const pool = D.RECRUIT_POOLS[it.pool] || {};
       const tk = C().ticketOf(it.pool);
       actions = `<div class="btn-row"><button class="btn small gold" data-gorecruit="1">去「${pool.name || '招募'}」使用（现有 ${tk ? tk.n : n} 张）</button></div>
-        <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.7">
+        <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
           招募时<b>自动优先扣券</b>，券不够才扣货币；十连要么 10 张券、要么给足货币。
         </div>`;
     }
     const body = `
-      <div class="card mb3" style="display:flex;align-items:baseline;gap:10px">
-        <b style="font-size:16px">${it.name}</b>
+      <div class="card mb3" style="display:flex;align-items:baseline;gap:0.625rem">
+        <b style="font-size:1rem">${it.name}</b>
         <span style="margin-left:auto;color:var(--gold);font-weight:700">×${n}</span>
       </div>
       <div class="card mb3">
@@ -3404,7 +3404,7 @@ window.UI = (function () {
       <div class="card mb3">
         <h3>在哪用</h3>
         <div class="kv"><span class="k">使用场景</span><span>${where}</span></div>
-        <div style="font-size:12px;color:var(--dim);line-height:1.8;margin-top:6px">${esc(it.use || '')}</div>
+        <div style="font-size:0.75rem;color:var(--dim);line-height:1.8;margin-top:0.375rem">${esc(it.use || '')}</div>
       </div>
       <div class="card mb3">
         <h3>去哪弄</h3>
@@ -3540,7 +3540,7 @@ window.UI = (function () {
     const S = C().S;
     const goBack = onBack || (w2 => bagModal(w2));
     const body = `
-      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:10px">
+      <div style="font-size:0.75rem;color:var(--dim);line-height:1.7;margin-bottom:0.625rem">
         血清是<b>永久强化剂</b>：喂给某名伙伴后永久加属性，每人每种有上限。
         血统血清只有对应血统能用——先觉醒血统，再决定喂给谁。
       </div>
@@ -3551,14 +3551,14 @@ window.UI = (function () {
         const haveMat = S.items[s.mat] || 0;
         const can = Math.min(Math.floor(haveMat / s.matN), Math.floor(S.cur.points / s.points));
         return `<div class="card mb2">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem">
             <div class="grow">
-              <div style="font-size:13px">💊 <b>${s.name}</b>${s.bloodline ? ` <span style="color:var(--gold);font-size:11px">${s.bloodline}专属</span>` : ''}</div>
+              <div style="font-size:0.8125rem">💊 <b>${s.name}</b>${s.bloodline ? ` <span style="color:var(--gold);font-size:0.6875rem">${s.bloodline}专属</span>` : ''}</div>
               <div class="hint mt1">${D.ITEMS[itemId].desc.replace(/^【[^】]*】/, '')}</div>
               <div class="hint mt1">配方：${matName} ×${s.matN} + ◈ ${s.points}　（现有 ${matName} ${haveMat} · ◈ ${fmt(S.cur.points)}）</div>
-              <div style="font-size:11px;color:${own ? 'var(--green)' : 'var(--dim)'};margin-top:4px">已有血清 ×${own}</div>
+              <div style="font-size:0.6875rem;color:${own ? 'var(--green)' : 'var(--dim)'};margin-top:0.25rem">已有血清 ×${own}</div>
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;flex-direction:column;gap:0.375rem">
               <button class="btn small" data-refine="1:${s.id}" ${can >= 1 ? '' : 'disabled'}>炼 ×1</button>
               <button class="btn small" data-refine="10:${s.id}" ${can >= 10 ? '' : 'disabled'}>炼 ×10</button>
             </div>
@@ -3647,14 +3647,14 @@ window.UI = (function () {
             <div class="t2">Lv.${p.level} · ${p.bloodline ? p.bloodline + '血统 Lv.' + p.bloodlineLv : '未觉醒血统'}</div></div>
             ${p.current ? '' : `<button class="btn small" data-switchprotag="${p.altIndex}">切换</button>`}
           </div>`).join('')}
-        <div style="font-size:11px;color:var(--dim);margin:8px 0">新建主角从 Lv.1 开始，可体验不同血统路线；世界进度、货币、队伍不受影响</div>
+        <div style="font-size:0.6875rem;color:var(--dim);margin:0.5rem 0">新建主角从 Lv.1 开始，可体验不同血统路线；世界进度、货币、队伍不受影响</div>
         <button class="btn small block" data-newprotag="1">➕ 新建主角</button>
       </div>
       <div class="card">
         <h3>危险区</h3>
         <button class="btn small ghost" data-reset="1" style="color:var(--accent)">删除当前进度，重新开始</button>
       </div>
-      <div style="text-align:center;font-size:10px;color:var(--dim);padding:8px;opacity:.6" data-ver>残域 V${GAME_VER}</div>
+      <div style="text-align:center;font-size:0.625rem;color:var(--dim);padding:0.5rem;opacity:.6" data-ver>残域 V${GAME_VER}</div>
     `;
     const w = showPanel(wrap, '设置与存档', body);
     let verTaps = 0, verTimer = null;
@@ -3694,7 +3694,7 @@ window.UI = (function () {
       const json = C().exportSave();
       const m = modal('导出存档', `
         <div class="hint mb2">全选下面这段文字复制走</div>
-        <textarea id="exp-ta" readonly style="width:100%;height:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:11px;line-height:1.5;outline:none;word-break:break-all">${esc(json)}</textarea>
+        <textarea id="exp-ta" readonly style="width:100%;height:9.375rem;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.625rem;font-size:0.6875rem;line-height:1.5;outline:none;word-break:break-all">${esc(json)}</textarea>
         <div class="btn-row mt3"><button class="btn small primary" data-copy>📋 复制</button><button class="btn small ghost" data-close>关闭</button></div>`, { center: true });
       const ta = m.querySelector('#exp-ta');
       ta.onclick = () => ta.select();
@@ -3711,7 +3711,7 @@ window.UI = (function () {
     if (saveImport) saveImport.onclick = () => {
       const m = modal('导入存档', `
         <div class="hint mb2">粘到下面，确认后<b style="color:var(--accent)">当前进度会被覆盖</b></div>
-        <textarea id="imp-ta" placeholder="在这里粘贴存档内容…" style="width:100%;height:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font-size:11px;line-height:1.5;outline:none;word-break:break-all"></textarea>
+        <textarea id="imp-ta" placeholder="在这里粘贴存档内容…" style="width:100%;height:9.375rem;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.625rem;font-size:0.6875rem;line-height:1.5;outline:none;word-break:break-all"></textarea>
         <div class="btn-row mt3"><button class="btn small primary" data-doimport>确认导入</button><button class="btn small ghost" data-close>取消</button></div>`, { center: true });
       m.querySelector('[data-close]').onclick = () => closeModal(m);
       m.querySelector('[data-doimport]').onclick = () => {
@@ -3754,7 +3754,7 @@ window.UI = (function () {
       closeModal(w);
       const nw = modal('新建主角', `
         <div class="note mb3">新主角从 Lv.1 开始（当前主角保留）</div>
-        <input id="np-input" maxlength="12" placeholder="输入新主角名字（12字内）" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none;margin-bottom:12px" />
+        <input id="np-input" maxlength="12" placeholder="输入新主角名字（12字内）" style="width:100%;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.75rem;font-size:0.9375rem;outline:none;margin-bottom:0.75rem" />
         <button class="btn primary block" data-ok>创建并开始探索</button>`, { center: true });
       nw.querySelector('[data-ok]').onclick = () => {
         const r = C().createProtagonist(nw.querySelector('#np-input').value);
@@ -4062,13 +4062,13 @@ window.UI = (function () {
       panel.className = 'b-result';
       panel.innerHTML = `
         <h2 class="${res.win ? 'win' : 'lose'}">${res.win ? '胜 利' : '任务失败'}</h2>
-        <div style="color:var(--dim);font-size:12px">${res.rounds} 回合${outcome.sub ? ' · ' + outcome.sub : ''}</div>
+        <div style="color:var(--dim);font-size:0.75rem">${res.rounds} 回合${outcome.sub ? ' · ' + outcome.sub : ''}</div>
         ${rewards.length ? `<div class="reward-chips">${rewards.map(r => `<span class="reward-chip">${r}</span>`).join('')}</div>` : ''}
         ${outcome.extraHtml || ''}
-        ${acts.length ? `<div class="btn-row" style="max-width:340px;width:100%">
+        ${acts.length ? `<div class="btn-row" style="max-width:21.25rem;width:100%">
           ${acts.map((a, i) => `<button class="btn ${a.primary ? 'primary' : ''}" data-bact="${i}">${i === autoIdx ? autoNextBtnHtml(a.label, autoSec) : a.label}</button>`).join('')}
         </div>` : ''}
-        <button class="btn ${acts.length ? 'ghost' : 'primary'}" style="min-width:200px" data-close>${outcome.closeLabel || (res.win ? (acts.length ? '收下奖励并返回' : '收下奖励') : '返回')}</button>`;
+        <button class="btn ${acts.length ? 'ghost' : 'primary'}" style="min-width:12.5rem" data-close>${outcome.closeLabel || (res.win ? (acts.length ? '收下奖励并返回' : '收下奖励') : '返回')}</button>`;
       overlay.appendChild(panel);
       if (outcome.onExtra) outcome.onExtra(panel);
       let autoT = null, autoLeft = autoSec;
@@ -4325,8 +4325,8 @@ window.UI = (function () {
           Object.entries(r.gains.cur).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">${curIcon(k)}${v > 0 ? '+' : ''}${fmt(v)}</span>`); });
           Object.entries(r.gains.items).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">🎒 ${(D.ITEMS[k] || {}).name || k}×${v}</span>`); });
           modal('收取奖励', `
-            <div style="font-size:12px;color:var(--dim);text-align:center">本次共收取 ${r.total} 项</div>
-            <div class="reward-chips" style="margin:12px 0">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
+            <div style="font-size:0.75rem;color:var(--dim);text-align:center">本次共收取 ${r.total} 项</div>
+            <div class="reward-chips" style="margin:0.75rem 0">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
           `, { center: true });
           render();
           break;
@@ -4369,7 +4369,7 @@ window.UI = (function () {
               toast(`完成主线【${cur.q.name}】`, 2200);
               // 弹的是"这条任务真正解锁了什么"（由 claimQuest 返回，不再去读下一条任务的字段）
               if (r.unlocked && r.unlocked.length) {
-                setTimeout(() => modal('🔓 新功能解锁', `<div style="text-align:center;padding:10px;font-size:14px">${r.unlocked.join(' · ')} 已解锁！</div>`, { center: true }), 400);
+                setTimeout(() => modal('🔓 新功能解锁', `<div style="text-align:center;padding:0.625rem;font-size:0.875rem">${r.unlocked.join(' · ')} 已解锁！</div>`, { center: true }), 400);
               }
             }
           }
@@ -4536,7 +4536,7 @@ window.UI = (function () {
   function gmModal() {
     const S = C().S;
     const w = modal('🛠 GM 调试面板', `
-      <div style="font-size:11px;color:var(--accent);margin-bottom:10px">仅用于开发测试，滥用会破坏游戏乐趣</div>
+      <div style="font-size:0.6875rem;color:var(--accent);margin-bottom:0.625rem">仅用于开发测试，滥用会破坏游戏乐趣</div>
       <div class="grid2">
         <button class="btn small" data-gm="cur">货币 +10000（晶石+5000）</button>
         <button class="btn small" data-gm="unlocks">解锁全部功能</button>
@@ -4550,7 +4550,7 @@ window.UI = (function () {
         <button class="btn small" data-gm="floor">深井 +10 层</button>
         <button class="btn small" data-gm="recruit">✦ +900（十连）</button>
       </div>
-      <div style="font-size:11px;color:var(--dim);margin-top:12px">玩家Lv.${S.player.level} · 铭刻${S.player.geneLock} · 深井${S.corridor.floor}层 · 伙伴${Object.keys(S.chars).length}</div>
+      <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.75rem">玩家Lv.${S.player.level} · 铭刻${S.player.geneLock} · 深井${S.corridor.floor}层 · 伙伴${Object.keys(S.chars).length}</div>
     `);
     w.querySelectorAll('[data-gm]').forEach(b => b.onclick = () => {
       const act = b.dataset.gm;
@@ -4600,9 +4600,9 @@ window.UI = (function () {
        这里只负责把"这次拿到了什么"讲清楚。 */
     const mat = g.gains.matCount ? { item: g.gains.matItem, count: g.gains.matCount } : null;
     modal('欢迎回来，执灯者', `
-      <div style="text-align:center;padding:6px 0 12px">
-        <div style="font-size:13px;color:var(--dim)">离线 ${formatDuration(g.seconds)}（效率 ${Math.round(g.efficiency * 100)}%）</div>
-        <div class="reward-chips" style="margin-top:14px">
+      <div style="text-align:center;padding:0.375rem 0 0.75rem">
+        <div style="font-size:0.8125rem;color:var(--dim)">离线 ${formatDuration(g.seconds)}（效率 ${Math.round(g.efficiency * 100)}%）</div>
+        <div class="reward-chips" style="margin-top:0.875rem">
           <span class="reward-chip">◈ +${fmt(g.gains.points)}</span>
           <span class="reward-chip">EXP +${fmt(g.gains.exp)}</span>
           ${g.gains.otherworld ? `<span class="reward-chip">◆ +${g.gains.otherworld}</span>` : ''}
@@ -4610,7 +4610,7 @@ window.UI = (function () {
           ${mat && mat.count ? `<span class="reward-chip">⚙️ ${D.ITEMS[mat.item].name}×${mat.count}</span>` : ''}
           ${g.gains.matStashed ? `<span class="reward-chip">📮 待领箱 +${g.gains.matStashed}</span>` : ''}
         </div>
-        <div style="font-size:11px;color:var(--dim);margin-top:10px">离线期间挂机分工的产线一样在跑。</div>
+        <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.625rem">离线期间挂机分工的产线一样在跑。</div>
       </div>`, { center: true });
     refresh();
   }
@@ -4618,10 +4618,10 @@ window.UI = (function () {
     if (!r) return;
     const rw = r.reward.ssrTicket ? '🎫 SSR自选券' : rewardText(r.reward);
     modal(`七日登录 · 第 ${r.day} 天`, `
-      <div style="text-align:center;padding:10px 0">
-        <div style="font-size:34px;margin-bottom:8px">${['🌑','🌒','🌓','🌔','🌕','🌖','🌗'][r.day - 1]}</div>
-        <div style="font-size:14px">今日奖励</div>
-        <div class="reward-chips mt3"><span class="reward-chip" style="font-size:14px">${rw}</span></div>
+      <div style="text-align:center;padding:0.625rem 0">
+        <div style="font-size:2.125rem;margin-bottom:0.5rem">${['🌑','🌒','🌓','🌔','🌕','🌖','🌗'][r.day - 1]}</div>
+        <div style="font-size:0.875rem">今日奖励</div>
+        <div class="reward-chips mt3"><span class="reward-chip" style="font-size:0.875rem">${rw}</span></div>
       </div>`, { center: true });
   }
   function showTutorial() {
@@ -4644,9 +4644,9 @@ window.UI = (function () {
   const RANDOM_NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊'];
   function showCharCreate() {
     const w = modal('创建你的执灯者', `
-      <div class="event-desc" style="margin-bottom:12px">灯阁需要一个名字来记录你的行程。这个名字将伴随你进入每一个世界。</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <input id="cc-name" maxlength="12" placeholder="输入你的名字（12字内）" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font-size:15px;outline:none" />
+      <div class="event-desc" style="margin-bottom:0.75rem">灯阁需要一个名字来记录你的行程。这个名字将伴随你进入每一个世界。</div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.875rem">
+        <input id="cc-name" maxlength="12" placeholder="输入你的名字（12字内）" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:0.625rem;color:var(--text);padding:0.75rem;font-size:0.9375rem;outline:none" />
         <button class="btn" data-dice style="flex:0 0 auto">🎲</button>
       </div>
       <button class="btn primary block" data-confirm>以这个名字进入残域</button>
