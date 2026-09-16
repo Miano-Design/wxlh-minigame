@@ -884,7 +884,10 @@ window.DATA = (function () {
   const SECT_MAX = 60;
   const SECT_PCT_PER_LV = 0.005;                                   // 每级：全队全属性 +0.5%
   const sectExpNeed = lv => Math.round(375 * Math.pow(1.075, lv - 1));   // V9.5.70：整体压慢 ×1.25
-  const sectBonusPct = lv => Math.max(0, lv - 1) * SECT_PCT_PER_LV;
+  /* V9.5.81（自审）：评级等级从 0 起之后，加成也要从 0 起算。
+     原来写的是 (lv-1)×0.5%——那是 1 基时代的写法：Lv.1 显示"升了一级"却拿 0% 加成，
+     一辈子比文案少 0.5%。现在 Lv.0 = 0%、Lv.1 = +0.5%、Lv.60 = +30%，与指南一致。 */
+  const sectBonusPct = lv => Math.max(0, lv) * SECT_PCT_PER_LV;
   // 评级经验来源（写在一处，UI 直接读这张表，避免"说明和实装两处写"）
   const SECT_EXP = { normal: 12, hard: 26, hell: 48, win: 2, perMin: 1.2 };
 

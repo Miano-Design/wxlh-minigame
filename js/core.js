@@ -1958,7 +1958,9 @@ window.Core = (function () {
      我们做成同样的机制：**不用手动点**，打关卡 / 打赢 / 挂机都会涨经验，满了自动升。
      这样"打关卡"这件事除了掉装备之外，还有一条挡不住的长期回报。 */
   function sectInfo() {
-    const lv = (S.sect && S.sect.lv) || 1;
+    // V9.5.81（自审·边界档）：评级从 0 级起，`|| 1` 会把 0 当成假值吞掉 →
+    // 新号被显示成 Lv.1，sectBonusPct 还按 Lv.1 白送 0.5% 全队属性。0 是合法值，只能兜底成 0。
+    const lv = (S.sect && S.sect.lv) || 0;
     const exp = (S.sect && S.sect.exp) || 0;
     const need = D.sectExpNeed(lv);
     return {
@@ -1972,7 +1974,7 @@ window.Core = (function () {
   // 每级：全队全属性 +0.5%（与铭刻 / 血统 / 血清同为百分比区，加算）
   function sectBonusPct() {
     if (!S.sect) return { atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 };
-    const v = D.sectBonusPct(S.sect.lv || 1);
+    const v = D.sectBonusPct(S.sect.lv || 0);
     return { atkPct: v, hpPct: v, defPct: v, spdPct: v, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 };
   }
   function applySect(pct) {
@@ -1982,7 +1984,7 @@ window.Core = (function () {
   // 涨评级经验；返回本次升了几级（UI 用来提示"评级提升"）
   function addSectExp(n) {
     if (!n || n <= 0) return 0;
-    if (!S.sect) S.sect = { lv: 1, exp: 0 };
+    if (!S.sect) S.sect = { lv: 0, exp: 0 };
     if (S.sect.lv >= D.SECT_MAX) return 0;
     S.sect.exp += n;
     let up = 0;
@@ -2820,7 +2822,7 @@ window.Core = (function () {
     const list = Object.keys(owned).map(id => {
       const b = D.beastById(id);
       if (!b) return null;
-      const lv = owned[id].lv || 1;
+      const lv = owned[id].lv || 0;      // V9.5.81：伴生体也是 0 基
       return {
         id, b, lv, soul: owned[id].soul || 0,
         active: S.beast.active === id,
@@ -2843,7 +2845,7 @@ window.Core = (function () {
     const owned = id && S.beast.owned[id];
     const b = id ? D.beastById(id) : null;
     if (!owned || !b) return {};
-    return D.beastPctAt(b, owned.lv || 1);
+    return D.beastPctAt(b, owned.lv || 0);   // V9.5.81：同上
   }
   function activeBeastElem() {
     const b = S.beast.active ? D.beastById(S.beast.active) : null;

@@ -687,6 +687,29 @@ setParty(['C021']);
   t('收一次之后又从头开始攒', (() => { Core.claimIdle(); return Core.S.idle.bankSec === 0 && !Core.idleFull(); })());
 }
 
+/* ===== V9.5.81（自审·边界档）：0 是合法等级，不能被 `|| 1` 当成假值吞掉 =====
+   边界体检渲染"全新档"时发现主页写着「评级 Lv.1」——因为 sectInfo 里写的是 `S.sect.lv || 1`。
+   更麻烦的是 sectBonusPct 用同一个写法，等于新号白送 +0.5% 全队全属性。 */
+{
+  Core.newGame(); Core.setPlayerName('评级0'); Core.choosePlayerBloodline('修真');
+  t('新号评级是 Lv.0（不是 Lv.1）', Core.sectInfo().lv === 0);
+  t('新号没有评级加成（0 级就该是 0）', Core.sectBonusPct().atkPct === 0 && Core.sectBonusPct().hpPct === 0);
+  t('评级 0→1 需要的经验没变', Core.sectInfo().need === D.sectExpNeed(0));
+  Core.addSectExp(D.sectExpNeed(0));
+  t('攒够经验才升到 Lv.1', Core.sectInfo().lv === 1 && Core.sectInfo().pct > 0);
+}
+{
+  Core.newGame(); Core.setPlayerName('伴生体0');
+  Core.S.items.beast_egg = 50;
+  Core.hatchBeast(1);
+  const id = Object.keys(Core.S.beast.owned)[0];
+  t('刚孵化的伴生体是 0 级', Core.S.beast.owned[id].lv === 0);
+  t('0 级伴生体加成按 0 级算（不是 1 级）', (() => {
+    const b = D.beastById(id);
+    return JSON.stringify(D.beastPctAt(b, 0)) === JSON.stringify(D.beastPctAt(b, Core.S.beast.owned[id].lv));
+  })());
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];
@@ -1445,12 +1468,13 @@ setParty(['C021']);
 {
   Core.newGame();
   const s0 = Core.sectInfo();
-  t('评级初始 1 级', s0.lv === 1 && s0.pct === 0);
+  t('评级初始 0 级（V9.5.81 起从 0 起算）', s0.lv === 0 && s0.pct === 0);
   const before = Core.effectivePlayerStats().atk;
   const up = Core.addSectExp(100000);
   t('评级经验能升级', up > 0 && Core.sectInfo().lv > 1);
   t('评级加成真的进属性', Core.effectivePlayerStats().atk > before);
-  t('评级加成按每级 0.5% 走', Math.abs(Core.sectInfo().pct - (Core.sectInfo().lv - 1) * 0.005) < 1e-9);
+  // V9.5.81：评级从 0 起算 → Lv.1 就该有 0.5%（旧写法是 (lv-1)，白白少一级）
+  t('评级加成按每级 0.5% 走', Math.abs(Core.sectInfo().pct - Core.sectInfo().lv * 0.005) < 1e-9);
 
   // 打关卡自动涨评级（不用手动点）
   const lvBefore = Core.sectInfo().lv;

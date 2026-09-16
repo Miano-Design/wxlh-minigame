@@ -182,4 +182,119 @@ const deadCss = classNames.filter(c => {
 console.log(deadCss.length ? '  ⚠ 样式表里没人用的类：' + deadCss.join(' ') : '  样式表没有孤立类 ✓');
 
 const total2 = total + deadCss.length;
-console.log(`\n结论：${total2 === 0 ? '全绿 ✓' : '有 ' + total2 + ' 项要看'}`);
+let bound = 0;
+console.log('\n=== ⑦ 边界状态：同一批界面在极端档位下是否还站得住 ===');
+/* 起因（V9.5.81 自审）：前面所有检查都只在一个"中间档"上跑。但真实玩家会经过
+     全新档（没伙伴没道具）、没钱、背包满、满配毕业 这些状态——
+     那些状态下最容易出现"空白页 / undefined / 全 disabled 的死界面"。
+   这里把 6 种极端档位 × 全部界面各渲染一遍。 */
+{
+  const STATES = [
+    ['全新档（Lv.0，没有伙伴/道具/装备）', () => {
+      Core.newGame(); Core.setPlayerName('新号'); Core.choosePlayerBloodline('修真');
+      Core.S.cur = { points: 0, story: 0, otherworld: 0, holy: 0, skillChip: 0, bloodCrystal: 0, corridor: 0, rp: 0 };
+      Core.S.items = {}; Core.S.equips = {}; Core.S.chars = {}; Core.S.party = ['@player', null, null, null, null];
+    }],
+    ['一分钱没有（全解锁但货币为 0）', () => {
+      Core.newGame(); Core.setPlayerName('穷'); Core.choosePlayerBloodline('修真');
+      D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+      Core.addChar('C021'); Core.S.party[1] = 'C021';
+      Core.S.cur = { points: 0, story: 0, otherworld: 0, holy: 0, skillChip: 0, bloodCrystal: 0, corridor: 0, rp: 0 };
+    }],
+    ['背包全满', () => {
+      Core.newGame(); Core.setPlayerName('满'); Core.choosePlayerBloodline('修真');
+      Object.keys(D.ITEMS).forEach(k => { Core.S.items[k] = 999; });
+      Core.S.stash = [{ id: 'exp_s', n: 5 }, { id: 'ticket_normal', n: 2 }];
+      for (let i = 0; i < 60; i++) Core.grantEquip('W05', 'SR');
+    }],
+    ['中期末（有伙伴有资源）', () => {
+      Core.newGame(); Core.setPlayerName('中期'); Core.choosePlayerBloodline('修真');
+      Core.addPlayerExp(200000); D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+      ['C021', 'C022', 'C023'].forEach(id => Core.addChar(id));
+      Core.S.party = ['@player', 'C021', 'C022', 'C023', null];
+      Core.S.cur = { points: 99999, story: 9999, otherworld: 9999, holy: 999, skillChip: 9999, bloodCrystal: 999, corridor: 999, rp: 99 };
+      ['W01', 'W02', 'W03'].forEach(w => { Core.S.worlds[w] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(2), hell: Array(12).fill(0) } }; });
+      Core.S.corridor = { floor: 12, best: 12 }; Core.S.arena = { floor: 8, best: 8, date: '', used: 1 };
+    }],
+    ['满配毕业（全满级满阶）', () => {
+      Core.newGame(); Core.setPlayerName('毕业'); Core.choosePlayerBloodline('修真');
+      D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+      Core.S.player.level = D.PLAYER_MAX_LV; Core.S.player.geneLock = D.GENE_LOCKS.length;
+      Core.S.player.bloodlineLv = D.BLOODLINE_MAX; Core.S.player.realm = D.REALM_STAGE_COUNT;
+      Core.S.player.skillLv = D.SKILL_MAX_BY_INDEX.slice(); Core.S.player.reincarnations = 3;
+      D.BUILDINGS.forEach(b => { Core.S.buildings[b.id] = 50; });
+      Core.S.auth = D.AUTHORITY_MAX; Core.S.sect = { lv: D.SECT_MAX, exp: 0 };
+      D.KEJI.forEach(k => { Core.S.keji[k.id] = k.max; });
+      Object.keys(D.ITEMS).forEach(k => { Core.S.items[k] = 99; });
+      Core.S.cur = { points: 1e7, story: 1e6, otherworld: 1e6, holy: 1e5, skillChip: 1e6, bloodCrystal: 1e6, corridor: 1e5, rp: 1e5 };
+      D.WORLDS.forEach(w => { Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(3), hell: Array(12).fill(3) } }; });
+      Core.S.corridor = { floor: 200, best: 200 }; Core.S.arena = { floor: 60, best: 60, date: '', used: 0 };
+    }],
+    ['全锁（什么都没解锁）', () => {
+      Core.newGame(); Core.setPlayerName('锁'); Core.choosePlayerBloodline('修真');
+      Core.S.unlocks = {};
+      Core.S.worlds = { W01: { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } } };
+    }],
+  ];
+  const P2 = UI._panels;
+  /* 扫荡面板在"一关都没通关"时会**故意**返回空并弹一句提示（不是 bug），
+     所以它单独放宽：允许空返回。 */
+  const ALLOW_EMPTY = ['扫荡'];
+  const PANELS = [
+    ['主角详情', () => P2.protagonistDetail()],
+    /* 伙伴详情要传"自己拥有的伙伴"；一个都没有的档位就跳过这一项
+       （传未拥有的 id 会被 V9.5.81 加的守卫挡住并返回 null，那是预期行为）。 */
+    ['伙伴详情', () => { const id = Object.keys(Core.S.chars)[0]; return id ? P2.charDetail(id) : '<无伙伴，跳过>'; }],
+    ['背包', () => P2.bagModal()],
+    ['货币图鉴', () => P2.currencyModal('holy')],
+    ['玩法指南', () => P2.guideModal()],
+    ['设置', () => P2.settingsModal()],
+    ['商店-灯阁', () => P2.shopModal('god')],
+    ['商店-深井', () => P2.shopModal('corridor')],
+    ['任务', () => P2.tasksModal('daily')],
+    ['扫荡', () => P2.sweepModal('W01', 'normal')],
+    ['招募', () => P2.recruitModal()],
+    ['转生', () => P2.reincarnModal()],
+    ['铭刻', () => P2.geneLockModal()],
+    ['挂机分工', () => P2.idleLinesModal()],
+    ['限时悬赏', () => P2.bountyModal()],
+    ['境界', () => P2.realmModal()],
+    ['伴生体', () => P2.beastModal()],
+    ['灯阁权限', () => P2.authorityModal()],
+    ['灯阁评级', () => P2.sectModal()],
+    ['秘术阁', () => P2.kejiModal()],
+    ['游历', () => P2.travelModal()],
+    ['药园', () => P2.gardenModal()],
+    ['斗法台', () => P2.arenaModal()],
+    ['法宝', () => P2.fabaoModal()],
+    ['坐骑', () => P2.mountModal()],
+    ['求签', () => P2.signModal()],
+    ['灯录', () => P2.codexModal()],
+    ['概率公示', () => P2.recruitRatesModal()],
+  ];
+  STATES.forEach(([label, setup]) => {
+    setup();
+    const bad = [];
+    Object.entries(P2._screens).forEach(([n, fn]) => {
+      try {
+        const h = fn();
+        if (!h || typeof h !== 'string') return bad.push(`${n} 空`);
+        if (/undefined|NaN|\[object Object\]/.test(h)) bad.push(`${n} 有洞`);
+      } catch (e) { bad.push(`${n} 抛异常(${e.message})`); }
+    });
+    PANELS.forEach(([n, fn]) => {
+      try {
+        const out = fn();
+        const h = typeof out === 'string' ? out : (out && out.innerHTML) || '';
+        if (!h.length) { if (!ALLOW_EMPTY.includes(n)) bad.push(`${n} 空`); return; }
+        if (/undefined|NaN/.test(h)) bad.push(`${n} 有洞`);
+      } catch (e) { bad.push(`${n} 抛异常(${e.message})`); }
+    });
+    if (bad.length) { console.log(`  ✗ ${label}：${[...new Set(bad)].join(' / ')}`); bound += bad.length; }
+    else console.log(`  ✓ ${label}`);
+  });
+  if (!bound) console.log('  6 种极端档位 × 全部界面：没有空白页、没有 undefined、没有崩溃 ✓');
+}
+
+const total3 = total2 + bound;
+console.log(`\n结论：${total3 === 0 ? '全绿 ✓' : '有 ' + total3 + ' 项要看'}`);
