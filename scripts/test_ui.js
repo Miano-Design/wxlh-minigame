@@ -386,6 +386,21 @@ t('没签契约 / 没选血统时，游戏界面一页都渲染不出来', () =>
   }
   if (byId['view'].innerHTML.indexOf('screen') < 0) throw new Error('补完开局之后界面没回来');
 });
+t('开局没走完时，七日登录这类弹窗要排队等（不能在起名和血统之间抢先跳出来）', () => {
+  const src = fs.readFileSync('js/main.js', 'utf8');
+  if (src.indexOf('UI.needsOnboarding') < 0) throw new Error('main.js 没有把"开局没走完"算进弹窗排队条件');
+  const keepName = Core.S.player.name, keepBl = Core.S.player.bloodline;
+  try {
+    Core.S.player.bloodline = '';
+    if (!UI.needsOnboarding()) throw new Error('没血统时没被认成"开局没走完"');
+    Core.S.player.bloodline = keepBl;
+    Core.S.player.name = '';
+    if (!UI.needsOnboarding()) throw new Error('没名字时没被认成"开局没走完"');
+  } finally {
+    Core.S.player.name = keepName; Core.S.player.bloodline = keepBl;
+  }
+  if (UI.needsOnboarding()) throw new Error('开局走完了还说没走完');
+});
 t('首页主线是一条横条（不再是"主线 + 今日"两枚匾额）', () => {
   const html = UI._panels._screens.homeScreen();
   if (html.indexOf('data-sec="quest"') < 0) throw new Error('缺主线条');

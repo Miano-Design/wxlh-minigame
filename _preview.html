@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>残域小游戏·预览</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05070b; overflow: hidden; }
+  #stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #mc { display: block; width: var(--w, 430px); height: var(--h, 900px); box-shadow: 0 0 0 1px #232b3b; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="mc"></canvas></div>
+<script>
+  /* 预览垫片：把 wx 的最小子集接到浏览器画布上（只在电脑上核对界面用，不进包）
+     —— 画布尺寸、触摸、本地存储三件事，够 cv.js / wx-adapter.js 跑起来。 */
+  const canvas = document.getElementById('mc');
+  const mem = {};
+  const W = Number((location.search.match(/w=(\d+)/) || [])[1] || 430);
+  const H = Number((location.search.match(/h=(\d+)/) || [])[1] || 900);
+  document.documentElement.style.setProperty('--w', W + 'px');
+  document.documentElement.style.setProperty('--h', H + 'px');
+  const handlers = { start: [], move: [], end: [] };
+  window.wx = {
+    createCanvas: () => canvas,
+    getWindowInfo: () => ({ windowWidth: W, windowHeight: H, pixelRatio: 1, platform: 'devtools' }),
+    getSystemInfoSync: () => ({ windowWidth: W, windowHeight: H, pixelRatio: 1, platform: 'devtools' }),
+    onTouchStart: (h) => handlers.start.push(h),
+    onTouchMove: (h) => handlers.move.push(h),
+    onTouchEnd: (h) => handlers.end.push(h),
+    getStorageSync: (k) => (k in mem ? mem[k] : ''),
+    setStorageSync: (k, v) => { mem[k] = v; },
+    removeStorageSync: (k) => { delete mem[k]; },
+    getStorageInfoSync: () => ({ keys: Object.keys(mem) }),
+  };
+  const rect = () => canvas.getBoundingClientRect();
+  const toEvt = (e) => {
+    const r = rect();
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+    return { touches: [{ clientX: t.clientX - r.left, clientY: t.clientY - r.top }], changedTouches: null };
+  };
+  const fire = (kind) => (e) => { e.preventDefault(); handlers[kind].forEach((h) => h(toEvt(e))); };
+  ['start', 'move', 'end'].forEach((k) => document.addEventListener('touch' + k, fire(k), { passive: false }));
+  canvas.addEventListener('mousedown', fire('start'));
+  canvas.addEventListener('mousemove', (e) => { if (e.buttons) fire('move')(e); });
+  canvas.addEventListener('mouseup', fire('end'));
+</script>
+<script src="js/wx-adapter.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/cv.js"></script>
+<script src="js/screens.js"></script>
+<script>
+  const CV = window.CV, Core = window.Core;
+  CV.setup(wx.getWindowInfo());
+  CV.bindTouch();
+  Core.newGame();
+  Core.setPlayerName('孤鸿');
+  Core.choosePlayerBloodline('修真');
+  Core.S.player.level = 11;
+  Core.S.cur.points = 999999;
+  // ?p=xxx 直接落到哪一页（不写就按存档走开机流程）
+  const page = (location.search.match(/p=(\w+)/) || [])[1];
+  if (page) CV.reset(page);
+  else if (!Core.S.player.name) CV.reset('create');
+  else if (!Core.S.player.bloodline) CV.reset('bloodline');
+  else CV.reset('home');
+</script>
+</body>
+</html>

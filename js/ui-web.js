@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.31';
+  const GAME_VER = '9.5.32';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -42,7 +42,7 @@ window.UI = (function () {
   function rewardText(o) {
     const parts = Object.entries(o || {}).filter(([, v]) => v !== 0 && v !== null && v !== undefined)
       .map(([k, v]) => (k === 'item'
-        ? [].concat(v).map(id => `🎁${(D.ITEMS[id] || {}).name || id}`).join(' ')
+        ? [].concat(v).map(id => `🎁 ${(D.ITEMS[id] || {}).name || id}`).join(' ')
         : `${curIcon(k)}${fmt(v)}`));
     return parts.length ? parts.join(' · ') : '—';
   }
@@ -336,7 +336,7 @@ window.UI = (function () {
       </div>
       ${D.CURRENCIES.map(c => {
         const info = D.CURRENCY_INFO[c.id] || {};
-        return `<div class="card" id="cur-${c.id}" style="margin-bottom:8px;${focusId === c.id ? 'border-color:' + c.color : ''}">
+        return `<div class="card" id="cur-${c.id}" style="${focusId === c.id ? 'border-color:' + c.color : ''}">
           <h3><span style="color:${c.color}">${c.icon}</span> ${c.name}
             <span class="sub">持有 ${fmt(S.cur[c.id] || 0)}</span></h3>
           <div style="font-size:12px;line-height:1.75"><b style="color:var(--gold)">用途</b>：${info.use || '—'}</div>
@@ -356,7 +356,7 @@ window.UI = (function () {
     // 免得玩家看到一堆星号。
     const md = s => String(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
     const body = D.GUIDE_CHAPTERS.map(ch => `
-      <div class="card" id="guide-${ch.id}" style="margin-bottom:8px">
+      <div class="card" id="guide-${ch.id}">
         <h3>${ch.title}</h3>
         ${ch.body.map(line => `<div style="font-size:12px;line-height:1.85;color:var(--text)">· ${md(line)}</div>`).join('')}
       </div>`).join('')
@@ -575,26 +575,26 @@ window.UI = (function () {
     const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
     const rows = [
       { act: 'open-buildings', unlock: 'buildings', ico: '🏗', name: '基地建设',
-        cur: `五栋合计 Lv.${bLv}`, desc: '花 ◈点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
+        cur: `五栋合计 Lv.${bLv}`, desc: '花 ◈ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
       { act: 'open-authority', unlock: 'buildings', ico: '🔑', name: '灯阁权限',
-        cur: `Lv.${au.lv} / ${au.max}`, desc: '花 ✦圣洁晶石 + ◆异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
+        cur: `Lv.${au.lv} / ${au.max}`, desc: '花 ✦ 圣洁晶石 + ◆ 异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
       { act: 'open-sect', unlock: null, ico: '🏯', name: '灯阁评级',
         cur: `Lv.${C().sectInfo().lv} / ${D.SECT_MAX}`, desc: '打关卡自动涨的全局评级，每级全队全属性 +0.5%，不用手动点' },
       { act: 'open-keji', unlock: null, ico: '📜', name: '秘术阁',
         cur: `已修 ${D.KEJI.reduce((s, k) => s + C().kejiLv(k.id), 0)} 级`,
-        desc: `${D.KEJI.length} 条百分比长线（战斗 + 挂机经济），花 ◆异界结晶，点一下立刻生效` },
+        desc: `${D.KEJI.length} 条百分比长线（战斗 + 挂机经济），花 ◆ 异界结晶，点一下立刻生效` },
       { act: 'open-fabao', unlock: null, ico: '🔮', name: '法宝',
         cur: `已得 ${C().fabaoState().own.length} / ${D.FABAO.length} 件`,
-        desc: '装备给数值、法宝给效果（吸血 / 开场能量 / 减伤），主角同时带 1 件，花 ◆异界结晶买' },
+        desc: '装备给数值、法宝给效果（吸血 / 开场能量 / 减伤），主角同时带 1 件，花 ◆ 异界结晶买' },
       { act: 'open-garden', unlock: null, ico: '🌱', name: '药园',
         cur: `${C().gardenState().filter(p => p.plot).length} / ${D.GARDEN_PLOTS} 块在用`,
-        desc: '花 ◈点数种灵田，到点收强化材料，另有几率出稀有物；离线也计时' },
+        desc: '花 ◈ 点数种灵田，到点收强化材料，另有几率出稀有物；离线也计时' },
       { act: 'open-arena', unlock: null, ico: '🥋', name: '斗法台',
         cur: `第 ${C().arenaState().floor} 台 · 剩 ${C().arenaState().left} 次`,
         desc: `每天 ${D.ARENA_DAILY} 次镜像擂台，守擂者按你的战力换算，赢一场升一台拿结晶与徽记` },
       { act: 'open-mount', unlock: null, ico: '🐎', name: '坐骑',
         cur: `已驯服 ${C().mountState().own.length} / ${D.MOUNTS.length} 匹`,
-        desc: '花 ◈点数 + 材料驯服，全队（含伙伴）永久加数值；同时只骑 1 匹，随时换' },
+        desc: '花 ◈ 点数 + 材料驯服，全队（含伙伴）永久加数值；同时只骑 1 匹，随时换' },
       { act: 'open-sign', unlock: null, ico: '🎋', name: '求签',
         cur: C().signState().canDraw ? '今日还没求签' : `今日【${C().signState().tier}】`,
         desc: '每天免费摇一签，签文给当天的挂机加成 + 一笔硬通货，隔天自动失效' },
@@ -980,7 +980,7 @@ window.UI = (function () {
         const chips = Object.entries(agg).filter(([k]) => k !== '_equips' && k !== '_items')
           .map(([k, v]) => k === 'exp' ? `EXP+${fmt(v)}` : `${curIcon(k)}+${fmt(v)}`);
         if (agg._equips) chips.push(`🗡装备×${agg._equips}`);
-        if (agg._items) chips.push(`🎒道具×${agg._items}`);
+        if (agg._items) chips.push(`🎒 道具×${agg._items}`);
         refresh(); renderTopbar();
         lootPanel(`扫荡结果（×${r.count}${r.capped ? ' · 已达上限' : ''}）`, chips.map(c => `<span class="reward-chip">${c}</span>`).join(''), () => draw(), w);
       });
@@ -2089,14 +2089,14 @@ window.UI = (function () {
       return `<div class="card mb3">
         <h3>${p.name} <span class="sub">${p.tag} · 用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
         <div class="rate-row">${rate}</div>
-        <div class="kv"><span class="k">单抽</span><span>${cost}${tk ? ` · 或 🎫${tkName}×1（现有 ${tk.n} 张）` : ''}</span></div>
-        <div class="kv"><span class="k">十连</span><span>${ten}${tk ? ` · 或 🎫${tkName}×10` : ''} · 保底至少 1 个 SR</span></div>
+        <div class="kv"><span class="k">单抽</span><span>${cost}${tk ? ` · 或 🎫 ${tkName}×1（现有 ${tk.n} 张）` : ''}</span></div>
+        <div class="kv"><span class="k">十连</span><span>${ten}${tk ? ` · 或 🎫 ${tkName}×10` : ''} · 保底至少 1 个 SR</span></div>
         <div style="font-size:11px;color:var(--dim);line-height:1.7;margin-top:6px">${D.pityText(pid)}</div>
         ${left}
       </div>`;
     }).join('');
     const w = showPanel(wrap, '概率公示', `
-      <div class="card" style="margin-bottom:10px;border-color:#ffd76a55">
+      <div class="card mb3" style="border-color:#ffd76a55">
       </div>
       ${rows}
       <button class="btn ghost block" style="margin-top:4px" data-back>‹ 返回招募</button>`);
@@ -2166,7 +2166,7 @@ window.UI = (function () {
   /* ================= 建筑 ================= */
   function buildingsModal(wrap) {
     const S = C().S;
-    const w = showPanel(wrap, '基地建设', `<div class="hint mb2">全部消耗 ◈点数</div>` + D.BUILDINGS.map(b => {
+    const w = showPanel(wrap, '基地建设', `<div class="hint mb2">全部消耗 ◈ 点数</div>` + D.BUILDINGS.map(b => {
       const lv = S.buildings[b.id];
       const cost = D.buildingCost(b.id, lv);
       return `<div class="card mb3">
@@ -2245,7 +2245,7 @@ window.UI = (function () {
       <div class="card" style="border-color:#e6b64c44">
         <h3>斗法台 <span class="sub">第 ${st.floor} 台 · 历史最高 ${st.best} 台</span></h3>
         <div class="note">每天 <b>${st.cap}</b> 次机会，
-          赢了升一台并拿 ◆异界结晶 + ♜深井徽记，输了退一台（次数照常消耗，不会卡死在第 1 台）。</div>
+          赢了升一台并拿 ◆ 异界结晶 + ♜ 深井徽记，输了退一台（次数照常消耗，不会卡死在第 1 台）。</div>
         <div class="kv mt2"><span class="k">今日剩余</span><span>${st.left} / ${st.cap}</span></div>
         <div class="kv"><span class="k">本台奖励</span><span style="color:var(--gold)">◆ ${fmt(st.reward.otherworld)} · ♜ ${st.reward.corridor}</span></div>
         <button class="btn primary block mt3" data-arena="1" ${st.left > 0 ? '' : 'disabled'}>${st.left > 0 ? `挑战第 ${st.floor} 台` : '今日次数已用完'}</button>
@@ -2285,7 +2285,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#e6b64c44">
         <h3>法宝 <span class="sub">已得 ${st.own.length} / ${D.FABAO.length} 件</span></h3>
-  <div class="note">主角同时只带 1 件 · 用 ◆异界结晶 购买</div>
+  <div class="note">主角同时只带 1 件 · 用 ◆ 异界结晶 购买</div>
         <div class="kv mt2"><span class="k">当前佩戴</span><span style="color:var(--gold)">${on ? `${on.name}（${on.desc}）` : '未佩戴'}</span></div>
       </div>
       ${D.FABAO.map(f => {
@@ -2334,7 +2334,7 @@ window.UI = (function () {
       <div class="card" style="border-color:#e6b64c44">
         <h3>坐骑 <span class="sub">已驯服 ${st.own.length} / ${D.MOUNTS.length} 匹</span></h3>
         <div class="note"><b>全队通用，伙伴也吃</b>。
-          同时只骑 1 匹，随时能换；花 ◈点数 + 强化材料驯服，高阶坐骑额外花 ◆异界结晶。</div>
+          同时只骑 1 匹，随时能换；花 ◈ 点数 + 强化材料驯服，高阶坐骑额外花 ◆ 异界结晶。</div>
         <div class="kv mt2"><span class="k">当前乘骑</span><span style="color:var(--gold)">${on ? `${on.name}（${on.desc}）` : '未乘骑'}</span></div>
       </div>
       ${D.MOUNTS.map(m => {
@@ -2451,7 +2451,7 @@ window.UI = (function () {
         return `<span class="step-chip ${done ? 'done' : curS ? 'cur' : ''}" data-step="${c.idx}">
           <b>${D.REALM_TIERS[c.tier]}</b><i>${done ? '已成' : `Lv.${D.REALMS[c.idx].lv} · ${rate}%`}</i></span>`;
       }).join('');
-      return `<div class="card" style="margin-bottom:8px">
+      return `<div class="card">
         <h3>${mi + 1}. ${mj}</h3><div class="step-row">${cells}</div></div>`;
     }).join('');
     const body = `
@@ -2546,7 +2546,7 @@ window.UI = (function () {
   }
   /* ================= 秘术阁（对标《道友修仙》的 KeJi） =================
      对标它那套"每条线每级只加一点点、能一路修到顶"的长线，我们做成 42 条
-     （战斗 33 条 + 挂机经济 9 条），消耗统一走 ◆异界结晶（它的 coinBase 那一路）。 */
+     （战斗 33 条 + 挂机经济 9 条），消耗统一走 ◆ 异界结晶（它的 coinBase 那一路）。 */
   function kejiModal(wrap) {
     const S = C().S;
     const coin = S.cur[D.KEJI_COIN] || 0;
@@ -2556,8 +2556,8 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#ffd76a55">
         <h3>秘术阁 <span class="sub">已修 ${total} / ${maxTotal} 级</span></h3>
-  <div class="note">升级只花 ◆异界结晶 · 前 8 条加战斗，后 4 条加挂机经济</div>
-        <div class="kv mt2"><span class="k">◆异界结晶</span><span style="color:var(--gold)">${fmt(coin)}</span></div>
+  <div class="note">升级只花 ◆ 异界结晶 · 前 8 条加战斗，后 4 条加挂机经济</div>
+        <div class="kv mt2"><span class="k">◆ 异界结晶</span><span style="color:var(--gold)">${fmt(coin)}</span></div>
       </div>
       ${D.KEJI.map(k => {
         const lv = C().kejiLv(k.id);
@@ -2599,7 +2599,7 @@ window.UI = (function () {
   }
 
   // 洞府在那边是"一次性把高级货币投进去，永久抬高挂机倍率 / 任务数 / 副本次数"的滚雪球投资。
-  // 我们把它落地成一条独立的 10 级线：花 ✦圣洁晶石 + ◆异界结晶，投入永久、转生保留。
+  // 我们把它落地成一条独立的 10 级线：花 ✦ 圣洁晶石 + ◆ 异界结晶，投入永久、转生保留。
   function authorityModal(wrap) {
     const S = C().S;
     const info = C().authorityInfo();
@@ -2609,7 +2609,7 @@ window.UI = (function () {
     const body = `
       <div class="card" style="border-color:#ffd76a55">
         <h3>灯阁权限 <span class="sub">Lv.${info.lv} / ${info.max}</span></h3>
-  <div class="note">投入一次永久生效，转生不清空 · 花 ✦圣洁晶石 + ◆异界结晶</div>
+  <div class="note">投入一次永久生效，转生不清空 · 花 ✦ 圣洁晶石 + ◆ 异界结晶</div>
       </div>
       <div class="card">
         <h3>当前生效</h3>
@@ -2625,8 +2625,8 @@ window.UI = (function () {
         : `<div class="card" style="border-color:#ffd76a66">
         <h3>下一级 · Lv.${info.lv + 1}</h3>
         <div class="note mb2">${info.nextDesc}</div>
-        <div class="kv"><span class="k">✦圣洁晶石</span><span style="color:${hl >= cost.holy ? 'var(--green)' : 'var(--accent)'}">${fmt(hl)} / ${fmt(cost.holy)}</span></div>
-        <div class="kv"><span class="k">◆异界结晶</span><span style="color:${ow >= cost.otherworld ? 'var(--green)' : 'var(--accent)'}">${fmt(ow)} / ${fmt(cost.otherworld)}</span></div>
+        <div class="kv"><span class="k">✦ 圣洁晶石</span><span style="color:${hl >= cost.holy ? 'var(--green)' : 'var(--accent)'}">${fmt(hl)} / ${fmt(cost.holy)}</span></div>
+        <div class="kv"><span class="k">◆ 异界结晶</span><span style="color:${ow >= cost.otherworld ? 'var(--green)' : 'var(--accent)'}">${fmt(ow)} / ${fmt(cost.otherworld)}</span></div>
         <button class="btn primary block" style="margin-top:10px" data-auth="1" ${afford ? '' : 'disabled'}>⚡ 提升灯阁权限</button>
       </div>`}
       <div class="section-title">权限一览（${info.max} 级）</div>
@@ -2659,7 +2659,7 @@ window.UI = (function () {
       </div>
       ${rows.map(r => {
       const leader = r.leaderId;
-      return `<div class="card" style="margin-bottom:8px;${leader ? '' : 'border-style:dashed'}">
+      return `<div class="card" style="${leader ? '' : 'border-style:dashed'}">
         <h3>${r.line.ico} ${r.line.name} <span class="sub">${r.per}</span></h3>
         <div class="hint mb2">${r.line.desc}${leader ? ` · 领队【${r.line.attrName}】${r.attrValue} → 加成 +${Math.round(r.bonus * 100)}%` : ''}</div>
         ${leader
@@ -2719,7 +2719,7 @@ window.UI = (function () {
       ${st.list.map(({ b, leftMs, expired, done, claimed }) => {
       const state = claimed ? '已领取' : expired ? '已过期' : done ? '可领取' : '进行中';
       const color = claimed || expired ? 'var(--dim)' : done ? 'var(--green)' : 'var(--gold)';
-      return `<div class="card" style="margin-bottom:8px;${done && !claimed && !expired ? 'border-color:var(--green)' : ''}">
+      return `<div class="card" style="${done && !claimed && !expired ? 'border-color:var(--green)' : ''}">
         <h3>${b.name} <span class="sub" style="color:${color}">${state}</span></h3>
         <div class="note">${b.desc}</div>
         <div class="kv"><span class="k">剩余时间</span><span>${expired ? '已结束' : formatDuration(Math.max(0, Math.floor(leftMs / 1000)))}</span></div>
@@ -2782,7 +2782,7 @@ window.UI = (function () {
       ${st.list.map(x => {
       const counter = D.ELEMENT_COUNTER[x.b.elem];
       const need = D.BEAST_SOUL_PER_LV * x.lv;
-      return `<div class="card" style="margin-bottom:8px;${x.active ? 'border-color:var(--gold)' : ''}">
+      return `<div class="card" style="${x.active ? 'border-color:var(--gold)' : ''}">
         <div style="display:flex;align-items:flex-start;gap:10px">
           <div class="bico" style="font-size:24px">${elemIcon(x.b.elem)}</div>
           <div class="grow">
@@ -2854,7 +2854,7 @@ window.UI = (function () {
           <b>${tier}</b><i>${done ? '已成' : `Lv.${r.lv} · ${Math.round(r.rate * 100)}%`}</i></span>`;
       }).join('');
       const doneN = D.REALM_TIERS.filter((t, ti) => base + ti < st.realm).length;
-      return `<div class="card" style="margin-bottom:8px;${doneN === 4 ? '' : doneN ? 'border-color:#ffd76a77' : 'opacity:.62'}">
+      return `<div class="card" style="${doneN === 4 ? '' : doneN ? 'border-color:#ffd76a77' : 'opacity:.62'}">
         <h3>${mi + 1}. ${mj} <span class="sub">${doneN}/4</span></h3>
         <div class="step-row">${cells}</div>
       </div>`;
@@ -3114,7 +3114,7 @@ window.UI = (function () {
       ${D.GENE_LOCKS.map((g, i) => {
         const unlocked = S.player.geneLock > i;
         const isNext = S.player.geneLock === i;
-        return `<div class="card" style="margin-bottom:8px;${isNext ? 'border-color:var(--accent)' : ''}">
+        return `<div class="card" style="${isNext ? 'border-color:var(--accent)' : ''}">
           <h3>${i + 1}阶 · ${g.name} ${unlocked ? '<span class="sub" style="color:var(--green)">已解锁</span>' : ''}</h3>
           <div class="note">${g.desc}</div>
           ${isNext && !info.max ? `
@@ -3149,7 +3149,7 @@ window.UI = (function () {
       </div>
       <div class="section-title">永久天赋（♾ ${fmt(S.cur.rp)}）</div>
       <div style="font-size:11px;color:var(--dim);line-height:1.7;margin:0 2px 8px">
-        四支天赋点满各需 ♾6200（10/20/40/80/150/300/600/1000/1500/2500）。加成对全队生效，转生后保留。
+        四支天赋点满各需 ♾ 6200（10/20/40/80/150/300/600/1000/1500/2500）。加成对全队生效，转生后保留。
       </div>
       ${Object.entries(D.TALENTS).map(([k, t]) => {
         const lv = S.player.talents[k];
@@ -3305,7 +3305,7 @@ window.UI = (function () {
       if (asDrawer) bagModal(root);
       else { closeModal(w); render(); }
     };
-    /* V9.5.16（父亲大人）：点扩容格先问一句"是否支付 ◈xxxx 扩容"，确认了才扣钱 */
+    /* V9.5.16（父亲大人）：点扩容格先问一句"是否支付 ◈ xxxx 扩容"，确认了才扣钱 */
     root.querySelectorAll('[data-expand]').forEach(b => b.onclick = () => {
       const kind = ['eq', 'mat'].includes(b.dataset.expand) ? b.dataset.expand : 'item';
       const cost = D.bagExpandCost(C().S.bag[kind + 'Expands'] || 0);
@@ -3615,11 +3615,11 @@ window.UI = (function () {
       <div class="card">
         <h3>自动分解 <span class="sub">背包满之前就开始省格子</span></h3>
         <div class="list-row">
-          <div class="grow"><div class="t1">自动分解 N 装备</div><div class="t2">掉到 N 品质直接换成 ◆异界结晶</div></div>
+          <div class="grow"><div class="t1">自动分解 N 装备</div><div class="t2">掉到 N 品质直接换成 ◆ 异界结晶</div></div>
           <button class="btn small ${S.settings.autoSellN ? 'primary' : ''}" data-autosell="autoSellN">${S.settings.autoSellN ? '已开启' : '已关闭'}</button>
         </div>
         <div class="list-row">
-          <div class="grow"><div class="t1">自动分解 R 装备</div><div class="t2">掉到 R 品质直接换成 ◆异界结晶</div></div>
+          <div class="grow"><div class="t1">自动分解 R 装备</div><div class="t2">掉到 R 品质直接换成 ◆ 异界结晶</div></div>
           <button class="btn small ${S.settings.autoSellR ? 'primary' : ''}" data-autosell="autoSellR">${S.settings.autoSellR ? '已开启' : '已关闭'}</button>
         </div>
       </div>
@@ -4116,9 +4116,9 @@ window.UI = (function () {
   /* ================= 副本战斗流程 ================= */
   function rewardChips(got) {
     return got.map(g => {
-      if (g.k === 'equip') return `<span class="rtext-${g.v.rarity}">🗡${g.v.name}</span>`;
+      if (g.k === 'equip') return `<span class="rtext-${g.v.rarity}">🗡 ${g.v.name}</span>`;
       if (g.k === 'exp') return `EXP+${fmt(g.v)}`;
-      if (g.k === 'item') return `🎒${D.ITEMS[g.v].name}${g.n > 1 ? '×' + g.n : ''}`;
+      if (g.k === 'item') return `🎒 ${D.ITEMS[g.v].name}${g.n > 1 ? '×' + g.n : ''}`;
       return `${curIcon(g.k)}+${fmt(g.v)}${g.sold ? '(自动分解)' : ''}`;
     });
   }
@@ -4603,10 +4603,10 @@ window.UI = (function () {
       <div style="text-align:center;padding:6px 0 12px">
         <div style="font-size:13px;color:var(--dim)">离线 ${formatDuration(g.seconds)}（效率 ${Math.round(g.efficiency * 100)}%）</div>
         <div class="reward-chips" style="margin-top:14px">
-          <span class="reward-chip">◈+${fmt(g.gains.points)}</span>
-          <span class="reward-chip">EXP+${fmt(g.gains.exp)}</span>
-          ${g.gains.otherworld ? `<span class="reward-chip">◆+${g.gains.otherworld}</span>` : ''}
-          ${g.gains.story ? `<span class="reward-chip">❖+${g.gains.story}</span>` : ''}
+          <span class="reward-chip">◈ +${fmt(g.gains.points)}</span>
+          <span class="reward-chip">EXP +${fmt(g.gains.exp)}</span>
+          ${g.gains.otherworld ? `<span class="reward-chip">◆ +${g.gains.otherworld}</span>` : ''}
+          ${g.gains.story ? `<span class="reward-chip">❖ +${g.gains.story}</span>` : ''}
           ${mat && mat.count ? `<span class="reward-chip">⚙️ ${D.ITEMS[mat.item].name}×${mat.count}</span>` : ''}
           ${g.gains.matStashed ? `<span class="reward-chip">📮 待领箱 +${g.gains.matStashed}</span>` : ''}
         </div>
@@ -4710,6 +4710,10 @@ window.UI = (function () {
     },
     render, refresh, toast, modal, closeModal,
     sfx,
+    // 开局三步（签契约 → 起名 → 选血统）还没走完。main.js 用它压住"七日登录"这类弹窗：
+    // 起名弹窗关掉、血统弹窗还没起来的那半秒里，弹窗栈是空的，登录奖励会抢先跳出来，
+    // 再被血统弹窗盖住 —— 父亲大人在电脑上看到的就是这一下。
+    needsOnboarding: () => !onboarded(),
     showOfflineGains, showLoginReward, showTutorial, showCharCreate,
     showBloodlinePick: () => bloodlineModal(null, { first: true }),
     tickIdle() {

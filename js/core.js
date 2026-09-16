@@ -967,7 +967,7 @@ window.Core = (function () {
   }
 
   // 扩容分三种：kind = 'item'（道具）| 'mat'（材料）| 'eq'（装备），三条曲线各自独立。
-  // 每次 +10 格，价格从 ◈1500 起、每扩一次 ×1.3。
+  // 每次 +10 格，价格从 ◈ 1500 起、每扩一次 ×1.3。
   function buyBagCap(kind) {
     const k = ['eq', 'mat'].includes(kind) ? kind : 'item';
     const expandsKey = k + 'Expands';
@@ -1765,7 +1765,7 @@ window.Core = (function () {
   }
 
   /* ================= 灯阁权限（对标《道友修仙》的"洞府"） ================= */
-  // 建筑用点数（软货币）升级，这条线专用高级货币（✦圣洁晶石 + ◆异界结晶）——
+  // 建筑用点数（软货币）升级，这条线专用高级货币（✦ 圣洁晶石 + ◆ 异界结晶）——
   // 目的：给"抽卡之外"的高级货币一个长线出口，投进去就永久生效，转生也保留。
   function authority() { return D.authorityBonus(S.auth || 0); }
   function authorityInfo() {
@@ -1837,7 +1837,7 @@ window.Core = (function () {
   /* ================= 秘术阁（对标《道友修仙》的 KeJi） =================
      对标的是它那套"每条线每级只加一点点、但能一路修到顶"的长线（合 550 级）。
      我们做成 42 条：33 条加战斗（攻/生/防/速/暴击/暴伤/技能/闪避…），9 条加挂机经济
-     （产出/经验/掉落/离线上限…）。消耗统一走 ◆异界结晶（这是它的 coinBase 那一路），
+     （产出/经验/掉落/离线上限…）。消耗统一走 ◆ 异界结晶（这是它的 coinBase 那一路），
      让高级货币在"抽卡"之外有第二个出口。 */
   function kejiLv(id) { return (S.keji && S.keji[id]) || 0; }
   function kejiCostOf(id) {
@@ -1974,7 +1974,7 @@ window.Core = (function () {
     const g = D.GARDEN.find(x => x.id === gardenId);
     if (!g) return { ok: false, msg: '没有这种灵田' };
     if (S.garden[idx]) return { ok: false, msg: '这块地还种着东西' };
-    if (!canAfford({ points: g.points })) return { ok: false, msg: `◈点数不足（需要 ${fmtNum(g.points)}）` };
+    if (!canAfford({ points: g.points })) return { ok: false, msg: `◈ 点数不足（需要 ${fmtNum(g.points)}）` };
     spend({ points: g.points });
     S.garden[idx] = { id: g.id, at: Date.now() + g.sec * 1000 };
     save();
@@ -2058,7 +2058,7 @@ window.Core = (function () {
     if (!f) return { ok: false, msg: '没有这件法宝' };
     if (!S.fabao) S.fabao = { own: [], on: null };
     if (S.fabao.own.includes(id)) return { ok: false, msg: `已经有「${f.name}」了` };
-    if ((S.cur.otherworld || 0) < f.cost) return { ok: false, msg: `◆异界结晶不足（需要 ${f.cost}）` };
+    if ((S.cur.otherworld || 0) < f.cost) return { ok: false, msg: `◆ 异界结晶不足（需要 ${f.cost}）` };
     addCur('otherworld', -f.cost);
     S.fabao.own.push(id);
     if (!S.fabao.on) S.fabao.on = id;
