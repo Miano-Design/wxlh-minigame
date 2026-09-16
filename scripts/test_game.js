@@ -536,6 +536,9 @@ setParty(['C021']);
 // 36. 自动分解开关
 {
   Core.newGame();
+  /* V9.5.64 起新手补给自带一套 R 装备：这一例只关心「新掉的那件要被自动分解」，先清空 */
+  Core.S.equips = {};
+  Core.S.equipped['@player'] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
   Core.setPlayerName('回归');
   Core.S.settings.autoSellN = true;
   const before = Core.S.cur.otherworld;
@@ -716,7 +719,8 @@ setParty(['C021']);
 
 // 46. 深井曲线与深井印记
 {
-  t('深井 100 层不再是断崖', D.corridorEnemy(100).hp < 200000 && D.corridorEnemy(100).hp > 80000);
+  // V9.5.64：前 100 层成长加陡（1.060/层），第 100 层还是 BOSS（×2.4），血量区间跟着上移
+  t('深井 100 层不再是断崖', D.corridorEnemy(100).hp < 2500000 && D.corridorEnemy(100).hp > 800000);
   t('深井印记每 10 层 1 枚', D.corridorMarks(95) === 9 && D.corridorMarks(100) === 10);
   t('深井印记有上限', D.corridorMarks(9999) === D.CORRIDOR_MARK_CAP);
   t('深井印记加成为 1.5%/枚', Math.abs(D.corridorMarkBonus(100) - 0.15) < 1e-9);

@@ -1605,9 +1605,10 @@ window.DATA = (function () {
   // 新曲线放缓（1.032 / 1.026 / 1.020），并新增「深井印记」：每通 10 层永久 +1.5% 属性（仅深井内，上限 30 枚 +45%）。
   function corridorEnemy(floor) {
     let gHp, gAtk, gDef;
-    if (floor <= 100) { gHp = 1.032; gAtk = 1.026; gDef = 1.020; }
-    else if (floor <= 300) { gHp = 1.028; gAtk = 1.024; gDef = 1.018; }
-    else { gHp = 1.022; gAtk = 1.020; gDef = 1.015; }
+    /* V9.5.64（父亲大人：深井太简单、一下推好多层）——前 100 层成长大幅加陡。 */
+    if (floor <= 100) { gHp = 1.060; gAtk = 1.045; gDef = 1.030; }
+    else if (floor <= 300) { gHp = 1.045; gAtk = 1.035; gDef = 1.022; }
+    else { gHp = 1.035; gAtk = 1.026; gDef = 1.018; }
     const hpM = Math.pow(gHp, floor - 1), atkM = Math.pow(gAtk, floor - 1), defM = Math.pow(gDef, floor - 1);
     const isBoss = floor % 50 === 0, isElite = floor % 10 === 0;
     const mult = isBoss ? 2.4 : isElite ? 1.7 : 1;

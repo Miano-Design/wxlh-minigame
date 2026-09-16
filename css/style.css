@@ -262,7 +262,10 @@ body {
 /* 长按换位：抓起的那块亮起来，其余位置进入"可放下"的提示状态 */
 .pslot .pos-hint { position: absolute; right: 0.5rem; bottom: 0.3125rem; font-size: 0.6875rem; color: var(--dim); opacity: .7; }
 /* 长按换位：关掉系统长按菜单与文字选择，免得"长按"变成复制/放大镜 */
-.pslot, .pos-row-label { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.pslot, .pos-row-label { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  /* V9.5.64（父亲大人）：手机上长按抓起后手指一拖，浏览器会当成"滚页面"并掐掉 pointerup，
+     结果只能再点一下才换位。站位格子上的手势交给我们自己处理。 */
+  touch-action: none; }
 .pslot.grabbing { border-color: var(--gold); box-shadow: 0 0 0 2px #e6b64c55, 0 0.375rem 1.125rem #0008; transform: translateY(-2px); }
 .party-grid.grabbed .pslot { border-color: #e6b64c99; border-style: dashed; }
 .party-grid.grabbed .pslot.grabbing { border-style: solid; }

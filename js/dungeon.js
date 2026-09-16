@@ -5,13 +5,15 @@ window.Dungeon = (function () {
 
   function diffMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).mult; }
   function rewardMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).rewardMult; }
-  function stageMult(stage) { return Math.pow(1.16, stage - 1); }
+  /* V9.5.64（父亲大人：副本前期太难、没几关就卡）——
+   关卡成长从 1.16 放到 1.13；攻击曲线也从 1.10 放到 1.085（见 makeEnemies）。 */
+function stageMult(stage) { return Math.pow(1.13, stage - 1); }
 
   // 生成一场战斗的敌人
   function makeEnemies(worldId, diff, stage, kind) {
     const w = D.WORLDS.find(x => x.id === worldId);
     const m = diffMult(diff) * stageMult(stage);                       // HP 用满倍率（V5 §51）
-    const mAtk = diffMult(diff) * Math.pow(1.10, stage - 1);           // 攻击放缓
+    const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1);          // 攻击放缓（V9.5.64 再放缓一档）
     const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);           // 防御放缓，避免伤害坍缩
     const faction = THEME_FACTION[w.theme];
     const mk = (name, hp, atk, def, opts) => Object.assign({
@@ -37,15 +39,17 @@ window.Dungeon = (function () {
       const bossHp = w.bossHp[D.DIFFICULTY.findIndex(d => d.id === diff)] || w.bossHp[0];
       // Boss 血量按世界序号缩放（早期世界玩家战力低，避免数值碾压）
       const wi = D.WORLDS.indexOf(w);
-      const bossHpMult = 0.28 + wi * 0.05;
-      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 2.2 * diffMult(diff) * (1 + stage * 0.04), w.def * 1.8 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true })];
+      /* V9.5.64（父亲大人：前期副本卡关）——首关 Boss 血量系数 0.28 → 0.10，
+         之后每个世界再 +0.05：第一个 Boss 是"能打赢的关"，不是劝退墙。 */
+      const bossHpMult = 0.05 + wi * 0.05;
+      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04), w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true })];
       list.push(mk(w.enemies[0], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
       if (diff !== 'normal') list.push(mk(w.enemies[1], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
       return label(list);
     }
     if (kind === 'elite') {
       return label([
-        mk(w.elite, w.hp * 2.4 * m, w.atk * 1.5 * mAtk, w.def * 1.4 * mDef, { isElite: true }),
+        mk(w.elite, w.hp * 2.0 * m, w.atk * 1.35 * mAtk, w.def * 1.3 * mDef, { isElite: true }),   // V9.5.64：精英不再是一堵墙
         mk(w.enemies[Math.floor(Math.random() * 3)], w.hp * m, w.atk * mAtk, w.def * mDef, {}),
       ]);
     }

@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.63';
+  const GAME_VER = '9.5.64';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -206,8 +206,7 @@ window.UI = (function () {
     guardArmed = false;
     const overlay = document.getElementById('battle-overlay');
     if (overlay) {
-      const skip = overlay.querySelector('[data-skip]');
-      if (skip) skip.click();
+      // V9.5.64（父亲大人）：战斗界面没有"跳过"按钮了，返回键在战斗途中先吃掉（战斗自己会打完）
       armGuard();
       return;
     }
@@ -262,6 +261,7 @@ window.UI = (function () {
           <div class="sheet-body">${bodyHtml}</div>
         </div>`;
     root.appendChild(wrap);
+    bindActsIn(wrap);                 // 弹窗里的 [data-act] 也要能点（V9.5.64）
     modalStack.push(wrap);
     wrap._drawSeq = ++modalDrawSeq;
     wrap._onClose = opts.onClose || null;
@@ -298,6 +298,7 @@ window.UI = (function () {
       if (th) th.textContent = title;
     }
     if (sb) { sb.innerHTML = bodyHtml; sb.scrollTop = st; }
+    bindActsIn(w);
     w._drawSeq = ++modalDrawSeq;
     return w;
   }
@@ -789,14 +790,14 @@ window.UI = (function () {
     // 一条入口 = [动作, 名字, 状态文字, 解锁条件(可空), 是否亮红点]
     const lines = [
       ['open-party', '队伍', `${C().S.party.filter(Boolean).length} 人上阵`],
-      ['open-grow', '成长', '六条养成线总览'],
+      ['open-grow', '成长'],
       ['open-sect', '灯阁评级', `Lv.${sect.lv}`],
       ['open-keji', '秘术阁', `${kejiTotal} 级`],
       ['open-fabao', '法宝', fbOwn ? `${fbOwn}/${D.FABAO.length} 件` : '去挑一件'],
       ['open-garden', '药园', `${gardenBusy} 块在用`],
       ['open-arena', '斗法台', `第 ${arena.floor} 台 · 剩 ${arena.left} 次`],
       ['open-mount', '坐骑', mountOwn ? `${mountOwn}/${D.MOUNTS.length} 匹` : '去驯一匹'],
-      ['open-refine', '炼化台', '装备材料炼血清'],
+      ['open-refine', '炼化台'],
       ['open-authority', '灯阁权限', `Lv.${au.lv}/${au.max}`, 'buildings'],
       ['open-buildings', '基地建设', `合计 Lv.${bLv}`, 'buildings'],
       ['open-genelock', '铭刻', gl, 'geneLock'],
@@ -805,22 +806,21 @@ window.UI = (function () {
       ['open-codex', '灯录', `${C().codexState().owned}/${C().codexState().total} 名`, 'recruit'],
     ];
     const daily = [
-      ['open-bounty', '限时悬赏', '按时重置', null, C().bountyState().list.some(x => x.done && !x.claimed)],
-      ['open-tasks', '每日任务', '主线 / 日常 / 周常', 'tasks'],
-      ['open-ach', '成就', '长线目标', null, achDot],
+      ['open-bounty', '限时悬赏', null, null, C().bountyState().list.some(x => x.done && !x.claimed)],
+      ['open-tasks', '每日任务', 'tasks'],
+      ['open-ach', '成就', null, null, achDot],
       ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
       // V9.5.52（父亲大人）：这一格的说明文字改成"本期 UP 是谁 · 什么阵营"，比堆免费次数有用
       ['open-recruit', '招募伙伴', (() => {
         const up = D.recruitUpChar();
         return up ? `本期 UP：${up.name} · ${up.faction}` : '去招募伙伴';
       })(), 'recruit', C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
-      ['open-shop', '兑换大厅', '三档商店', 'shop'],
+      ['open-shop', '兑换大厅', 'shop'],
     ];
     return `<div class="section-title" data-sec="grow">养成</div>
       ${tileGrid(lines)}
       <div class="grid-title">日常</div>
       ${tileGrid(daily)}`
-      + '<div class="hint mt2">全部养成线的总览在「执灯者 → 成长」。</div>'
   }
   /* 游历：只放「游历奇遇」本身——挂机路上随机冒出来的奇遇，进度条就是它的唯一入口。 */
   function travelBlock() {
@@ -1074,9 +1074,6 @@ window.UI = (function () {
     const w = D.WORLDS.find(x => x.id === run.worldId);
     const total = run.waves.length;
     const prog = Array.from({ length: total }, (_, i) => `<i class="${i < run.wave ? 'done' : ''}"></i>`).join('');
-    const potionBar = potionBarHtml()
-      ? `<div class="mt2">${potionBarHtml()}<div style="font-size:0.625rem;color:var(--dim);margin-top:0.3125rem">副本内使用 · 本场探索全程有效</div></div>`
-      : `<div style="font-size:0.625rem;color:var(--dim);margin-top:0.5rem">背包里还没有探索用道具（灯阁市集可买治疗剂 / 强化剂）</div>`;
     // 波次列表（纯文字）：打过的划掉，当前的高亮，后面的等着
     const waveList = run.waves.map((k, i) => {
       const done = i < run.wave, cur = i === run.wave;
@@ -1091,7 +1088,6 @@ window.UI = (function () {
         <h3>${w.name} · ${{ normal: '普通', hard: '困难', hell: '地狱' }[run.diff]} · 第 ${run.stage}/12 关 <span class="sub">共 ${total} 波</span></h3>
         <div class="route-progress">${prog}</div>
         <div style="display:flex;gap:0.375rem">${partyHpHtml()}</div>
-        ${potionBar}
         ${Object.keys(run.buffs).length ? `<div style="margin-top:0.5rem;font-size:0.6875rem;color:var(--green)">本关增益：${Object.entries(run.buffs).map(([k, v]) => `${D.CONSUMABLE_TAG[k] || k}+${Math.round(v * 100)}%`).join(' ')}</div>` : ''}
       </div>
       <div class="card"><h3>本关波次</h3>${waveList}</div>
@@ -3949,16 +3945,15 @@ window.UI = (function () {
       </div>
       <div class="b-field">
         <div class="b-row enemies"></div>
+        <!-- V9.5.64（父亲大人）：前排画在上面、后排画在下面，跟队伍页一个方向。
+             以前是反的（后排在上、前排在下），看着就是"前后排颠倒了"。 -->
+        <div class="b-line-label" data-line="front">我方前排</div>
+        <div class="b-row allies front"></div>
         <div class="b-line-label" data-line="back">我方后排</div>
         <div class="b-row allies back"></div>
-        <div class="b-line-label" data-line="front">我方前排 · 敌人优先打这里</div>
-        <div class="b-row allies front"></div>
       </div>
       <div id="battle-log"></div>
-      <div class="b-controls">
-        <div class="b-potions" data-bpotions></div>
-        <button class="btn block" data-skip>跳过 ⏩</button>
-      </div>`;
+      `;
     root.appendChild(overlay);
     // 单位状态
     const units = {};
@@ -4031,29 +4026,13 @@ window.UI = (function () {
     let speed = S.settings.speed;
     /* 战备补给条：副本里随时能喝，但一场战斗的帧是"开打前一次算完"的，
        所以喝下去的药从**下一波**进场时生效（血线低就趁这波还没打完先喝）。 */
-    const potBox = overlay.querySelector('[data-bpotions]');
-    function paintPotions() {
-      if (!potBox) return;
-      const bar = run ? potionBarHtml() : '';
-      if (!bar) { potBox.innerHTML = ''; return; }
-      const lastWave = run.wave >= run.waves.length - 1;
-      // 整场战斗是"开打前一次算完"的，药剂只能作用于**下一波进场**。
-      // 最后一波后面没有下一波了（这一关打完 run 就清空），在这里喝药等于白扣道具，所以不给按。
-      if (lastWave) {
-        potBox.innerHTML = '<div class="b-potion-tip">收官战 · 药剂要到下一关才生效（每关开局满血），先留着吧</div>';
-        return;
-      }
-      potBox.innerHTML = `<div class="b-potion-tip">战备补给 · 喝了从下一波进场生效</div>${bar}`;
-      bindPotionButtons(overlay, paintPotions);
-    }
-    paintPotions();
+    /* V9.5.64（父亲大人）：副本里的药剂条整个去掉了（战斗是一次算完的，喝了也白扣）。 */
     overlay.querySelector('[data-speedbtn]').onclick = ev => {
       speed = speed >= 3 ? 1 : speed + 1;
       S.settings.speed = speed; C().save();
       ev.target.textContent = speed + '×速度';
     };
     let idx = 0, skipped = false, finished = false;
-    overlay.querySelector('[data-skip]').onclick = () => { skipped = true; };
     if (start.note) log(`⚠ 世界机制：${start.note}`);
     // 带血进场时把血线写出来：玩家才知道血是"继承"过来的，不是被刷新了
     const carried = start.allies.filter(u => u.hp < u.maxHp)
@@ -4374,6 +4353,8 @@ window.UI = (function () {
         return {
           rewards: [`◈+${rw.points}`, `❖+${rw.story}`, `♜+${rw.corridor}`].concat(rw.bloodCrystal ? [`❥+${rw.bloodCrystal}`] : [], gotMark ? [`♜ 获得深井印记（${C().corridorMarks()}枚 · 深井内 +${Math.round(C().corridorMarkBonus() * 100)}%）`] : []),
           sub: `进入第 ${floor + 1} 层`,
+          // V9.5.64（父亲大人）：深井结算也要能"自动接着打下一层"（以前只能手动点返回）
+          actions: [{ label: `继续第 ${floor + 1} 层`, primary: true, fn: () => fightCorridor() }],
           after: () => render(),
         };
       },
@@ -4433,116 +4414,123 @@ window.UI = (function () {
     return showPanel(undefined, '成长', growScreen());
   }
 
+  /* 按钮分发（V9.5.64）：主界面和弹窗/二级页共用同一套 ——
+     以前只给 #view 里的 [data-act] 绑过，弹窗里的按钮点了没反应（父亲大人报的「无效按键」）。 */
+  function runAct(act, el, root) {
+    const S = C().S;
+switch (act) {
+          /* 这里原来还有一个 'claim-idle' 分支，但全站没有任何元素发出过这个动作
+             （挂机卡上的按钮早就统一成 claim-all 了）——分支留着也没人点得到，V8.9 删掉。
+             同样的"有分支没出处"清单由测试 scripts/test_ui.js 守着。 */
+          case 'open-recruit': openRecruit(); break;
+          case 'claim-all': {
+            const r = C().claimEverything();
+            sfx(r.total ? 'coin' : 'fail');
+            const chips = [];
+            if (r.seconds) chips.push(`<span class="reward-chip">⏳ 挂机 ${formatDuration(r.seconds)}</span>`);
+            Object.entries(r.gains.cur).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">${curIcon(k)}${v > 0 ? '+' : ''}${fmt(v)}</span>`); });
+            Object.entries(r.gains.items).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">🎒 ${(D.ITEMS[k] || {}).name || k}×${v}</span>`); });
+            modal('收取奖励', `
+              <div style="font-size:0.75rem;color:var(--dim);text-align:center">本次共收取 ${r.total} 项</div>
+              <div class="reward-chips" style="margin-top:0.75rem;margin-bottom:0.75rem">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
+            `, { center: true });
+            render();
+            break;
+          }
+          case 'open-shop': shopModal('god'); break;
+          case 'open-buildings': buildingsModal(); break;
+          case 'open-authority': authorityModal(); break;
+          case 'open-sect': sectModal(); break;
+          case 'open-keji': kejiModal(); break;
+          case 'open-party': openPartyPanel(); break;
+          case 'open-grow': openGrowPanel(); break;
+          case 'open-travel': travelModal(); break;
+          // 首页游历条上的奇遇已经出来了：点一下直接领走（不再进二级页面）
+          case 'claim-travel': {
+            const tvr = C().claimTravel();
+            if (!tvr.ok) { toast(tvr.msg); break; }
+            toast(`🎁 ${tvr.msg}`, 2600);
+            sfx('coin');
+            render(); renderTopbar();
+            break;
+          }
+          case 'open-bloodline': bloodlineModal(); break;
+          case 'open-garden': gardenModal(); break;
+          case 'open-refine': refineModal(); break;
+          case 'open-arena': arenaModal(); break;
+          case 'open-fabao': fabaoModal(); break;
+          case 'open-mount': mountModal(); break;
+          case 'open-sign': signModal(); break;
+          case 'open-tasks': tasksModal(); break;
+          case 'open-genelock': geneLockModal(); break;
+          case 'open-reincarn': reincarnModal(); break;
+          case 'open-idlelines': idleLinesModal(); break;
+          case 'open-bounty': bountyModal(); break;
+          case 'open-realm': realmModal(); break;
+          case 'open-beast': beastModal(); break;
+          case 'open-settings': settingsModal(); break;
+          case 'claim-quest': {
+            const cur = C().currentQuest();
+            if (cur) {
+              const r = C().claimQuest(cur.q.id);
+              if (r.ok) {
+                toast(`完成主线【${cur.q.name}】`, 2200);
+                // 弹的是"这条任务真正解锁了什么"（由 claimQuest 返回，不再去读下一条任务的字段）
+                if (r.unlocked && r.unlocked.length) {
+                  setTimeout(() => modal('🔓 新功能解锁', `<div style="text-align:center;padding:0.625rem;font-size:0.875rem">${r.unlocked.join(' · ')} 已解锁！</div>`, { center: true }), 400);
+                }
+              }
+            }
+            render();
+            break;
+          }
+          case 'goto-quest': {
+            const cur = C().currentQuest();
+            if (!cur) break;
+            gotoQuest(cur.q.id);
+            break;
+          }
+          case 'open-guide': guideModal(); break;
+          case 'open-codex': codexModal(); break;
+          case 'open-ach': tasksModal('ach'); break;
+          case 'auto-equip': {
+            const r = C().autoEquipBest();
+            toast(r.changed ? `已为 ${r.members} 名成员重新分配 ${r.changed} 处装备（含从没上阵的伙伴身上取下的）` : '当前已是最优配置', 2600);
+            sfx('coin');
+            repaintParty(); renderTopbar();
+            break;
+          }
+          case 'open-corridor':
+            if (!C().isUnlocked('corridor')) { toast('🔒 ' + C().unlockTip('corridor')); break; }
+            dungeonView = { page: 'corridor' }; render(); break;
+          case 'open-corridor-shop': shopModal('corridor'); break;
+          case 'fight-corridor': fightCorridor(); break;
+          case 'back-worlds': dungeonView = { page: 'worlds' }; run = null; C().clearPendingRun(); render(); break;
+          case 'abandon-run':
+            confirmBox('撤离副本', '确定撤离？本次探索进度将丢失，已获得的奖励会保留。', () => {
+              const wid = run ? run.worldId : dungeonView.worldId;
+              const df = run ? run.diff : (dungeonView.diff || 'normal');
+              run = null;
+              C().clearPendingRun();
+              dungeonView = { page: 'world', worldId: wid, diff: df };
+              render();
+            });
+            break;
+          case 'open-sweep':
+            sweepModal(dungeonView.worldId, dungeonView.diff);
+            break;
+        }
+  
+  }
+  function bindActsIn(root) {
+    root.querySelectorAll('[data-act]').forEach(el => el.onclick = () => runAct(el.dataset.act, el, root));
+  }
+
   function bindScreen() {
     const root = $view();
     // 背包页签的按钮与弹窗共用一套绑定
     if (curTab === 'bag') bindBag(root, false);
-    root.querySelectorAll('[data-act]').forEach(el => el.onclick = () => {
-      const act = el.dataset.act;
-      const S = C().S;
-      switch (act) {
-        /* 这里原来还有一个 'claim-idle' 分支，但全站没有任何元素发出过这个动作
-           （挂机卡上的按钮早就统一成 claim-all 了）——分支留着也没人点得到，V8.9 删掉。
-           同样的"有分支没出处"清单由测试 scripts/test_ui.js 守着。 */
-        case 'open-recruit': openRecruit(); break;
-        case 'claim-all': {
-          const r = C().claimEverything();
-          sfx(r.total ? 'coin' : 'fail');
-          const chips = [];
-          if (r.seconds) chips.push(`<span class="reward-chip">⏳ 挂机 ${formatDuration(r.seconds)}</span>`);
-          Object.entries(r.gains.cur).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">${curIcon(k)}${v > 0 ? '+' : ''}${fmt(v)}</span>`); });
-          Object.entries(r.gains.items).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">🎒 ${(D.ITEMS[k] || {}).name || k}×${v}</span>`); });
-          modal('收取奖励', `
-            <div style="font-size:0.75rem;color:var(--dim);text-align:center">本次共收取 ${r.total} 项</div>
-            <div class="reward-chips" style="margin-top:0.75rem;margin-bottom:0.75rem">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
-          `, { center: true });
-          render();
-          break;
-        }
-        case 'open-shop': shopModal('god'); break;
-        case 'open-buildings': buildingsModal(); break;
-        case 'open-authority': authorityModal(); break;
-        case 'open-sect': sectModal(); break;
-        case 'open-keji': kejiModal(); break;
-        case 'open-party': openPartyPanel(); break;
-        case 'open-grow': openGrowPanel(); break;
-        case 'open-travel': travelModal(); break;
-        // 首页游历条上的奇遇已经出来了：点一下直接领走（不再进二级页面）
-        case 'claim-travel': {
-          const tvr = C().claimTravel();
-          if (!tvr.ok) { toast(tvr.msg); break; }
-          toast(`🎁 ${tvr.msg}`, 2600);
-          sfx('coin');
-          render(); renderTopbar();
-          break;
-        }
-        case 'open-bloodline': bloodlineModal(); break;
-        case 'open-garden': gardenModal(); break;
-        case 'open-refine': refineModal(); break;
-        case 'open-arena': arenaModal(); break;
-        case 'open-fabao': fabaoModal(); break;
-        case 'open-mount': mountModal(); break;
-        case 'open-sign': signModal(); break;
-        case 'open-tasks': tasksModal(); break;
-        case 'open-genelock': geneLockModal(); break;
-        case 'open-reincarn': reincarnModal(); break;
-        case 'open-idlelines': idleLinesModal(); break;
-        case 'open-bounty': bountyModal(); break;
-        case 'open-realm': realmModal(); break;
-        case 'open-beast': beastModal(); break;
-        case 'open-settings': settingsModal(); break;
-        case 'claim-quest': {
-          const cur = C().currentQuest();
-          if (cur) {
-            const r = C().claimQuest(cur.q.id);
-            if (r.ok) {
-              toast(`完成主线【${cur.q.name}】`, 2200);
-              // 弹的是"这条任务真正解锁了什么"（由 claimQuest 返回，不再去读下一条任务的字段）
-              if (r.unlocked && r.unlocked.length) {
-                setTimeout(() => modal('🔓 新功能解锁', `<div style="text-align:center;padding:0.625rem;font-size:0.875rem">${r.unlocked.join(' · ')} 已解锁！</div>`, { center: true }), 400);
-              }
-            }
-          }
-          render();
-          break;
-        }
-        case 'goto-quest': {
-          const cur = C().currentQuest();
-          if (!cur) break;
-          gotoQuest(cur.q.id);
-          break;
-        }
-        case 'open-guide': guideModal(); break;
-        case 'open-codex': codexModal(); break;
-        case 'open-ach': tasksModal('ach'); break;
-        case 'auto-equip': {
-          const r = C().autoEquipBest();
-          toast(r.changed ? `已为 ${r.members} 名成员重新分配 ${r.changed} 处装备（含从没上阵的伙伴身上取下的）` : '当前已是最优配置', 2600);
-          sfx('coin');
-          repaintParty(); renderTopbar();
-          break;
-        }
-        case 'open-corridor':
-          if (!C().isUnlocked('corridor')) { toast('🔒 ' + C().unlockTip('corridor')); break; }
-          dungeonView = { page: 'corridor' }; render(); break;
-        case 'open-corridor-shop': shopModal('corridor'); break;
-        case 'fight-corridor': fightCorridor(); break;
-        case 'back-worlds': dungeonView = { page: 'worlds' }; run = null; C().clearPendingRun(); render(); break;
-        case 'abandon-run':
-          confirmBox('撤离副本', '确定撤离？本次探索进度将丢失，已获得的奖励会保留。', () => {
-            const wid = run ? run.worldId : dungeonView.worldId;
-            const df = run ? run.diff : (dungeonView.diff || 'normal');
-            run = null;
-            C().clearPendingRun();
-            dungeonView = { page: 'world', worldId: wid, diff: df };
-            render();
-          });
-          break;
-        case 'open-sweep':
-          sweepModal(dungeonView.worldId, dungeonView.diff);
-          break;
-      }
-    });
+    bindActsIn(root);
     root.querySelectorAll('[data-locked]').forEach(el => el.onclick = () => {
       toast('🔒 ' + C().unlockTip(el.dataset.locked), 2200);
     });

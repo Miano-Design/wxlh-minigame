@@ -148,11 +148,9 @@ t('波间无缝衔接：不弹结算页，补血手段搬到战斗界面底部',
   const j = src.indexOf('if (outcome.seamless && res.win)');
   if (j < 0) throw new Error('finish() 没有处理无缝衔接（还会弹结算页）');
   if (src.slice(j, j + 400).indexOf('outcome.after') < 0) throw new Error('无缝衔接没有接上后续动作');
-  // 药剂改成战斗界面底部那条战备补给
-  if (src.indexOf('data-bpotions') < 0) throw new Error('战斗界面缺战备补给条');
-  if (src.indexOf('function paintPotions') < 0 || src.indexOf('function bindPotionButtons') < 0) {
-    throw new Error('缺药剂条的渲染 / 绑定');
-  }
+  // V9.5.64（父亲大人）：副本里的药剂条和"跳过"按钮都撤了，战斗界面不该再有它们
+  if (src.indexOf('data-bpotions') >= 0) throw new Error('战斗界面还有药剂条');
+  if (src.indexOf('data-skip') >= 0) throw new Error('战斗界面还有"跳过"按钮');
   if (src.indexOf('extraHtml: waveExtraHtml()') >= 0) throw new Error('波间结算页还在');
 });
 t('战斗快照带 charId（波间血量继承的前提，不然每波都满血开打）', () => {
@@ -1401,14 +1399,11 @@ t('药剂不复活阵亡成员（星级评价里的"无人阵亡"才有意义）
   if (r.down !== 1) throw new Error('没有回报"有几名成员已阵亡"');
 });
 
-t('最后一波不再给按药剂（战斗是一次算完的，喝了纯白扣）', () => {
+t('副本里没有药剂、没有跳过：战斗是一次算完的', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
-  if (src.indexOf('收官战 · 药剂要到下一关才生效') < 0) throw new Error('最后一波缺"不给喝药"的说明');
-  const i = src.indexOf('function paintPotions');
-  if (i < 0) throw new Error('找不到 paintPotions');
-  const seg = src.slice(i, i + 900);
-  const j = seg.indexOf('if (lastWave)');
-  if (j < 0 || seg.slice(j, j + 220).indexOf('return') < 0) throw new Error('最后一波没有提前返回（还能按药剂）');
+  ['data-bpotions', 'data-skip', 'paintPotions', '收官战 · 药剂'].forEach(k => {
+    if (src.indexOf(k) >= 0) throw new Error('还留着：' + k);
+  });
 });
 
 t('抓起之后立刻点别的格子不会被吞掉（新手势＝清掉上一次的"吞点击"）', () => {

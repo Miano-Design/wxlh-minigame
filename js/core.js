@@ -276,6 +276,17 @@ window.Core = (function () {
     addCur('points', D.STARTER.points);
     addCur('holy', D.STARTER.holy);
     Object.entries(D.STARTER.items).forEach(([k, v]) => addItem(k, v));
+    /* V9.5.64（父亲大人：副本前期太难）——新手补给里给主角**一整套 R 装备**并直接穿上。
+       数值体检（scripts/balance_check.js）显示：同样等级下"裸装"过不了 W01 后几关，
+       穿一套 R 就顺畅了。第一个世界不该是"逼你先刷装备"的墙。 */
+    (S.starterEquipUids = []).length = 0;
+    [['weapon', 'R'], ['head', 'R'], ['armor', 'R'], ['hands', 'R'], ['legs', 'R'], ['accessory', 'R']]
+      .forEach(([slot, rarity]) => {
+        const uid = 'start_' + slot;
+        S.equips[uid] = D.makeEquip('W01', slot, rarity, uid, { setType: 'plain' });
+        S.equipped['@player'][slot] = uid;
+        S.starterEquipUids.push(uid);
+      });
     unlockWorld('W01');
     save();
   }
