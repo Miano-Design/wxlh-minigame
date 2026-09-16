@@ -526,9 +526,11 @@ window.DATA = (function () {
        它的招募不是直接花货币，而是花"券"；券可以从商店买、也能从玩法里掉。
        好处是"打副本 → 掉券 → 去抽"自己成了一条循环，不用先攒够一大笔货币才敢点招募。
        我们三个池子各配一张券，抽的时候「有券先用券，没券才花货币」，规则只有这一条。 */
-    ticket_normal: { name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◈ 点数）', src: '副本战斗、扫荡、挂机、每日任务' },
-    ticket_adv:    { name: '圣契招募令', type: 'ticket', where: 'recruit', pool: 'advanced', use: '在「招募伙伴」点高级池招募时自动先用它', desc: '高级招募 1 次（没券时会自动改花 ✦ 圣洁晶石）', src: '精英/Boss 掉落、限时悬赏、每周任务、兑换大厅' },
-    ticket_lim:    { name: '异界征召令', type: 'ticket', where: 'recruit', pool: 'limited', use: '在「招募伙伴」点限定池招募时自动先用它', desc: '限定招募 1 次（没券时会自动改花 ◆ 异界结晶）', src: '深井、地狱难度、周常全清、异界商店' },
+    /* V9.5.75（父亲大人）：招募券**不再上架**，只能靠玩法拿——
+       "白抽一次"是奖励，能用钱买就失去意义了；顺带也彻底消灭了 V9.5.74 那类"券价 vs 单抽价"的比价问题。 */
+    ticket_normal: { name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◈ 点数）', src: '副本战斗与扫荡掉落、每日任务全清、限时悬赏、登录奖励（商店不卖）' },
+    ticket_adv:    { name: '圣契招募令', type: 'ticket', where: 'recruit', pool: 'advanced', use: '在「招募伙伴」点高级池招募时自动先用它', desc: '高级招募 1 次（没券时会自动改花 ✦ 圣洁晶石）', src: '精英 / 守关 Boss 掉落、限时悬赏、每周任务、登录奖励、游历奇遇（商店不卖）' },
+    ticket_lim:    { name: '异界征召令', type: 'ticket', where: 'recruit', pool: 'limited', use: '在「招募伙伴」点限定池招募时自动先用它', desc: '限定招募 1 次（没券时会自动改花 ◆ 异界结晶）', src: '地狱难度守关 Boss、周常全清、高阶悬赏、登录奖励、游历奇遇（商店不卖）' },
     /* V9.5.66（父亲大人）：探索用消耗品整块删掉。
        起因是副本药剂条撤掉之后，这 9 种东西（治疗剂 ×4、强化剂 ×5）既没有自然的用武之地，
        又占着商店货架和掉落位。与其到处补入口，不如整条线砍掉——战斗改成"一波接一波、
@@ -674,7 +676,7 @@ window.DATA = (function () {
       '高级招募（✦ 圣洁晶石）：主力池，SR 起抽，50 抽内必出 SSR、100 抽内必出 UR，而且优先给「你还没有的伙伴」——缺图鉴就抽它。',
       '限定招募（◆ 异界结晶）：定向池，本期只出「当期 UP」所属阵营的伙伴，SSR 里一半是当期 UP，50 抽内必出当期 UP。想要某个特定的人，就盯着它抽。',
       '保底三个池分开关账：高级池和限定池各自数自己的 SSR / UR / UP 次数，换池不会清零，也不会串。',
-      '**招募券**：每个池配一张券（引灯招募券 / 圣契招募令 / 异界征召令），从副本掉落、悬赏、每日与每周任务、登录、商店都能拿。抽的时候**有券先用券，券不够才扣货币**；十连要么给 10 张券、要么给足货币，不混着扣。',
+      '**招募券**：每个池配一张券（引灯招募券 / 圣契招募令 / 异界征召令）。券**只能在玩法里拿**（副本掉落、悬赏、每日与每周任务、登录、游历奇遇），商店不卖——券是"白抽一次"的奖励，能用钱买就失去意义了。抽的时候**有券先用券，券不够才扣货币**；十连要么给 10 张券、要么给足货币，不混着扣。',
       '想知道每一档到底多少概率？「招募伙伴」页**右上角那个 ⓘ** 就是概率公示，逐池列清每一档出率、保底抽数、还差几抽触发保底。',
       '每天有免费次数：**普通池 3 次**（每次间隔 10 分钟）、**高级池 1 次**，出率与该池完全一样，同样计入主线与每日任务；用完之后按钮恢复成花券/货币。',
     ] },
@@ -1402,8 +1404,6 @@ window.DATA = (function () {
       { currencyGain: { skillChip: 10 }, name: '技能芯片×10', price: 2000, stock: -1 },
       { item: 'box_r', name: '随机R装备', price: 5000, stock: -1 },
       { item: 'box_sr', name: '随机SR装备', price: 30000, stock: -1 },
-      // V9.5.74（自审）：同货币买券不能比直接抽贵。单抽 500 → 券卖 450（便宜 10%，货架才有意义）
-      { item: 'ticket_normal', name: '引灯招募券', price: 450, stock: 3 },
     ] },
     otherworld: { name: '异界商店', currency: 'otherworld', items: [
       { item: 'box_sr', name: 'SR装备箱', price: 100, stock: -1 },
@@ -1415,9 +1415,6 @@ window.DATA = (function () {
       { item: 'mat_t5', name: '灯阁残片×3', price: 900, count: 3, stock: -1, req: { world: 'W06' } },
       { item: 'exp_l', name: '高级经验模块', price: 150, stock: -1, req: { world: 'W04' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 4200, stock: -1, req: { world: 'W15' } },
-      { item: 'ticket_adv', name: '圣契招募令', price: 120, stock: 2 },
-      // V9.5.74（自审）：限定池单抽只要 ◆60，这张券却卖 ◆180（贵 3 倍）——同货币倒挂，改成 ◆50
-      { item: 'ticket_lim', name: '异界征召令', price: 50, stock: 2 },
     ] },
     story: { name: '故事商店', currency: 'story', items: [
       { shardRandom: 'R', shardCount: 10, name: '随机R伙伴碎片×10', price: 100, stock: -1 },
@@ -1427,7 +1424,6 @@ window.DATA = (function () {
       { item: 'exp_m', name: '中级经验模块×2', price: 150, count: 2, stock: -1 },
       { currencyGain: { skillChip: 100 }, name: '技能芯片×100', price: 200, stock: -1 },
       { currencyGain: { holy: 10 }, name: '圣洁晶石×10', price: 500, stock: 1 },
-      { item: 'ticket_normal', name: '引灯招募券', price: 250, stock: 3 },
     ] },
     corridor: { name: '深井商店', currency: 'corridor', items: [
       { shardRandom: 'SR', shardCount: 10, name: 'SR伙伴碎片×10', price: 100, stock: -1 },
@@ -1441,8 +1437,6 @@ window.DATA = (function () {
       { item: 'mat_t5', name: '灯阁残片×5', price: 150, count: 5, stock: -1 },
       { item: 'box_ssr', name: 'SSR装备箱', price: 500, stock: -1 },
       { item: 'box_ur', name: 'UR装备箱', price: 1500, stock: -1 },
-      { item: 'ticket_adv', name: '圣契招募令', price: 150, stock: 3 },
-      { item: 'ticket_lim', name: '异界征召令', price: 220, stock: 2 },
     ] },
   };
 

@@ -116,25 +116,24 @@ Object.entries(D.SHOPS).forEach(([sid, shop]) => {
   });
 });
 ok('商店价钱 / 货币 / 商品 id 全部有效');
-/* 同货币的价格关系：商店卖的招募券不能比"直接抽一次"还贵（那货架就没人买了），
-   十连也不能比单抽贵 —— V9.5.74 就是靠这条抓出两处倒挂（普通券 600 vs 单抽 500、
-   限定券 ◆180 vs 单抽 ◆60）。 */
+/* 招募经济的两条规则（V9.5.75 父亲大人定的）：
+   ① **招募券不上架**——券是"白抽一次"的奖励，只能用钱买的话就失去意义了；
+      顺带也彻底消灭了"券价 vs 单抽价"这类比价问题（V9.5.74 就是靠它抓出两处倒挂）。
+   ② 十连不能比 10 次单抽还贵。 */
 {
   let inv = 0;
+  const ticketIds = Object.values(D.RECRUIT_POOLS).map(p => p.ticket);
+  Object.entries(D.SHOPS).forEach(([sid, shop]) => {
+    shop.items.forEach(it => {
+      if (ticketIds.includes(it.item)) { fail(`${shop.name} 还在卖招募券「${it.item}」——券只能靠玩法获得`); inv++; }
+    });
+  });
   Object.entries(D.RECRUIT_POOLS).forEach(([pid, pool]) => {
     const cur = Object.keys(pool.cost)[0];
     const single = pool.cost[cur], ten = pool.ten[cur];
     if (ten && single && ten > single * 10) { fail(`${pool.name} 的十连 ${ten} 比 10 次单抽 ${single * 10} 还贵`); inv++; }
-    Object.entries(D.SHOPS).forEach(([, shop]) => {
-      if (shop.currency !== cur) return;                     // 跨货币不直接可比
-      shop.items.forEach(it => {
-        if (it.item === pool.ticket && it.price > single) {
-          fail(`${shop.name} 的${it.name}卖 ${it.price}，比「${pool.name}」单抽 ${single} 还贵`); inv++;
-        }
-      });
-    });
   });
-  if (!inv) ok('同货币关系没倒挂（券价 ≤ 单抽价，十连 ≤ 10 次单抽）');
+  if (!inv) ok('招募券不在任何商店里 · 十连 ≤ 10 次单抽');
 }
 function rewardSanity(label, r) {
   if (!r || typeof r !== 'object') return;

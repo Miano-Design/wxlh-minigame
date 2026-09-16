@@ -952,6 +952,21 @@ setParty(['C021']);
   t('喂下血清后战力跟着涨', Core.power(cid) > p0);
 }
 
+/* V9.5.75（父亲大人）：招募券只能是系统赠送，商店不卖 —— 这条规则锁死，
+   以后谁把券摆回货架、或者把来源删空（券变成拿不到的"死道具"），这里都会报。 */
+{
+  const TICKETS = ['ticket_normal', 'ticket_adv', 'ticket_lim'];
+  const shopItems = Object.values(D.SHOPS).flatMap(s => s.items.map(i => i.item)).filter(Boolean);
+  t('招募券不在任何商店里', TICKETS.every(k => !shopItems.includes(k)));
+  t('三种券都还有玩法来源', (() => {
+    const dataSide = JSON.stringify([D.MAIN_QUESTS, D.DAILY_TASKS, D.WEEKLY_TASKS, D.DAILY_ALL_REWARD,
+      D.WEEKLY_ALL_REWARD, D.LOGIN_REWARDS, D.TRAVELS, D.makeBounties({ player: { level: 50 }, worlds: {}, chars: {}, corridor: {}, beast: {}, stats: {} })]);
+    const dungeonSide = fs.readFileSync('js/dungeon.js', 'utf8');
+    return TICKETS.every(k => dataSide.indexOf(k) >= 0 && dungeonSide.indexOf(k) >= 0);
+  })());
+  t('券的来源文案不再提商店', TICKETS.every(k => (D.ITEMS[k].src || '').indexOf('商店不卖') >= 0));
+}
+
 // 50. 招募三池：花三种货币、出三种结构、保底各自独立
 {
   const P = D.RECRUIT_POOLS;
@@ -1794,6 +1809,23 @@ setParty(['C021']);
   t('离线 4 分钟：settleOffline 返回了收益', !!g && !g.cheat && g.seconds > 200 && g.gains.points > 0);
   t('离线 4 分钟：点数真的进了账（不再依赖弹窗）', Core.S.cur.points - p0 === g.gains.points);
   t('离线 4 分钟：主角经验也进了账', Core.S.player.exp - e0 === g.gains.exp);
+}
+
+/* V9.5.75（父亲大人：招募券只能系统赠送）：券下架之后我又量了一次日产量，
+   发现"扫荡守关 Boss 60 次"每天能刷出约 30 张高级券（= 每天白送 7 个 SSR）。
+   现在规则改成：**手打副本照旧掉券，扫荡不掉** —— 这条用例把两个方向都钉住。 */
+{
+  Core.newGame(); Core.setPlayerName('券');
+  Core.choosePlayerBloodline('修真');
+  Core.stageComplete('W01', 'normal', 11, 3);
+  Core.S.cur.points = 1e7; Core.S.bag.itemCap = 999; Core.S.bag.matCap = 999;
+  const TICKS = ['ticket_normal', 'ticket_adv', 'ticket_lim'];
+  const snap = () => TICKS.map(k => Core.S.items[k] || 0).join(',');
+  const before = snap();
+  Core.S.sweep = { date: '', count: 0, bonus: 0 };
+  window.Dungeon.sweep('W01', 'normal', 12, 60);
+  t('扫荡不掉招募券（券是探索的惊喜，不是重复劳动的产物）', snap() === before);
+  t('扫荡照样给材料', Object.keys(Core.S.items).some(k => k.indexOf('mat_t') === 0));
 }
 
 // V9.5-3：扫荡界面上写着 EXP，就必须真的发经验（含战斗统计）

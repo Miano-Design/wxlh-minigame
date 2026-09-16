@@ -104,7 +104,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
   }
 
   // 结算奖励（含装备掉落）
-  function grantRewards(worldId, diff, stage, kind) {
+  /* opts.noTicket：扫荡时传 true —— 见下面招募券那一段的说明。
+     opts.extra：预留（比如活动加成），目前没用。 */
+  function grantRewards(worldId, diff, stage, kind, opts) {
+    opts = opts || {};
     const r = battleRewards(worldId, diff, stage, kind);
     const got = [];
     const Core = window.Core;
@@ -147,18 +150,24 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       const sn = kind === 'boss' ? 2 : 1;
       if (Core.addItem(matId, sn)) got.push({ k: 'item', v: matId, n: sn });
     }
-    // 招募券掉落（对标《道友修仙》的"招徒卷"：券是玩法里会掉的，不是只能在商店买）。
-    // 这样"打副本 → 掉券 → 去招募"自己就是一条循环，不必先攒够一大笔货币才敢点招募。
-    if (kind === 'boss' && Math.random() < Math.min(1, 0.50 * dropBoost)) {
-      if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
-    } else if (kind === 'elite' && Math.random() < Math.min(1, 0.28 * dropBoost)) {
-      if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
-    } else if (kind === 'combat' && Math.random() < Math.min(1, 0.18 * dropBoost)) {
-      if (Core.addItem('ticket_normal')) got.push({ k: 'item', v: 'ticket_normal', n: 1 });
-    }
-    // 地狱难度的 Boss 额外掉限定券（限定池是"定向池"，券最稀有）
-    if (diff === 'hell' && kind === 'boss' && Math.random() < 0.35) {
-      if (Core.addItem('ticket_lim')) got.push({ k: 'item', v: 'ticket_lim', n: 1 });
+    /* 招募券掉落（V9.5.75 复核）：券是"探索的惊喜"，**扫荡不给**。
+       起因：券改成"商店不卖、只能玩法获得"之后，我算了一下日产量——
+       扫荡守关 Boss 一次掉券概率 50%，一天 60 次扫荡 = **30 张圣契招募令**（地狱再 +21 张限定券），
+       而高级池 25% 出 SSR → 等于是每天白送 7 个 SSR，图鉴两周就满，招募这条线直接失去意义。
+       现在：手打副本照旧掉券（打一关完整 12 层 ≈ 1.6 张普通券 + 1 张高级券，是"惊喜"的量级），
+       扫荡只给材料 / 点数 / 结晶 —— 扫荡是"重复劳动"，惊喜不该从重复劳动里刷。 */
+    if (!opts.noTicket) {
+      if (kind === 'boss' && Math.random() < Math.min(1, 0.50 * dropBoost)) {
+        if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
+      } else if (kind === 'elite' && Math.random() < Math.min(1, 0.28 * dropBoost)) {
+        if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
+      } else if (kind === 'combat' && Math.random() < Math.min(1, 0.18 * dropBoost)) {
+        if (Core.addItem('ticket_normal')) got.push({ k: 'item', v: 'ticket_normal', n: 1 });
+      }
+      // 地狱难度的 Boss 额外掉限定券（限定池是"定向池"，券最稀有）
+      if (diff === 'hell' && kind === 'boss' && Math.random() < 0.35) {
+        if (Core.addItem('ticket_lim')) got.push({ k: 'item', v: 'ticket_lim', n: 1 });
+      }
     }
     // 高阶世界的普通战斗也会掉低级材料（前期囤的材料不会因为世界推进变废）
     if (kind !== 'boss' && tier > 1 && Math.random() < 0.12 * dropBoost) {
@@ -217,7 +226,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     const total = [];
     let exp = 0;
     for (let i = 0; i < n; i++) {
-      const g = grantRewards(worldId, diff, stage, kind);
+      const g = grantRewards(worldId, diff, stage, kind, { noTicket: true });   // V9.5.75：扫荡不掉招募券（见 grantRewards 里的说明）
       // 扫荡 = 自动重打这一关：经验与战绩必须和手打一致。
       // 以前 exp 只写进 got（结算面板照样显示 "EXP+xxx"），却没有一行把它加进角色/主角经验（V9.5 修）。
       exp += g.rewards.exp || 0;
