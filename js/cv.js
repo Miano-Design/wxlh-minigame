@@ -24,6 +24,10 @@
       accent: '#d43a4f', accent2: '#97273a', gold: '#e6b64c',
       green: '#56c894', blue: '#6ec6ff', red: '#d43a4f',
     },
+    /* 下面这几组数值在 setup() 里按网页版的根字号等比缩放：
+       网页版 css 里是 html { font-size: clamp(14.5px, 3.85vw, 16px) }，
+       所有令牌都是 rem —— 这里用**同一条公式**算出系数 k，两边字距/间距才会一样大。 */
+    SCALE: 1,
     SP: [4, 10, 14, 18, 24],       // --sp1..--sp5
     RADIUS: 10, RADIUS_SM: 7,      // --radius / --radius-sm
     FS: { xs: 11, sm: 11, md: 12, lg: 13, f1: 15, f2: 17 },   // --fs-xs..--fs-2
@@ -55,6 +59,16 @@
     ctx.scale(dpr, dpr);
     CV.ctx = ctx;
     CV.pxW = pxW; CV.pxH = pxH;
+    /* —— 令牌缩放：与网页版 html{font-size:clamp(14.5px,3.85vw,16px)} 同一条公式 ——
+       375 及以下 → 14.5/16 = 0.906；430 以上 → 16/16 = 1；中间线性过渡。
+       这样同一个界面在手机和网页上看起来一样大（父亲大人要求"网页版是唯一标准"）。 */
+    const root = Math.max(14.5, Math.min(16, 0.0385 * pxW));
+    const k = root / 16;
+    CV.SCALE = k;
+    CV.SP = [4, 10, 14, 18, 24].map((v) => v * k);
+    CV.FS = { xs: 11 * k, sm: 11 * k, md: 12 * k, lg: 13 * k, f1: 15 * k, f2: 17 * k };
+    CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k;
+    CV.NAV_H = 62 * k;
     try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
     return CV;
   };
@@ -141,12 +155,16 @@
     if (!c) return;
     CV.hits = [];
     CV.y = 0;
+    /* 开局三步（欢迎 / 起名 / 选血统）时**不画顶栏和底栏**——
+       网页版这时整块界面是隐藏的（没签契约看不到游戏界面，V9.5.23 定的），这里照做。 */
+    const chromeless = ['welcome', 'create', 'bloodline'].indexOf(CV.top().name) >= 0;
+    if (chromeless) { CV.TOP = CV.safeTop; CV.NAV_H = 0; }
     c.save();
     c.fillStyle = CV.C.bg;
     c.fillRect(0, 0, CV.W, CV.H);
     c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
     c.beginPath(); c.rect(0, 0, CV.W, CV.H); c.clip();
-    CV.topbar();
+    if (!chromeless) CV.topbar();
     c.save();
     c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
     c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
@@ -155,7 +173,8 @@
     if (fn) fn(CV.top().opts);
     CV.contentH = CV.y + 20;
     c.restore();
-    CV.navbar();
+    if (!chromeless) CV.navbar();
+    if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
     CV.drawToasts();
     c.restore();
   };
