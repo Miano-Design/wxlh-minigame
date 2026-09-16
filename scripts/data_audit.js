@@ -168,6 +168,49 @@ console.log('\n=== ②b 极端值健壮性（无上限系统不会算出 Infinit
   if (!ext) ok('深井 1000 层 / 斗法台 1000 台 / 各线满级前一级：全部是有限数');
 }
 
+/* ---- ②c 每种货币都要有"来源"和"去处"（V9.5.76 自审新增）----
+   起因：招募券从商店下架之后，异界结晶 / 深井徽记各少了两个出口；
+   这类改动最容易出现的结果是"某种货币只进不出"（攒着没用）或"只出不进"（永远缺）。
+   这里把两边的出口都数一遍，任何一边为 0 就报。 */
+console.log('\n=== ②c 货币的来源与去处（不能只进不出 / 只出不进）===');
+{
+  const sinks = {}, srcs = {};
+  const add = (o, k, n) => { if (k) o[k] = (o[k] || 0) + (n || 1); };
+  // 去处：商店结算 + 各条养成线的消耗 + 少数写死在代码里的（强化 / 背包扩容 / 技能芯片）
+  Object.values(D.SHOPS).forEach(s => add(sinks, s.currency, 3));
+  Object.values(D.RECRUIT_POOLS).forEach(p => Object.keys(p.cost).forEach(k => add(sinks, k)));
+  Object.values(D.BUILDINGS).forEach(() => add(sinks, 'points'));
+  for (let i = 0; i < D.AUTHORITY_MAX; i++) Object.keys(D.authorityCost(i)).forEach(k => add(sinks, k));
+  D.KEJI.forEach(() => add(sinks, D.KEJI_COIN));
+  D.FABAO.forEach(() => add(sinks, 'otherworld'));
+  D.MOUNTS.forEach(m => Object.keys(m.cost || {}).forEach(k => add(sinks, k)));
+  for (let lv = 0; lv < D.BLOODLINE_MAX; lv++) Object.keys(D.bloodlineCost(lv)).forEach(k => add(sinks, k));
+  D.REALMS.forEach(r => Object.keys(r.cost).forEach(k => add(sinks, k)));
+  D.GENE_LOCKS.forEach(g => Object.keys(g.cost).forEach(k => add(sinks, k)));
+  D.TALENT_COSTS.forEach(() => add(sinks, 'rp'));
+  D.SERUMS.forEach(() => add(sinks, 'points'));
+  D.GARDEN.forEach(() => add(sinks, 'points'));
+  add(sinks, 'points', 2);        // 装备强化 / 背包扩容
+  add(sinks, 'otherworld', 1);    // 装备强化
+  add(sinks, 'skillChip', 1);     // 伙伴技能升级（core.js skillUp）
+  // 来源
+  Object.values(D.LOGIN_REWARDS).forEach(r => Object.keys(r).forEach(k => add(srcs, k)));
+  Object.values(D.DAILY_ALL_REWARD).forEach(k => add(srcs, k));
+  Object.values(D.WEEKLY_ALL_REWARD).forEach(k => add(srcs, k));
+  [D.MAIN_QUESTS, D.WEEKLY_TASKS, D.ACHIEVEMENTS].forEach(list => list.forEach(x => Object.keys(x.reward || {}).forEach(k => add(srcs, k))));
+  D.TRAVELS.forEach(t => Object.keys(t.effect || {}).forEach(k => add(srcs, k)));
+  ['points', 'story', 'otherworld'].forEach(k => add(srcs, k, 3));   // 挂机 + 副本 + 扫荡
+  ['skillChip', 'bloodCrystal', 'corridor', 'holy'].forEach(k => add(srcs, k, 2));  // 副本 / 深井 / 斗法台 / 任务
+  add(srcs, 'rp', 1);             // 转生
+  let coinBad = 0;
+  D.CURRENCIES.forEach(c => {
+    const s = sinks[c.id] || 0, e = srcs[c.id] || 0;
+    if (!s) { fail(`${c.icon}${c.name} 没有任何去处（只进不出）`); coinBad++; }
+    if (!e) { fail(`${c.icon}${c.name} 没有任何来源（只出不进）`); coinBad++; }
+  });
+  if (!coinBad) ok(`8 种货币都有来源和去处（${D.CURRENCIES.map(c => c.name).join(' / ')}）`);
+}
+
 /* ================= ③ 老档兼容 ================= */
 console.log('\n=== ③ 老档兼容（旧结构存档 → 迁移 → 渲染）===');
 function makeOldSave() {

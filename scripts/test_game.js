@@ -965,6 +965,7 @@ setParty(['C021']);
     return TICKETS.every(k => dataSide.indexOf(k) >= 0 && dungeonSide.indexOf(k) >= 0);
   })());
   t('券的来源文案不再提商店', TICKETS.every(k => (D.ITEMS[k].src || '').indexOf('商店不卖') >= 0));
+  t('券的来源文案也不提扫荡（扫荡已经不掉了）', TICKETS.every(k => (D.ITEMS[k].src || '').indexOf('扫荡掉落') < 0));
 }
 
 // 50. 招募三池：花三种货币、出三种结构、保底各自独立
