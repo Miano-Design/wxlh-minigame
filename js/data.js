@@ -957,14 +957,15 @@ window.DATA = (function () {
     // 补齐到 40 种（对标 YouLi 的 601 条池子）：越靠后越稀有，权重越低
     { id: 'tv13', ico: '🌾', name: '荒田拾穗',   w: 14, desc: '路边的荒田里还留着几株能用的灵植。', effect: { points: 600, item: 'mat_t1' } },
     { id: 'tv14', ico: '🍲', name: '野灶留食',   w: 12, desc: '有人在这儿生过火，锅里的东西还热着。', effect: { points: 900 } },
-    { id: 'tv15', ico: '🕯', name: '残烛照壁',   w: 10, desc: '墙上的刻痕被烛光一照，是一段吐纳口诀。', effect: { points: 1400, exp: 0 } },
+    // V9.5.72：effect 里的 `exp: 0` 是早期占位，删掉（奖励表不留零值）
+    { id: 'tv15', ico: '🕯', name: '残烛照壁',   w: 10, desc: '墙上的刻痕被烛光一照，是一段吐纳口诀。', effect: { points: 1400 } },
     { id: 'tv16', ico: '🐍', name: '灵蛇蜕皮',   w: 9,  desc: '一条灵蛇刚蜕完皮，旧皮里还含着灵气。', effect: { item: 'mat_t2' } },
     { id: 'tv17', ico: '🌫', name: '雾中问路',   w: 9,  desc: '雾气里有人替你指了条近路。', effect: { points: 1600 } },
     { id: 'tv18', ico: '🏚', name: '废屋搜查',   w: 8,  desc: '一间塌了半边的屋子，柜子还没被人翻过。', effect: { points: 1100, item: 'exp_s' } },
     { id: 'tv19', ico: '🧭', name: '指路罗盘',   w: 7,  desc: '捡到一只还能转的罗盘，顺手记住了几条矿脉走向。', effect: { points: 2200, item: 'mat_t2' } },
     { id: 'tv20', ico: '🪨', name: '灵石碎块',   w: 7,  desc: '山体裂缝里嵌着几块灵石碎块。', effect: { otherworld: 60 } },
     { id: 'tv21', ico: '🧙‍♂️', name: '隐士论道', w: 6,  desc: '一位隐士与你论了半日道。', effect: { points: 2600, skillChip: 8 } },
-    { id: 'tv22', ico: '🌸', name: '花丛小憩',   w: 6,  desc: '在花丛里睡了一觉，醒来神清气爽。', effect: { exp: 0, points: 500, holy: 15 } },
+    { id: 'tv22', ico: '🌸', name: '花丛小憩',   w: 6,  desc: '在花丛里睡了一觉，醒来神清气爽。', effect: { points: 500, holy: 15 } },
     { id: 'tv23', ico: '🗡', name: '古战场拾遗', w: 5,  desc: '古战场上还能捡到没锈透的家伙。', effect: { item: 'mat_t3' } },
     { id: 'tv24', ico: '🧊', name: '寒潭淬体',   w: 5,  desc: '跳进寒潭泡了一炷香，皮肉更结实了。', effect: { points: 3200 } },
     { id: 'tv25', ico: '📕', name: '藏经残页',   w: 4,  desc: '藏经阁流出来的一页残纸。', effect: { skillChip: 30 } },
@@ -1550,7 +1551,8 @@ window.DATA = (function () {
       check: S => S.player.bloodlineLv >= 1 || Object.values(S.chars).some(c => c.bloodlineLv >= 1) },
     { id: 'q14', name: '潜影之后', desc: '通关 潜影窟·第12关', reward: { holy: 300, otherworld: 200 },
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[11] > 0 },
-    { id: 'q15', name: '执灯者之路', desc: '通关 怨声旧宅·第12关', reward: { holy: 500, rp: 0 }, unlock: 'reincarn',
+    // V9.5.72：reward 里原来挂了个 `rp: 0`（转生点 0），纯占位——奖励表里不留零值
+    { id: 'q15', name: '执灯者之路', desc: '通关 怨声旧宅·第12关', reward: { holy: 500 }, unlock: 'reincarn',
       check: S => S.worlds.W03 && S.worlds.W03.stages.normal[11] > 0 },
   ];
 

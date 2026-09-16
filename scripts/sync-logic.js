@@ -25,7 +25,7 @@ const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],
   ['manifest.webmanifest', 'manifest.webmanifest'], ['sw.js', 'sw.js']];
 /* 测试与体检脚本也一起同步（它们本来就和网页版逐字节一致，各留一份会各自变旧，
    结果是小游戏这边跑的还是上一版的用例——2026-09-17 发现并补上）。 */
-const CHECKS = ['test_ui.js', 'test_game.js', 'balance_check.js', 'design_audit.js', 'product_audit.js', 'copy_audit.js', 'cap_audit.js'];
+const CHECKS = ['test_ui.js', 'test_game.js', 'balance_check.js', 'design_audit.js', 'product_audit.js', 'copy_audit.js', 'cap_audit.js', 'data_audit.js'];
 
 let changed = 0, same = 0;
 const JOBS = [];
