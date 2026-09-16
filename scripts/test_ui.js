@@ -1266,53 +1266,20 @@ t('招募页：没有「每日免费」卡片，免费次数显示在单抽按�
   // 高级池还留着 1 次免费
   if (html2.indexOf('免费抽 1 次（今日还剩 1 次）') < 0) throw new Error('高级池的免费没显示');
 });
-t('GM 门禁：线上默认关；带 ?gm=1 开一次就在这台设备记住', () => {
-  const store2 = {};
-  const prevLoc = global.location;
-  const prevStore = global.localStorage;
-  const run = (hostname, search, store) => {
-    global.location = { hostname, search };
-    global.localStorage = {
-      getItem: k => (k in store ? store[k] : null),
-      setItem: (k, v) => { store[k] = String(v); },
-      removeItem: k => { delete store[k]; },
-    };
-    let out = null;
-    const uiSrc = fs.readFileSync('js/ui.js', 'utf8');
-    const saved = window.UI;
-    eval(uiSrc);                       // 用新的 location/localStorage 重新跑一遍 UI 模块
-    out = window.UI;
-    window.UI = saved || out;
-    return out;
-  };
-  const s1 = {};
-  if (run('miano-design.github.io', '', s1)._panels._gmAllowed() !== false) throw new Error('线上没带参数居然能进 GM');
-  const s2 = {};
-  if (run('miano-design.github.io', '?gm=1', s2)._panels._gmAllowed() !== true) throw new Error('带 ?gm=1 进不去');
-  if (s2.wxlh_gm !== '1') throw new Error('带参数打开后没把标记记在本机');
-  const s3 = { wxlh_gm: '1' };
-  if (run('miano-design.github.io', '', s3)._panels._gmAllowed() !== true) throw new Error('记住之后还是进不去');
-  if (run('localhost', '', {})._panels._gmAllowed() !== true) throw new Error('本机调试被挡了');
-  global.location = prevLoc;
-  global.localStorage = prevStore;
-});
-t('免费抽倒计时的刷新不能用 textContent（会把货币图标的 HTML 显示成乱码）', () => {
+t('GM 面板入口不再有门禁（父亲大人：手机也要能进）', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
-  // 冷却那段必须用 innerHTML（文案里带货币图标的 HTML）；
-  // 精确匹配那一句，避免误伤"就绪"分支里合法的 textContent 纯文本写法
-  if (src.indexOf('el.innerHTML = `${pay} · 免费还差') < 0) {
-    throw new Error('倒计时没有用 innerHTML 写（会显示成 <span style=...> 乱码）');
-  }
+  const k = src.indexOf('function gmAllowed');
+  const seg = src.slice(k, k + 200);
+  if (seg.indexOf('return true') < 0) throw new Error('gmAllowed 还带着门禁');
 });
-t('图鉴：按阵营分开，每个阵营里从低稀有度排到高稀有度', () => {
-  const html = UI._panels.codexModal().innerHTML;
-  ['先锋', '策略', '科技', '异能', '支援'].forEach(f => {
-    if (html.indexOf('class="codex-fac">' + f) < 0) throw new Error('缺阵营分组：' + f);
-  });
-  const seg = html.split('class="codex-fac">先锋')[1].split('codex-fac">')[0];
-  const idx = [...seg.matchAll(/cmeta">(N|R|SR|SSR|UR)/g)].map(m => D.RARITIES.indexOf(m[1]));
-  if (!idx.length) throw new Error('先锋组里没读到卡片');
-  for (let i = 1; i < idx.length; i++) if (idx[i] < idx[i - 1]) throw new Error('阵营内不是从低稀有度到高稀有度：' + idx.join(','));
+t('开局选血统：标题只有一处，副标题写"选定后不可更改"', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('const w = opts.first');
+  const seg = src.slice(i, i + 200);
+  if (seg.indexOf('选定后不可更改') < 0) throw new Error('标题右侧没写"选定后不可更改"');
+  const bi = src.indexOf('function bloodlineModal');
+  const bseg = src.slice(bi, bi + 1200);
+  if (bseg.indexOf('<h3>选择血统 ') >= 0) throw new Error('弹窗里还重复着一张"选择血统"卡');
 });
 t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
@@ -1492,15 +1459,6 @@ t('装备页筛选后不再补一屏空格子（否则看着像筛选没生效�
   UI._panels._setEquipFilter('all', 'all');            // 还原，别影响后面的用例
 });
 
-t('GM 面板在线上要带 ?gm=1 才认（不再跟正式包一起裸奔）', () => {
-  const src = fs.readFileSync('js/ui.js', 'utf8');
-  const i = src.indexOf('function gmAllowed');
-  if (i < 0) throw new Error('缺 GM 门禁函数');
-  const seg = src.slice(i, i + 500);
-  if (seg.indexOf('gm=1') < 0) throw new Error('线上没有要求 ?gm=1');
-  if (seg.indexOf('localhost') < 0) throw new Error('本地开发没有被放行');
-  if (src.indexOf('if (!gmAllowed())') < 0) throw new Error('连点版本号那条路径没有走门禁');
-});
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

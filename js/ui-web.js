@@ -4,23 +4,12 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.60';
+  const GAME_VER = '9.5.61';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
-  function gmAllowed() {
-    const loc = (typeof location !== 'undefined' && location) || null;
-    if (!loc) return true;
-    const h = loc.hostname || '';
-    if (!h || h === 'localhost' || h === '127.0.0.1' || h === '::1') return true;
-    // V9.5.58（父亲大人）：线上包默认关着（普通玩家连点 7 次也开不出来）。
-    // 想在这台设备上调试：网址后面加 ?gm=1 打开一次 → 这里把标记记进本机存储，
-    // 以后这台设备（手机也一样）直接连点 7 次就能进，不用每次带参数。
-    let flagged = false;
-    try { flagged = localStorage.getItem('wxlh_gm') === '1'; } catch (e) {}
-    const byUrl = /(^|[?&])gm=1(&|$)/.test(loc.search || '');
-    if (byUrl && !flagged) { try { localStorage.setItem('wxlh_gm', '1'); } catch (e) {} }
-    return byUrl || flagged;
-  }
+  /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
+     入口仍然是"设置页连点版本号 7 次"这个隐藏手势，普通玩家不会误触。 */
+  function gmAllowed() { return true; }
 
   /* ================= 工具 ================= */
   function fmt(n) {
@@ -2546,10 +2535,9 @@ window.UI = (function () {
     const S = C().S;
     const cur = S.player.bloodline;
     if (!cur) {
+      // V9.5.61（父亲大人）：标题已经在弹窗外框上了，这里不再重复一张"选择血统"卡；
+      // "选定后不可更改"挪到标题右侧（.sub）
       const body = `
-        <div class="card" style="border-color:#e6b64c66">
-          <h3>选择血统 <span class="sub">选定后不可更改</span></h3>
-        </div>
         ${Object.entries(D.BLOODLINES).map(([id, bl]) => `
           <div class="card">
             <h3>${id} <span class="sub">${bl.desc}</span></h3>
@@ -2557,7 +2545,9 @@ window.UI = (function () {
             <div class="hint">每大境分初期 / 中期 / 后期 / 大圆满，共 ${D.REALM_STAGE_COUNT} 阶。</div>
             <button class="btn gold block mt3" data-pbl="${id}">觉醒 ${id} 血统</button>
           </div>`).join('')}`;
-      const w = opts.first ? modal('选择血统', body, { center: true, sticky: true }) : modal('血统', body);
+      const w = opts.first
+        ? modal('选择血统 <span class="sub">选定后不可更改</span>', body, { center: true, sticky: true })
+        : modal('血统', body);
       w.querySelectorAll('[data-pbl]').forEach(b => b.onclick = () => {
         const id = b.dataset.pbl;
         confirmBox('确认血统', `选择「${id}」后不可更改，境界线将从「${D.realmName(id, 0)}」开始。确定吗？`, () => {
