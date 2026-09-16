@@ -387,8 +387,11 @@ t('没签契约 / 没选血统时，游戏界面一页都渲染不出来', () =>
   if (byId['view'].innerHTML.indexOf('screen') < 0) throw new Error('补完开局之后界面没回来');
 });
 t('开局没走完时，七日登录这类弹窗要排队等（不能在起名和血统之间抢先跳出来）', () => {
-  const src = fs.readFileSync('js/main.js', 'utf8');
-  if (src.indexOf('UI.needsOnboarding') < 0) throw new Error('main.js 没有把"开局没走完"算进弹窗排队条件');
+  // 小游戏工程没有 main.js（入口是 game.js，那边开局守卫在 cv/screens 里），这条只在网页版查
+  if (fs.existsSync('js/main.js')) {
+    const src = fs.readFileSync('js/main.js', 'utf8');
+    if (src.indexOf('UI.needsOnboarding') < 0) throw new Error('main.js 没有把"开局没走完"算进弹窗排队条件');
+  }
   const keepName = Core.S.player.name, keepBl = Core.S.player.bloodline;
   try {
     Core.S.player.bloodline = '';
