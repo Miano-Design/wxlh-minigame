@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-16 12:08 */
+   生成时间：2026-09-16 12:11 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -525,6 +525,7 @@ module.exports = {
   "backgroundColor": "#07090e",
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%",
   "height": "100%",
   "flexDirection": "column",
@@ -533,6 +534,7 @@ module.exports = {
  "view#app__view#topbar": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%",
   "maxWidth": 520,
   "backgroundColor": "rgba(7,9,14,.94)",
@@ -544,6 +546,7 @@ module.exports = {
  "view#app__view#topbar__view.player-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 10,
@@ -554,6 +557,7 @@ module.exports = {
  "view#app__view#topbar__view.player-row__text.pname": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 10,
   "__textW": 45
@@ -561,6 +565,7 @@ module.exports = {
  "view#app__view#topbar__view.player-row__text.plv": {
   "color": "#e6b64c",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "borderWidth": 1,
   "borderColor": "#e6b64c66",
   "borderRadius": 7,
@@ -578,12 +583,14 @@ module.exports = {
  "view#app__view#topbar__view.player-row__view.tb-spacer": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "marginRight": 10
  },
  "view#app__view#topbar__view#curbar": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "paddingTop": 2,
   "paddingRight": 14,
@@ -593,6 +600,7 @@ module.exports = {
  "view#app__view#topbar__view#curbar__view.cur-chip": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -614,30 +622,35 @@ module.exports = {
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh5spr3": {
   "color": "#ffd76a",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 5,
   "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-val": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 5,
   "__textW": 17
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isx1l3rubl": {
   "color": "#6ec6ff",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 5,
   "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh4wp74": {
   "color": "#ff9ecb",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 5,
   "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip.more": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -659,12 +672,14 @@ module.exports = {
  "view#app__view#topbar__view#curbar__view.cur-chip.more__text.cur-val": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 5,
   "__textW": 77
  },
  "view#app__scrollview#view": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "paddingTop": 6,
   "paddingRight": 12,
   "paddingBottom": 14,
@@ -675,6 +690,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "padding": 0,
   "paddingTop": 0,
   "paddingRight": 0,
@@ -684,6 +700,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -701,6 +718,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 7,
@@ -714,6 +732,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rk": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 10,
   "__textW": 48
@@ -721,6 +740,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxwtv0ps.rv": {
   "color": "#d43a4f",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "textAlign": "right",
   "fontWeight": "bold",
@@ -734,6 +754,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rs": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minWidth": 0,
   "marginRight": 10,
   "__textW": 123
@@ -741,6 +762,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rv": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "textAlign": "right",
   "fontWeight": "bold",
@@ -754,6 +776,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -771,6 +794,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 0,
@@ -785,6 +809,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -792,6 +817,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -800,6 +826,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 115
@@ -807,6 +834,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
@@ -827,18 +855,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t2__text": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -866,6 +897,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__text.section-title": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "fontWeight": "bold",
@@ -879,12 +911,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.text-menu": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "column",
   "alignItems": "center",
   "justifyContent": "center",
@@ -910,6 +944,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__text.tt-name": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "maxWidth": "100%",
   "lineHeight": 16,
@@ -920,6 +955,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__text.tt-sub": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minHeight": 12,
   "maxWidth": "100%",
   "lineHeight": 15,
@@ -930,6 +966,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__text.hint.mt2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "lineHeight": 19,
   "width": "100%"
@@ -937,6 +974,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__text.grid-title": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "letterSpacing": 2,
   "marginTop": 14,
   "marginRight": 2,
@@ -947,6 +985,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -964,6 +1003,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 7,
@@ -977,6 +1017,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.rk": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 10,
   "__textW": 72
@@ -984,6 +1025,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.rv": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "textAlign": "right",
   "fontWeight": "bold",
@@ -997,6 +1039,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.rs": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minWidth": 0,
   "marginRight": 10,
   "__textW": 24
@@ -1004,6 +1047,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -1021,6 +1065,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 6,
@@ -1034,6 +1079,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-k": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 10,
   "__textW": 48
@@ -1041,6 +1087,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-v": {
   "color": "#e6b64c",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 10,
   "__textW": 65
@@ -1048,6 +1095,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-s": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minWidth": 0,
   "marginRight": 10,
   "__textW": 200
@@ -1055,12 +1103,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 23
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-k.isxmg8sha": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "marginRight": 10,
   "__textW": 48
@@ -1068,6 +1118,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-r": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "right",
   "whiteSpace": "nowrap",
   "minWidth": 0,
@@ -1079,6 +1130,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line.idle-mini": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 6,
@@ -1092,6 +1144,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line.idle-mini__text.il-k": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 10,
   "__textW": 48
@@ -1099,6 +1152,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line.idle-mini__text.il-s": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minWidth": 0,
   "marginRight": 10,
   "__textW": 299
@@ -1106,6 +1160,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.btn-row.mt2": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "flexDirection": "row",
   "flexWrap": "wrap"
@@ -1113,6 +1168,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.btn-row.mt2__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1144,6 +1200,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.btn-row.mt2__text.btn.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1175,6 +1232,7 @@ module.exports = {
  "view#app__view#navbar": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%",
   "maxWidth": 520,
   "flexDirection": "row",
@@ -1188,6 +1246,7 @@ module.exports = {
  "view#app__view#navbar__view.active.nav-item": {
   "color": "#e6b64c",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "flexDirection": "column",
   "alignItems": "center",
@@ -1196,6 +1255,7 @@ module.exports = {
  "view#app__view#navbar__view.active.nav-item__text.ico": {
   "color": "#e6b64c",
   "fontSize": 19,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 19,
   "marginBottom": 3,
   "width": "100%",
@@ -1204,6 +1264,7 @@ module.exports = {
  "view#app__view#navbar__view.active.nav-item__text.nav-t": {
   "color": "#e6b64c",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginBottom": 3,
   "width": "100%",
   "textAlign": "center"
@@ -1211,6 +1272,7 @@ module.exports = {
  "view#app__view#navbar__view.nav-item": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "flexDirection": "column",
   "alignItems": "center",
@@ -1219,6 +1281,7 @@ module.exports = {
  "view#app__view#navbar__view.nav-item__text.ico": {
   "color": "#7a849b",
   "fontSize": 19,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 19,
   "marginBottom": 3,
   "width": "100%",
@@ -1227,6 +1290,7 @@ module.exports = {
  "view#app__view#navbar__view.nav-item__text.nav-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginBottom": 3,
   "width": "100%",
   "textAlign": "center"
@@ -1234,6 +1298,7 @@ module.exports = {
  "view#app__view#modal-root": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "left": 0,
   "top": 0,
@@ -1243,6 +1308,7 @@ module.exports = {
  "view#app__view#modal-root__view.modal-mask": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "backgroundColor": "rgba(0,0,0,.62)",
   "left": 0,
@@ -1253,6 +1319,7 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "width": "92%",
   "maxWidth": 520,
@@ -1274,6 +1341,7 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet__view.sheet-head": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 14,
@@ -1286,12 +1354,14 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 60
  },
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x": {
   "color": "#7a849b",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 34,
   "height": 34,
   "flex": 0,
@@ -1320,12 +1390,14 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x__text.ce-ico": {
   "color": "#7a849b",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 15,
   "__textW": 8
  },
  "view#app__view#modal-root__view.center.sheet__text.sheet-body": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "paddingTop": 14,
   "paddingRight": 18,
   "paddingBottom": 18,
@@ -1335,6 +1407,7 @@ module.exports = {
  "view#app__view#modal-root__view.page": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "width": "100%",
   "maxWidth": 520,
@@ -1347,6 +1420,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.page-head": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -1361,6 +1435,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.page-head__view.back-x": {
   "color": "#b6bfd0",
   "fontSize": 20,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1389,18 +1464,21 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.page-head__view.back-x__text.ce-ico": {
   "color": "#b6bfd0",
   "fontSize": 20,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 20,
   "__textW": 8
  },
  "view#app__view#modal-root__view.page__view.page-head__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 60
  },
  "view#app__view#modal-root__view.page__view.page-head__view.page-pad": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 40,
   "flex": 0,
   "marginRight": 10
@@ -1408,6 +1486,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minHeight": 0,
   "paddingTop": 14,
@@ -1418,6 +1497,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#ffd76a55",
@@ -1434,27 +1514,32 @@ module.exports = {
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif"
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view__text.sub": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__text.note": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 21,
   "width": "100%"
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.bar.exp.mt3": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 14,
   "height": 8,
   "backgroundColor": "#0d1120",
@@ -1467,6 +1552,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.kv": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "space-between",
@@ -1480,6 +1566,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.kv__text.k": {
   "color": "#7a849b",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "minWidth": 0,
   "marginRight": 10,
@@ -1488,12 +1575,14 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 58
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -1511,11 +1600,13 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "space-between",
@@ -1529,6 +1620,7 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text.k": {
   "color": "#7a849b",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "minWidth": 0,
   "marginRight": 10,
@@ -1537,12 +1629,14 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 86
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__text.hint.mb2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginBottom": 10,
   "lineHeight": 19,
   "width": "100%"
@@ -1550,6 +1644,7 @@ module.exports = {
  "view#app__view#battle-root": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "left": 0,
   "top": 0,
@@ -1558,16 +1653,19 @@ module.exports = {
  },
  "view#app__view#battle-root__view.b-head": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif"
  },
  "view#app__view#battle-root__view.b-head__text.b-title": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__view#battle-root__view.b-head__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1594,6 +1692,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-field": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "flexDirection": "column",
   "paddingTop": 0,
@@ -1604,6 +1703,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-field__view.b-row.enemies": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "justifyContent": "center",
   "flexWrap": "wrap"
@@ -1611,6 +1711,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-field__text.b-line-label": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "letterSpacing": 1,
   "width": "100%"
@@ -1618,6 +1719,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-field__view.allies.b-row.back": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "justifyContent": "center",
   "flexWrap": "wrap"
@@ -1625,6 +1727,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-field__view.allies.b-row.front": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "justifyContent": "center",
   "flexWrap": "wrap"
@@ -1632,6 +1735,7 @@ module.exports = {
  "view#app__view#battle-root__view#battle-log": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "height": 86,
   "marginTop": 8,
   "marginRight": 14,
@@ -1653,6 +1757,7 @@ module.exports = {
  "view#app__view#battle-root__view.b-controls": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "column",
   "paddingTop": 0,
   "paddingRight": 14,
@@ -1662,12 +1767,14 @@ module.exports = {
  "view#app__view#battle-root__view.b-controls__view.b-potions": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "column",
   "marginBottom": 8
  },
  "view#app__view#battle-root__view.b-controls__text.block.btn": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1694,6 +1801,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -1702,6 +1810,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.t1__text.t1-t": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 90
@@ -1709,18 +1818,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18
  },
  "view#app__scrollview#view__view.screen__view.card__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.section-title": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "fontWeight": "bold",
@@ -1733,6 +1845,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.section-title__text.section-title-t": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "letterSpacing": 1,
   "marginRight": 10,
@@ -1741,6 +1854,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 10,
@@ -1753,6 +1867,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -1760,6 +1875,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -1768,6 +1884,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t1__text.t1-t": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 45
@@ -1775,18 +1892,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -1796,6 +1916,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.blk.hint.mt2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "width": "100%",
   "lineHeight": 19
@@ -1803,12 +1924,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.blk.hint.mt2__text.blk.hint-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 19,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -1826,6 +1949,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 0,
@@ -1839,6 +1963,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -1846,6 +1971,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -1854,6 +1980,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow__view.t1__text.t1-t": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 45
@@ -1861,18 +1988,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -1882,6 +2012,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "flexDirection": "row",
   "flexWrap": "wrap"
@@ -1889,6 +2020,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -1920,6 +2052,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.off.primary__text.btn-t": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "lineHeight": 16,
   "textAlign": "center",
@@ -1930,6 +2063,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "width": "100%",
   "lineHeight": 19
@@ -1937,6 +2071,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#8be9e955",
@@ -1957,6 +2092,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.world-ico": {
   "color": "#e9edf6",
   "fontSize": 24,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 52,
   "height": 52,
   "borderRadius": 12,
@@ -1977,6 +2113,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 12
@@ -1984,6 +2121,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -1992,6 +2130,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 30
@@ -1999,6 +2138,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
@@ -2019,6 +2159,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -2026,6 +2167,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -2035,6 +2177,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2054,6 +2197,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__text.world-ico": {
   "color": "#e9edf6",
   "fontSize": 24,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 52,
   "height": 52,
   "borderRadius": 12,
@@ -2074,6 +2218,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 12
@@ -2081,6 +2226,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow__text.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -2090,6 +2236,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -2097,6 +2244,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -2106,6 +2254,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2126,6 +2275,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.world-ico": {
   "color": "#e9edf6",
   "fontSize": 24,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 52,
   "height": 52,
   "borderRadius": 12,
@@ -2146,6 +2296,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 12
@@ -2153,6 +2304,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow__text.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -2162,6 +2314,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -2169,6 +2322,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -2177,25 +2331,30 @@ module.exports = {
  },
  "view#app__scrollview#view__view.screen__view.card__view": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif"
  },
  "view#app__scrollview#view__view.screen__view.card__view__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view__text.sub": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid": {
   "color": "#e9edf6",
-  "fontSize": 15
+  "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif"
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.pos-row-label": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 8,
   "marginRight": 2,
   "marginBottom": 6,
@@ -2207,6 +2366,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.pos-row-label__text": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 275
@@ -2214,11 +2374,13 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row"
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#e6b64c12",
   "borderWidth": 1,
   "borderColor": "#e6b64c",
@@ -2240,6 +2402,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.isxmq1bso.pos-tag": {
   "color": "#e6b64c",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "top": 6,
   "left": 8,
@@ -2248,6 +2411,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.avatar.isx1nwqca7": {
   "color": "#e6b64c",
   "fontSize": 17.6,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 40,
   "height": 40,
   "backgroundColor": "#232c42",
@@ -2266,6 +2430,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.pname": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "fontWeight": "bold",
   "minWidth": 0,
@@ -2276,6 +2441,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.filled.protag-slot.pslot__text.pmeta": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "minWidth": 0,
   "whiteSpace": "nowrap",
@@ -2285,6 +2451,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.pslot": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#161d2a",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2306,6 +2473,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.pslot__text.pos-tag": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "position": "absolute",
   "top": 6,
   "left": 8,
@@ -2314,6 +2482,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots__view.pslot__text.isx1xgut5": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "paddingTop": 34,
   "width": "100%"
@@ -2321,6 +2490,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__text.block.btn.mt3.small": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 14,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2348,6 +2518,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.btn-grid3.mt2": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 10,
   "flexDirection": "row",
   "flexWrap": "wrap"
@@ -2355,6 +2526,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.btn-grid3.mt2__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -2381,6 +2553,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.btn-grid3.mt1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 4,
   "flexDirection": "row",
   "flexWrap": "wrap"
@@ -2388,6 +2561,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.btn-grid3.mt1__text.btn.gold.small": {
   "color": "#fdf3dc",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -2414,6 +2588,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__text.hint.mt1": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 4,
   "lineHeight": 19,
   "width": "100%"
@@ -2421,11 +2596,13 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 10,
@@ -2439,6 +2616,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__text.avatar.isx1nwqca7": {
   "color": "#e6b64c",
   "fontSize": 17.6,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "borderColor": "#e6b64c",
   "width": 40,
   "height": 40,
@@ -2447,6 +2625,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -2454,6 +2633,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -2462,6 +2642,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 30
@@ -2469,6 +2650,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.isxc4hjzl.tag": {
   "color": "#e6b64c",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#e6b64c",
@@ -2489,6 +2671,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
@@ -2509,6 +2692,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -2516,6 +2700,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__text.empty": {
   "color": "#7a849b",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "paddingTop": 30,
   "paddingRight": 0,
@@ -2526,6 +2711,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__text.block.btn.mt3.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 14,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2552,6 +2738,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.kv": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "space-between",
@@ -2565,6 +2752,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.kv__text.k": {
   "color": "#7a849b",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "minWidth": 0,
   "marginRight": 10,
@@ -2573,12 +2761,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 10,
   "__textW": 15
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 8,
   "borderTopWidth": 1,
   "borderTopColor": "#232b3b"
@@ -2586,6 +2776,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row": {
   "color": "#e9edf6",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "flexWrap": "wrap",
@@ -2600,6 +2791,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-name": {
   "color": "#e9edf6",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "minWidth": 62,
   "marginRight": 6,
@@ -2608,6 +2800,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-req": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 6,
@@ -2616,6 +2809,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-buff": {
   "color": "#56c894",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "whiteSpace": "nowrap",
   "marginRight": 6,
@@ -2624,6 +2818,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__view.fm-on": {
   "color": "#56c894",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "width": 46,
   "textAlign": "right",
@@ -2632,12 +2827,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.pill-tabs": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "paddingBottom": 6
  },
  "view#app__scrollview#view__view.screen__view.pill-tabs__text.active.pill": {
   "color": "#fff",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2660,6 +2857,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.pill-tabs__text.pill": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2682,6 +2880,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "marginBottom": 8
@@ -2689,6 +2888,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__text.flabel": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 8,
   "__textW": 22
@@ -2696,6 +2896,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "paddingBottom": 0,
   "flex": 1,
@@ -2705,6 +2906,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs__text.active.pill": {
   "color": "#fff",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2727,6 +2929,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs__text.pill": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -2749,6 +2952,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__view.search-input#char-search": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minHeight": 44,
   "backgroundColor": "#111621",
@@ -2769,6 +2973,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.filter-bar__text.btn.ghost.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -2796,6 +3001,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__text.isxao4oo7": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 0,
   "marginRight": 2,
   "marginBottom": 8,
@@ -2805,12 +3011,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.char-grid#char-list": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.char-grid#char-list__text.empty.isx10ihlmm": {
   "color": "#7a849b",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "paddingTop": 30,
   "paddingRight": 0,
@@ -2821,6 +3029,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.char-grid#char-list__text.block.btn.isx10ihlmm.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -2846,6 +3055,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2865,6 +3075,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__text.gr-ico": {
   "color": "#e9edf6",
   "fontSize": 22,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "opacity": 0.92,
   "marginRight": 14,
@@ -2873,6 +3084,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__view.gr-grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -2880,12 +3092,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__view.gr-grow__text.gr-t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__view.gr-grow__text.gr-t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 17,
   "width": "100%"
@@ -2893,6 +3107,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__text.gr-cur": {
   "color": "#e6b64c",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "textAlign": "right",
   "maxWidth": "42%",
@@ -2902,6 +3117,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -2921,6 +3137,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__text.gr-ico": {
   "color": "#e9edf6",
   "fontSize": 22,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "opacity": 0.92,
   "marginRight": 14,
@@ -2929,6 +3146,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__view.gr-grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -2936,12 +3154,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__view.gr-grow__text.gr-t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__view.gr-grow__text.gr-t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 17,
   "width": "100%"
@@ -2949,6 +3169,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__text.gr-cur": {
   "color": "#e6b64c",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "textAlign": "right",
   "maxWidth": "42%",
@@ -2958,6 +3179,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.tab-cards": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "paddingTop": 10,
   "paddingRight": 0,
@@ -2969,6 +3191,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.tab-cards__text.active.tab-card": {
   "color": "#fff",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "minHeight": 44,
@@ -2990,6 +3213,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.tab-cards__text.tab-card": {
   "color": "#7a849b",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "minHeight": 44,
@@ -3011,6 +3235,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#232b3b",
@@ -3028,6 +3253,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-head": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "marginBottom": 8
@@ -3035,24 +3261,28 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-head__text": {
   "color": "#e9edf6",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 8,
   "__textW": 45
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-head__text.sub": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 8,
   "__textW": 36
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "flexWrap": "wrap"
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minHeight": 62,
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
@@ -3078,6 +3308,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled__text.bg-name": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "width": "100%",
   "flex": 1,
@@ -3093,6 +3324,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot.filled__text.bg-count": {
   "color": "#e6b64c",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "textAlign": "center",
   "fontWeight": "bold",
   "marginBottom": 2,
@@ -3101,6 +3333,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.bg-slot": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minHeight": 62,
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
@@ -3123,6 +3356,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.add.bg-slot": {
   "color": "#7a849b",
   "fontSize": 22,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "minHeight": 62,
   "borderRadius": 10,
   "borderTopLeftRadius": 10,
@@ -3149,6 +3383,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid__view.add.bg-slot__text": {
   "color": "#7a849b",
   "fontSize": 22,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 22,
   "textAlign": "center",
   "marginBottom": 2,
@@ -3157,6 +3392,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginBottom": 10,
   "flexDirection": "row",
   "paddingBottom": 0,
@@ -3165,6 +3401,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight__text.active.pill.sm": {
   "color": "#fff",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -3187,6 +3424,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight__text.pill.sm": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "flexDirection": "row",
   "alignItems": "center",
@@ -3209,18 +3447,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.eq-bar": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center"
  },
  "view#app__scrollview#view__view.screen__view.eq-bar__text": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginRight": 8,
   "__textW": 126
  },
  "view#app__scrollview#view__view.screen__view.eq-bar__text.btn.ghost.push.small": {
   "color": "#b6bfd0",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -3249,11 +3490,13 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.hint": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 19
  },
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__view.tt-name": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "maxWidth": "100%",
   "lineHeight": 16,
@@ -3262,6 +3505,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__view.tt-name__text": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "lineHeight": 16,
   "width": "100%"
@@ -3269,6 +3513,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.text-menu__view.tile__view.tt-name__view.tt-dot": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "lineHeight": 16,
   "width": 6,
@@ -3280,6 +3525,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#111621",
   "borderWidth": 1,
   "borderColor": "#8be9e955",
@@ -3299,6 +3545,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__text.world-ico": {
   "color": "#e9edf6",
   "fontSize": 24,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "width": 52,
   "height": 52,
   "borderRadius": 12,
@@ -3319,6 +3566,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 12
@@ -3326,6 +3574,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -3334,6 +3583,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1__text": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 30
@@ -3341,6 +3591,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "normal",
   "borderWidth": 1,
   "borderColor": "#333e55",
@@ -3361,6 +3612,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -3368,6 +3620,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__text.chev": {
   "color": "#7a849b",
   "fontSize": 16,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
@@ -3377,6 +3630,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxmq1bso.rv": {
   "color": "#e6b64c",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "textAlign": "right",
   "fontWeight": "bold",
@@ -3390,6 +3644,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.isxmq1bso.rk": {
   "color": "#e6b64c",
   "fontSize": 12,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 0,
   "marginRight": 10,
   "__textW": 72
@@ -3397,6 +3652,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__text.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -3406,6 +3662,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__text.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18,
   "width": "100%"
@@ -3413,6 +3670,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "backgroundColor": "#e6b64c14",
   "borderWidth": 1,
   "borderColor": "#e6b64c",
@@ -3430,6 +3688,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "paddingTop": 0,
@@ -3443,6 +3702,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
@@ -3450,6 +3710,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "flexDirection": "row",
   "alignItems": "center",
@@ -3458,6 +3719,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t1__text.isxmq1bso.t1-t": {
   "color": "#e6b64c",
   "fontSize": 15,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "marginRight": 6,
   "__textW": 30
@@ -3465,18 +3727,21 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "marginTop": 3,
   "lineHeight": 18
  },
  "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "lineHeight": 18,
   "width": "100%"
  },
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "flexDirection": "row",
   "alignItems": "center",
   "justifyContent": "center",
@@ -3508,6 +3773,7 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary__text.btn-t": {
   "color": "#e9edf6",
   "fontSize": 13,
+  "fontFamily": "-apple-system,PingFang SC,Microsoft YaHei,sans-serif",
   "fontWeight": "bold",
   "lineHeight": 16,
   "textAlign": "center",

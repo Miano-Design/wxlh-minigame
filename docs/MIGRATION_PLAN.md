@@ -60,3 +60,27 @@
   （现状是 `wxlh-game/` + `wxlh-minigame/`，功能等价；拆分要动仓库结构，**康康不擅自动**）
 - 是否安装他提到的外部 Skills（weixin-game-skill / design-wechat-miniapp-skill /
   wechat-miniprogram-auto-port-deploy / develop-web-game）？需要联网从他给的来源装。
+
+---
+
+## 附：当前卡点与下一步（2026-09-16 深夜，交接用）
+
+**已确认的事实（都是实测）**
+
+1. 同宽 390 下：小游戏与**网页版正文宽度完全一致**（`screen` / `card` 都是 366）✓
+2. 整页高度差 **24px**（网页版 1079 / 模拟器 1103）
+3. 唯一结构性差异：**主角卡那行**——网页版折两行（59px），小游戏一行（31px），差 28px
+4. 引擎自己的中文测宽**偏窄**（同一行：浏览器 358px、引擎约 223px）→ 以为放得下 → 不折行
+5. 已修：`font-family` 现在保留**完整字体栈**（`-apple-system,PingFang SC,Microsoft YaHei,sans-serif`），
+   根节点也补上了这套栈（canvas 里没有 body）——**但模拟器实测主角卡仍是 152（未折行）** ✗
+
+**下一步（按这个顺序查）**
+
+1. 在模拟器 console 里确认折算层给这行分配了什么宽度：
+   - `ce-fit.js` 的 `flexKids` 分支：`spare = innerW - fixedSum` 这一处
+   - 关键怀疑：`fixedSum` 里 `intrinsic[k]` 的**键对不上**（intrinsic 由 `ce-engine` 用 `CTX.walk(prepared.xml)` 生成，
+     而样式表键来自编译期——两边字符串若差一个字符就查不到 → 退化成 `__textW` 或 0 → spare 变正 → 又拉伸）
+   - 加一行临时日志打印 `key` / `fixedSum` / `innerW` / `spare` 即可确认
+2. 若确认是键对不上：改用 **`node.path` 与样式表同源**（都在同一函数里生成，别跨阶段拼接）
+3. 修好后重跑对比：目标是首页**总偏差 < 1000**、整页高度差 < 10px
+4. 然后按同样方法过其余页面（残域 / 执灯者 / 背包 / 装备 / 各二级面板），每页出差值表

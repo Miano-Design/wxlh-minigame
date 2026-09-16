@@ -361,7 +361,9 @@ function convertDecls(decls, ctx) {
       }
       case 'font-family':
         if (/^(inherit|initial|unset)$/.test(val)) break;   // 交给继承那一遍（引擎不做继承，我们在编译期显式写下去）
-        out.fontFamily = val.replace(/["']/g, '').split(',')[0].trim();
+        // 保留整串字体栈（canvas 的 font 允许逗号列表；只取第一个会退化成 
+        // -apple-system 这类平台关键字，小游戏里测宽就偏窄）
+        out.fontFamily = val.replace(/["']/g, '').split(',').map((x) => x.trim()).filter(Boolean).join(',');
         break;
       case 'line-height':
         if (/^\d*\.?\d+$/.test(val)) meta.lineHeightUnitless = parseFloat(val);

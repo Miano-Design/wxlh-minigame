@@ -10,6 +10,7 @@
   background: #07090e;
   color: #e9edf6;
   font-size: 15px;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;   /* 与网页版 body 同一套字体栈（canvas 里没有 body，挂到根上） */
   width: 100%;
   height: 100%;
   display: flex;
