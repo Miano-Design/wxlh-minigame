@@ -188,9 +188,10 @@ body {
 .hint { font-size: var(--fs-sm); color: var(--dim); line-height: 1.7; }
 .note { font-size: var(--fs-md); color: var(--dim); line-height: 1.75; }
 .lead { font-size: var(--fs-lg); color: var(--text2); line-height: 1.75; }
-.gold { color: var(--gold); } .green { color: var(--green); } .red { color: var(--accent); } .blue { color: var(--blue); }
-.dim { color: var(--dim); } .strong { font-weight: 700; }
-.mb1 { margin-bottom: var(--sp1); } .mb2 { margin-bottom: var(--sp2); } .mb3 { margin-bottom: var(--sp3); } .mb4 { margin-bottom: var(--sp4); }
+/* V9.5.71：.blue / .strong 没人用（要加粗都直接用 <b>），删；.gold/.green/.red/.dim 仍在用 */
+.gold { color: var(--gold); } .green { color: var(--green); } .red { color: var(--accent); }
+.dim { color: var(--dim); }
+.mb2 { margin-bottom: var(--sp2); } .mb3 { margin-bottom: var(--sp3); }
 .mt1 { margin-top: var(--sp1); } .mt2 { margin-top: var(--sp2); } .mt3 { margin-top: var(--sp3); } .mt4 { margin-top: var(--sp4); }
 .tap { cursor: pointer; }
 .empty { text-align: center; color: var(--dim); font-size: var(--fs-md); padding: var(--sp5) 0; }
@@ -431,15 +432,9 @@ body {
 .diff-tabs .btn { flex: 1; }
 .diff-tabs .btn.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
 
-/* ---------- 路线节点 ---------- */
-.route-step { display: flex; gap: 0.625rem; margin-bottom: 0.75rem; }
-.route-node { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1rem 0.5rem; text-align: center; cursor: pointer; }
-.route-node .nico { font-size: 1.625rem; }
-.route-node .nname { font-size: 0.8125rem; margin-top: 0.375rem; font-weight: 600; }
-.route-node.elite { border-color: #ffb03a66; }
-.route-node.event { border-color: #6ec6ff66; }
-.route-node.chest { border-color: #ffd76a66; }
-.route-node.heal { border-color: #5dd39e66; }
+/* V9.5.71（自审）：.route-step / .route-node（含 .nico/.nname/.elite/.event/.chest/.heal）
+   是"先选路线再打"那版副本界面的残留，副本改成点关卡直接开打之后就没人用了，删。
+   注意 .route-progress 还在用（副本页顶部那条进度），别一起删。 */
 .route-progress { display: flex; gap: 0.25rem; justify-content: center; margin: 0.25rem 0 0.875rem; }
 .route-progress i { width: 1.75rem; height: 0.25rem; border-radius: 2px; background: var(--line); }
 .route-progress i.done { background: var(--accent); }
@@ -500,7 +495,7 @@ body {
 .reward-chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 62.4375rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; }
 
 /* ---------- 事件 ---------- */
-.event-choices .btn { margin-top: 0.5rem; }
+/* V9.5.71：.event-choices 是"途中事件二选一"的残留（波间不再插事件），删；.event-desc 仍在用 */
 .event-desc { color: var(--dim); font-size: 0.8125rem; line-height: 1.7; background: var(--panel); border-radius: 0.625rem; padding: 0.75rem; }
 
 /* ---------- 其他 ---------- */
@@ -622,8 +617,7 @@ body {
 /* 引导气泡：固定 17.5rem 在 20rem 的小屏上会顶出右边，改成"最多 280，窄屏自动让位" */
 .coach-tip { position: absolute; width: min(17.5rem, calc(100vw - 1.5rem)); background: var(--panel); border: 1px solid var(--gold); border-radius: 0.75rem; padding: 0.75rem 0.875rem; color: var(--text); box-shadow: 0 0.5rem 1.875rem rgba(0,0,0,.6); }
 @keyframes coachPulse { 0%, 100% { box-shadow: 0 0 0.5rem rgba(255,215,106,.35); } 50% { box-shadow: 0 0 1.375rem rgba(255,215,106,.8); } }
-.recruit-card { text-align: center; padding: 0.5rem 0.25rem; }
-.recruit-card .avatar { width: 3.25rem; height: 3.25rem; margin: 0 auto 0.375rem; }
+/* V9.5.71：.recruit-card 已被 .char-card 取代（招募结果那排伙伴卡），删 */
 .shine { animation: shine .8s ease; }
 @keyframes shine { 0% { box-shadow: 0 0 0 #fff0; } 40% { box-shadow: 0 0 1.625rem #ffd76aaa; } 100% { box-shadow: 0 0 0 #fff0; } }
 .stat-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.375rem; }
@@ -742,8 +736,7 @@ body {
 .filter-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
 .filter-bar .flabel { font-size: 0.6875rem; color: var(--dim); flex: 0 0 auto; }
 .filter-bar .grow-pills { flex: 1; padding-bottom: 0; margin-bottom: 0; }
-.search-input { flex: 1; min-height: 2.75rem; background: var(--panel); border: 1px solid var(--line); border-radius: 0.625rem; color: var(--text); font-size: 0.8125rem; font-family: inherit; padding: 0 0.75rem; outline: none; }
-.search-input::placeholder { color: var(--dim); }
+/* V9.5.71：.search-input 是"图鉴搜名字"的输入框，V9.5.55 撤掉搜索框后没人用了，删 */
 
 /* ---------- 数值跳动（货币收支） ---------- */
 .float-cur { position: absolute; left: 50%; top: -2px; transform: translateX(-50%); font-size: 0.6875rem; font-weight: 800; pointer-events: none; animation: curfloat .6s ease-out forwards; white-space: nowrap; text-shadow: 0 1px 3px #000; }
@@ -774,7 +767,7 @@ body {
 }
 .ticket-row.has { border-style: solid; border-color: #ffd76a66; background: linear-gradient(90deg, #ffd76a18, transparent); color: var(--text); }
 .ticket-row b { color: var(--gold); }
-.ticket-row .ticket-hint { margin-left: auto; color: var(--dim); }
+/* V9.5.71：.ticket-hint 已随招募页改版撤掉，删 */
 
 /* ---------- 境界小阶（大境 × 初/中/后/大圆满） ---------- */
 .step-row { display: flex; gap: 0.375rem; margin-top: 0.375rem; }

@@ -301,10 +301,23 @@ setParty(['C021']);
 // 23. 主角技能加点
 {
   Core.S.player.bloodline = null; Core.S.player.bloodlineLv = 0;
-  Core.S.player.skillPoints = 3; Core.S.player.skillLv = [1, 1, 1];
-  t('技能加点', Core.allocateSkill(0).ok && Core.S.player.skillLv[0] === 2 && Core.S.player.skillPoints === 2);
+  Core.S.player.skillPoints = 3; Core.S.player.skillLv = [0, 0, 0];   // V9.5.71：技能从 0 级起
+  t('技能加点', Core.allocateSkill(0).ok && Core.S.player.skillLv[0] === 1 && Core.S.player.skillPoints === 2);
   const r = Core.resetSkills();
-  t('洗点返还', r.ok && Core.S.player.skillLv.join() === '1,1,1' && Core.S.player.skillPoints === 3);
+  t('洗点返还', r.ok && Core.S.player.skillLv.join() === '0,0,0' && Core.S.player.skillPoints === 3);
+  /* V9.5.71（自审抓到的刷点漏洞）：0 基之后"退 sum(等级-1) + 重置回 [1,1,1]"
+     等于洗一次白拿 3 级。这条用例专门盯住"洗点前后总点数守恒"。 */
+  t('反复洗点不会白刷技能等级', (() => {
+    const p = Core.S.player;
+    p.skillLv = [3, 2, 1]; p.skillPoints = 0;
+    let guard = 0;
+    while (Core.resetSkills().ok && guard++ < 20) { /* 一直洗 */ }
+    // 洗到底之后：等级全 0、拿到的技能点 = 原来投入的 6 点
+    const expect = 3 + 2 + 1;
+    const got = p.skillPoints;
+    p.skillLv = [0, 0, 0]; p.skillPoints = 0;
+    return got === expect;
+  })());
   t('未觉醒用通用技能', Core.protagonistSkills().s1.name === '求生突刺');
   Core.S.player.bloodline = '血族';
   t('觉醒后切换血统技能', Core.protagonistSkills().s1.name === '猩红汲取');

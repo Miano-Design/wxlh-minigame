@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.70';
+  const GAME_VER = '9.5.71';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -700,7 +700,7 @@ window.UI = (function () {
     const expNeed = D.EXP_TABLE[S.player.level] || 1;
     const au = C().authorityInfo();
     const spentAttr = D.ATTR_META.reduce((s, a) => s + ((S.player.attrs && S.player.attrs[a.id]) || 0), 0);
-    const spentSkill = (S.player.skillLv || [1, 1, 1]).reduce((s, x) => s + x - 1, 0);
+    const spentSkill = (S.player.skillLv || [0, 0, 0]).reduce((s, x) => s + x, 0);   // V9.5.71：0 基口径
     const sect = C().sectInfo();
     // 参考产品的主界面最上面就是这种【标签】值 的文字行，一行一件事，不做卡片格子
     /* V9.5.3：整块主角卡都可点（父亲大人要求）——以前只有【主角】那一行的黄字能点，
@@ -1335,7 +1335,7 @@ window.UI = (function () {
     const st = C().effectivePlayerStats();
     // 洗点用的两个数：已经分出去的属性点 / 已经投进去的技能点（0 就说明没得洗）
     const spentAttr = D.ATTR_META.reduce((s, a) => s + ((S.player.attrs && S.player.attrs[a.id]) || 0), 0);
-    const spentSkill = (S.player.skillLv || [1, 1, 1]).reduce((s, x) => s + x - 1, 0);
+    const spentSkill = (S.player.skillLv || [0, 0, 0]).reduce((s, x) => s + x, 0);   // V9.5.71：0 基口径
     const gl = S.player.geneLock;
     const blCost = S.player.bloodline && S.player.bloodlineLv < D.BLOODLINE_MAX ? D.bloodlineCost(S.player.bloodlineLv) : null;
     const lvlPct = Math.min(100, S.player.exp / (D.EXP_TABLE[S.player.level] || 1) * 100);
@@ -1371,8 +1371,8 @@ window.UI = (function () {
         <h3>⚡ ${S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'} <span class="sub">可用技能点 ${S.player.skillPoints || 0}</span>
           <button class="btn small ghost hbtn" data-pskillreset="1" ${spentSkill > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
         ${[P.s1, P.s2, P.ult].map((sk, i) => `
-          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [1, 1, 1])[i]}/${D.SKILL_MAX}</span>
-            <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [1, 1, 1])[i] < 10 ? '' : 'disabled'}>+1</button></div>
+          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [0, 0, 0])[i]}/${D.SKILL_MAX}</span>
+            <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [0, 0, 0])[i] < D.SKILL_MAX ? '' : 'disabled'}>+1</button></div>
           <div class="sdesc">${sk.desc}</div></div>`).join('')}
         <div class="skill-row"><div class="sname">被动·${P.passive.name}</div><div class="sdesc">${P.passive.desc}</div></div>
       </div>
@@ -1415,7 +1415,7 @@ window.UI = (function () {
       if (r.ok) reopenSelf();
     });
     w.querySelector('[data-pskillreset]').onclick = () => {
-      confirmBox('技能重置', `把 ${spentSkill} 点技能点全部退回，技能回到 Lv.1 重新点？战力只会短暂变化，点数一点不少。`, () => {
+      confirmBox('技能重置', `把 ${spentSkill} 点技能点全部退回，技能回到 Lv.0 重新点？战力只会短暂变化，点数一点不少。`, () => {
         const r = C().resetSkills();
         toast(r.msg);
         if (r.ok) reopenSelf();
@@ -1628,7 +1628,9 @@ window.UI = (function () {
         <div class="btn-row mt3">
           <button class="btn small" data-lvup="1" ${!cost ? 'disabled' : ''}>升 1 级</button>
           <button class="btn small" data-lvup="10" ${!cost ? 'disabled' : ''}>升 10 级</button>
-          <button class="btn small ghost" data-reborn="1" ${c.lv > 1 ? '' : 'disabled'}>重生</button>
+          <!-- V9.5.71（自审）：等级从 0 起之后，只要练过 1 级（Lv.1）就该能重生，
+               原来写的是 c.lv > 1 —— Lv.1 的伙伴"有东西可退却按不动" -->
+          <button class="btn small ghost" data-reborn="1" ${c.lv > 0 ? '' : 'disabled'}>重生</button>
         </div>
         <div class="hint mt2">${cost ? `升下一级需要 ${fmt(cost.exp)} 伙伴经验 + ◈ ${fmt(cost.points)}` : '已满级'} · 经验模块在背包里用，直接进这个池子</div>
       </div>
@@ -1678,7 +1680,9 @@ window.UI = (function () {
       </div>` : ''}
     `);
     restoreModalScroll(w, scrollTop);
-    const reopenSelf = () => { charDetail(id, 0, w); };
+    /* V9.5.71（自审）：原地重画必须把 opts 带上——不然从队伍点进来、点一次「升 1 级」之后，
+       底下那张「队伍操作（无损换将 / 下阵）」就凭空消失了（重画时 opts 变成空对象）。 */
+    const reopenSelf = () => { charDetail(id, 0, w, opts); };
     w.querySelectorAll('[data-lvup]').forEach(b => b.onclick = () => {
       const r = C().levelUp(id, +b.dataset.lvup);
       toast(r.msg);
@@ -1706,7 +1710,7 @@ window.UI = (function () {
     const rebornBtn = w.querySelector('[data-reborn]');
     if (rebornBtn) rebornBtn.onclick = () => {
       const refund = C().expSpentOn(id);
-      confirmBox('伙伴重生', `把 <b>${cname(id)}</b> 重置回 Lv.1，返还 <b>${fmt(refund)}</b> 伙伴经验（点数不返还）。<br>星级 / 血统 / 装备 / 血清都不动。确定吗？`, () => {
+      confirmBox('伙伴重生', `把 <b>${cname(id)}</b> 重置回 Lv.0，返还 <b>${fmt(refund)}</b> 伙伴经验（点数不返还）。<br>星级 / 血统 / 装备 / 血清都不动。确定吗？`, () => {
         const r = C().rebornChar(id);
         toast(r.msg, 2600);
         sfx(r.ok ? 'level' : 'fail');
@@ -1717,7 +1721,7 @@ window.UI = (function () {
       const uid = (C().S.equipped[id] || {})[el.dataset.eqslot];
       if (uid) { equipDetail(uid, null, id); return; }
       const st = modalScroll(w);
-      pickEquipFor(id, el.dataset.eqslot, w2 => charDetail(id, st, w2), w);
+      pickEquipFor(id, el.dataset.eqslot, w2 => charDetail(id, st, w2, opts), w);   // 换完装备同样要带上 opts
     });
     w.querySelectorAll('[data-unequip]').forEach(b => b.onclick = ev => {
       ev.stopPropagation();
@@ -3853,7 +3857,7 @@ window.UI = (function () {
         allies.push(Object.assign({}, pst, {
           name: cname('@player'), kind: 'warrior', faction: null,
           position,
-          skills: C().protagonistSkills(), skillLv: S.player.skillLv || [1, 1, 1],
+          skills: C().protagonistSkills(), skillLv: S.player.skillLv || [0, 0, 0],
           atk: Math.round(pst.atk * (1 + fb.atkPct + buffAtk) * mult),
           def: Math.round(pst.def * mult),
           spd: Math.round(pst.spd * (1 + buffSpd) * mult),

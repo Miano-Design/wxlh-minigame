@@ -143,4 +143,27 @@ ladder('灯阁评级', D.SECT_MAX, lv => D.sectExpNeed(lv), 'sectExp', [1, 5, 10
 ladder('秘术阁（攻伐诀）', D.KEJI[0].max, lv => D.kejiCost(D.KEJI[0], lv + 1), 'otherworld', [1, 5, 10, 20, 30, 60]);
 console.log('\n  读法：每一段都是"到这里累计花了几天"。前期（前 10 级）应该以分钟~小时计，');
 console.log('        中段线性变长，末段最长但仍在同一条曲线上——中间突然跳档就是数值没接好。');
+
+/* ---- 门槛 vs 上限：不能出现"要求超过上限"的死门槛（V9.5.71 自审新增） ---- */
+let gate = 0;
+const gateFail = [];
+D.GENE_LOCKS.forEach((g, i) => {
+  const lvReq = [1, 20, 40, 60, 80][i];
+  if (lvReq > D.PLAYER_MAX_LV) { gateFail.push(`铭刻 ${i + 1} 要求 Lv.${lvReq} > 上限 Lv.${D.PLAYER_MAX_LV}`); gate++; }
+});
+D.REALMS.forEach((r, i) => {
+  if (r.lv > D.PLAYER_MAX_LV) { gateFail.push(`境界第 ${i + 1} 阶要求 Lv.${r.lv} > 上限`); gate++; }
+});
+if (D.BLOODLINE_UNLOCK_LV > D.PLAYER_MAX_LV) { gateFail.push('血统觉醒门槛超过等级上限'); gate++; }
+{
+  // 转生：Lv.100 + 铭刻 5 + 灯芯 Lv.30 —— 三个门槛都要够得着
+  const need = { lv: 100, geneLock: 5, core: 30 };
+  if (need.lv > D.PLAYER_MAX_LV) { gateFail.push('转生要求等级超过上限'); gate++; }
+  if (need.geneLock > D.GENE_LOCKS.length) { gateFail.push('转生要求铭刻阶数超过上限'); gate++; }
+  if (need.core > 50) { gateFail.push('转生要求灯芯等级超过建筑上限'); gate++; }
+}
+console.log('\n=== 门槛 vs 上限（有没有"这辈子到不了"的解锁条件）===');
+console.log(`  铭刻 5 阶要 Lv.${[1, 20, 40, 60, 80].slice(-1)[0]} · 境界 36 阶要 Lv.${D.REALMS[D.REALMS.length - 1].lv} · 转生要 Lv.100 + 铭刻 5 + 灯芯 30 · 评级上限 Lv.${D.SECT_MAX}`);
+console.log(gateFail.length ? '  ' + gateFail.map(x => '✗ ' + x).join('\n  ') : '  所有门槛都在上限之内 ✓');
+
 console.log(`\n结论：${warn === 0 ? '所有上限之间对得上 ✓' : '有 ' + warn + ' 处上限对不上，要调'}`);

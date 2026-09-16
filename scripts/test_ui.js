@@ -821,6 +821,13 @@ t('从队伍点进来的详情，最下面有「无损换将 / 下阵」', () =>
   const plain = UI._panels.charDetail('C021').innerHTML;
   if (plain.indexOf('data-off') >= 0) throw new Error('从图鉴进来也冒出了下阵按钮');
 });
+/* V9.5.71（自审）：详情里"升一级/换件装备"都会原地重画这一层，
+   重画时如果丢掉 opts，那张「队伍操作」卡就会凭空消失——这条用例盯住它。 */
+t('在详情里操作之后，「队伍操作」卡还在（原地重画不能丢 opts）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  if (src.indexOf('charDetail(id, 0, w, opts)') < 0) throw new Error('重画时丢了 opts（升级后队伍操作卡会消失）');
+  if (src.indexOf('charDetail(id, st, w2, opts)') < 0) throw new Error('换装备后重画丢了 opts');
+});
 t('预设独立成卡（不跟小队挤在一起）', () => {
   const html = UI._panels._screens.partyScreen();
   const iSquad = html.indexOf('灯阁小队');

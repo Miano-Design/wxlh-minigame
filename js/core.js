@@ -1802,7 +1802,7 @@ window.Core = (function () {
     return (S.player.bloodline && D.BLOODLINE_SKILLS[S.player.bloodline]) || D.PROTAGONIST.skills;
   }
   function allocateSkill(idx) {
-    const lv = S.player.skillLv || (S.player.skillLv = [1, 1, 1]);
+    const lv = S.player.skillLv || (S.player.skillLv = [0, 0, 0]);
     if (idx < 0 || idx > 2) return { ok: false, msg: '技能不存在' };
     if (lv[idx] >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
     if ((S.player.skillPoints || 0) < 1) return { ok: false, msg: '没有可用技能点' };
@@ -1812,10 +1812,14 @@ window.Core = (function () {
     return { ok: true, msg: `技能升到 Lv.${lv[idx]}` };
   }
   function resetSkills() {
-    const lv = S.player.skillLv || [1, 1, 1];
-    const refund = lv.reduce((s, x) => s + x - 1, 0);
+    /* V9.5.71（自审）：技能从 1 基改成 0 基之后这里漏改了——
+       原来退的是 sum(等级-1)、重置成 [1,1,1]，而技能等级从 0 起算意味着：
+       退 2 点却把三条技能又放回 1 级（净赚 3 级），反复洗点可以白刷技能等级。
+       现在按 0 基口径：退 sum(等级)、重置成 [0,0,0]。 */
+    const lv = S.player.skillLv || [0, 0, 0];
+    const refund = lv.reduce((s, x) => s + x, 0);
     if (refund <= 0) return { ok: false, msg: '尚未加点' };
-    S.player.skillLv = [1, 1, 1];
+    S.player.skillLv = [0, 0, 0];
     S.player.skillPoints = (S.player.skillPoints || 0) + refund;
     save();
     return { ok: true, msg: `已重置，返还 ${refund} 点技能点` };
@@ -1848,13 +1852,13 @@ window.Core = (function () {
     const p = {};
     PROTAGONIST_KEYS.forEach(k => { p[k] = S.player[k]; });
     p.attrs = Object.assign(ATTR_ZERO(), p.attrs);
-    p.skillLv = (p.skillLv || [1, 1, 1]).slice();
+    p.skillLv = (p.skillLv || [0, 0, 0]).slice();
     return p;
   }
   function restoreProtagonist(p) {
     PROTAGONIST_KEYS.forEach(k => { S.player[k] = p[k]; });
     S.player.attrs = Object.assign(ATTR_ZERO(), p.attrs);
-    S.player.skillLv = (p.skillLv || [1, 1, 1]).slice();
+    S.player.skillLv = (p.skillLv || [0, 0, 0]).slice();
   }
   function protagonistList() {
     return [

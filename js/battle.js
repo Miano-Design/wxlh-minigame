@@ -172,7 +172,8 @@ window.Battle = (function () {
     const allies = cfg.allies.map(spec => {
       const u = makeEnemyUnit(spec, 'ally');
       u.kind = spec.kind; u.faction = spec.faction; u.position = spec.position;
-      u.skills = spec.skills; u.skillLv = spec.skillLv || [1, 1, 1];
+      // V9.5.71：技能等级从 0 起（0 = 没点过，倍率 1.0），兜底数组跟着改
+      u.skills = spec.skills; u.skillLv = spec.skillLv || [0, 0, 0];
       u.name = spec.name;
       // 转生天赋带来的战斗字段（旧版这些属性根本没被传进战斗引擎）
       u.dmgReduce = spec.dmgReduce || 0;

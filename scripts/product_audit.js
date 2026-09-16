@@ -166,4 +166,20 @@ htmls.forEach(([label, h]) => {
 console.log(leaks.length ? '  ✗ ' + leaks.join('\n  ✗ ') : '  没有漏出来的内部字 ✓');
 
 const total = problems.length + orphans.length + missing.length + empties.length + leaks.length;
-console.log(`\n结论：${total === 0 ? '全绿 ✓' : '有 ' + total + ' 项要看'}`);
+console.log('\n=== ⑥ 样式表里没人用的类（改版删界面后的残留）===');
+/* 起因（V9.5.71 自审）：删掉战斗界面的「我方前排 / 我方后排」字条之后，
+   它的 .b-line-label 规则也跟着删了；但同类残留（比如 .pos-hint）就一直躺在那儿没人管。
+   这里把 style.css 里的选择器抠出来，去 js/ 与 index.html 里找引用，找不到就报。 */
+/* 先剥注释：style.css 里有一段"V8.6 删掉了没人再用的类：.plaque / .hero-num …"的留档说明，
+   不剥的话这些名字会被当成"还在用的类"（或者反过来被报成孤立类），两头都是假警报。 */
+const cssSrc = fs.readFileSync('css/style.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+const jsAll = fs.readFileSync('js/ui.js', 'utf8') + fs.readFileSync('js/main.js', 'utf8') + fs.readFileSync('index.html', 'utf8');
+const classNames = [...new Set((cssSrc.match(/\.[a-zA-Z][a-zA-Z0-9_-]*/g) || []).map(s => s.slice(1)))];
+const deadCss = classNames.filter(c => {
+  if (/^(pslot|party|b-|u-|char|skill|reward|step|list|kv|btn|bar|stage|world|bag|bg-|tab|pill|eq|fm|idle|float|coach|drag|empty|tag|dot|tt|pos|rarity|stat|travel|ast|cname|cmeta|sheet|page|modal|toast|overlay|climb|loot|inparty|shine|gold|green|low|dead|hit|acting|on|off|done|cur|sel|filled|locked|boss|enemy|ally|rtext|sub|k|t1|t2|grow|hint|note|stars|key|val|row|sec|run|arm|aut|sw|fp|sig|sel-|no-sel)/.test(c)) return false;
+  return jsAll.indexOf(c) < 0;
+});
+console.log(deadCss.length ? '  ⚠ 样式表里没人用的类：' + deadCss.join(' ') : '  样式表没有孤立类 ✓');
+
+const total2 = total + deadCss.length;
+console.log(`\n结论：${total2 === 0 ? '全绿 ✓' : '有 ' + total2 + ' 项要看'}`);
