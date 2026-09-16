@@ -1774,6 +1774,11 @@ window.Core = (function () {
     addCur('otherworld', g.otherworld);
     addCur('story', g.story);
     addPlayerExp(g.exp);
+    /* V9.5.79（自审·长线模拟）：**在线挂机也要产评级经验**。
+       以前只有 settleOffline（离线结算）里那一行会加，而玩法指南写的是"挂机每分钟 +1.2"——
+       于是把游戏开着挂一整天的玩家，评级经验一点不涨（同一段时间，离线算、在线不算，两套口径）。
+       现在按同样的比例补上；离线那条走 elapsedSec、这条走 bankSec，两个时间窗互不重叠，不会重复计。 */
+    addSectExp(Math.floor(S.idle.bankSec / 60 * D.SECT_EXP.perMin));
     // 采集产线的材料：按档位折算，背包满就跳过（不吞玩家的东西，只是这一轮收不进来）
     if (g.mat > 0) {
       const m = grantIdleMat(g.mat);
@@ -2956,6 +2961,10 @@ window.Core = (function () {
         if (k === 'exp') { /* 角色经验在战斗内结算 */ }
         else addCur(k, v);
       });
+      /* V9.5.79（自审·长线模拟）：玩法指南一直写着"每打赢一场 +2 评级经验"，
+         但代码里**从来没有这一行**（SECT_EXP.win 定义了却没人用）。
+         现在补上：所有胜利都算（手动战斗、扫荡、深井、斗法台都走这里）。 */
+      addSectExp(D.SECT_EXP.win);
     }
     S.stats.battles++;
     if (isBoss && won) S.stats.bosses++;

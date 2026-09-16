@@ -651,6 +651,29 @@ setParty(['C021']);
   t('转生后重练到顶：技能点仍是 0（供给是"等级"不是"升级次数"）', Core.S.player.level === 100 && Core.S.player.skillPoints === 0);
 }
 
+/* ===== V9.5.79（自审·长线模拟跑出来的两个真 bug）=====
+   玩法指南写着"挂机每分钟 +1.2 评级经验"和"每打赢一场 +2"，但代码里：
+   前者只在离线结算里算（在线挂机一点不给），后者**根本没写**。 */
+{
+  Core.newGame(); Core.setPlayerName('评级');
+  Core.choosePlayerBloodline('修真'); Core.ensureDaily();
+  const before = Core.S.sect.exp + Core.S.sect.lv * 1000;
+  Core.S.idle.bankSec = 3600;               // 在线挂机 1 小时
+  Core.claimIdle();
+  const after = Core.S.sect.exp + Core.S.sect.lv * 1000;
+  t('在线挂机也产评级经验（以前只有离线才算）', after > before);
+  t('挂机 1 小时的评级经验≈ 60 分钟 × 1.2', after - before >= 60);
+}
+{
+  Core.newGame(); Core.setPlayerName('评级2');
+  const e0 = Core.S.sect.exp + Core.S.sect.lv * 1000;
+  Core.battleSettle({}, true, false);       // 打赢一场
+  const e1 = Core.S.sect.exp + Core.S.sect.lv * 1000;
+  t('每打赢一场 +2 评级经验（文案里一直有，代码里以前没有）', e1 - e0 === D.SECT_EXP.win);
+  Core.battleSettle({}, false, false);      // 打输不算
+  t('打输不加评级经验', (Core.S.sect.exp + Core.S.sect.lv * 1000) === e1);
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];
