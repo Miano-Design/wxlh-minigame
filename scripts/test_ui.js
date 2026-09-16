@@ -1259,6 +1259,36 @@ t('招募页：没有「每日免费」卡片，免费次数显示在单抽按�
   // 高级池还留着 1 次免费
   if (html2.indexOf('免费抽 1 次（今日还剩 1 次）') < 0) throw new Error('高级池的免费没显示');
 });
+t('GM 门禁：线上默认关；带 ?gm=1 开一次就在这台设备记住', () => {
+  const store2 = {};
+  const prevLoc = global.location;
+  const prevStore = global.localStorage;
+  const run = (hostname, search, store) => {
+    global.location = { hostname, search };
+    global.localStorage = {
+      getItem: k => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = String(v); },
+      removeItem: k => { delete store[k]; },
+    };
+    let out = null;
+    const uiSrc = fs.readFileSync('js/ui.js', 'utf8');
+    const saved = window.UI;
+    eval(uiSrc);                       // 用新的 location/localStorage 重新跑一遍 UI 模块
+    out = window.UI;
+    window.UI = saved || out;
+    return out;
+  };
+  const s1 = {};
+  if (run('miano-design.github.io', '', s1)._panels._gmAllowed() !== false) throw new Error('线上没带参数居然能进 GM');
+  const s2 = {};
+  if (run('miano-design.github.io', '?gm=1', s2)._panels._gmAllowed() !== true) throw new Error('带 ?gm=1 进不去');
+  if (s2.wxlh_gm !== '1') throw new Error('带参数打开后没把标记记在本机');
+  const s3 = { wxlh_gm: '1' };
+  if (run('miano-design.github.io', '', s3)._panels._gmAllowed() !== true) throw new Error('记住之后还是进不去');
+  if (run('localhost', '', {})._panels._gmAllowed() !== true) throw new Error('本机调试被挡了');
+  global.location = prevLoc;
+  global.localStorage = prevStore;
+});
 t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   const i = css.indexOf('.reward-chips {');
