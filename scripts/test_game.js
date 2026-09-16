@@ -20,7 +20,8 @@ function withRandom(v, fn) { Math.random = () => v; try { return fn(); } finally
 
 // 1. 新游戏
 Core.newGame();
-t('初始点数 50000', Core.S.cur.points === 50000);
+t('初始点数 20000（= 40 次普通抽，够组队也够买东西）', Core.S.cur.points === 20000);
+t('开局点数换算成普通抽不超过 40 次', D.STARTER.points / D.RECRUIT_POOLS.normal.cost.points <= 40);
 t('初始无招募角色', Object.keys(Core.S.chars).length === 0);
 // 上阵 5 格：0/1 前排、2/3/4 后排；主角本人（'@player'）就占一格
 t('开局上阵只有主角一人', Core.S.party.length === 5 && Core.S.party[0] === '@player' && Core.S.party.filter(Boolean).length === 1);

@@ -301,5 +301,39 @@ Core.newGame(); Core.setPlayerName('新档'); Core.choosePlayerBloodline('修真
   if (!n) ok('新档全部页面渲染正常');
 }
 
-console.log(`\n结论：${bad === 0 ? '数据健全 + 老档兼容 ✓' : '有 ' + bad + ' 项要修'}`);
+/* ================= ⑤ 导出函数冒烟 =================
+   起因（V9.5.77 自审）：测试只覆盖"我们想到要测"的路径，导出函数里那些没人调的角落
+   （比如 addCharExp 收到异常参数）会一直藏着。这里把 Core 的**每个导出函数**都用
+   几组常见参数真调一次：抛异常、或者返回值里出现 NaN / Infinity，都报出来。 */
+console.log('\n=== ⑤ 导出函数冒烟（每个导出函数真调一次）===');
+{
+  /* 这几个函数天然要求"具体对象"参数（装备实例 / uid 数组 / 建筑 id），
+     用通用参数调必然抛错，属于正常，不算问题。 */
+  const NEEDS_OBJECT = ['equipStats', 'decomposeMany', 'equipScore', 'upgradeBuilding', 'enhanceCost', 'enhanceMat'];
+  const coreNames = Object.keys(Core).filter(k => typeof Core[k] === 'function');
+  const throws = [], nans = [];
+  coreNames.forEach(n => {
+    if (NEEDS_OBJECT.indexOf(n) >= 0) return;
+    Core.newGame(); Core.setPlayerName('冒烟'); Core.choosePlayerBloodline('修真');
+    const argsets = [[], ['C021'], ['@player'], [1], ['W01', 'normal'], ['exp_s'], ['god'], [{}]];
+    let done = false;
+    for (let i = 0; i < argsets.length && !done; i++) {
+      const a = argsets[i];
+      try {
+        const r = Core[n].apply(null, a);
+        done = true;
+        const chk = (v, path) => { if (typeof v === 'number' && !Number.isFinite(v)) nans.push(`${n}(${JSON.stringify(a)}) 返回 ${path} = ${v}`); };
+        chk(r, 'self');
+        if (r && typeof r === 'object' && !Array.isArray(r)) Object.entries(r).forEach(([k, v]) => chk(v, k));
+      } catch (e) {
+        if (i === argsets.length - 1) throws.push(`${n}() → ${e.message}`);
+      }
+    }
+  });
+  if (throws.length) throws.forEach(x => fail('导出函数全部参数都抛异常：' + x));
+  if (nans.length) nans.forEach(x => fail('导出函数返回 NaN / Infinity：' + x));
+  if (!throws.length && !nans.length) ok(`${coreNames.length} 个导出函数：没有崩溃、没有 NaN`);
+}
+
+console.log(`\n结论：${bad === 0 ? '数据健全 + 老档兼容 + 导出函数健壮 ✓' : '有 ' + bad + ' 项要修'}`);
 process.exit(bad ? 1 : 0);

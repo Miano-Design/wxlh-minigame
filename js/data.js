@@ -888,7 +888,7 @@ window.DATA = (function () {
   // 评级经验来源（写在一处，UI 直接读这张表，避免"说明和实装两处写"）
   const SECT_EXP = { normal: 12, hard: 26, hell: 48, win: 2, perMin: 1.2 };
 
-  /* ================= 秘术阁（对标《道友修仙》的 KeJi · 41 条线，每级 +0.3%） =================
+  /* ================= 秘术阁（对标《道友修仙》的 KeJi；我们现在是 42 条线，每级 +0.1%~0.8%） =================
      它的秘术线是"用金币 + 仙石喂出来的百分比"，每条 40~60 级，每级加得很小。
      作用有两个：① 高级货币多一条出口（不只有抽卡）；② 长线目标一眼看得到头。
      rate 就是每级加多少（0.004 = +0.4%），消耗走 KEJI_COIN 这一种货币。 */
@@ -906,7 +906,7 @@ window.DATA = (function () {
     { id: 'wuxing', name: '悟性诀', ico: '📘', key: 'expPct',   rate: 0.004, max: 40, base: 14, step: 3, info: '经验获取' },
     { id: 'juyun',  name: '聚运术', ico: '🍀', key: 'dropPct',  rate: 0.003, max: 30, base: 20, step: 4, info: '掉落概率' },
     { id: 'jingxin', name: '静心诀', ico: '🌙', key: 'offlinePct', rate: 0.003, max: 30, base: 20, step: 4, info: '离线效率' },
-    // 补齐到 41 条（对标 KeJi 的 41 条线）：数值都很小，靠"永远还有下一级"撑长线
+    // 补齐到 42 条：数值都很小，靠"永远还有下一级"撑长线
     { id: 'xueqi',  name: '血气诀', ico: '🩸', key: 'lifesteal', rate: 0.001, max: 40, base: 22, step: 4, info: '吸血' },
     { id: 'shouyi', name: '守御术', ico: '⛰', key: 'resPct',    rate: 0.002, max: 40, base: 22, step: 4, info: '减伤' },
     { id: 'shendu', name: '神读咒', ico: '📖', key: 'spiritPct', rate: 0.004, max: 40, base: 16, step: 3, info: '精神（技能倍率）' },
@@ -1492,7 +1492,12 @@ window.DATA = (function () {
     { ssrTicket: true, item: 'ticket_lim' },
   ];
   const STARTER = {
-    points: 50000, holy: 1000,
+    /* V9.5.77（父亲大人）：开局启动资金 50000 → 20000。
+       起因：普通招募单抽从 5000 降到 500 之后，原来这 5 万点等于 **100 次普通抽**（以前 10 次），
+       新手第一天就能把普通池的 N/R 抽个遍、攒一大把碎片，把"招募"这条线的节奏压扁了。
+       20000 点 = 40 次普通抽，或者买 4 个 R 装备箱 / 一堆材料 / 两次背包扩容——
+       够组一队、也够买东西，但不再是"送一百连"。 */
+    points: 20000, holy: 1000,
     items: { exp_s: 20 },
   };
 

@@ -24,6 +24,7 @@ for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js']) e
 const D = window.DATA, Core = window.Core;
 const uiSrc = fs.readFileSync('js/ui.js', 'utf8');
 const coreSrc = fs.readFileSync('js/core.js', 'utf8');
+const dataSrc = fs.readFileSync('js/data.js', 'utf8');
 
 let bad = 0;
 const fail = (msg) => { bad++; console.log('  ✗ ' + msg); };
@@ -168,6 +169,39 @@ userStrings(stripComments(fs.readFileSync('js/data.js', 'utf8')))
   });
 [...new Set(entryHits)].forEach(h => fail(h));
 if (!entryHits.length) console.log(`  入口名与界面标签对得上（认识 ${labelSet.size} 个真实标签）✓`);
+
+console.log('\n=== ⑧ 文案里的数量词要和数据表对得上 ===');
+/* 起因（V9.5.77 自审）：玩法指南里"秘术阁 12 条线、合 550 级"这种**手写的数量**
+   会在数据扩过一次之后变成假话（那次是 12→42 条、550→1505 级，隔了好几版才被发现）。
+   这里把能自动核对的数量词全列出来，对不上就报。 */
+{
+  const RULES = [
+    [/秘术阁[^。]{0,40}?(\d+)\s*条/, D.KEJI.length, '秘术阁条数'],
+    [/合\s*(\d+)\s*级/, D.KEJI.reduce((s, k) => s + k.max, 0), '秘术阁合计级数'],
+    [/(\d+)\s*大境/, D.REALM_MAJORS.length, '大境数量'],
+    [/共\s*(\d+)\s*小阶/, D.REALM_STAGE_COUNT, '境界小阶总数'],   // 注意"9 大境 × 4 小阶"里的 4 是每境的小阶数，不能拿总数去比
+    [/(\d+)\s*块地/, D.GARDEN_PLOTS, '药园地块数'],
+    [/(\d+)\s*名执灯者/, D.characters.length, '角色总数（含隐藏）'],
+    [/图鉴内\s*(\d+)\s*名可招募/, D.characters.filter(c => !c.hidden).length, '可招募伙伴数'],
+    [/(\d+)\s*条百分比/, D.KEJI.length, '秘术阁条数（另一处写法）'],
+  ];
+  const sources = [['js/data.js', dataSrc], ['js/ui.js', uiSrc],
+    ['README.md', fs.readFileSync('README.md', 'utf8')]];
+  let numBad = 0;
+  sources.forEach(([file, raw]) => {
+    const text = stripComments(raw);
+    userStrings(text).concat([text]).forEach(s => {
+      RULES.forEach(([re, expect, label]) => {
+        const m = s.match(re);
+        if (m && String(expect) !== m[1]) {
+          numBad++;
+          fail(`${file}：「${m[0]}」对不上——${label}实际是 ${expect}`);
+        }
+      });
+    });
+  });
+  if (!numBad) console.log(`  ${RULES.length} 条数量词规则全部对得上 ✓（秘术阁 ${D.KEJI.length} 条/${D.KEJI.reduce((s, k) => s + k.max, 0)} 级 · 境界 ${D.REALM_STAGE_COUNT} 阶 · 药园 ${D.GARDEN_PLOTS} 块 · 可招募 ${D.characters.filter(c => !c.hidden).length} 名）`);
+}
 
 console.log(`\n结论：${bad === 0 ? '文案与当前版本对得上 ✓' : '有 ' + bad + ' 处文案要对一遍'}`);
 process.exit(bad ? 1 : 0);

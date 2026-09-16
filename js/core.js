@@ -2962,7 +2962,13 @@ window.Core = (function () {
   function addCharExp(charIds, exp) {
     // 天赋「灯阁恩赐」的经验加成在这里统一生效（副本 / 深井角色经验）
     // V9.5.46：统一进**共享的伙伴经验池**（charIds 只作兼容参数保留）
-    const n = Math.round(exp * graceExpMult());
+    /* V9.5.77（自审·导出函数冒烟）：这里原来不校验参数——万一有人传进来 undefined，
+       算出来是 NaN，`S.charExp + NaN` 会把**整个伙伴经验池**变成 NaN 写进存档，
+       之后所有升级、重生、经验模块全都废掉（而且很难查）。
+       经验池是存档里最值钱的字段之一，值得加一道闸。 */
+    const raw = Number(exp);
+    const n = Number.isFinite(raw) ? Math.round(raw * graceExpMult()) : 0;
+    if (!n) return 0;
     S.charExp = (S.charExp || 0) + n;
     return n;
   }
