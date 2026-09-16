@@ -856,7 +856,7 @@ window.UI = (function () {
     const [act, name, sub, , dot] = x;
     return `<button class="tile" data-act="${act}">
       <span class="tt-name">${name}${dot ? '<i class="tt-dot"></i>' : ''}</span>
-      <span class="tt-sub">${sub || ''}</span></button>`;
+      ${sub ? `<span class="tt-sub">${sub}</span>` : ''}</button>`;   /* V9.5.60：没副标题就别留那 12px 空位（否则标题被挤偏） */
   }
   function formatDuration(sec) {
     sec = Math.floor(sec);
