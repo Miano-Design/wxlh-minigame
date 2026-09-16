@@ -247,20 +247,20 @@
     CV.y += th + GAP;
 
     /* ⑤ 挂机（网页版 idleBlock：三行 + 两个按钮） */
-    const bank = Core.idleBankGains(), rates = Core.idleRates(), lines = Core.idleLines(), t0 = Core.todayState();
+    const bank = Core.idleBankGains(), rates = Core.idleRates(), lines = Core.idleLines();
     sectionTitle('挂机');
     const ih = 158;
     card(CV.y, ih);
     const dur = G.formatDuration || ((s) => s + '秒');
     CV.text('【挂机】', PAD + 14, CV.y + 24, { size: CV.FS.md, color: CV.C.dim });
-    CV.text('◈' + rates.pointsPerMin.toFixed(1) + '/分', PAD + 70, CV.y + 24, { size: CV.FS.f1, bold: true, color: CV.C.gold });
+    CV.text('◈ ' + rates.pointsPerMin.toFixed(1) + '/分', PAD + 70, CV.y + 24, { size: CV.FS.md, color: CV.C.dim });
     CV.text('EXP ' + rates.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h',
       PAD + 150, CV.y + 24, { size: CV.FS.sm, color: CV.C.dim });
     CV.text('【已挂】', PAD + 14, CV.y + 54, { size: CV.FS.md, color: CV.C.dim });
-    CV.text(dur(bank.seconds), PAD + 70, CV.y + 54, { size: CV.FS.f1, bold: true });
+    CV.text(dur(bank.seconds), PAD + 70, CV.y + 54, { size: CV.FS.md, color: CV.C.dim });
     CV.text('【待领】', CV.W - PAD - 200, CV.y + 54, { size: CV.FS.md, color: CV.C.dim });
-    CV.text('◈' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp) + (bank.otherworld ? ' · ◆' + bank.otherworld : '') + (bank.mat ? ' · 材料 ' + bank.mat : ''),
-      CV.W - PAD - 14, CV.y + 54, { size: CV.FS.md, color: CV.C.gold, align: 'right' });
+    CV.text('◈ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp) + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '') + (bank.mat ? ' · 材料 ' + bank.mat : ''),
+      CV.W - PAD - 14, CV.y + 54, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
     CV.text('【分工】', PAD + 14, CV.y + 82, { size: CV.FS.md, color: CV.C.dim });
     CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? cname(l.leaderId) : '空')).join(' · '), CV.W - PAD * 2 - 100, CV.FS.sm),
       PAD + 70, CV.y + 82, { size: CV.FS.sm, color: CV.C.dim });
@@ -271,7 +271,7 @@
     const g3 = CV.ctx.createLinearGradient(0, by, 0, by + 42);
     g3.addColorStop(0, '#c9364a'); g3.addColorStop(1, '#97273a');
     CV.round(PAD + 14 + bw2 + 10, by, bw2, 42, 7, g3, '#e05a6d40');
-    CV.text('⚡ 一键收取' + (t0.claimable ? '（' + t0.claimable + '）' : ''), PAD + 14 + bw2 + 10 + bw2 / 2, by + 21, { size: CV.FS.lg, bold: true, align: 'center' });
+    CV.text('收取奖励', PAD + 14 + bw2 + 10 + bw2 / 2, by + 21, { size: CV.FS.lg, bold: true, align: 'center' });
     CV.hit('claim_all', PAD + 14 + bw2 + 10, by, bw2, 42);
     CV.y += ih + GAP;
 

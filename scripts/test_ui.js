@@ -307,7 +307,7 @@ t('旧页签名映射到「执灯者」子页', () => {
 });
 t('V8.6：今日卡已撤，每天要做的事都摊在首页上', () => {
   const html = UI._panels._screens.homeScreen();
-  ['一键收取', '限时悬赏', '每日任务', '招募伙伴'].forEach(k => {
+  ['收取奖励', '限时悬赏', '每日任务', '招募伙伴'].forEach(k => {
     if (html.indexOf(k) < 0) throw new Error('首页缺少：' + k);
   });
   if (html.indexOf('open-today') >= 0) throw new Error('「今日」入口还留着');

@@ -74,14 +74,16 @@ window.DATA = (function () {
   function bagExpandCost(expands) { return Math.round(1500 * Math.pow(1.3, expands)); }
 
   const CURRENCIES = [
-    { id: 'points',     name: '点数',     icon: '◈', color: '#ffd76a' },
-    { id: 'story',      name: '故事点',   icon: '❖', color: '#7ee0a3' },
-    { id: 'otherworld', name: '异界结晶', icon: '◆', color: '#6ec6ff' },
-    { id: 'holy',       name: '圣洁晶石', icon: '✦', color: '#ff9ecb' },
-    { id: 'skillChip',  name: '技能芯片', icon: '▣', color: '#c5a3ff' },
-    { id: 'bloodCrystal', name: '血统结晶', icon: '❥', color: '#ff6b6b' },
-    { id: 'corridor',   name: '深井徽记', icon: '♜', color: '#8be9e9' },
-    { id: 'rp',         name: '转生点',   icon: '♾', color: '#ffe08a' },
+    /* 图标后面统一带一个空格（父亲大人要求）：图标跟数字贴在一起看不清，
+       写进图标本身，全站拼字符串的地方就都自动空一格了。 */
+    { id: 'points',     name: '点数',     icon: '◈ ', color: '#ffd76a' },
+    { id: 'story',      name: '故事点',   icon: '❖ ', color: '#7ee0a3' },
+    { id: 'otherworld', name: '异界结晶', icon: '◆ ', color: '#6ec6ff' },
+    { id: 'holy',       name: '圣洁晶石', icon: '✦ ', color: '#ff9ecb' },
+    { id: 'skillChip',  name: '技能芯片', icon: '▣ ', color: '#c5a3ff' },
+    { id: 'bloodCrystal', name: '血统结晶', icon: '❥ ', color: '#ff6b6b' },
+    { id: 'corridor',   name: '深井徽记', icon: '♜ ', color: '#8be9e9' },
+    { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#ffe08a' },
   ];
 
   /* ================= 角色 ================= */
@@ -646,7 +648,7 @@ window.DATA = (function () {
       '3. 领每日免费招募（招募页第一个按钮，一天一次）。',
       '4. 做完每日任务 + 全部完成奖励（任务面板）。',
       '5. 扫荡已通关的关卡拿材料（每天 60 次）＋ 斗法台 5 次（结晶与徽记最稳的来源）。',
-      '懒得一项项点？点首页最下面「挂机」那块里的「一键收取」：挂机、任务、周常、成就、图鉴里所有已经达成、躺着等点的奖励，一次全收。',
+      '懒得一项项点？点首页最下面「挂机」那块里的「收取奖励」：挂机、任务、周常、成就、图鉴里所有已经达成、躺着等点的奖励，一次全收。',
     ] },
     { id: 'recruit', title: '⑧ 三张招募池，花的是三种钱', body: [
       '普通招募（◈点数）：日常池，只出 N / R / SR，重复伙伴转碎片。花的是挂机能刷的点数，定位是攒碎片升星。',
@@ -661,7 +663,7 @@ window.DATA = (function () {
       '首页「挂机」那块点「派人分工」，可以给 4 条产线各派 1 名领队：闭关修炼（经验）、灵材采集（强化材料）、外围探索（点数）、灯阁守卫（异界结晶）。',
       '每条线看领队的**对应那一维**（不是战力）：闭关看精神、采集看肌肉、探索看神经、守卫看免疫，对应维值越高产出越高（最高 +150%）；不派领队这条线就不产出。',
       '上阵主力不能派去挂机——所以这里正好是"板凳伙伴"的用处，练了的人不会白练。',
-      '产线收益和挂机收益一起累计，在首页「一键收取」或挂机卡的领取按钮里结算。',
+      '产线收益和挂机收益一起累计，在首页「收取奖励」或挂机卡的领取按钮里结算。',
     ] },
     { id: 'bounty', title: '⑩ 限时悬赏与境界', body: [
       '限时悬赏有截止时间，到点作废：达成后手动领奖，奖励是圣洁晶石 / 异界结晶 / 血统结晶这类硬通货。',

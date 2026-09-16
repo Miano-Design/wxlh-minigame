@@ -974,7 +974,7 @@ window.Core = (function () {
     const capKey = k + 'Cap';
     const label = { eq: '装备', mat: '材料', item: '道具' }[k];
     const cost = D.bagExpandCost(S.bag[expandsKey] || 0);
-    if (!spend({ points: cost })) return { ok: false, msg: `点数不足（需 ◈${cost}）` };
+    if (!spend({ points: cost })) return { ok: false, msg: `点数不足（需 ◈ ${cost}）` };
     S.bag[expandsKey] = (S.bag[expandsKey] || 0) + 1;
     S.bag[capKey] += D.BAG_EXPAND_SIZE;
     save();
@@ -1140,7 +1140,7 @@ window.Core = (function () {
     // 先判够不够，再扣材料——顺序反了会白吞材料（档案里的同类问题）
     if (!mat.has) cost.points += mat.subPoints;
     if (!canAfford(cost)) {
-      return { ok: false, msg: mat.has ? '点数或异界结晶不足' : `点数不足（无${D.ITEMS[mat.itemId].name}，需代用 ◈${mat.subPoints}）` };
+      return { ok: false, msg: mat.has ? '点数或异界结晶不足' : `点数不足（无${D.ITEMS[mat.itemId].name}，需代用 ◈ ${mat.subPoints}）` };
     }
     if (mat.has) {
       S.items[mat.itemId]--;
@@ -1564,7 +1564,7 @@ window.Core = (function () {
     return { ok: true, msg: `${charName(charId)} 已派往「${D.IDLE_LINES.find(l => l.id === lineId).name}」` };
   }
   function offlineCapHours() {
-    let cap = 12 + (S.player.geneLock >= 5 ? 12 : 0);
+    let cap = 8 + (S.player.geneLock >= 5 ? 12 : 0);
     cap += S.buildings.medical * 0.2;
     cap += authority().capHours;
     return cap;
@@ -2030,7 +2030,7 @@ window.Core = (function () {
       Object.entries(rw).forEach(([k, v]) => addCur(k, v));
       S.arena.floor++;
       S.arena.best = Math.max(S.arena.best, S.arena.floor);
-      msg = `守擂成功！升到第 ${S.arena.floor} 台 · ◆${rw.otherworld} · ♜${rw.corridor}`;
+      msg = `守擂成功！升到第 ${S.arena.floor} 台 · ◆ ${rw.otherworld} · ♜ ${rw.corridor}`;
     } else {
       S.arena.floor = Math.max(1, S.arena.floor - 1);
       msg = '守擂失败，退一台再来（次数照常消耗）';
@@ -2510,7 +2510,7 @@ window.Core = (function () {
     return { ok: true, msg: `图鉴奖励已领取（${n} 名）` };
   }
 
-  /* ================= 今日概览 / 一键收取 ================= */
+  /* ================= 今日概览 / 收取奖励 ================= */
   // 首页「今日」卡要的三件事：挂机待收、任务进度、免费招募。
   // 全部从存档现算，不额外存字段——这样"卡上写的"和"实际能领的"不可能对不上。
   function todayState() {
@@ -2537,7 +2537,7 @@ window.Core = (function () {
       claimable: (idleReady ? 1 : 0) + dailyClaimable + weeklyClaimable + achClaimable + codexClaimable,
     };
   }
-  // 一键收取：把"已经达成、躺在那儿等点"的奖励一次全领掉。
+  // 收取奖励：把"已经达成、躺在那儿等点"的奖励一次全领掉。
   // 不做"帮你花"，只做"帮你收"——收取不会失败，也不会改变任何进度。
   function claimEverything() {
     ensureDaily();
@@ -2763,7 +2763,7 @@ window.Core = (function () {
     if (st.haveMat < st.matN) {
       return { ok: false, msg: `渡劫材料不足：需要 ${D.ITEMS[st.matItem].name} ×${st.matN}（现有 ${st.haveMat}）` };
     }
-    if (!canAfford({ points: st.points })) return { ok: false, msg: `点数不足：需要 ◈${fmtNum(st.points)}` };
+    if (!canAfford({ points: st.points })) return { ok: false, msg: `点数不足：需要 ◈ ${fmtNum(st.points)}` };
     // 先扣消耗：失败也扣，这是"天道不收白食"；但等级不掉，所以永远有下一次
     S.items[st.matItem] -= st.matN;
     if (S.items[st.matItem] <= 0) delete S.items[st.matItem];

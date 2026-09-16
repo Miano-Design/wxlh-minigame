@@ -609,11 +609,11 @@ body {
 .idle-line { display: flex; align-items: baseline; gap: var(--sp2); padding: 6px 0; border-bottom: 1px dashed var(--line-soft); flex-wrap: wrap; }
 .idle-line:last-of-type { border-bottom: none; }
 .idle-line .il-k { color: var(--dim); font-size: var(--fs-md); flex: 0 0 auto; }
-.idle-line .il-v { color: var(--gold); font-weight: 700; font-size: var(--fs-1); }
+.idle-line .il-v { color: var(--dim); font-weight: 400; font-size: var(--fs-md); }
 .idle-line .il-s { color: var(--dim); font-size: var(--fs-sm); min-width: 0; }
 /* V9.5.13：这里以前还有一句 margin-left:auto，和「【待领】」标签上的 auto 撞在一起——
    两个 auto 把标签和数值顶开一大段。auto 只留标签那一个，数值紧跟标签（间距与【已挂】一致）。 */
-.idle-line .il-r { text-align: right; white-space: nowrap; font-size: var(--fs-md); min-width: 0; max-width: 78%; overflow: hidden; text-overflow: ellipsis; }
+.idle-line .il-r { color: var(--dim); text-align: right; white-space: nowrap; font-size: var(--fs-md); min-width: 0; max-width: 78%; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- 首页入口：纯文字方块（对标参考图的功能按钮） ---------- */
 /* 参考产品的按钮就是一个描边方块里写两个字：挂机 / 挑战 / 收取 / 排序 / 图鉴。
