@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.34';
+  const GAME_VER = '9.5.35';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2117,7 +2117,7 @@ window.UI = (function () {
       refresh(); renderTopbar();
       const left = C().S.ssrTicket;
       updateModal(w, 'SSR 自选', `
-        <div class="reward-chips" style="margin:1rem 0;justify-content:center"><span class="reward-chip" style="font-size:0.875rem">${esc(r.msg)}</span></div>
+        <div class="reward-chips" style="margin-top:1rem;margin-bottom:1rem"><span class="reward-chip" style="font-size:0.875rem">${esc(r.msg)}</span></div>
         <div style="text-align:center;font-size:0.75rem;color:var(--dim);margin-bottom:0.75rem">剩余自选券 ${left} 张</div>
         <button class="btn primary block" data-back>返回招募</button>`);
       w.querySelector('[data-back]').onclick = () => recruitModal(w);
@@ -4326,7 +4326,7 @@ window.UI = (function () {
           Object.entries(r.gains.items).forEach(([k, v]) => { if (v) chips.push(`<span class="reward-chip">🎒 ${(D.ITEMS[k] || {}).name || k}×${v}</span>`); });
           modal('收取奖励', `
             <div style="font-size:0.75rem;color:var(--dim);text-align:center">本次共收取 ${r.total} 项</div>
-            <div class="reward-chips" style="margin:0.75rem 0">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
+            <div class="reward-chips" style="margin-top:0.75rem;margin-bottom:0.75rem">${chips.join('') || '<span class="reward-chip">暂时没有可领取的东西</span>'}</div>
           `, { center: true });
           render();
           break;

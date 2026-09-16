@@ -1136,6 +1136,18 @@ t('文字不出格：卡片与关键文字行都有断行 / 省略兜底', () =>
   });
   if (!css.includes('flex-wrap: wrap')) throw new Error('按钮行没有换行兜底');
 });
+t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
+  const css = fs.readFileSync('css/style.css', 'utf8');
+  const i = css.indexOf('.reward-chips {');
+  if (i < 0) throw new Error('找不到 .reward-chips');
+  const rule = css.slice(i, css.indexOf('}', i));
+  if (!/justify-content:\s*center/.test(rule)) throw new Error('药丸没有内容居中');
+  if (!/width:\s*100%/.test(rule)) throw new Error('药丸容器不是整宽：会变成"固定宽的块"，块自己贴左边（就是电脑上那个歪）');
+  if (/max-width:\s*20rem/.test(rule)) throw new Error('药丸容器还留着 max-width:20rem，整块会被挤到左边');
+  // 目前只有弹窗/结算这类"内容整体居中"的地方用它；容器整宽居中后，左右不再依赖 max-width
+  const uses = [...fs.readFileSync('js/ui.js', 'utf8').matchAll(/class="reward-chips/g)].length;
+  if (uses < 4) throw new Error('reward-chips 的用法数量不对（模板被改过了？）');
+});
 t('正文上边距跟着顶栏实际高度走（系统字号调大也不顶进顶栏）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   // 数值单位会变（px / rem 都行），关键是"跟着量出来的 --topbar-h 走"，不是写死
