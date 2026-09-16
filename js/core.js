@@ -403,8 +403,12 @@ window.Core = (function () {
     try { curListener(id, delta); } catch (e) { /* UI 出错不影响存档 */ }
   }
   function addCur(id, n) {
-    if (!n) return;
-    const d = Math.floor(n);
+    /* V9.5.86（自审·边界参数压测）：这里原来只判 `!n`——传 NaN 会把货币写成 NaN、
+       传 Infinity 会写成 Infinity，传字符串会做字符串拼接（'0abc'）。货币是存档的地基，
+       非有限数一律忽略；顺手把数值型字符串转成数字（老代码有 `addCur(k, '100')` 这种写法）。 */
+    const raw = typeof n === 'string' ? Number(n) : n;
+    if (!Number.isFinite(raw) || !raw) return;
+    const d = Math.floor(raw);
     S.cur[id] = Math.max(0, (S.cur[id] || 0) + d);
     emitCur(id, d);
   }
@@ -687,7 +691,8 @@ window.Core = (function () {
   function craftSerum(serumId, n = 1) {
     const sd = D.serumById[serumId];
     if (!sd) return { ok: false, msg: '没有这个配方' };
-    const want = Math.max(1, Math.floor(n));
+    // V9.5.86（边界压测）：n 传 null/NaN 时 Math.floor 会给出 NaN，后面的扣款会写成 NaN
+    const want = Math.max(1, Math.floor(Number(n)) || 1);
     const haveMat = S.items[sd.mat] || 0;
     const can = Math.min(want, Math.floor(haveMat / sd.matN), Math.floor(S.cur.points / sd.points));
     if (can < 1) {
@@ -753,7 +758,11 @@ window.Core = (function () {
   function skillUp(charId, idx) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
-    const lv = c.skillLv[idx];
+    /* V9.5.86（边界压测）：索引越界时 cost 会变 undefined，`skillChip -= undefined` 直接写成 NaN。
+       注意 `null >= 0` 在 JS 里是 **true**（null 会隐式转成 0），所以不能只判大小，得判整数。 */
+    const si = Number(idx);
+    if (!Number.isInteger(si) || si < 0 || si > 2) return { ok: false, msg: '技能不存在' };
+    const lv = c.skillLv[si];
     if (lv >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
     const cost = SKILL_CHIP_COST[lv];      // 技能从 0 级起，价目表也跟着 0 起
     if (S.cur.skillChip < cost) return { ok: false, msg: `技能芯片不足（${S.cur.skillChip}/${cost}）` };
@@ -1156,8 +1165,19 @@ window.Core = (function () {
     Object.keys(S.items).forEach(k => { if (!D.ITEMS[k]) delete S.items[k]; });
     Object.keys(S.equips).forEach(uid => {
       const e = S.equips[uid];
-      const ok = e && typeof e === 'object' && !!D.EQUIP_SLOTS[e.slot] && !!D.EQUIP_RARITY_MULT[e.rarity];
-      if (!ok) delete S.equips[uid];
+      /* V9.5.86（自审·战斗引擎压测）：这里原来只校验槽位和稀有度——
+         一件 `base: { atk: NaN }` 的装备能通过，然后一路把 NaN 带进战力、血量、
+         战斗帧，最后写进"进行中的探索"存档（run.hpPct 变 NaN），界面上就是 NaN%。
+         现在把数值字段也校验掉：base 里每个数必须是有限数、affixes 的加成同理、
+         enhance 夹到 0~99。任何一项不合法就整件丢掉（宁可少一件，不能带毒）。 */
+      const fin = v => Number.isFinite(Number(v));
+      const ok = e && typeof e === 'object' && !!D.EQUIP_SLOTS[e.slot] && !!D.EQUIP_RARITY_MULT[e.rarity]
+        && fin(e.enhance) && Number(e.enhance) >= 0
+        && e.base && typeof e.base === 'object'
+        && Object.values(e.base).every(fin)
+        && (!e.affixes || (Array.isArray(e.affixes) && e.affixes.every(a => a && fin(a.v))));
+      if (!ok) { delete S.equips[uid]; return; }
+      e.enhance = clampNum(e.enhance, 0, 99);
     });
     Object.keys(S.cur || {}).forEach(k => { S.cur[k] = Math.max(0, numOr(S.cur[k], 0)); });
     S.player.level = clampNum(S.player.level, 0, D.PLAYER_MAX_LV);
@@ -1200,6 +1220,19 @@ window.Core = (function () {
        （normalizeParty 在 migrate 的前半段跑过，那时这些 id 还在）——不补这一步，
        渲染队伍盘时就会在 D.charById[id].rarity 上崩。 */
     S.party = normalizeParty(S.party);
+    /* V9.5.86：**进行中的探索**也要洗——它同样被存进档里（刷新/被系统回收后接着打），
+       一份被改过的档可能带着 NaN 的血线或离谱的波次，进副本页就会画出 "NaN%" 的血条。 */
+    if (S.pendingRun && typeof S.pendingRun === 'object') {
+      const pr = S.pendingRun;
+      pr.stage = clampNum(pr.stage, 1, 12);
+      pr.wave = clampNum(pr.wave, 0, 2);
+      if (!Array.isArray(pr.waves) || !pr.waves.length) pr.waves = ['combat'];
+      pr.hpPct = pr.hpPct && typeof pr.hpPct === 'object' ? pr.hpPct : {};
+      Object.keys(pr.hpPct).forEach(k => { pr.hpPct[k] = clampNum(pr.hpPct[k], 0, 1); });
+      if (!D.WORLDS.some(w => w.id === pr.worldId)) S.pendingRun = null;
+    } else if (S.pendingRun !== undefined) {
+      S.pendingRun = null;
+    }
   }
   function dedupeEquips() {
     const seen = new Set();
@@ -1876,8 +1909,10 @@ window.Core = (function () {
     return g;
   }
   function addPlayerExp(n) {
-    if (!n) return;
-    S.player.exp += n;
+    // V9.5.86：同样的道理——非有限数会让经验变成 Infinity/-Infinity，字符串会拼接成 '0abc'
+    const raw = typeof n === 'string' ? Number(n) : n;
+    if (!Number.isFinite(raw) || !raw) return;
+    S.player.exp += raw;
     while (S.player.level < D.PLAYER_MAX_LV && S.player.exp >= D.EXP_TABLE[S.player.level]) {
       S.player.exp -= D.EXP_TABLE[S.player.level];
       S.player.level++;

@@ -746,6 +746,74 @@ setParty(['C021']);
   t('全是非法字符的名字会被拒绝', Core.setPlayerName('<<<>>>') === false);
 }
 
+/* ===== V9.5.86（自审·边界参数压测）：坏参数不能把存档写成 NaN =====
+   实测抓到的病：addCur('points', NaN) → 货币变 NaN；addPlayerExp('abc') → 经验变 '0abc'（字符串拼接）；
+   skillUp(id, -1) → cost 变 undefined → 芯片变 NaN；craftSerum(id, null) → 点数变 NaN。
+   存档一旦被写成 NaN，之后所有计算全废（而且很难查），所以这几个入口都加了闸。 */
+{
+  Core.newGame(); Core.setPlayerName('坏参数'); Core.choosePlayerBloodline('修真');
+  Core.addChar('C021'); Core.S.cur.points = 1000;
+  const finite = () => Object.values(Core.S.cur).every(v => typeof v !== 'number' || Number.isFinite(v))
+    && Number.isFinite(Core.S.player.exp) && Number.isFinite(Core.S.player.level);
+  t('addCur 收到 NaN / Infinity 时忽略，不写坏货币', (() => {
+    Core.addCur('points', NaN); Core.addCur('points', Infinity); Core.addCur('points', -Infinity);
+    return Core.S.cur.points === 1000 && finite();
+  })());
+  t('addPlayerExp 收到非数字时忽略，经验不会被拼成字符串', (() => {
+    const before = Core.S.player.exp;
+    Core.addPlayerExp('abc'); Core.addPlayerExp(NaN); Core.addPlayerExp(Infinity);
+    return Core.S.player.exp === before && finite();
+  })());
+  t('skillUp 索引越界时安全拒绝（不会把芯片写成 NaN）', (() => {
+    const before = Core.S.cur.skillChip;
+    const r1 = Core.skillUp('C021', -1), r2 = Core.skillUp('C021', 9), r3 = Core.skillUp('C021', null);
+    return !r1.ok && !r2.ok && !r3.ok && Core.S.cur.skillChip === before && finite();
+  })());
+  t('craftSerum 数量传 null / NaN 时安全处理', (() => {
+    Core.S.items.mat_t1 = 20; Core.S.cur.points = 5000;
+    Core.craftSerum('sr_atk', null); Core.craftSerum('sr_atk', NaN); Core.craftSerum('sr_atk', 'abc');
+    return finite() && Core.S.cur.points >= 0;
+  })());
+  t('正常调用完全不受影响', (() => {
+    Core.newGame(); Core.setPlayerName('正常'); Core.choosePlayerBloodline('修真');
+    const p0 = Core.S.cur.points, e0 = Core.S.player.exp;   // 新档自带开局点数，得按增量比
+    Core.addCur('points', 100);
+    Core.addPlayerExp(100);
+    return Core.S.cur.points === p0 + 100 && Core.S.player.exp === e0 + 100;
+  })());
+}
+
+/* ===== V9.5.86（自审·战斗压测 + 存档洗净）：带毒的装备 / 探索进度会被清掉 =====
+   战斗引擎在 12 种异常编成下都不崩，唯一能把 NaN 带进战斗的是"输入自带 NaN"——
+   也就是一份被改过的档里塞了一件 `base:{atk:NaN}` 的装备。所以要在存档层拦住。 */
+{
+  Core.newGame(); Core.setPlayerName('毒装'); Core.choosePlayerBloodline('修真');
+  Core.S.equips = {
+    bad: { uid: 'bad', name: '毒剑', rarity: 'SR', slot: 'weapon', enhance: 3, base: { atk: NaN }, affixes: [] },
+    bad2: { uid: 'bad2', name: '怪甲', rarity: 'SR', slot: 'armor', enhance: 2, base: { hp: 100 }, affixes: [{ k: 'critPct', v: NaN }] },
+  };
+  Core.S.equipped['@player'].weapon = 'bad';
+  Core.grantEquip('W05', 'SR', 'weapon');
+  Core.migrate();
+  t('存档清洗：base 带 NaN 的装备被丢掉', Core.S.equips.bad === undefined);
+  t('存档清洗：affix 带 NaN 的装备也被丢掉', Core.S.equips.bad2 === undefined);
+  t('存档清洗：合法装备留着', Object.keys(Core.S.equips).length >= 1);
+  t('存档清洗：穿戴引用跟着清掉（不指向已删装备）', !Core.S.equipped['@player'].weapon || !!Core.S.equips[Core.S.equipped['@player'].weapon]);
+  t('存档清洗：主角属性里没有 NaN', Object.values(Core.effectivePlayerStats()).every(v => typeof v !== 'number' || Number.isFinite(v)));
+}
+{
+  Core.newGame(); Core.setPlayerName('毒进度'); Core.choosePlayerBloodline('修真');
+  Core.S.pendingRun = { worldId: 'W01', diff: 'normal', stage: NaN, wave: 99, waves: 'x', hpPct: { '@player': NaN } };
+  Core.migrate();
+  const pr = Core.S.pendingRun;
+  t('存档清洗：探索进度的 NaN 被洗干净', pr.stage === 1 && pr.wave === 2 && Array.isArray(pr.waves) && pr.hpPct['@player'] === 0);
+  t('存档清洗：世界 id 不存在时整条进度丢掉', (() => {
+    Core.S.pendingRun = { worldId: 'W99', stage: 1, waves: ['combat'], hpPct: {} };
+    Core.migrate();
+    return Core.S.pendingRun === null;
+  })());
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];

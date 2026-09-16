@@ -307,18 +307,30 @@ Core.newGame(); Core.setPlayerName('新档'); Core.choosePlayerBloodline('修真
    几组常见参数真调一次：抛异常、或者返回值里出现 NaN / Infinity，都报出来。 */
 console.log('\n=== ⑤ 导出函数冒烟（每个导出函数真调一次）===');
 {
-  /* 这几个函数天然要求"具体对象"参数（装备实例 / uid 数组 / 建筑 id），
-     用通用参数调必然抛错，属于正常，不算问题。 */
-  const NEEDS_OBJECT = ['equipStats', 'decomposeMany', 'equipScore', 'upgradeBuilding', 'enhanceCost', 'enhanceMat'];
+  /* V9.5.86（自审）：原来这 6 个函数是**直接跳过**的（它们要求具体对象参数，通用参数必然抛错），
+     等于"冒烟"漏掉了 6 个出口——跳过就是没测。现在改成**喂真参数**：
+     先造一件真装备 / 一个真建筑，再按它们的签名调，这样才真的覆盖到了。 */
+  const SPECIAL_ARGS = {
+    equipStats: c => [c.realEquip],
+    equipScore: c => [c.realEquip],
+    enhanceCost: c => [c.realEquip],
+    enhanceMat: c => [c.realEquip],
+    decomposeMany: c => [[c.realEquip.uid]],
+    upgradeBuilding: () => ['core'],
+  };
   const coreNames = Object.keys(Core).filter(k => typeof Core[k] === 'function');
   const throws = [], nans = [];
   coreNames.forEach(n => {
-    if (NEEDS_OBJECT.indexOf(n) >= 0) return;
     Core.newGame(); Core.setPlayerName('冒烟'); Core.choosePlayerBloodline('修真');
+    Core.addChar('C021');
+    Core.grantEquip('W05', 'SR', 'weapon');
+    const ctx = { realEquip: Core.S.equips[Object.keys(Core.S.equips)[0]] || { uid: 'x', name: 'x', rarity: 'R', slot: 'weapon', enhance: 0, base: {}, affixes: [], lock: false } };
     const argsets = [[], ['C021'], ['@player'], [1], ['W01', 'normal'], ['exp_s'], ['god'], [{}]];
+    const argsetsFor = fn => (SPECIAL_ARGS[fn] ? [SPECIAL_ARGS[fn](ctx)] : argsets);
     let done = false;
-    for (let i = 0; i < argsets.length && !done; i++) {
-      const a = argsets[i];
+    const list = argsetsFor(n);
+    for (let i = 0; i < list.length && !done; i++) {
+      const a = list[i];
       try {
         const r = Core[n].apply(null, a);
         done = true;
@@ -326,7 +338,7 @@ console.log('\n=== ⑤ 导出函数冒烟（每个导出函数真调一次）===
         chk(r, 'self');
         if (r && typeof r === 'object' && !Array.isArray(r)) Object.entries(r).forEach(([k, v]) => chk(v, k));
       } catch (e) {
-        if (i === argsets.length - 1) throws.push(`${n}() → ${e.message}`);
+        if (i === list.length - 1) throws.push(`${n}() → ${e.message}`);
       }
     }
   });
@@ -335,5 +347,85 @@ console.log('\n=== ⑤ 导出函数冒烟（每个导出函数真调一次）===
   if (!throws.length && !nans.length) ok(`${coreNames.length} 个导出函数：没有崩溃、没有 NaN`);
 }
 
-console.log(`\n结论：${bad === 0 ? '数据健全 + 老档兼容 + 导出函数健壮 ✓' : '有 ' + bad + ' 项要修'}`);
+/* ================= ⑥ 边界参数压测 =================
+   起因（V9.5.86 自审）：⑤ 只用了"正常参数"，但真正把存档写坏的往往是**异常参数**——
+   0 / 负数 / NaN / Infinity / 1e15。这里给所有"吃数字"的核心函数喂一圈这些值，
+   要求两件事：① 不抛异常；② 调用完之后存档里的关键数字仍然是有限数（没被写成 NaN）。 */
+console.log('\n=== ⑥ 边界参数压测（0 / 负数 / NaN / Infinity / 1e15）===');
+{
+  const BADS = [0, -1, NaN, Infinity, -Infinity, 1e15, undefined, null, '', 'abc'];
+  /* [函数名, 参数模板（用 % 占位那个坏值）]；% 只放数字，字符串参数单独用 '.' 表示"不存在的 id" */
+  const CASES = [
+    ['addCur', v => ['points', v]], ['addPlayerExp', v => [v]], ['addCharExp', v => [['C021'], v]],
+    ['addSectExp', v => [v]], ['onlineTick', v => [v]], ['levelUp', v => ['C021', v]],
+    ['skillUp', v => ['C021', v]], ['addItem', v => ['exp_s', v]], ['removeItem', v => ['exp_s', v]],
+    ['allocateAttr', v => ['muscle', v]], ['allocateSkill', v => [v]], ['hatchBeast', v => [v]],
+    ['craftSerum', v => ['sr_atk', v]], ['useExpItem', v => ['exp_s', v]], ['openBoxes', v => ['box_r', v]],
+    ['addShards', v => ['C021', v]], ['starUp', v => ['C021']], ['rebornChar', v => ['C021']],
+    ['buyBagCap', v => ['item']], ['setIdleLeader', v => ['cultivate', '.']], ['swapPartyMember', v => [1, '.']],
+    ['buyFabao', v => ['.']], ['buyMount', v => ['.']], ['buyShopItem', v => ['god', v]],
+    ['decomposeMany', v => [[v]]], ['setPlayerName', v => [v]], ['addItemToStash', v => ['exp_s', v]],
+  ];
+  let crush = 0, poison = 0;
+  CASES.forEach(([fn, mk]) => {
+    if (typeof Core[fn] !== 'function') return;      // 名字对不上就跳过（避免脚本自己写错造成假报）
+    BADS.forEach(v => {
+      Core.newGame(); Core.setPlayerName('压测'); Core.choosePlayerBloodline('修真');
+      Core.addChar('C021'); Core.S.cur.points = 1000;
+      try { Core[fn].apply(null, mk(v)); }
+      catch (e) { crush++; console.log(`  ✗ ${fn}(${JSON.stringify(v)}) 抛异常：${e.message}`); return; }
+      // 状态有没有被污染成 NaN / Infinity
+      const poisoned = Object.entries(Core.S.cur).filter(([, x]) => typeof x === 'number' && !Number.isFinite(x));
+      const lvBad = !Number.isFinite(Core.S.player.level) || !Number.isFinite(Core.S.player.exp);
+      if (poisoned.length || lvBad) {
+        poison++;
+        console.log(`  ✗ ${fn}(${JSON.stringify(v)}) 把存档写成了非法数：` +
+          poisoned.map(([k, x]) => k + '=' + x).join(' ') + (lvBad ? ` 等级=${Core.S.player.level} 经验=${Core.S.player.exp}` : ''));
+      }
+    });
+  });
+  if (!crush && !poison) console.log(`  ${CASES.length} 个核心函数 × ${BADS.length} 种坏参数：不崩、也不会把存档写成 NaN ✓`);
+  else { bad += crush + poison; }
+}
+
+/* ================= ⑦ 战斗引擎异常编成 =================
+   起因（V9.5.86 自审）：战斗是整个游戏的心脏，但之前只在"正常编成"下跑过。
+   这里喂 11 种异常编成 × 5 种回合上限：空敌人 / 空我方 / 1 打 5 / 巨大数值 / 零属性 /
+   负血 / NaN 属性 / 缺字段 / 没有技能 / 位置为空 …… 要求不崩、且帧里的数字都是有限数。 */
+console.log('\n=== ⑦ 战斗引擎异常编成 ===');
+{
+  const Battle = window.Battle;
+  const base = () => ({ name: '我方', kind: 'warrior', position: 'front', skills: D.PROTAGONIST.skills, skillLv: [0, 0, 0], maxHp: 1000, hp: 1000, atk: 100, def: 50, spd: 50, crit: 0, critDmg: 1.5, eva: 0, skillMult: 1 });
+  const foe = () => ({ name: '敌方', kind: 'warrior', hp: 1000, atk: 100, def: 50, spd: 50 });
+  const CASES = [
+    ['空敌人', [], []], ['空我方', [base()], []], ['双方都空', [], []],
+    ['1 打 5', [base()], [foe(), foe(), foe(), foe(), foe()]],
+    ['5 打 1', [base(), base(), base(), base(), base()], [foe()]],
+    ['巨大数值', [Object.assign(base(), { maxHp: 1e12, hp: 1e12, atk: 1e9 })], [Object.assign(foe(), { hp: 1e12, atk: 1e9 })]],
+    ['零属性', [Object.assign(base(), { maxHp: 1, hp: 1, atk: 0, def: 0, spd: 0 })], [Object.assign(foe(), { hp: 1, atk: 0, def: 0, spd: 0 })]],
+    ['负血', [Object.assign(base(), { hp: -5 })], [Object.assign(foe(), { hp: -5 })]],
+    ['NaN 属性', [Object.assign(base(), { maxHp: NaN, hp: NaN, atk: NaN })], [Object.assign(foe(), { hp: NaN })]],
+    ['缺字段', [{ name: '裸人' }], [{ name: '裸敌' }]],
+    ['没有技能', [Object.assign(base(), { skills: null, skillLv: null })], [foe()]],
+    ['位置为空', [Object.assign(base(), { position: null })], [foe()]],
+  ];
+  let fb = 0;
+  CASES.forEach(([label, allies, enemies]) => {
+    [0, -1, 1, 60, 999].forEach(mr => {
+      let res;
+      try { res = Battle.run({ allies, enemies, worldId: null, maxRounds: mr }); }
+      catch (e) { fb++; console.log(`  ✗ ${label} maxRounds=${mr} 抛异常：${e.message}`); return; }
+      if (!res || !Array.isArray(res.frames) || typeof res.win !== 'boolean') { fb++; console.log(`  ✗ ${label} maxRounds=${mr} 返回结构不对`); return; }
+      // NaN 属性那条是"输入就带毒"：引擎不该崩，但帧里出现 NaN 属于**输入问题**，
+      // 由存档层的 sanitizeSave 负责（装备 base 带 NaN 会被整件丢掉）——这里只查不崩。
+      if (label === 'NaN 属性') return;
+      const nan = res.frames.find(f => Object.values(f).some(v => typeof v === 'number' && !Number.isFinite(v)));
+      if (nan) { fb++; console.log(`  ✗ ${label} maxRounds=${mr} 帧里出现非法数：${JSON.stringify(nan).slice(0, 100)}`); }
+    });
+  });
+  if (!fb) console.log(`  ${CASES.length} 种异常编成 × 5 种回合上限：不崩、帧里没有 NaN ✓（NaN 属性那条由存档层拦截）`);
+  else bad += fb;
+}
+
+console.log(`\n结论：${bad === 0 ? '数据健全 + 老档兼容 + 导出函数健壮 + 边界参数安全 + 战斗引擎抗造 ✓' : '有 ' + bad + ' 项要修'}`);
 process.exit(bad ? 1 : 0);
