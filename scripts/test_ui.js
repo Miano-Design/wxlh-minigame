@@ -578,11 +578,14 @@ t('灯阁权限入口在「执灯者 → 成长」子页', () => {
   const html = UI._panels._screens.growScreen();
   if (!html.includes('灯阁权限')) throw new Error('缺入口');
 });
-t('招募页显示券数量与"有券先用券"', () => {
+t('招募页：有券才显示那行券；标签/机制说明都不写（父亲大人要求）', () => {
   Core.addItem('ticket_normal', 3);
   const html = UI._panels.recruitModal().innerHTML;
-  if (!html.includes('引灯招募券')) throw new Error('没显示券名');
-  if (!html.includes('有券先用券')) throw new Error('没说明扣券规则');
+  if (!html.includes('引灯招募券')) throw new Error('有券时没显示券那一行');
+  ['日常池：', '主力池：', '定向池：', '有券先用券', '本次会花', '用来攒碎片升星'].forEach(k => {
+    if (html.indexOf(k) >= 0) throw new Error('招募页还留着注释：' + k);
+  });
+  if (html.indexOf('本期 UP') < 0) throw new Error('定向 UP 那条要保留');
 });
 t('招募页有概率公示入口', () => {
   const html = UI._panels.recruitModal().innerHTML;

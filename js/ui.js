@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.49';
+  const GAME_VER = '9.5.50';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2102,15 +2102,18 @@ window.UI = (function () {
       const oneLabel = tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`;
       const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}·保底SR）`;
       return `<div class="card pool-card mb3">
-        <h3>${p.name} <span class="tag" style="color:var(--gold);border-color:var(--gold)">${p.tag}</span>
-          <span class="sub">用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
-        <div style="font-size:0.6875rem;color:var(--dim);line-height:1.75;margin-bottom:0.5rem">${p.desc}</div>
-        ${tk ? `<div class="ticket-row ${tk.n > 0 ? 'has' : ''}">
+        <!-- V9.5.50（父亲大人）：池名后面的"攒碎片/补图鉴/定向UP"标签、以及那一大段机制说明都不要了 -->
+        <h3>${p.name} <span class="sub">用 ${Object.keys(p.cost).map(curName).join(' / ')}</span></h3>
+        ${tk && tk.n > 0 ? `<div class="ticket-row has">
           <span>🎫 ${tkName} ×<b>${tk.n}</b></span>
-          <span class="ticket-hint">${tk.n > 0 ? '有券先用券，货币不动' : `没券了，本次会花 ${Object.keys(p.cost).map(curName).join(' / ')}`}</span>
         </div>` : ''}
         <div class="rate-row">${Object.entries(p.rates).map(([r, v]) => `<span class="rtext-${r}">${r} ${(v * 100).toFixed(1)}%</span>`).join('')}</div>
-        ${up ? `<div class="up-banner">本期 UP：<b>${esc(up.name)}</b> · 本期只出「${up.faction}」阵营（SSR 里一半是他，50 抽必出）</div>` : ''}
+        ${up ? (() => {
+          const left = D.upTimeLeft();
+          const dLeft = Math.floor(left / 86400e3), hLeft = Math.floor(left % 86400e3 / 3600e3);
+          return `<div class="up-banner">本期 UP：<b>${esc(up.name)}</b> · 「${up.faction}」阵营（SSR 里一半是他，50 抽必出）
+            <span style="float:right;color:var(--dim)">剩 ${dLeft} 天 ${hLeft} 小时</span></div>`;
+        })() : ''}
         ${pv ? `<div class="pity-row">
           <span>SSR 保底 <b>${pv.ssr.n}</b>/${pv.ssr.cap}</span>
           <span>UR 保底 <b>${pv.ur.n}</b>/${pv.ur.cap}</span>

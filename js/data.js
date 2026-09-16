@@ -1148,13 +1148,31 @@ window.DATA = (function () {
   };
   const PITY = { SSR: 50, UR: 100 };
   const PITY_UP = 50;
-  // 当期 UP：按自然周轮换，不写死角色，以后加角色自动进入轮换
-  const weekIndex = ts => Math.floor((ts || Date.now()) / (7 * 86400e3));
-  const recruitUpChar = (ts) => {
-    const pool = characters.filter(c => c.rarity === 'SSR' && !c.hidden);
-    if (!pool.length) return null;
-    return pool[weekIndex(ts) % pool.length];
+  /* 当期 UP（V9.5.50 父亲大人问过机制后重整）：
+     · 周期：**自然周**，每周一 00:00（本地时间）换一期；
+     · 顺序：全部 SSR（不含隐藏角色）按名单顺序**依次轮换**——不是随机，走完一轮再从头来；
+     · 也就是说"下一期是谁"是确定的（当前角色后面的那一个）。 */
+  const WEEK_MS = 7 * 86400e3;
+  const weekStart = ts => {
+    const d = new Date(ts || Date.now());
+    const day = (d.getDay() + 6) % 7;                                  // 0 = 周一
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);   // 本周一 00:00 本地
+    mon.setHours(0, 0, 0, 0);
+    return mon.getTime();
   };
+  const weekIndex = ts => Math.round(weekStart(ts) / WEEK_MS);
+  const upPool = () => characters.filter(c => c.rarity === 'SSR' && !c.hidden);
+  const recruitUpChar = (ts) => {
+    const pool = upPool();
+    if (!pool.length) return null;
+    return pool[((weekIndex(ts) % pool.length) + pool.length) % pool.length];
+  };
+  const recruitUpNext = (ts) => {                 // 下一期是谁（轮换，可预知）
+    const pool = upPool();
+    if (!pool.length) return null;
+    return pool[((weekIndex(ts) + 1) % pool.length + pool.length) % pool.length];
+  };
+  const upTimeLeft = (ts) => WEEK_MS - ((ts || Date.now()) - weekStart(ts));   // 距下一期还有多少毫秒
 
   /* ================= 挂机分工 ================= */
   // 4 条产线，各派 1 名领队（不能用已上阵的主力），领队战力越高产出越高。
@@ -1649,7 +1667,7 @@ window.DATA = (function () {
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,
     SIGNS, rollSign,
-    RECRUIT_POOLS, PITY, PITY_UP, recruitUpChar, weekIndex,
+    RECRUIT_POOLS, PITY, PITY_UP, recruitUpChar, recruitUpNext, upTimeLeft, weekIndex,
     FORMATIONS, pityText,
     AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV,
     IDLE_LINES, IDLE_LINE_ATTR_DIV, IDLE_MAT_PER_MIN,
