@@ -1138,7 +1138,8 @@ t('文字不出格：卡片与关键文字行都有断行 / 省略兜底', () =>
 });
 t('正文上边距跟着顶栏实际高度走（系统字号调大也不顶进顶栏）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
-  if (!css.includes('calc(var(--topbar-h, 92px)')) throw new Error('#view 上边距还是写死的');
+  // 数值单位会变（px / rem 都行），关键是"跟着量出来的 --topbar-h 走"，不是写死
+  if (!css.includes('calc(var(--topbar-h,')) throw new Error('#view 上边距还是写死的');
   const ui = fs.readFileSync('js/ui.js', 'utf8');
   if (!ui.includes('--topbar-h')) throw new Error('没有量顶栏高度写进 --topbar-h');
   if (!ui.includes('visualViewport')) throw new Error('没有处理键盘遮住弹窗的问题');
