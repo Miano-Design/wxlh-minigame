@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.39';
+  const GAME_VER = '9.5.40';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -317,6 +317,12 @@ window.UI = (function () {
   function showPanel(wrap, title, bodyHtml, keepScroll) {
     if (wrap) return updateModal(wrap, title, bodyHtml, keepScroll);
     return modal(title, bodyHtml);
+  }
+  /* 详情类面板要用**居中弹窗**而不是整页（父亲大人：背包里的物品详情弹窗就够了，不用进二级页）。
+     原地重画仍然走 updateModal，两种形态都支持。 */
+  function showCenterPanel(wrap, title, bodyHtml, keepScroll) {
+    if (wrap) return updateModal(wrap, title, bodyHtml, keepScroll);
+    return modal(title, bodyHtml, { center: true });
   }
   function confirmBox(title, text, onOk) {
     const w = modal(title, `
@@ -1907,7 +1913,7 @@ window.UI = (function () {
       : cs ? `${cs.name}（${cs.text}）· 限${D.KIND_NAMES[eq.classSet]}定位激活`
       : set ? `${set.name}（${set.text}）`
       : '普通装备';
-    const w = showPanel(wrap, `${eq.name}`, `
+    const w = showCenterPanel(wrap, `${eq.name}`, `
       <div class="mb3">
         <span class="rtext-${eq.rarity}" style="font-size:1.0625rem;font-weight:800">${eq.rarity}</span>
         <b style="font-size:1.0625rem"> ${eq.name} <span style="color:var(--gold)">+${eq.enhance}</span></b>
@@ -3349,7 +3355,7 @@ window.UI = (function () {
   function itemDetail(itemId, wrap, backFn) {
     const S = C().S;
     const it = D.ITEMS[itemId];
-    const goBack = backFn || (w2 => bagModal(w2));
+    const goBack = backFn || (w2 => { closeModal(w2); render(); });   // 弹窗形态：返回＝关掉它，背包页还在后面
     if (!it) return goBack(wrap);
     const n = S.items[itemId] || 0;
     const where = { explore: '副本探索中', character: '伙伴培养页', anywhere: '随时' }[it.where] || '—';
@@ -3411,8 +3417,8 @@ window.UI = (function () {
         <div class="note">${esc(it.src || '副本掉落 / 商店兑换')}</div>
       </div>
       ${actions}
-      <button class="btn ghost block mt4" data-back>‹ 返回背包</button>`;
-    const w = showPanel(wrap, '道具详情', body);
+      <button class="btn ghost block mt4" data-back>‹ 返回</button>`;
+    const w = showCenterPanel(wrap, '道具详情', body);
     w.querySelector('[data-back]').onclick = () => goBack(w);
     const gr = w.querySelector('[data-gorecruit]');
     if (gr) gr.onclick = () => { closeModal(w); setTab('home'); setTimeout(() => openRecruit(), 220); };
