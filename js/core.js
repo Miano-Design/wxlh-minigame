@@ -1564,10 +1564,15 @@ window.Core = (function () {
     return { ok: true, msg: `${charName(charId)} 已派往「${D.IDLE_LINES.find(l => l.id === lineId).name}」` };
   }
   function offlineCapHours() {
-    let cap = 8 + (S.player.geneLock >= 5 ? 12 : 0);
-    cap += S.buildings.medical * 0.2;
+    /* 基础上线 6 小时；三条加成**点满加起来正好 +6 小时** → 满配刚好 12 小时（父亲大人定的）：
+         铭刻 5 阶        +4 小时（一次性大节点）
+         灯阁权限 2/7 级  +0.5 × 2 = +1 小时
+         医疗室 每 10 级  +0.2 × 5 = +1 小时（50 级封顶）
+       所以不会"点满还差一截"，也不会提前撞上限（Math.min 只是兜底，正常永远不触发）。 */
+    let cap = 6 + (S.player.geneLock >= 5 ? 4 : 0);
+    cap += Math.floor(S.buildings.medical / 10) * 0.2;
     cap += authority().capHours;
-    return cap;
+    return Math.min(12, Math.round(cap * 100) / 100);      // 顺手抹掉浮点尾数
   }
   function offlineEfficiency() {
     return Math.min(1.5, 0.85 + S.buildings.medical * 0.01 + (talentAll().offlinePct || 0) + authority().offlinePct + kejiBonus().offlinePct);

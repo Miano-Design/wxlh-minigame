@@ -1744,5 +1744,27 @@ setParty(['C021']);
   t('W14 每回合都有规则帧', r14.frames.filter(f => f.type === 'rule').length >= 5);
 }
 
+/* ---- 离线上限的数值是配好的（父亲大人定的）：基础 6h，
+   铭刻 5 阶 +4h · 灯阁权限 2/7 级各 +0.5h · 医疗室每 10 级 +0.2h（50 级 = +1h），
+   三条点满正好 +6h → 满配刚好 12h：不许提前撞上限，也不许点满还差一截。 ---- */
+{
+  Core.newGame();
+  Core.S.buildings.medical = 0; Core.S.player.geneLock = 0; Core.S.auth = 0;
+  t('新档离线上限正好 6 小时', Core.offlineCapHours() === 6);
+  Core.S.buildings.medical = 9;                       // 差一级，不给
+  t('医疗室 9 级还不给上限', Core.offlineCapHours() === 6);
+  Core.S.buildings.medical = 10;
+  t('医疗室满 10 级 +0.2h', Math.abs(Core.offlineCapHours() - 6.2) < 1e-9);
+  Core.S.player.geneLock = 5;
+  t('铭刻 5 阶 +4h', Math.abs(Core.offlineCapHours() - 10.2) < 1e-9);
+  Core.S.auth = 2;
+  t('灯阁权限 2 级 +0.5h', Math.abs(Core.offlineCapHours() - 10.7) < 1e-9);
+  Core.S.auth = 7;
+  t('灯阁权限 7 级再 +0.5h（累计 1h）', Math.abs(Core.offlineCapHours() - 11.2) < 1e-9);
+  Core.S.buildings.medical = 50;                      // 三条线全点满
+  Core.S.auth = D.AUTHORITY_MAX;
+  t('三条点满：正好 12 小时（不溢不欠）', Core.offlineCapHours() === 12);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

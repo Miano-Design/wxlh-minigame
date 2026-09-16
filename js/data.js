@@ -826,14 +826,15 @@ window.DATA = (function () {
     { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 300 } },
     { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 800 } },
     { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2000 } },
-    { stage: 5, name: '完全解锁', desc: '全属性+15%，挂机上限+12小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 5000 } },
+    { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 5000 } },
   ];
 
   /* ================= 建筑 ================= */
   const BUILDINGS = [
     { id: 'core',     name: '灯芯',   base: 1000, desc: '每级：挂机收益 +2%' },
     { id: 'training', name: '训练室',     base: 800,  desc: '每级：挂机经验 +3%' },
-    { id: 'medical',  name: '医疗室',     base: 700,  desc: '每级：离线效率 +1%、离线上限 +12分钟' },
+    // 离线上限按"每 10 级 +0.2 小时"给：50 级正好 +1 小时（跟铭刻 4h、灯阁权限 1h 凑成满配 +6h）
+    { id: 'medical',  name: '医疗室',     base: 700,  desc: '每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时' },
     { id: 'workshop', name: '装备工坊',   base: 900,  desc: '每级：装备强化费用 -1%（最多-40%）' },
     { id: 'geneLab',  name: '血统实验室', base: 1200, desc: '每级：血统升级费用 -1%（最多-40%）' },
   ];
@@ -1069,18 +1070,21 @@ window.DATA = (function () {
   });
   const AUTHORITY = [
     { lv: 1,  desc: '挂机产出 +6%、挂机经验 +4%' },
-    { lv: 2,  desc: '离线上限 +0.6 小时' },
+    { lv: 2,  desc: '离线上限 +0.5 小时' },
     { lv: 3,  desc: '每日扫荡次数 +4' },
     { lv: 4,  desc: '挂机产出再 +6%（累计 +12%）' },
     { lv: 5,  desc: '离线效率 +5%（累计 +5%）' },
     { lv: 6,  desc: '挂机经验再 +4%（累计 +8%）' },
-    { lv: 7,  desc: '离线上限再 +0.6 小时（累计 +1.2h）' },
+    { lv: 7,  desc: '离线上限再 +0.5 小时（累计 +1h）' },
     { lv: 8,  desc: '每日扫荡再 +4（累计 +8）' },
     { lv: 9,  desc: '挂机产出再 +6%（累计 +18%）' },
     { lv: 10, desc: '全队全属性 +5%、离线效率 +5%（累计 +10%）' },
   ];
   // 权限加成（按当前等级线性累加，界面与实装共用这一份数据，避免"写了没做"）
-  const AUTHORITY_PER_LV = { idlePct: 0.06, expPct: 0.04, capHours: 0.6, sweep: 4, offlinePct: 0.05, allPct: 0.05 };
+  /* capHours 这一步 0.5：2/7 级各一次，满级正好 +1 小时。
+     离线上限的三条来源是配好的——铭刻 5 阶 +4h · 灯阁权限 +1h · 医疗室 50 级 +1h，
+     加起来正好 +6 小时（基础 6h → 满配 12h），既不会提前封顶也不会差一截。 */
+  const AUTHORITY_PER_LV = { idlePct: 0.06, expPct: 0.04, capHours: 0.5, sweep: 4, offlinePct: 0.05, allPct: 0.05 };
   const authorityBonus = lv => {
     lv = Math.max(0, Math.min(AUTHORITY_MAX, lv | 0));
     // 1/4/9 级给挂机产出，2/7 级给离线上限，3/8 级给扫荡次数，5/10 级给离线效率，10 级额外给全属性
