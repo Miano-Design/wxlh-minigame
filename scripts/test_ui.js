@@ -748,13 +748,39 @@ t('伙伴默认排序：上阵 → 等级 → 稀有度 → 星级', () => {
   const rest = order.slice(front.length).map(id => Core.S.chars[id].lv);
   for (let i = 1; i < rest.length; i++) if (rest[i] > rest[i - 1]) throw new Error('同阵营优先级里等级没降序：' + rest.join(','));
 });
-t('换将无损：新上阵的继承被换下那位的等级', () => {
+t('换将无损：继承等级 + 能穿的装备跟着走、穿不了的留下', () => {
+  Core.newGame(); Core.setPlayerName('换将');
+  ['C021', 'C022'].forEach(id => { try { Core.addChar(id); } catch (e) {} });
+  Core.S.party = ['@player', 'C021', null, null, null];
+  Core.S.chars.C021.lv = 20; Core.S.chars.C022.lv = 3;
+  const u1 = 'eqswap1', u2 = 'eqswap2';
+  Core.S.equips[u1] = D.makeEquip('W01', 'weapon', 'SR', u1, { setType: 'plain' });
+  const sigIdx = D.SIGNATURE_EQUIPS.findIndex(x => x.charId && x.charId !== 'C021' && x.charId !== 'C022');
+  Core.S.equips[u2] = D.makeSignatureEquip(sigIdx, u2);            // 别人的专属：C022 穿不了
+  Core.S.equipped.C021 = Object.assign({}, Core.S.equipped.C021, { weapon: u1, head: u2 });
+  const r = Core.swapPartyMember(1, 'C022');
+  if (!r.ok) throw new Error('换将失败：' + r.msg);
+  if (Core.S.party[1] !== 'C022') throw new Error('新伙伴没上阵');
+  if (Core.S.chars.C022.lv !== 20) throw new Error('没有继承等级：' + Core.S.chars.C022.lv);
+  if ((Core.S.equipped.C022 || {}).weapon !== u1) throw new Error('能穿的武器没转过去');
+  if ((Core.S.equipped.C022 || {}).head === u2) throw new Error('穿不了的专属装备被硬塞过去了');
+  if ((Core.S.equipped.C021 || {}).head !== u2) throw new Error('穿不了的专属装备没有留在原伙伴身上');
+});
+t('点已上阵的格子先出"下阵 / 无损换将"两选弹窗', () => {
+  Core.newGame(); Core.setPlayerName('两选');
+  Core.addChar('C021');
+  Core.S.party = ['@player', 'C021', null, null, null];
+  const w = UI._panels.slotMenu(1);
   const src = fs.readFileSync('js/ui.js', 'utf8');
-  const i = src.indexOf('function pickPartyChar');
-  const seg = src.slice(i, i + 2200);
-  if (seg.indexOf('继承 Lv.') < 0 || seg.indexOf('Math.max(') < 0) {
-    throw new Error('换将里没有"继承等级"的逻辑');
+  const i = src.indexOf('function slotMenu');
+  const seg = src.slice(i, i + 1400);
+  ['data-swap', 'data-off', '无损换将', '下阵'].forEach(k => {
+    if (seg.indexOf(k) < 0) throw new Error('两选弹窗缺：' + k);
+  });
+  if (src.indexOf('if (who && who !== \'@player\') { slotMenu(idx); return null; }') < 0) {
+    throw new Error('点已上阵的格子没有走两选弹窗');
   }
+  if (w) UI._panels._closeModal(w);
 });
 t('预设独立成卡（不跟小队挤在一起）', () => {
   const html = UI._panels._screens.partyScreen();

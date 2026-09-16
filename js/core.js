@@ -513,6 +513,34 @@ window.Core = (function () {
      经验模块往池子里加，升级从池子里扣，伙伴重生把花掉的加回池子。
      这样前期练的低稀有度伙伴，后期重生就能把经验让给高稀有度伙伴。 */
   function partnerExp() { return S.charExp || 0; }
+  /* 无损换将（V9.5.47）：把 slotIdx 上的伙伴换成 newId ——
+       ① 新伙伴继承被换下那位的等级（取较高者，绝不掉级）；
+       ② 被换下那位身上"新伙伴也穿得了"的装备跟着转过去；穿不了（职业专属 / 定位不符）留在原位。
+     返回 { ok, outId, inheritLv, moved }。 */
+  function swapPartyMember(slotIdx, newId) {
+    if (!S.chars[newId]) return { ok: false, msg: '未拥有该伙伴' };
+    const outId = S.party[slotIdx];
+    if (outId === '@player') return { ok: false, msg: '主角必上阵，这一格不能换' };
+    if (outId === newId) return { ok: false, msg: '他已经在这一格了' };
+    let inheritLv = 0, moved = 0;
+    if (outId && S.chars[outId]) {
+      const keep = Math.max(S.chars[outId].lv, S.chars[newId].lv);
+      if (keep !== S.chars[newId].lv) { S.chars[newId].lv = keep; inheritLv = keep; }
+    }
+    S.party[slotIdx] = newId;
+    // 全场只有一个位置能站同一个人：别的地方还站着他就先撤掉
+    S.party.forEach((id, i) => { if (i !== slotIdx && id === newId) S.party[i] = null; });
+    if (outId && S.chars[outId] && S.equipped[outId]) {
+      Object.keys(S.equipped[outId]).forEach(slot => {
+        const uid = S.equipped[outId][slot];
+        if (!uid || !S.equips[uid]) return;
+        if (!canEquip(newId, S.equips[uid])) return;      // 穿不了就留在原伙伴身上
+        if (equipItem(newId, uid)) moved++;
+      });
+    }
+    save();
+    return { ok: true, outId: outId || null, inheritLv, moved };
+  }
   function levelUp(charId, times = 1) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
@@ -2857,7 +2885,7 @@ window.Core = (function () {
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
-    addChar, addShards, levelCost, levelUp, useExpItem, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
+    addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
     craftSerum, useSerum, serumTaken, serumApplied,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,

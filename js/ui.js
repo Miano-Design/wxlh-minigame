@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.46';
+  const GAME_VER = '9.5.47';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1269,8 +1269,33 @@ window.UI = (function () {
       return dropOn(pos);
     }
     if (pos === 'P') { protagonistDetail(); return null; }
-    pickPartyChar(+pos);
+    const idx = +pos;
+    const who = C().S.party[idx];
+    // V9.5.47（父亲大人）：点"已经上了人"的格子 → 先出一个两选弹窗：下阵 / 无损换将
+    if (who && who !== '@player') { slotMenu(idx); return null; }
+    pickPartyChar(idx);
     return null;
+  }
+  /* 已上阵格子的两选弹窗：下阵 / 无损换将 */
+  function slotMenu(idx) {
+    const S = C().S;
+    const id = S.party[idx];
+    if (!id || id === '@player') return;
+    const w = modal('这一格：' + cname(id), `
+      <div class="hint mb2">${D.charById[id].role} · ${D.charById[id].faction} · Lv.${S.chars[id].lv} · 战力 ${fmt(C().power(id))}</div>
+      <div class="btn-row">
+        <button class="btn small gold" data-swap="1">无损换将</button>
+        <button class="btn small ghost" data-off="1">下阵</button>
+      </div>
+      <div class="hint mt2">无损换将：新上阵的会继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。</div>
+    `, { center: true });
+    w.querySelector('[data-swap]').onclick = () => { closeModal(w); pickPartyChar(idx); };
+    w.querySelector('[data-off]').onclick = () => {
+      S.party[idx] = null; C().save();
+      closeModal(w); render();
+      toast(`${cname(id)} 已下阵`);
+    };
+    return w;
   }
   // 测试用：读当前"抓起"状态（grabbedPos 是模块级私有变量，外部看不到）
   function grabState() { return { grabbed: grabbedPos, hover: hoverPos, suppress: suppressClick, dragging }; }
@@ -1536,22 +1561,14 @@ window.UI = (function () {
       el.onclick = () => {
         const id = el.dataset.pick;
         if (S.party.includes(id)) return;
-        const oldId = S.party[slotIdx];
-        if (oldId === '@player') return;     // 主角那一格不能被顶掉
-        S.party[slotIdx] = id;
-        // V9.5.46（父亲大人）：换将无损 —— 新上阵的直接继承被换下那位的等级（取较高者，绝不掉级）
-        let inheritMsg = '';
-        if (oldId && C().S.chars[oldId] && C().S.chars[id]) {
-          const keep = Math.max(C().S.chars[oldId].lv, C().S.chars[id].lv);
-          if (keep !== C().S.chars[id].lv) {
-            C().S.chars[id].lv = keep;
-            inheritMsg = `，继承 Lv.${keep}`;
-          }
-        }
-        C().save();
+        // V9.5.47：换将无损走 core 里的 swapPartyMember（继承等级 + 能穿的装备跟着走）
+        const sw = C().swapPartyMember(slotIdx, id);
+        if (!sw.ok) { toast(sw.msg || '换不了'); return; }
         closeModal(w);
         render();
-        toast(`${D.charById[id].name} 已上阵${inheritMsg}${oldId ? `（${D.charById[oldId].name} 已下阵）` : ''}`);
+        toast(`${D.charById[id].name} 已上阵${sw.inheritLv ? `，继承 Lv.${sw.inheritLv}` : ''}`
+          + `${sw.moved ? `，带走 ${sw.moved} 件装备` : ''}`
+          + `${sw.outId ? `（${D.charById[sw.outId].name} 已下阵）` : ''}`, 2600);
       };
     });
   }
@@ -1669,7 +1686,6 @@ window.UI = (function () {
           </div>
         </div>
         <div class="kv mt2"><span class="k">伙伴经验</span><span style="color:var(--gold)">${fmt(C().partnerExp())}</span></div>
-        <div class="kv"><span class="k">这个伙伴已投入</span><span>${fmt(C().expSpentOn(id))}</span></div>
         <div class="btn-row mt3">
           <button class="btn small" data-lvup="1" ${!cost ? 'disabled' : ''}>升 1 级</button>
           <button class="btn small" data-lvup="10" ${!cost ? 'disabled' : ''}>升 10 级</button>
@@ -4876,7 +4892,7 @@ window.UI = (function () {
       applyPotionHp,
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
-      openPartyPanel, openGrowPanel, charListSorted, pickPartyChar,
+      openPartyPanel, openGrowPanel, charListSorted, pickPartyChar, slotMenu,
     },
   };
 })();
