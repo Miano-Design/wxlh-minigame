@@ -252,6 +252,18 @@ window.Core = (function () {
       (S.altPlayers || []).forEach(p => { if (p) p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
       S.skillZeroBased = true;
     }
+    /* V9.5.73（技能点规则换代）：技能点从"每 3 级 1 点"回到"每级 1 点"，
+       上限从 11 提到 35/35/30（合计 100）。
+       老档必须按**新规则**把该给的技能点补齐——否则一个已经 100 级的老档，
+       手上只有 33 点（旧规则），而技能要 100 点，他永远点不满（等级已经到顶，再也拿不到点）。
+       一次性标记 skillPointRuleV2，不会重复补。 */
+    if (!S.skillPointRuleV2) {
+      const earned = Math.floor((S.player.level || 0) / D.SKILL_POINT_EVERY_LV);
+      const spent = (S.player.skillLv || [0, 0, 0]).reduce((a, b) => a + b, 0);
+      const fixed = Math.max(0, earned - spent);
+      if (fixed > (S.player.skillPoints || 0)) S.player.skillPoints = fixed;
+      S.skillPointRuleV2 = true;
+    }
     S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3);
     if (S.player.skillPoints === undefined) {
       const spent = S.player.skillLv.reduce((s, x) => s + x, 0);     // 技能等级从 0 起，已花点数就是等级和
@@ -726,14 +738,19 @@ window.Core = (function () {
     save();
     return { ok: true, msg: `升到 ${c.star}★` };
   }
-  // V9.5.68：技能上限 10 → 12，所以芯片价目表补两级（沿用原来的涨幅）
-  const SKILL_CHIP_COST = [10, 20, 35, 55, 80, 110, 150, 200, 260, 340, 430];
+  /* V9.5.73（父亲大人：技能上限 35/35/30）：伙伴技能也用同一张上限表，
+     但伙伴花的是**技能芯片**（主角花技能点）。上限从 11 涨到 35，价目表不能还是手写 11 条，
+     所以改成公式：第 lv 级（0 基）要 10 × 1.16^lv 个芯片。
+       满一条 35 级 ≈ 1.1 万芯片 ≈ 3 天（芯片日收入约 2400~4400）
+       一个伙伴三条点满 ≈ 3.3 万芯片 ≈ 7~14 天 —— 和其它养成线的量级一致。 */
+  const SKILL_CHIP_BASE = 10, SKILL_CHIP_GROW = 1.16;
+  const SKILL_CHIP_COST = Array.from({ length: D.SKILL_MAX }, (_, lv) => Math.round(SKILL_CHIP_BASE * Math.pow(SKILL_CHIP_GROW, lv)));
   function skillUp(charId, idx) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     const lv = c.skillLv[idx];
-    if (lv >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
-    const cost = SKILL_CHIP_COST[lv];      // V9.5.69：技能从 0 级起，价目表也跟着 0 起
+    if (lv >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
+    const cost = SKILL_CHIP_COST[lv];      // 技能从 0 级起，价目表也跟着 0 起
     if (S.cur.skillChip < cost) return { ok: false, msg: `技能芯片不足（${S.cur.skillChip}/${cost}）` };
     S.cur.skillChip -= cost;
     c.skillLv[idx]++;
@@ -1804,7 +1821,7 @@ window.Core = (function () {
   function allocateSkill(idx) {
     const lv = S.player.skillLv || (S.player.skillLv = [0, 0, 0]);
     if (idx < 0 || idx > 2) return { ok: false, msg: '技能不存在' };
-    if (lv[idx] >= D.SKILL_MAX) return { ok: false, msg: '已满级' };
+    if (lv[idx] >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
     if ((S.player.skillPoints || 0) < 1) return { ok: false, msg: '没有可用技能点' };
     S.player.skillPoints--;
     lv[idx]++;

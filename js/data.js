@@ -71,13 +71,17 @@ window.DATA = (function () {
   ];
   const ATTR_POINTS_PER_LV = 3;   // 每升 1 级获得的属性点
   const ATTR_POINT_VALUE = 2;     // 每点属性点增加的六维值
-  /* V9.5.68（上限联动体检）：技能点改为每 3 级给 1 点（以前每级 1 点 = Lv.100 发 99 点，
-     而三条技能点满只要 27 点，多出 72 点没处花）。 */
-  const SKILL_POINT_EVERY_LV = 3;
-  /* 技能从 0 级起（0 = 没点过）：上限 11 级 = 每条 11 次升级，
-     3 条合计 33 点 = Lv.100 的技能点总量（floor(100/3)）。
-     技能倍率公式 1 + lv×0.07 跟着改成从 0 起算，所以 Lv.11 的强度与旧版 Lv.12 完全一致。 */
-  const SKILL_MAX = 11;
+  /* V9.5.73（父亲大人：技能等级改成 35/35/30）：
+     三条技能各自的上限 —— 技能1 35 级、技能2 35 级、必杀技 30 级，合计 100 级。
+     技能点回到"每升 1 级给 1 点"：Lv.100 正好 100 点 = 100 级，一条不多一条不少。
+     （V9.5.68 那版是"每 3 级 1 点 + 上限 11"，因为当时 27 点就点满了、多出的 72 点没处花；
+       现在上限翻了三倍，点数供给跟着回到 1 点/级，两边重新对齐。）
+     每级增益从 7% 调到 2%：满级强度 技能 1.70 倍 / 必杀 1.60 倍，与旧版满级（1.70）基本持平——
+     上限翻三倍但不给战力翻三倍，否则刚调好的副本/深井难度会白调。 */
+  const SKILL_POINT_EVERY_LV = 1;
+  const SKILL_MAX_BY_INDEX = [35, 35, 30];      // [技能1, 技能2, 必杀技]
+  const SKILL_MAX = Math.max.apply(null, SKILL_MAX_BY_INDEX);   // 35，给需要"最大上限"的地方用
+  const SKILL_PCT_PER_LV = 0.02;                // 每级技能倍率 +2%
   // V9.5.69：等级从 0 起之后，这个门槛必须跟着改成 0——否则开局第一件事（选血统）会被自己挡住
   const BLOODLINE_UNLOCK_LV = 0;  // 开局第一件事就是选血统（境界线跟着血统走，所以不能拖到后面）
 
@@ -797,7 +801,7 @@ window.DATA = (function () {
       realms: ['感应者', '念动者', '心灵使', '精神师', '念动师', '心灵主', '虚空者', '超感者', '念神'],
     },
   };
-  const BLOODLINE_MAX = 30;
+  const BLOODLINE_MAX = 50;   // V9.5.73（父亲大人）：血统满级 30 → 50
   // V9.5.70：整体压慢 ×1.5（结晶 10+5lv → 15+8lv；点数 2000×(lv+1) → 3000×(lv+1)）
   const bloodlineCost = lv => ({ bloodCrystal: 15 + lv * 8, points: 3000 * (lv + 1) });
 
@@ -1144,7 +1148,9 @@ window.DATA = (function () {
       rates: { N: 0.46, R: 0.36, SR: 0.18 },
       // 招募单抽价**不参与**这次"整体压慢"：它已经在上一轮定过（45000 十连），
       // 而且招募是"攒碎片"的日常循环，涨价会让新手期直接卡住
-      cost: { points: 5000 }, ten: { points: 45000 },
+      // V9.5.73（父亲大人）：单抽 5000 → 500（5000 点等于挂机 8 小时，抽一次太肉了）；
+      // 十连按原来的关系（9 次单抽的价）同步降到 4500，不然会出现"十连比单抽贵 90 倍"的倒挂
+      cost: { points: 500 }, ten: { points: 4500 },
       ticket: 'ticket_normal',
       desc: '日常池：只出 N / R / SR，重复伙伴转碎片。花的是挂机能刷的点数，用来攒碎片升星。有「引灯招募券」时先扣券。',
       tag: '攒碎片',
@@ -1396,7 +1402,8 @@ window.DATA = (function () {
       { currencyGain: { skillChip: 10 }, name: '技能芯片×10', price: 2000, stock: -1 },
       { item: 'box_r', name: '随机R装备', price: 5000, stock: -1 },
       { item: 'box_sr', name: '随机SR装备', price: 30000, stock: -1 },
-      { item: 'ticket_normal', name: '引灯招募券', price: 6000, stock: 3 },
+      // V9.5.73：券的价值 = 1 次普通招募，单抽降到 500 之后这里必须跟着降（原来比直接抽还贵 12 倍）
+      { item: 'ticket_normal', name: '引灯招募券', price: 600, stock: 3 },
     ] },
     otherworld: { name: '异界商店', currency: 'otherworld', items: [
       { item: 'box_sr', name: 'SR装备箱', price: 100, stock: -1 },
@@ -1686,7 +1693,8 @@ window.DATA = (function () {
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
-    ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV, SKILL_POINT_EVERY_LV, SKILL_MAX,
+    ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
+    SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
     BLOODLINE_SKILLS, KIND_NAMES, CLASS_SETS, SIGNATURE_EQUIPS, makeSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,

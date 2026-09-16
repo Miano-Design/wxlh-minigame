@@ -75,16 +75,16 @@ function row(name, cap, cost, note) {
 /* ---- ① 主角自己 ---- */
 const expAll = D.EXP_TABLE.reduce((a, b) => a + b, 0);   // V9.5.69：等级从 0 起，全表就是 0→满级
 row('主角等级', `Lv.${D.PLAYER_MAX_LV}`, { exp: expAll });
-const SKILL_MAX = D.SKILL_MAX;                       // 技能等级上限（主角与伙伴共用）
-const SKILL_BARS = 3;                                // 主角技能固定 3 条
-const skillSupply = Math.floor((D.EXP_TABLE.length - 1) / D.SKILL_POINT_EVERY_LV);   // 每 N 级 +1 点
-const skillNeed = SKILL_MAX * SKILL_BARS;   // 技能从 0 级起：上限值就是要点几次
+const SKILL_CAPS = D.SKILL_MAX_BY_INDEX;             // V9.5.73：三条技能各有上限 35/35/30
+const SKILL_BARS = SKILL_CAPS.length;
+const skillSupply = Math.floor(D.PLAYER_MAX_LV / D.SKILL_POINT_EVERY_LV);   // 每 N 级 +1 点
+const skillNeed = SKILL_CAPS.reduce((a, b) => a + b, 0);   // 0 基：上限值就是要点几次
 {
   const ratio = skillSupply / skillNeed;
   const verdict = ratio > 1.25 ? `⚠ 多出 ${skillSupply - skillNeed} 点没处花（供给是需求的 ${ratio.toFixed(1)} 倍）`
-    : ratio < 0.8 ? `⚠ 永远点不满（缺 ${skillNeed - skillSupply} 点）` : '✓ 对得上';
+    : ratio < 0.9 ? `⚠ 永远点不满（缺 ${skillNeed - skillSupply} 点）` : '✓ 对得上';
   if (ratio > 1.25 || ratio < 0.8) warn++;
-  rows.push(`  ${'主角技能点'.padEnd(22, '　')} 上限 3 条×Lv.${SKILL_MAX}   需要 ${skillNeed} 点 / Lv.100 给 ${skillSupply} 点   ${verdict}`);
+  rows.push(`  ${'主角技能点'.padEnd(22, '　')} 上限 ${SKILL_CAPS.join('/')} 级   需要 ${skillNeed} 点 / Lv.100 给 ${skillSupply} 点   ${verdict}`);
 }
 {
   const pts = D.PLAYER_MAX_LV * D.ATTR_POINTS_PER_LV;   // Lv.0→Lv.100 共 100 次升级
@@ -93,7 +93,7 @@ const skillNeed = SKILL_MAX * SKILL_BARS;   // 技能从 0 级起：上限值就
 
 /* ---- ② 伙伴（一名） ---- */
 row('伙伴等级', `Lv.${D.PLAYER_MAX_LV}`, { charExp: expAll, points: D.LEVEL_POINTS.reduce((a, b) => a + b, 0) });
-row('伙伴技能 3 条', `Lv.${SKILL_MAX}`, { skillChip: Core.SKILL_CHIP_COST.reduce((a, b) => a + b, 0) * 3 });
+row('伙伴技能 3 条', SKILL_CAPS.join('/'), { skillChip: Core.SKILL_CHIP_COST.reduce((a, b) => a + b, 0) * 3 });
 {
   let bc = 0, pt = 0;
   for (let lv = 0; lv < D.BLOODLINE_MAX; lv++) { const c = D.bloodlineCost(lv); bc += c.bloodCrystal; pt += c.points; }

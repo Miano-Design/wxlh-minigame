@@ -189,6 +189,11 @@ else {
   if (S.items.heal_s !== undefined || S.items.buff_muscle !== undefined) fail('已下架的消耗品还留在背包里');
   if (S.retiredRefund !== refundExpect) fail(`退款金额不对：期望 ${refundExpect}，实际 ${S.retiredRefund}`);
   if ((S.stash || []).length) fail('待领箱里还留着已下架的道具');
+  /* 技能点规则换代（每 3 级 1 点 → 每级 1 点）也要给老档补齐：
+     Lv.42 按新规则应有 42 点，已点掉 2+2+2 = 6 点 → 手上应该剩 36 点。
+     不补的话，一个满级老档会因为"等级到顶再也拿不到点"而永远点不满技能。 */
+  const expectPts = 42 - (2 + 2 + 2);
+  if (S.player.skillPoints !== expectPts) fail(`老档技能点没按新规则补齐：期望 ${expectPts}，实际 ${S.player.skillPoints}`);
   ['charExp', 'travel', 'garden', 'arena', 'beast', 'sect', 'keji', 'sign', 'fabao', 'mount'].forEach(k => {
     if (S[k] === undefined || S[k] === null) fail(`老档缺字段没补：${k}`);
   });

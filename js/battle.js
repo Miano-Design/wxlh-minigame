@@ -357,7 +357,9 @@ window.Battle = (function () {
     }
     // ===== 盟友技能 AI =====
     if (isAlly && u.skills) {
-      const skillMultLv = i => 1 + (u.skillLv[i] - 1) * 0.07;
+      // V9.5.73：技能从 0 级起 + 每级 +2%（旧写法是 1+(lv-1)*0.07，等级改 0 基之后
+      // 会在 Lv.0 算出 0.93 倍——等于把所有初始技能暗削 7%）。满级强度：技能 1.70 / 必杀 1.60。
+      const skillMultLv = i => 1 + (u.skillLv[i] || 0) * (window.DATA.SKILL_PCT_PER_LV || 0.02);
       // 天赋「技能CD-1」：技能冷却统一减 1（最低 1 回合），必杀不受影响
       const cdOf = i => Math.max(1, (i === 0 ? u.skills.s1.cd : u.skills.s2.cd) - (u.cdRed || 0));
       // 必杀

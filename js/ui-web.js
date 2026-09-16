@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.72';
+  const GAME_VER = '9.5.73';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -1371,8 +1371,8 @@ window.UI = (function () {
         <h3>⚡ ${S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'} <span class="sub">可用技能点 ${S.player.skillPoints || 0}</span>
           <button class="btn small ghost hbtn" data-pskillreset="1" ${spentSkill > 0 ? '' : 'disabled'}>↺ 重置</button></h3>
         ${[P.s1, P.s2, P.ult].map((sk, i) => `
-          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [0, 0, 0])[i]}/${D.SKILL_MAX}</span>
-            <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [0, 0, 0])[i] < D.SKILL_MAX ? '' : 'disabled'}>+1</button></div>
+          <div class="skill-row"><div class="sname">${['技能', '技能', '必杀'][i]}·${sk.name} <span class="tag">Lv.${(S.player.skillLv || [0, 0, 0])[i]}/${D.SKILL_MAX_BY_INDEX[i]}</span>
+            <button class="btn small" data-pskill="${i}" style="margin-left:auto" ${(S.player.skillPoints || 0) > 0 && (S.player.skillLv || [0, 0, 0])[i] < D.SKILL_MAX_BY_INDEX[i] ? '' : 'disabled'}>+1</button></div>
           <div class="sdesc">${sk.desc}</div></div>`).join('')}
         <div class="skill-row"><div class="sname">被动·${P.passive.name}</div><div class="sdesc">${P.passive.desc}</div></div>
       </div>
@@ -1649,7 +1649,7 @@ window.UI = (function () {
         ${skills.map((sk, i) => `
           <div class="skill-row">
             <div class="sname">${skillNames[i]}·${sk.name} <span class="tag">Lv.${c.skillLv[i]}</span>
-              <button class="btn small ghost" style="margin-left:auto" data-skillup="${i}" ${c.skillLv[i] >= D.SKILL_MAX ? 'disabled' : ''}>升级</button></div>
+              <button class="btn small ghost" style="margin-left:auto" data-skillup="${i}" ${c.skillLv[i] >= D.SKILL_MAX_BY_INDEX[i] ? 'disabled' : ''}>升级</button></div>
             <div class="sdesc">${sk.desc}（每级 +7% 效果 · 下级需 ▣ ${C().SKILL_CHIP_COST[c.skillLv[i] - 1] || '—'}）</div>
           </div>`).join('')}
         <div class="skill-row">

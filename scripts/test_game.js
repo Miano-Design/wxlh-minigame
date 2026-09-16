@@ -447,14 +447,14 @@ setParty(['C021']);
 {
   Core.newGame();
   Core.setPlayerName('回归');
-  Core.S.cur.points = 47000;                 // 够不上十连实际价 45000 的边界外
-  Core.S.cur.points = 44999;
+  // V9.5.73：普通池十连价 45000 → 4500，边界跟着挪
+  Core.S.cur.points = 4499;
   const poor = Core.recruitTen('normal');
-  t('点数不够十连直接拒绝', !!poor.error && Core.S.cur.points === 44999);
+  t('点数不够十连直接拒绝', !!poor.error && Core.S.cur.points === 4499);
   t('被拒绝时不产生角色', Object.keys(Core.S.chars).length === 0);
 
   Core.newGame();
-  Core.S.cur.points = 45000;
+  Core.S.cur.points = 4500;
   const ok = Core.recruitTen('normal');
   t('十连成功返回10个结果', !ok.error && ok.results.length === 10);
   t('十连按折扣价扣款', Core.S.cur.points === 0);
@@ -522,10 +522,12 @@ setParty(['C021']);
 {
   Core.newGame(); Core.setPlayerName('上限');
   const SKILL_BARS = 3;
-  t('技能上限有单一出处', D.SKILL_MAX >= 10 && D.SKILL_POINT_EVERY_LV >= 1);
+  t('技能上限有单一出处', Array.isArray(D.SKILL_MAX_BY_INDEX) && D.SKILL_MAX_BY_INDEX.length === SKILL_BARS && D.SKILL_POINT_EVERY_LV >= 1);
+  t('三条技能各有上限（35/35/30）', D.SKILL_MAX_BY_INDEX.join(',') === '35,35,30');
   t('Lv.100 给的技能点正好点满三条技能', (() => {
     const supply = Math.floor(100 / D.SKILL_POINT_EVERY_LV);
-    const need = D.SKILL_MAX * SKILL_BARS;   // 技能从 0 级起：上限值就是要点几次
+    // V9.5.73：三条技能各有上限（35/35/30），合计要等于 Lv.100 的技能点总量
+    const need = D.SKILL_MAX_BY_INDEX.reduce((a, b) => a + b, 0);
     return supply === need;
   })());
   t('升级真的按"每 N 级 1 点"发', (() => {
@@ -555,10 +557,11 @@ setParty(['C021']);
     return Core.S.chars.C021.skillLv[0] === D.SKILL_MAX;
   })());
   t('芯片价目表覆盖全部等级', Core.SKILL_CHIP_COST.length >= D.SKILL_MAX - 1);
-  t('老档按新口径补技能点（Lv.100 → 33 点）', (() => {
+  t('老档按新口径补技能点（Lv.100 → 100 点）', (() => {
     Core.newGame(); Core.setPlayerName('上限5');
     Core.S.player.level = 100; Core.S.player.skillLv = [1, 1, 1];
     delete Core.S.player.skillPoints;
+    delete Core.S.skillPointRuleV2;                 // 老档没有这个一次性标记
     Core.migrate();
     return Core.S.player.skillPoints === Math.floor(100 / D.SKILL_POINT_EVERY_LV);
   })());
@@ -955,7 +958,9 @@ setParty(['C021']);
   t('三池花三种货币', P.normal.currency === 'points' && P.advanced.currency === 'holy' && P.limited.currency === 'otherworld');
   t('普通池不出 SSR/UR', !P.normal.rates.SSR && !P.normal.rates.UR);
   t('高级池最低 SR', !P.advanced.rates.N && !P.advanced.rates.R && !!P.advanced.rates.SR);
-  t('三池单抽价各不相同', P.normal.cost.points === 5000 && P.advanced.cost.holy === 100 && P.limited.cost.otherworld === 60);
+  // V9.5.73：普通单抽 5000 → 500（父亲大人：5000 抽一次太肉了）；十连按 9 次单抽的价
+  t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.holy === 100 && P.limited.cost.otherworld === 60);
+  t('十连价 = 9 次单抽（不会出现十连比单抽贵几十倍）', P.normal.ten.points === P.normal.cost.points * 9);
 
   Core.newGame(); Core.setPlayerName('招募');
   Core.addCur('points', 5000 * 220);
