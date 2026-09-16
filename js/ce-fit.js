@@ -94,7 +94,11 @@
       const flexKids = kids.filter((k) => out[k].flex && typeof out[k].width !== 'number');
       if (flexKids.length) {
         const spare = innerW - fixedSum;
-        if (spare > 0) {
+        /* 容差：canvas 量字宽和浏览器总有几个百分点误差，边界上会出现
+           "引擎觉得勉强放得下、浏览器觉得放不下"（例：主角卡那行 spare=+17，浏览器差 37）。
+           剩余空间不到行宽 8% 时不当成"放得下" —— 宁可折行，跟浏览器一致。 */
+        const spareOk = spare > innerW * 0.08;
+        if (spareOk) {
           const totalFlex = flexKids.reduce((sum, k) => sum + (out[k].flex || 1), 0);
           flexKids.forEach((k) => {
             out[k].width = Math.max(24, Math.round((spare * (out[k].flex || 1)) / totalFlex));
