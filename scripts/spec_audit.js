@@ -144,5 +144,57 @@ section('=== ⑧ 深井曲线（十五度自审修的那条）===');
   chk('深井成就最高的那档，在实测天花板（约 130 层）之内', maxReq <= 130, '最高要求 ' + maxReq + ' 层');
 }
 
+/* ---------- 9. 跨天重置：第二天该恢复的必须真的恢复 ---------- */
+section('=== ⑨ 跨天重置（把存档里的日期拨回昨天，再看各系统有没有恢复）===');
+{
+  Core.newGame(); Core.setPlayerName('跨天'); Core.choosePlayerBloodline('修真'); Core.ensureDaily();
+  const YESTERDAY = '2000-01-01';
+  /* 免费抽：普通 3 次 / 高级 1 次，跨天必须回满 */
+  Core.S.recruit.free.date = YESTERDAY;
+  Core.S.recruit.free.normal = { used: 3, at: Date.now() };
+  Core.S.recruit.free.advanced = { used: 1, at: 0 };
+  chk('免费抽：跨天回满（普通 3 次 / 高级 1 次）',
+    Core.freeState('normal').left === 3 && Core.freeState('advanced').left === 1);
+  /* 扫荡次数：跨天回满 */
+  Core.S.sweep = { date: YESTERDAY, count: 99, bonus: 50 };
+  chk('扫荡次数：跨天回满，且昨天剩下的"额外额度"不带到今天', Core.sweepLeft() === Core.sweepCap());
+  /* 斗法台次数：跨天回满 */
+  Core.S.arena = { floor: 5, best: 5, date: YESTERDAY, used: 99 };
+  chk('斗法台：跨天回满 5 次', Core.arenaState().left === (D.ARENA_DAILY || 5));
+  /* 求签：跨天要能再摇一次 */
+  Core.S.sign = { date: YESTERDAY, tier: '上上', idlePct: 0.1, drawn: 1 };
+  chk('求签：跨天签名与加成清空、可以再摇', Core.signState().fresh === false && Core.signState().idlePct === 0);
+  /* 商店每日限购：昨天买过的不占今天的额度 */
+  {
+    const shop = Object.entries(D.SHOPS).find(([, s]) => (s.items || []).some(it => it.stock > 0));
+    if (shop) {
+      const [sid, s] = shop;
+      const idx = s.items.findIndex(it => it.stock > 0);
+      Core.addCur(s.currency, 1e9);
+      Core.S.shop.bought = {};
+      Core.S.shop.bought[sid + '_' + idx + '_' + YESTERDAY] = 99;      // 昨天买满了
+      const r = Core.buyShopItem(sid, idx);
+      chk('商店每日限购：昨天买满不挡今天', r.ok === true, r.msg || '可以买');
+    } else {
+      chk('商店每日限购：昨天买满不挡今天', false, '找不到带限购的商品');
+    }
+  }
+  /* 登录奖励：跨天能再领，且七天一循环不卡在第 7 天 */
+  {
+    Core.S.login = { day: D.LOGIN_REWARDS.length, lastClaim: YESTERDAY, round: 1 };
+    const r = Core.loginReward();
+    chk('登录奖励：跨天能再领，第 8 天回到第 1 天（不是永远发第 7 天）',
+      !!r && r.day === 1 && (r.reward === D.LOGIN_REWARDS[0]));
+  }
+  /* 每日任务：跨天清空重来 */
+  {
+    D.DAILY_TASKS.forEach(t => { Core.S.tasks.daily[t.id] = t.target; });
+    Core.S.tasks.date = YESTERDAY;
+    Core.ensureDaily();
+    const done = D.DAILY_TASKS.filter(t => (Core.S.tasks.daily[t.id] || 0) > 0).length;
+    chk('每日任务：跨天清空（进度归零，可以重新做）', done === 0, done + ' 条还留着昨天的进度');
+  }
+}
+
 console.log(`\n硬指标看板：${pass} 条对得上，${fail} 条对不上`);
 process.exit(fail ? 1 : 0);

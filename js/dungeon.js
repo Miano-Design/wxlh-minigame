@@ -215,8 +215,8 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     if (!Core.S.worlds[worldId] || Core.S.worlds[worldId].stages[diff][stage - 1] <= 0) {
       return { ok: false, msg: '通关后才能扫荡' };
     }
-    // 每日扫荡上限
-    if (Core.S.sweep.date !== Core.dailyDate()) { Core.S.sweep.date = Core.dailyDate(); Core.S.sweep.count = 0; Core.S.sweep.bonus = 0; }
+    // 每日扫荡上限：跨天归零统一走 Core.ensureSweepDay（这条规则只留一处定义，V9.5.90）
+    Core.ensureSweepDay();
     const cap = Core.sweepCap();
     // 剩余次数走 sweepLeft()：它已经把「额外额度」算进去了
     const left = Core.sweepLeft();

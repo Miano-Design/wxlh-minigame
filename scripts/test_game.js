@@ -2402,5 +2402,28 @@ setParty(['C021']);
   }
 }
 
+/* ---- V9.5.90：扫荡的"跨天"只有一处定义（十八度自审） ----
+   原来 sweepLeft / addSweepBonus / Dun.sweep 各写了一遍跨天归零，其中 sweepLeft 那句
+   跨天时是 `cap + bonus` —— 把昨天的额外额度算进今天。同一规则写三遍 = 迟早分叉。 */
+{
+  Core.newGame(); Core.setPlayerName('扫荡跨天'); Core.choosePlayerBloodline('修真');
+  const cap = Core.sweepCap();
+  /* 今天：额外额度真的能加、能多扫 */
+  Core.S.sweep.date = Core.dailyDate();
+  Core.S.sweep.count = 0; Core.S.sweep.bonus = 0;
+  Core.addSweepBonus(7);
+  t('扫荡：今天加的额外额度算进今日剩余', Core.sweepLeft() === cap + 7, `${Core.sweepLeft()} / ${cap}+7`);
+  /* 跨天：额外额度、已用次数都不许带到今天 */
+  Core.S.sweep.date = '2000-01-01';
+  Core.S.sweep.count = cap + 7; Core.S.sweep.bonus = 7;
+  t('扫荡：跨天回满，且昨天的额外额度不带过来', Core.sweepLeft() === cap, `${Core.sweepLeft()} / ${cap}`);
+  t('扫荡：跨天后 bonus 归零', Core.S.sweep.bonus === 0);
+  /* 跨天后真的能扫满 cap 次（不是"显示能扫、实际扫不动"） */
+  Core.S.worlds.W01 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  Core.S.sweep.date = '2000-01-01'; Core.S.sweep.count = cap; Core.S.sweep.bonus = 0;
+  const r = window.Dungeon.sweep('W01', 'normal', 12, cap);
+  t('扫荡：跨天后能一口气扫满上限（显示与实扣一致）', r.ok && r.count === cap, `扫了 ${r.count} 次 / 上限 ${cap}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

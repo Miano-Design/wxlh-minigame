@@ -2650,16 +2650,25 @@ window.Core = (function () {
   }
   // 每日扫荡上限（灯阁权限越高，次数越多）
   function sweepCap() { return D.SWEEP_DAILY_CAP + authority().sweep; }
+  /* V9.5.90（十八度自审）：扫荡的"今天"只留这一处定义。
+     原来跨天逻辑被写了三遍（sweepLeft / addSweepBonus / Dun.sweep），而 sweepLeft 那句是
+     `return sweepCap() + bonus` —— 跨天时把**昨天的额外额度**算进今天的剩余次数，
+     于是界面会显示"今天还能扫 cap+50 次"，玩家点"全部剩余"时实际只能扫 cap 次。
+     网页版目前没有任何地方发额外额度（bonus 恒为 0），所以玩家碰不到；但这是"一接活动就露头"的坑，
+     而且"同一个规则写三遍"本身就是错的。现在三处都调 ensureSweepDay()。 */
+  function ensureSweepDay() {
+    if (S.sweep.date !== dailyDate()) { S.sweep.date = dailyDate(); S.sweep.count = 0; S.sweep.bonus = 0; }
+  }
   // 今日剩余扫荡次数（跨天自动重置）
   function sweepLeft() {
-    if (S.sweep.date !== dailyDate()) return sweepCap() + (S.sweep.bonus || 0);
+    ensureSweepDay();
     return Math.max(0, sweepCap() + (S.sweep.bonus || 0) - (S.sweep.count || 0));
   }
   // 今日额外扫荡额度 +n（跨天先归零，避免昨天的额度留到今天）
   function addSweepBonus(n) {
     const k = Math.max(0, Math.floor(n || 0));
     if (!k) return 0;
-    if (S.sweep.date !== dailyDate()) { S.sweep.date = dailyDate(); S.sweep.count = 0; S.sweep.bonus = 0; }
+    ensureSweepDay();
     S.sweep.bonus = (S.sweep.bonus || 0) + k;
     save();
     return S.sweep.bonus;
@@ -3185,7 +3194,7 @@ window.Core = (function () {
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
     buyShopItem, openBox, openBoxes, dailyDate, sweepLeft, enhanceMat,
-    addSweepBonus,
+    addSweepBonus, ensureSweepDay,
     shopReq,
     ensureDaily, task, claimTask, claimAllTasks, loginReward,
     ensureWeekly, weeklyState, claimWeekly, claimAllWeekly, weekKey,
