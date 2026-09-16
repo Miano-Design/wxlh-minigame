@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.69';
+  const GAME_VER = '9.5.70';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -1131,7 +1131,13 @@ window.UI = (function () {
     if (grabbedPos === null) return;
     if (ev && ev.preventDefault) ev.preventDefault();   // 拖动期间页面别跟着滚
     const p = targetAt(ev ? ev.clientX : 0, ev ? ev.clientY : 0);
-    if (p !== hoverPos) { hoverPos = p; paintHover(); }
+    if (p !== hoverPos) {
+      /* V9.5.70（父亲大人）：手指挪到新落点时给一下轻震 + 那一格实心高亮，
+         拖拽才有"咬合感"，不是划过去一片静悄悄。 */
+      if (p) { try { if (navigator && navigator.vibrate) navigator.vibrate(8); } catch (e) { } }
+      hoverPos = p;
+      paintHover();
+    }
   }
   function onDragEnd(ev) {
     stopDragTrack();
@@ -1215,31 +1221,15 @@ window.UI = (function () {
     if (pos === 'P') { protagonistDetail(); return null; }
     const idx = +pos;
     const who = C().S.party[idx];
-    // V9.5.47（父亲大人）：点"已经上了人"的格子 → 先出一个两选弹窗：下阵 / 无损换将
-    if (who && who !== '@player') { slotMenu(idx); return null; }
+    /* V9.5.70：点主角那一格＝看主角详情（以前会掉进"选上阵伙伴"，等于给了玩家一个
+       "往主角格子里塞别人"的入口——主角必上阵，那是个假操作）。 */
+    if (who === '@player') { protagonistDetail(); return null; }
+    /* V9.5.70（父亲大人）：「在队伍界面里点击队员直接就显示队员的详情吧，然后在最下面加多无损换将和下阵的按钮」。
+       以前点队员先弹一个只有两个按钮的小菜单，想看等级/装备还得再点一次——
+       现在直接进详情（能升级、能穿装备、能看技能），换将 / 下阵挪到详情最下面。 */
+    if (who && who !== '@player') { charDetail(who, 0, null, { fromSlot: idx }); return null; }
     pickPartyChar(idx);
     return null;
-  }
-  /* 已上阵格子的两选弹窗：下阵 / 无损换将 */
-  function slotMenu(idx) {
-    const S = C().S;
-    const id = S.party[idx];
-    if (!id || id === '@player') return;
-    const w = modal('这一格：' + cname(id), `
-      <div class="hint mb2">${D.charById[id].role} · ${D.charById[id].faction} · Lv.${S.chars[id].lv} · 战力 ${fmt(C().power(id))}</div>
-      <div class="btn-row">
-        <button class="btn small gold" data-swap="1">无损换将</button>
-        <button class="btn small ghost" data-off="1">下阵</button>
-      </div>
-      <div class="hint mt2">无损换将：新上阵的会继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。</div>
-    `, { center: true });
-    w.querySelector('[data-swap]').onclick = () => { closeModal(w); pickPartyChar(idx); };
-    w.querySelector('[data-off]').onclick = () => {
-      S.party[idx] = null; C().save();
-      closeModal(w); repaintParty();
-      toast(`${cname(id)} 已下阵`);
-    };
-    return w;
   }
   // 测试用：读当前"抓起"状态（grabbedPos 是模块级私有变量，外部看不到）
   function grabState() { return { grabbed: grabbedPos, hover: hoverPos, suppress: suppressClick, dragging }; }
@@ -1485,6 +1475,9 @@ window.UI = (function () {
     const owned = Object.keys(S.chars);
     const curId = S.party[slotIdx];
     const curName = curId && curId !== '@player' ? cname(curId) : '';
+    // V9.5.70：主角必上阵，他的格子不该出现在"选伙伴"这条路上（换位置用长按拖动）。
+    // 真走到这儿就当误触处理，避免把 '@player' 从队伍里顶掉。
+    if (curId === '@player') { toast('主角必上阵——想换位置就长按他那一格拖过去', 2400); return null; }
     const w = modal('选择上阵伙伴', (curName
       ? `<div class="list-row" style="border-color:#d43a4f55"><div class="grow"><div class="t1">当前：${curName}</div>
            <div class="t2">点下面的伙伴＝换人；也可以直接让他下阵</div></div>
@@ -1600,7 +1593,11 @@ window.UI = (function () {
       <div style="font-size:0.6875rem;color:var(--dim);margin:0 2px 0.5rem">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
       <div class="char-grid" id="char-list">${charGridHtml()}</div>`;
   }
-  function charDetail(id, scrollTop, wrap) {
+  /* opts.fromSlot：从「队伍」界面点进来的（这个值是他在队伍里的格子号）。
+     带上它，详情最下面会多一张「队伍操作」卡：无损换将 / 下阵——
+     不需要退出详情再回队伍页去操作。 */
+  function charDetail(id, scrollTop, wrap, opts) {
+    opts = opts || {};
     const S = C().S;
     const ch = D.charById[id];
     const c = S.chars[id];
@@ -1670,6 +1667,15 @@ window.UI = (function () {
         <h3>📊 属性面板 <span class="sub">装备 / 血统 / 星级都已算进来</span></h3>
         ${statGrid(st)}
       </div>
+      ${opts.fromSlot !== undefined ? `
+      <div class="card" style="border-color:#e6b64c66">
+        <h3>队伍操作 <span class="sub">当前第 ${opts.fromSlot + 1} 位</span></h3>
+        <div class="btn-row">
+          <button class="btn small gold" data-swap="1">无损换将</button>
+          <button class="btn small ghost" data-off="1">下阵</button>
+        </div>
+        <div class="hint mt2">无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。</div>
+      </div>` : ''}
     `);
     restoreModalScroll(w, scrollTop);
     const reopenSelf = () => { charDetail(id, 0, w); };
@@ -1718,6 +1724,25 @@ window.UI = (function () {
       C().unequipItem(id, b.dataset.unequip);
       reopenSelf();
     });
+    /* 队伍操作：换将 / 下阵。用 fromSlot 而不是"S.party.indexOf(id)"——
+       万一换将过程中队伍变了，索引用当时点进来的那个格子号才不会错位。 */
+    const swapBtn = w.querySelector('[data-swap]');
+    if (swapBtn) swapBtn.onclick = () => {
+      const slot = opts.fromSlot;
+      closeModal(w);
+      pickPartyChar(slot);
+    };
+    const offBtn = w.querySelector('[data-off]');
+    if (offBtn) offBtn.onclick = () => {
+      const slot = opts.fromSlot;
+      confirmBox('下阵', `确定让 <b>${cname(id)}</b> 下阵？等级与装备都保留在他的卡上，随时可以再上阵。`, () => {
+        C().S.party[slot] = null;
+        C().save();
+        closeModal(w);
+        repaintParty();
+        toast(`${cname(id)} 已下阵`);
+      });
+    };
     return w;
   }
   function equipBrief(eq) {
@@ -4839,7 +4864,7 @@ switch (act) {
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
       // 测试用：底栏那一排（红点归属的正确性只有把它画出来才验得了）
       navbarHtml,
-      openPartyPanel, openGrowPanel, charListSorted, pickPartyChar, slotMenu,
+      openPartyPanel, openGrowPanel, charListSorted, pickPartyChar,
       _gmAllowed: gmAllowed,
     },
   };

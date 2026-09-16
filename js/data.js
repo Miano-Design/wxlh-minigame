@@ -56,8 +56,8 @@ window.DATA = (function () {
   const EXP_TABLE = [];
   const LEVEL_POINTS = [];
   for (let lv = 0; lv < PLAYER_MAX_LV; lv++) {
-    EXP_TABLE[lv] = Math.round(70 * Math.pow(lv + 1, 1.18));
-    LEVEL_POINTS[lv] = Math.round(40 * Math.pow(1.06, lv));
+    EXP_TABLE[lv] = Math.round(105 * Math.pow(lv + 1, 1.18));   // V9.5.70：整体压慢 ×1.5
+    LEVEL_POINTS[lv] = Math.round(60 * Math.pow(1.06, lv));     // V9.5.70：整体压慢 ×1.5
   }
 
   /* ================= 主角六维（V5 §2.1） ================= */
@@ -558,19 +558,19 @@ window.DATA = (function () {
      每喂一支都能立刻看见数字变化（档案 G-13：文案与效果必须同源）。 */
   const SERUM_KEYS = { atkPct: '攻击', defPct: '防御', hpPct: '生命', spdPct: '速度', critPct: '暴击率', skillPct: '技能伤害', evaPct: '闪避' };
   const SERUMS = [
-    { id: 'sr_atk',   name: '力量血清', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 300,  bloodline: null, unlock: 1 },
-    { id: 'sr_def',   name: '护壁血清', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 300,  bloodline: null, unlock: 1 },
-    { id: 'sr_hp',    name: '细胞血清', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 300,  bloodline: null, unlock: 1 },
-    { id: 'sr_spd',   name: '神经血清', key: 'spdPct',   per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 600,  bloodline: null, unlock: 3 },
-    { id: 'sr_crit',  name: '感知血清', key: 'critPct',  per: 0.005, max: 30, mat: 'mat_t2', matN: 4, points: 700,  bloodline: null, unlock: 3 },
-    { id: 'sr_skill', name: '灵能血清', key: 'skillPct', per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 700,  bloodline: null, unlock: 4 },
+    { id: 'sr_atk',   name: '力量血清', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
+    { id: 'sr_def',   name: '护壁血清', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
+    { id: 'sr_hp',    name: '细胞血清', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
+    { id: 'sr_spd',   name: '神经血清', key: 'spdPct',   per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 900,  bloodline: null, unlock: 3 },
+    { id: 'sr_crit',  name: '感知血清', key: 'critPct',  per: 0.005, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 3 },
+    { id: 'sr_skill', name: '灵能血清', key: 'skillPct', per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 4 },
     // 血统专属（对标同类的"门派专属丹"）：只有对应血统能用，单次更强、上限更低
-    { id: 'sr_bl_vampire',  name: '血族·饕餮血清', key: 'atkPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1200, bloodline: '血族',   unlock: 5 },
-    { id: 'sr_bl_werewolf', name: '狼人·狂化血清', key: 'hpPct',    per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1200, bloodline: '狼人',   unlock: 5 },
-    { id: 'sr_bl_cultivator', name: '修真·剑心血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1200, bloodline: '修真', unlock: 5 },
-    { id: 'sr_bl_magic',    name: '魔法·秘能血清', key: 'critPct',  per: 0.015, max: 20, mat: 'mat_t3', matN: 3, points: 1200, bloodline: '魔法',   unlock: 6 },
-    { id: 'sr_bl_tech',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 1800, bloodline: '科技',   unlock: 6 },
-    { id: 'sr_bl_psychic',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 1800, bloodline: '念动力', unlock: 7 },
+    { id: 'sr_bl_vampire',  name: '血族·饕餮血清', key: 'atkPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '血族',   unlock: 5 },
+    { id: 'sr_bl_werewolf', name: '狼人·狂化血清', key: 'hpPct',    per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '狼人',   unlock: 5 },
+    { id: 'sr_bl_cultivator', name: '修真·剑心血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 5 },
+    { id: 'sr_bl_magic',    name: '魔法·秘能血清', key: 'critPct',  per: 0.015, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '魔法',   unlock: 6 },
+    { id: 'sr_bl_tech',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 6 },
+    { id: 'sr_bl_psychic',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 7 },
   ];
   const serumById = {};
   SERUMS.forEach(s => {
@@ -798,7 +798,8 @@ window.DATA = (function () {
     },
   };
   const BLOODLINE_MAX = 30;
-  const bloodlineCost = lv => ({ bloodCrystal: 10 + lv * 5, points: 2000 * (lv + 1) });
+  // V9.5.70：整体压慢 ×1.5（结晶 10+5lv → 15+8lv；点数 2000×(lv+1) → 3000×(lv+1)）
+  const bloodlineCost = lv => ({ bloodCrystal: 15 + lv * 8, points: 3000 * (lv + 1) });
 
   /* ================= 主角血统技能（觉醒后技能栏替换） ================= */
   // 结构与普通角色技能一致，战斗引擎直接可用
@@ -841,21 +842,21 @@ window.DATA = (function () {
     },
   };
   const GENE_LOCKS = [
-    { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', cost: { bloodCrystal: 100 } },
-    { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 300 } },
-    { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 800 } },
-    { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2000 } },
-    { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 5000 } },
+    { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', cost: { bloodCrystal: 125 } },
+    { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 375 } },
+    { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 1000 } },
+    { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2500 } },
+    { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 6250 } },
   ];
 
   /* ================= 建筑 ================= */
   const BUILDINGS = [
-    { id: 'core',     name: '灯芯',   base: 1000, desc: '每级：挂机收益 +2%' },
-    { id: 'training', name: '训练室',     base: 800,  desc: '每级：挂机经验 +3%' },
+    { id: 'core',     name: '灯芯',   base: 1250, desc: '每级：挂机收益 +2%' },
+    { id: 'training', name: '训练室',     base: 1000, desc: '每级：挂机经验 +3%' },
     // 离线上限按"每 10 级 +0.2 小时"给：50 级正好 +1 小时（跟铭刻 4h、灯阁权限 1h 凑成满配 +6h）
-    { id: 'medical',  name: '医疗室',     base: 700,  desc: '每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时' },
-    { id: 'workshop', name: '装备工坊',   base: 900,  desc: '每级：装备强化费用 -1%（最多-40%）' },
-    { id: 'geneLab',  name: '血统实验室', base: 1200, desc: '每级：血统升级费用 -1%（最多-40%）' },
+    { id: 'medical',  name: '医疗室',     base: 875,  desc: '每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时' },
+    { id: 'workshop', name: '装备工坊',   base: 1125, desc: '每级：装备强化费用 -1%（最多-40%）' },
+    { id: 'geneLab',  name: '血统实验室', base: 1500, desc: '每级：血统升级费用 -1%（最多-40%）' },
   ];
   const buildingCost = (id, lv) => {
     const b = BUILDINGS.find(x => x.id === id);
@@ -875,7 +876,7 @@ window.DATA = (function () {
      中期数值与原来逐级完全一致，改动只发生在"原本永远到不了的那一段"。 */
   const SECT_MAX = 60;
   const SECT_PCT_PER_LV = 0.005;                                   // 每级：全队全属性 +0.5%
-  const sectExpNeed = lv => Math.round(300 * Math.pow(1.075, lv - 1));
+  const sectExpNeed = lv => Math.round(375 * Math.pow(1.075, lv - 1));   // V9.5.70：整体压慢 ×1.25
   const sectBonusPct = lv => Math.max(0, lv - 1) * SECT_PCT_PER_LV;
   // 评级经验来源（写在一处，UI 直接读这张表，避免"说明和实装两处写"）
   const SECT_EXP = { normal: 12, hard: 26, hell: 48, win: 2, perMin: 1.2 };
@@ -931,7 +932,9 @@ window.DATA = (function () {
     { id: 'canghai', name: '沧海诀', ico: '🌊', key: 'resPct',  rate: 0.004, max: 20, base: 38, step: 8, info: '减伤' },
   ];
   const kejiById = id => KEJI.find(k => k.id === id) || null;
-  const kejiCost = (k, lv) => k.base + k.step * lv;
+  // V9.5.70：整体压慢 ×1.25（这里统一乘，不用逐条改 42 条线的基础值）
+  const KEJI_COST_MULT = 1.25;
+  const kejiCost = (k, lv) => Math.round((k.base + k.step * lv) * KEJI_COST_MULT);
 
   /* ================= 挂机游历奇遇（对标《道友修仙》的 YouLi · 601 条） =================
      它的挂机不是"只涨数字"：挂机过程中会随机掉出"游历事件"，点一下拿东西。
@@ -1028,27 +1031,27 @@ window.DATA = (function () {
      装备是"数值"，法宝是"效果"：每件法宝给一条特殊效果（开场能量、吸血、减伤…），
      主角带上 1 件。它对应参考图角色页右侧那排按钮里的"法宝"那一栏。 */
   const FABAO = [
-    { id: 'fb01', name: '噬魂珠', rarity: 'R',   cost: 800,   eff: { lifesteal: 0.04 },                     desc: '吸血 +4%' },
-    { id: 'fb02', name: '疾风符', rarity: 'R',   cost: 800,   eff: { spdPct: 0.06 },                        desc: '速度 +6%' },
-    { id: 'fb03', name: '玄铁盾', rarity: 'SR',  cost: 3000,  eff: { defPct: 0.10, dmgReduce: 0.03 },       desc: '防御 +10%、减伤 +3%' },
-    { id: 'fb04', name: '聚灵幡', rarity: 'SR',  cost: 3000,  eff: { initEnergy: 25 },                      desc: '开场能量 +25' },
-    { id: 'fb05', name: '破军戟', rarity: 'SR',  cost: 3600,  eff: { atkPct: 0.10, critDmg: 0.15 },        desc: '攻击 +10%、暴击伤害 +15%' },
-    { id: 'fb06', name: '太虚镜', rarity: 'SSR', cost: 12000, eff: { evaPct: 0.08, skillPct: 0.12 },       desc: '闪避 +8%、技能伤害 +12%' },
-    { id: 'fb07', name: '天罡印', rarity: 'SSR', cost: 12000, eff: { atkPct: 0.14, dmgReduce: 0.05 },      desc: '攻击 +14%、减伤 +5%' },
-    { id: 'fb08', name: '终焉之盘', rarity: 'UR',  cost: 40000, eff: { atkPct: 0.10, hpPct: 0.10, defPct: 0.10, spdPct: 0.10 }, desc: '全属性 +10%（主角专属）' },
+    { id: 'fb01', name: '噬魂珠', rarity: 'R',   cost: 1000,   eff: { lifesteal: 0.04 },                     desc: '吸血 +4%' },
+    { id: 'fb02', name: '疾风符', rarity: 'R',   cost: 1000,   eff: { spdPct: 0.06 },                        desc: '速度 +6%' },
+    { id: 'fb03', name: '玄铁盾', rarity: 'SR',  cost: 3750,  eff: { defPct: 0.10, dmgReduce: 0.03 },       desc: '防御 +10%、减伤 +3%' },
+    { id: 'fb04', name: '聚灵幡', rarity: 'SR',  cost: 3750,  eff: { initEnergy: 25 },                      desc: '开场能量 +25' },
+    { id: 'fb05', name: '破军戟', rarity: 'SR',  cost: 4500,  eff: { atkPct: 0.10, critDmg: 0.15 },        desc: '攻击 +10%、暴击伤害 +15%' },
+    { id: 'fb06', name: '太虚镜', rarity: 'SSR', cost: 15000, eff: { evaPct: 0.08, skillPct: 0.12 },       desc: '闪避 +8%、技能伤害 +12%' },
+    { id: 'fb07', name: '天罡印', rarity: 'SSR', cost: 15000, eff: { atkPct: 0.14, dmgReduce: 0.05 },      desc: '攻击 +14%、减伤 +5%' },
+    { id: 'fb08', name: '终焉之盘', rarity: 'UR',  cost: 50000, eff: { atkPct: 0.10, hpPct: 0.10, defPct: 0.10, spdPct: 0.10 }, desc: '全属性 +10%（主角专属）' },
     // 补齐到 20 件：R 是随手的，SR 是中期目标，SSR/UR 是结晶的主要出口
-    { id: 'fb09', name: '铜镜',   rarity: 'R',   cost: 900,   eff: { defPct: 0.05 },                  desc: '防御 +5%' },
-    { id: 'fb10', name: '木傀儡', rarity: 'R',   cost: 900,   eff: { hpPct: 0.06 },                   desc: '生命 +6%' },
-    { id: 'fb11', name: '铁针囊', rarity: 'R',   cost: 950,   eff: { critPct: 0.02 },                 desc: '暴击率 +2%' },
-    { id: 'fb12', name: '清风扇', rarity: 'R',   cost: 1000,  eff: { skillPct: 0.05 },                desc: '技能伤害 +5%' },
-    { id: 'fb13', name: '镇魂铃', rarity: 'SR',  cost: 2800,  eff: { resPct: 0.04 },                  desc: '减伤 +4%' },
-    { id: 'fb14', name: '离火轮', rarity: 'SR',  cost: 3400,  eff: { atkPct: 0.08, skillPct: 0.06 }, desc: '攻击 +8%、技能伤害 +6%' },
-    { id: 'fb15', name: '冰髓瓶', rarity: 'SR',  cost: 3200,  eff: { hpPct: 0.12, resPct: 0.02 },    desc: '生命 +12%、减伤 +2%' },
-    { id: 'fb16', name: '风雷靴', rarity: 'SR',  cost: 3300,  eff: { spdPct: 0.10, evaPct: 0.04 },   desc: '速度 +10%、闪避 +4%' },
-    { id: 'fb17', name: '血玉环', rarity: 'SSR', cost: 11000, eff: { lifesteal: 0.06, atkPct: 0.06 }, desc: '吸血 +6%、攻击 +6%' },
-    { id: 'fb18', name: '九幽幡', rarity: 'SSR', cost: 13000, eff: { skillPct: 0.16, critDmg: 0.20 }, desc: '技能伤害 +16%、暴击伤害 +20%' },
-    { id: 'fb19', name: '金乌羽', rarity: 'SSR', cost: 13000, eff: { critPct: 0.06, critDmg: 0.25 },  desc: '暴击率 +6%、暴击伤害 +25%' },
-    { id: 'fb20', name: '混沌钟', rarity: 'UR',  cost: 48000, eff: { defPct: 0.15, resPct: 0.08, hpPct: 0.15 }, desc: '防御 +15%、减伤 +8%、生命 +15%' },
+    { id: 'fb09', name: '铜镜',   rarity: 'R',   cost: 1125,   eff: { defPct: 0.05 },                  desc: '防御 +5%' },
+    { id: 'fb10', name: '木傀儡', rarity: 'R',   cost: 1125,   eff: { hpPct: 0.06 },                   desc: '生命 +6%' },
+    { id: 'fb11', name: '铁针囊', rarity: 'R',   cost: 1187,   eff: { critPct: 0.02 },                 desc: '暴击率 +2%' },
+    { id: 'fb12', name: '清风扇', rarity: 'R',   cost: 1250,  eff: { skillPct: 0.05 },                desc: '技能伤害 +5%' },
+    { id: 'fb13', name: '镇魂铃', rarity: 'SR',  cost: 3500,  eff: { resPct: 0.04 },                  desc: '减伤 +4%' },
+    { id: 'fb14', name: '离火轮', rarity: 'SR',  cost: 4250,  eff: { atkPct: 0.08, skillPct: 0.06 }, desc: '攻击 +8%、技能伤害 +6%' },
+    { id: 'fb15', name: '冰髓瓶', rarity: 'SR',  cost: 4000,  eff: { hpPct: 0.12, resPct: 0.02 },    desc: '生命 +12%、减伤 +2%' },
+    { id: 'fb16', name: '风雷靴', rarity: 'SR',  cost: 4125,  eff: { spdPct: 0.10, evaPct: 0.04 },   desc: '速度 +10%、闪避 +4%' },
+    { id: 'fb17', name: '血玉环', rarity: 'SSR', cost: 13750, eff: { lifesteal: 0.06, atkPct: 0.06 }, desc: '吸血 +6%、攻击 +6%' },
+    { id: 'fb18', name: '九幽幡', rarity: 'SSR', cost: 16250, eff: { skillPct: 0.16, critDmg: 0.20 }, desc: '技能伤害 +16%、暴击伤害 +20%' },
+    { id: 'fb19', name: '金乌羽', rarity: 'SSR', cost: 16250, eff: { critPct: 0.06, critDmg: 0.25 },  desc: '暴击率 +6%、暴击伤害 +25%' },
+    { id: 'fb20', name: '混沌钟', rarity: 'UR',  cost: 60000, eff: { defPct: 0.15, resPct: 0.08, hpPct: 0.15 }, desc: '防御 +15%、减伤 +8%、生命 +15%' },
   ];
   const fabaoById = id => FABAO.find(f => f.id === id) || null;
 
@@ -1056,13 +1059,13 @@ window.DATA = (function () {
      法宝给"效果"，坐骑给"基础数值"：主角骑 1 匹，永久生效、随时能换。
      对标参考图角色页右侧那排按钮里的"坐骑"那一栏。 */
   const MOUNTS = [
-    { id: 'mt01', name: '铁甲蜥', rarity: 'N',  cost: { points: 8000 },                                          pct: { hpPct: 0.04 },  desc: '生命 +4%' },
-    { id: 'mt02', name: '疾风狼', rarity: 'N',  cost: { points: 8000 },                                          pct: { spdPct: 0.05 }, desc: '速度 +5%' },
-    { id: 'mt03', name: '玄铁犀', rarity: 'R',  cost: { points: 40000, mat: 'mat_t2', matN: 20 },                 pct: { defPct: 0.08 },  desc: '防御 +8%' },
-    { id: 'mt04', name: '赤焰虎', rarity: 'R',  cost: { points: 40000, mat: 'mat_t2', matN: 20 },                 pct: { atkPct: 0.08 },  desc: '攻击 +8%' },
-    { id: 'mt05', name: '幽影豹', rarity: 'SR', cost: { points: 120000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { spdPct: 0.10, critPct: 0.03 }, desc: '速度 +10%、暴击率 +3%' },
-    { id: 'mt06', name: '雷麟兽', rarity: 'SR', cost: { points: 120000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { atkPct: 0.10, skillPct: 0.08 }, desc: '攻击 +10%、技能伤害 +8%' },
-    { id: 'mt07', name: '太古龙鲸', rarity: 'UR', cost: { points: 300000, otherworld: 6000, mat: 'mat_t5', matN: 10 }, pct: { atkPct: 0.12, hpPct: 0.12, defPct: 0.12, spdPct: 0.12 }, desc: '全属性 +12%' },
+    { id: 'mt01', name: '铁甲蜥', rarity: 'N',  cost: { points: 10000 },                                          pct: { hpPct: 0.04 },  desc: '生命 +4%' },
+    { id: 'mt02', name: '疾风狼', rarity: 'N',  cost: { points: 10000 },                                          pct: { spdPct: 0.05 }, desc: '速度 +5%' },
+    { id: 'mt03', name: '玄铁犀', rarity: 'R',  cost: { points: 50000, mat: 'mat_t2', matN: 20 },                 pct: { defPct: 0.08 },  desc: '防御 +8%' },
+    { id: 'mt04', name: '赤焰虎', rarity: 'R',  cost: { points: 50000, mat: 'mat_t2', matN: 20 },                 pct: { atkPct: 0.08 },  desc: '攻击 +8%' },
+    { id: 'mt05', name: '幽影豹', rarity: 'SR', cost: { points: 150000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { spdPct: 0.10, critPct: 0.03 }, desc: '速度 +10%、暴击率 +3%' },
+    { id: 'mt06', name: '雷麟兽', rarity: 'SR', cost: { points: 150000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { atkPct: 0.10, skillPct: 0.08 }, desc: '攻击 +10%、技能伤害 +8%' },
+    { id: 'mt07', name: '太古龙鲸', rarity: 'UR', cost: { points: 375000, otherworld: 6000, mat: 'mat_t5', matN: 10 }, pct: { atkPct: 0.12, hpPct: 0.12, defPct: 0.12, spdPct: 0.12 }, desc: '全属性 +12%' },
   ];
   const mountById = id => MOUNTS.find(m => m.id === id) || null;
   const MOUNT_PCT_NAME = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率', skillPct: '技能伤害' };
@@ -1138,6 +1141,8 @@ window.DATA = (function () {
     normal: {
       name: '普通招募', short: '普通', currency: 'points',
       rates: { N: 0.46, R: 0.36, SR: 0.18 },
+      // 招募单抽价**不参与**这次"整体压慢"：它已经在上一轮定过（45000 十连），
+      // 而且招募是"攒碎片"的日常循环，涨价会让新手期直接卡住
       cost: { points: 5000 }, ten: { points: 45000 },
       ticket: 'ticket_normal',
       desc: '日常池：只出 N / R / SR，重复伙伴转碎片。花的是挂机能刷的点数，用来攒碎片升星。有「引灯招募券」时先扣券。',
@@ -1299,7 +1304,7 @@ window.DATA = (function () {
   }
   const REALM_STEP = (100 - 10) / (REALM_MAJORS.length * REALM_TIERS.length - 1);   // ≈2.57 级一阶
   // 单阶消耗按等级平滑放大，保证 lv10→100 的累计消耗与旧表同量级（旧表累计 ≈388 万点 / 504 材料）
-  const realmCost = lv => Math.round(1980 * Math.pow(lv / 10, 2.19));
+  const realmCost = lv => Math.round(2475 * Math.pow(lv / 10, 2.19));   // V9.5.70：整体压慢 ×1.25
   const REALMS = (() => {
     const out = [];
     REALM_MAJORS.forEach((mj, mi) => {

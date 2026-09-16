@@ -781,8 +781,11 @@ setParty(['C021']);
   Core.newGame(); Core.setPlayerName('曲线');
   const expTotal = D.EXP_TABLE.slice(1, 100).reduce((a, b) => a + b, 0);
   const ptTotal = D.LEVEL_POINTS.slice(1, 100).reduce((a, b) => a + b, 0);
-  t('单人满级经验总量 < 200 万', expTotal < 2000000);
-  t('单人满级点数总量 < 30 万', ptTotal < 300000);
+  /* V9.5.70（父亲大人：进度整体再压慢一点）把这两条上限抬了一档：
+     经验 152 万 → 111 万之后再 ×1.5，点数 22 万 → 34 万。
+     阈值跟着改成"当前值 + 余量"，它的作用仍然是**防曲线再次与产出脱节**，不是钉死某个数。 */
+  t('单人满级经验总量 < 130 万', expTotal < 1300000);
+  t('单人满级点数总量 < 40 万', ptTotal < 400000);
   Core.S.player.level = 100; Core.S.player.geneLock = 5;
   Core.S.player.talents = { body: 0, energy: 0, nerve: 0, grace: 10 };   // 满「灯阁恩赐」
   Core.S.buildings.core = 30; Core.S.buildings.medical = 50; Core.S.buildings.training = 50;
@@ -791,7 +794,6 @@ setParty(['C021']);
   t('满配挂机经验 ≥ 120/分', r.expPerMin >= 120);
   /* V9.5.65（策划体检）：光看"总量 < 200 万"不够——80×Lv^1.32 就是满足这条却要 345 小时。
      挂机是这个游戏的主循环，**时间本身才是难度**，所以直接把"练到几级要多少小时"写成断言。 */
-  t('满级经验总量 < 90 万（比旧曲线 152 万砍掉四成）', expTotal < 900000);
   const hoursTo = (target) => {
     Core.newGame(); Core.setPlayerName('曲线');
     let mins = 0;
@@ -808,8 +810,12 @@ setParty(['C021']);
     }
     return mins / 60;
   };
-  t('纯挂机 Lv.20 ≤ 16 小时（新手第一天能看到等级在动）', hoursTo(20) <= 16);
-  t('纯挂机 Lv.100 ≤ 80 小时（满级是月内目标，不是 345 小时）', hoursTo(100) <= 80);
+  /* V9.5.70：父亲大人要求"进度整体再压慢一点"，等级曲线 ×1.5。
+     原来卡的是"别慢到 33 小时还升不到 Lv.20"（那是 V9.5.64 的老毛病），
+     现在把线放到 24 小时：比当初的 33 小时快，但比"一天满级"慢。 */
+  t('纯挂机 Lv.10 ≤ 12 小时（第一天一定看得到等级在动）', hoursTo(10) <= 12);
+  t('纯挂机 Lv.20 ≤ 24 小时（不是当年那个 33 小时的深坑）', hoursTo(20) <= 24);
+  t('纯挂机 Lv.100 ≤ 120 小时（满级仍是月内目标）', hoursTo(100) <= 120);
   Core.newGame(); Core.setPlayerName('曲线');
 }
 
@@ -890,7 +896,9 @@ setParty(['C021']);
   t('材料不足时拒绝炼化', Core.craftSerum('sr_atk', 1).ok === false);
   Core.S.items.mat_t1 = 20; Core.S.cur.points = 5000;
   const c1 = Core.craftSerum('sr_atk', 3);
-  t('炼化扣材料与点数', c1.ok && c1.count === 3 && Core.S.items.mat_t1 === 5 && Core.S.cur.points === 4100);
+  // 单价从数据表读，别写死——血清价改过一次（V9.5.70 整体压慢 ×1.5）
+  t('炼化扣材料与点数', c1.ok && c1.count === 3 && Core.S.items.mat_t1 === 5
+    && Core.S.cur.points === 5000 - D.SERUMS.find(x => x.id === 'sr_atk').points * 3);
   t('炼化产出血清道具', (Core.S.items['serum_sr_atk'] || 0) === 3);
   t('点数不足时拒绝炼化', Core.craftSerum('sr_spd', 10).ok === false);
 

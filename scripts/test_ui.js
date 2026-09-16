@@ -800,21 +800,26 @@ t('换将无损：继承等级 + 能穿的装备跟着走、穿不了的留下',
   if ((Core.S.equipped.C022 || {}).head === u2) throw new Error('穿不了的专属装备被硬塞过去了');
   if ((Core.S.equipped.C021 || {}).head !== u2) throw new Error('穿不了的专属装备没有留在原伙伴身上');
 });
-t('点已上阵的格子先出"下阵 / 无损换将"两选弹窗', () => {
-  Core.newGame(); Core.setPlayerName('两选');
+/* V9.5.70（父亲大人）：点队员不再先弹"两选小菜单"，而是**直接进详情**，
+   无损换将 / 下阵挪到详情最下面 —— 这样在队伍界面就能顺手升级、穿装备。 */
+t('点已上阵的队员直接进他的详情（不再先弹两选菜单）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  if (src.indexOf("charDetail(who, 0, null, { fromSlot: idx })") < 0) {
+    throw new Error('点队员没有直接进详情');
+  }
+  if (src.indexOf('function slotMenu') >= 0) throw new Error('两选小菜单还留着（已经被详情取代）');
+});
+t('从队伍点进来的详情，最下面有「无损换将 / 下阵」', () => {
+  Core.newGame(); Core.setPlayerName('队伍详情');
   Core.addChar('C021');
   Core.S.party = ['@player', 'C021', null, null, null];
-  const w = UI._panels.slotMenu(1);
-  const src = fs.readFileSync('js/ui.js', 'utf8');
-  const i = src.indexOf('function slotMenu');
-  const seg = src.slice(i, i + 1400);
+  const html = UI._panels.charDetail('C021', 0, null, { fromSlot: 1 }).innerHTML;
   ['data-swap', 'data-off', '无损换将', '下阵'].forEach(k => {
-    if (seg.indexOf(k) < 0) throw new Error('两选弹窗缺：' + k);
+    if (html.indexOf(k) < 0) throw new Error('队伍操作卡缺：' + k);
   });
-  if (src.indexOf('if (who && who !== \'@player\') { slotMenu(idx); return null; }') < 0) {
-    throw new Error('点已上阵的格子没有走两选弹窗');
-  }
-  if (w) UI._panels._closeModal(w);
+  // 不是从队伍进来的（比如从图鉴点进来）就不该出现这张卡
+  const plain = UI._panels.charDetail('C021').innerHTML;
+  if (plain.indexOf('data-off') >= 0) throw new Error('从图鉴进来也冒出了下阵按钮');
 });
 t('预设独立成卡（不跟小队挤在一起）', () => {
   const html = UI._panels._screens.partyScreen();
