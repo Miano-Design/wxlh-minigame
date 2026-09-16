@@ -39,7 +39,13 @@ function install(extra) {
 function makeCtx() {
   const base = {
     canvas: { width: 390, height: 844 },
-    measureText: (s) => ({ width: String(s).length * 7.5 }),
+    measureText(s) {
+      const m = /(\d+(?:\.\d+)?)px/.exec(this.font || '');
+      const fs = m ? parseFloat(m[1]) : 14;
+      let w = 0;
+      for (const ch of String(s)) w += /[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(ch) ? fs : fs * 0.55;
+      return { width: w };
+    },
     createLinearGradient: () => ({ addColorStop() {} }),
     measureTextWidth: () => 0,
   };

@@ -11,11 +11,31 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.CEFit = api;
 })(typeof window !== 'undefined' ? window : this, function () {
+  /* 用真画布量文字宽度（小游戏里有 canvas；没有就返回 null，退回编译期估算）。
+     这是"不要写死数值"的关键：字宽按当前字号、当前字体实测，跟浏览器一致。 */
+  let measureCtx = null, measureTried = false;
+  function measureText(text, fontSize, fontWeight) {
+    if (!measureTried) {
+      measureTried = true;
+      try {
+        const c = wx.createCanvas();
+        c.width = 8; c.height = 8;
+        measureCtx = c.getContext('2d');
+      } catch (e) { measureCtx = null; }
+    }
+    if (!measureCtx) return null;
+    try {
+      measureCtx.font = (fontWeight === 'bold' ? 'bold ' : '') + (fontSize || 14) + 'px sans-serif';
+      const w = measureCtx.measureText(String(text)).width;
+      return typeof w === 'number' && w > 0 ? w : null;
+    } catch (e) { return null; }
+  }
+
   function isPct(v) { return typeof v === 'string' && /^-?\d*\.?\d+%$/.test(v); }
   function pctOf(v) { return parseFloat(v) / 100; }
 
   /* 样式表 → 一份按画布尺寸算好的新样式表（不原地改传入的对象） */
-  function fit(styles, W, H) {
+  function fit(styles, W, H, intrinsic) {
     const out = {};
     Object.keys(styles).forEach((k) => { out[k] = Object.assign({}, styles[k]); });
 
@@ -65,7 +85,8 @@
         const c = out[k];
         // 已定宽的按宽度算；没定宽的用"文字宽度提示"（__textW）估，别当 0——
         // 当 0 的话弹性兄弟会分到整个空余宽度，右边的东西就飘了。
-        const cw = typeof c.width === 'number' ? c.width : (c.__textW || 0);
+        const cw = typeof c.width === 'number' ? c.width
+          : ((intrinsic && intrinsic[k]) || c.__textW || 0);   // 优先用运行时实测的内在宽度
         return sum + cw + (c.marginLeft || 0) + (c.marginRight || 0);
       }, 0);
       const flexKids = kids.filter((k) => out[k].flex && typeof out[k].width !== 'number');
@@ -85,10 +106,14 @@
        让它按内容撑一行（顶多溢出，绝不会卡）。 */
     Object.keys(out).forEach((k) => {
       const isText = k.split('__').pop().indexOf('text.') === 0;
-      if (isText && typeof out[k].width === 'number' && out[k].width < 24) delete out[k].width;
+      if (!isText) return;
+      ['maxWidth', 'maxHeight', 'minWidth', 'minHeight'].forEach((p2) => {
+        if (typeof out[k][p2] === 'number' && out[k][p2] < 24) out[k][p2] = 24;
+      });
+      if (typeof out[k].width === 'number' && out[k].width < 24) delete out[k].width;
     });
     return out;
   }
 
-  return { fit };
+  return { fit, measureText };
 });

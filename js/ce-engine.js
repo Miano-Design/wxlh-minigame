@@ -48,7 +48,34 @@ function flatten(LayoutInst) {
 
 function renderPage(ctx, W, H, markup) {
   const prepared = CTX.prepare(markup);
-  const styleSheet = CEFit.fit(STYLE, W, H);
+
+  /* 先算一张"内在宽度表"：文字元素用真画布实测，容器取子级最大值 + 左右内边距。
+     折算层分配弹性宽度时用它，替代"按字数估"——不写死任何尺寸数值。 */
+  const nodes = [];
+  CTX.walk(prepared.xml, (node) => nodes.push(node));
+  const raw0 = CEFit.fit(STYLE, W, H);          // 先拿一份（只为读字号/内边距）
+  const intrinsic = {};
+  nodes.forEach((node) => {
+    const st = raw0[node.path] || {};
+    const v = node.attrs && node.attrs.value;
+    let w = 0;
+    if (v) {
+      const m = CEFit.measureText(v, st.fontSize, st.fontWeight);
+      w = m !== null ? m : (st.__textW || 0);
+    }
+    intrinsic[node.path] = Math.max(intrinsic[node.path] || 0, w);
+  });
+  for (let i = nodes.length - 1; i >= 0; i--) {           // 后序：子级先算完
+    const node = nodes[i];
+    const st = raw0[node.path] || {};
+    const pad = (st.paddingLeft || 0) + (st.paddingRight || 0);
+    if (intrinsic[node.path] && !pad) continue;
+    const parentPath = node.path.slice(0, node.path.lastIndexOf('__'));
+    if (parentPath) intrinsic[parentPath] = intrinsic[parentPath] || 0;
+    if (parentPath) intrinsic[parentPath] = Math.max(intrinsic[parentPath], (intrinsic[node.path] || 0) + pad);
+  }
+
+  const styleSheet = CEFit.fit(STYLE, W, H, intrinsic);
 
   /* 自检：查不到上下文的元素 = 整套样式都没有（引擎按默认值画：黑底黑字、边距全丢） */
   const missing = [];
