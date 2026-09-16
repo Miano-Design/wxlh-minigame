@@ -194,10 +194,12 @@ t('招募流程', () => {
   const r = Core.recruitOnce('normal');
   if (r.error) throw new Error(r.error);
 });
-t('队伍页含主角', () => {
-  UI._setTab('party');
-  const html = byId['view'].innerHTML;
-  if (!html.includes('主角')) throw new Error('缺少主角位');
+t('队伍页含主角（现在是"主页→养成→队伍"弹窗）', () => {
+  const w = UI._panels.openPartyPanel();
+  const html = w ? (w.innerHTML || '') : '';
+  UI._panels._closeModal(w);
+  const direct = UI._panels._screens.partyScreen();
+  if (direct.indexOf('主角') < 0) throw new Error('缺少主角位');
 });
 t('没解锁的入口收成一行小字（不铺灰格子）', () => {
   UI._setTab('home');
@@ -727,13 +729,27 @@ t('指南正文的重点是加粗，不是星号', () => {
 });
 
 // ---- V8.3：队伍页（主角可换排 · 成员一览排到阵型前面） ----
-t('队伍页：成员一览排在阵型前面', () => {
+t('队伍页：没有「成员一览」了（下阵/换人直接在阵容格子上做）', () => {
   const html = UI._panels._screens.partyScreen();
-  const iTeam = html.indexOf('成员一览');
-  const iForm = html.indexOf('阵型');
-  if (iTeam < 0) throw new Error('缺成员一览');
-  if (iForm < 0) throw new Error('缺阵型');
-  if (iTeam > iForm) throw new Error('成员一览还在阵型后面');
+  if (html.indexOf('成员一览') >= 0) throw new Error('成员一览还在（父亲大人要求删掉）');
+  if (html.indexOf('阵型') < 0) throw new Error('缺阵型');
+  // 点格子 = 上阵/换人/下阵：选人弹窗里必须有「下阵」
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('function pickPartyChar');
+  const seg = src.slice(i, i + 1600);
+  if (seg.indexOf('data-clear') < 0) throw new Error('选人弹窗里没有「下阵」');
+});
+t('执灯者页签 = 伙伴总览；队伍/成长搬进主页养成', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('function rosterScreen');
+  const seg = src.slice(i, i + 600);
+  if (seg.indexOf('ROSTER_TABS') >= 0) throw new Error('执灯者页签还挂着"队伍/伙伴/成长"三个子页签');
+  if (seg.indexOf('charsScreen') < 0) throw new Error('执灯者页签没有直接显示伙伴总览');
+  const home = UI._panels._screens.homeScreen();
+  ['队伍', '成长'].forEach(k => { if (home.indexOf(k) < 0) throw new Error('主页养成里缺入口：' + k); });
+  if (src.indexOf("case 'open-party'") < 0 || src.indexOf("case 'open-grow'") < 0) {
+    throw new Error('两个新入口没有对应的处理分支');
+  }
 });
 t('队伍页：站位可长按换位（不再有单独按钮）', () => {
   const html = UI._panels._screens.partyScreen();

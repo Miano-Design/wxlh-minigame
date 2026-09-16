@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.44';
+  const GAME_VER = '9.5.45';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -563,11 +563,9 @@ window.UI = (function () {
   }
   // 「执灯者」= 队伍编成 / 伙伴图鉴 / 成长线，子页共用一条顶部胶囊
   function rosterScreen() {
-    const sub = { party: partyScreen, chars: charsScreen, grow: growScreen }[rosterView] || partyScreen;
-    return `<div class="tab-cards">
-        ${ROSTER_TABS.map(t => `<div class="tab-card ${rosterView === t.id ? 'active' : ''}" data-roster="${t.id}">${t.name}</div>`).join('')}
-      </div>
-      ${sub()}`;
+    /* V9.5.45（父亲大人）：执灯者这一块直接就是**伙伴总览** ——
+       「队伍」和「成长」搬去主页的养成板块（队伍＝上阵/换位，成长＝六条养成线总览）。 */
+    return charsScreen();
   }
 
   // 「成长」子页：把六条养成线集中在这里（原来全摊在首页）。
@@ -803,6 +801,8 @@ window.UI = (function () {
     const signToday = signSt.canDraw ? null : signSt;
     // 一条入口 = [动作, 名字, 状态文字, 解锁条件(可空), 是否亮红点]
     const lines = [
+      ['open-party', '队伍', `${C().S.party.filter(Boolean).length} 人上阵`],
+      ['open-grow', '成长', '六条养成线总览'],
       ['open-sect', '灯阁评级', `Lv.${sect.lv}`],
       ['open-keji', '秘术阁', `${kejiTotal} 级`],
       ['open-fabao', '法宝', fbOwn ? `${fbOwn}/${D.FABAO.length} 件` : '去挑一件'],
@@ -1342,31 +1342,6 @@ window.UI = (function () {
         </div>
       </div>
       <div class="card">
-        <h3>成员一览</h3>
-        ${S.party.map((id, i) => {
-          const inFront = i < 2;
-          if (!id) return '';
-          if (id === '@player') {
-            return `<div class="list-row" data-protag-row="1" style="cursor:pointer;border-color:#e6b64c55">
-              ${charAvatar('@player', 40)}
-              <div class="grow"><div class="t1">${cname('@player')} <span class="tag" style="color:var(--gold);border-color:var(--gold)">主角</span> <span class="tag">${inFront ? '前排' : '后排'}</span></div>
-                <div class="t2">Lv.${S.player.level} · 战力 ${fmt(C().playerPower())} · 必上阵，不能下阵</div></div>
-            </div>`;
-          }
-          const ch = D.charById[id];
-          const c = S.chars[id];
-          const st = C().effectiveStats(id);
-          return `<div class="list-row" data-char="${id}" style="cursor:pointer">
-            ${charAvatar(id, 40)}
-            <div class="grow"><div class="t1">${cname(id)} <span class="stars">${stars(c.star, D.RARITY_MAXSTAR[ch.rarity])}</span> <span class="tag">${inFront ? '前排' : '后排'}</span></div>
-            <div class="t2">攻${fmt(st.atk)} · 防${fmt(st.def)} · 血${fmt(st.hp)} · 速${fmt(st.spd)}</div></div>
-            <button class="btn small ghost" data-remove="${id}">下阵</button>
-          </div>`;
-        }).join('')}
-        ${S.party.filter(id => id && id !== '@player').length ? '' : `<div class="empty">还没有伙伴上阵。</div>
-          <button class="btn primary block mt3" data-act="open-recruit">✦ 去招募伙伴</button>`}
-      </div>
-      <div class="card">
         <h3>🧩 阵型 <span class="sub">主角可补位（阵容上满 5 人才成阵）</span></h3>
         <div class="kv"><span class="k">当前构成</span><span>${fbCount || '—'}</span></div>
         <div class="kv"><span class="k">成阵</span><span style="color:var(--green)">${fb.names.length ? fb.names.join(' · ') : '未成阵'}</span></div>
@@ -1530,7 +1505,14 @@ window.UI = (function () {
   function pickPartyChar(slotIdx) {
     const S = C().S;
     const owned = Object.keys(S.chars);
-    const w = modal('选择上阵伙伴', owned.map(id => {
+    const curId = S.party[slotIdx];
+    const curName = curId && curId !== '@player' ? cname(curId) : '';
+    const w = modal('选择上阵伙伴', (curName
+      ? `<div class="list-row" style="border-color:#d43a4f55"><div class="grow"><div class="t1">当前：${curName}</div>
+           <div class="t2">点下面的伙伴＝换人；也可以直接让他下阵</div></div>
+           <button class="btn small ghost" data-clear="1">下阵</button></div>`
+      : '<div class="hint mb2">这一格还空着，点一个伙伴让他上阵</div>')
+      + owned.map(id => {
       const ch = D.charById[id];
       const c = S.chars[id];
       const inParty = S.party.includes(id);
@@ -1540,6 +1522,12 @@ window.UI = (function () {
         ${inParty ? '<span class="tag">已上阵</span>' : ''}
       </div>`;
     }).join('') || '<div class="empty">还没有伙伴，去招募吧</div>');
+    const clearBtn = w.querySelector('[data-clear]');
+    if (clearBtn) clearBtn.onclick = () => {
+      C().S.party[slotIdx] = null; C().save();
+      closeModal(w); render();
+      toast(`${curName} 已下阵`);
+    };
     w.querySelectorAll('[data-pick]').forEach(el => {
       el.onclick = () => {
         const id = el.dataset.pick;
@@ -3014,7 +3002,7 @@ window.UI = (function () {
       return;
     }
     if (qid === 'q04') {
-      setTab('party');
+      openPartyPanel();   // V9.5.45：队伍搬去 主页→养成→队伍，引导直接开那个弹窗
       // 注意：主角默认就占着第 1 格，所以这里指向"前排"这一整排，别指向某个具体格子（可能正好是主角）
       coachmark('[data-row="front"]', '点空位把招募到的伙伴放进队伍。上阵共 5 格（前 2 后 3），主角占其中一格，还能再上 4 名队友；想换位置就长按任意一格抓起，按住拖到别的位置松手放下——主角也能拖到后排。');
       return;
@@ -4363,6 +4351,44 @@ window.UI = (function () {
   }
 
   /* ================= 界面事件绑定 ================= */
+  /* 队伍盘的交互绑定：主界面（执灯者页签）和「主页→养成→队伍」弹窗共用一套。
+     root._partyRedraw 有值时（弹窗形态）就重画那一层，否则重画整页。 */
+  function bindPartyBoard(root) {
+    const repaint = () => (root._partyRedraw ? root._partyRedraw() : render());
+    // 站位：长按抓起 → 拖到别的位置松手放下；点空位＝选人上阵，点已上阵＝换人/下阵，点主角＝看详情
+    root.querySelectorAll('[data-pos]').forEach(el => {
+      const pos = el.dataset.pos;
+      armLongPress(el, pos);
+      el.onclick = () => { clickPosition(pos); };
+    });
+    const grabCancel = root.querySelector('[data-grab-cancel]');
+    if (grabCancel) grabCancel.onclick = () => { cancelGrab(false); repaint(); };
+    root.querySelectorAll('[data-preset-save]').forEach(el => el.onclick = () => {
+      const r = C().savePreset(+el.dataset.presetSave);
+      toast(r.msg || (r.ok ? '已保存编队预设' : '保存失败'));
+      sfx('click');
+      repaint();
+    });
+    root.querySelectorAll('[data-preset-use]').forEach(el => el.onclick = () => {
+      const r = C().applyPreset(+el.dataset.presetUse);
+      toast(r.msg);
+      sfx(r.ok ? 'success' : 'fail');
+      if (r.ok) repaint();
+    });
+    root.querySelectorAll('[data-protag]:not([data-pos])').forEach(el => el.onclick = () => protagonistDetail());
+  }
+  /* 「主页 → 养成 → 队伍」用的弹窗：里面的操作原地重画这一层，不退出 */
+  function openPartyPanel() {
+    const w = showPanel(undefined, '队伍', partyScreen());
+    w._partyRedraw = () => { updateModal(w, '队伍', partyScreen()); bindPartyBoard(w); };
+    bindPartyBoard(w);
+    return w;
+  }
+  /* 「主页 → 养成 → 成长」用的弹窗：六条养成线的总览（原执灯者→成长子页） */
+  function openGrowPanel() {
+    return showPanel(undefined, '成长', growScreen());
+  }
+
   function bindScreen() {
     const root = $view();
     // 背包页签的按钮与弹窗共用一套绑定
@@ -4403,6 +4429,8 @@ window.UI = (function () {
         case 'open-authority': authorityModal(); break;
         case 'open-sect': sectModal(); break;
         case 'open-keji': kejiModal(); break;
+        case 'open-party': openPartyPanel(); break;
+        case 'open-grow': openGrowPanel(); break;
         case 'open-travel': travelModal(); break;
         // 首页游历条上的奇遇已经出来了：点一下直接领走（不再进二级页面）
         case 'claim-travel': {
@@ -4519,30 +4547,7 @@ window.UI = (function () {
         render();
       });
     });
-    // 站位：长按抓起 → 拖到别的位置松手放下；没抓起时，点空位＝选人上阵，点已上阵＝换人，点主角＝看详情
-    root.querySelectorAll('[data-pos]').forEach(el => {
-      const pos = el.dataset.pos;
-      armLongPress(el, pos);
-      el.onclick = () => clickPosition(pos);
-    });
-    const grabCancel = root.querySelector('[data-grab-cancel]');
-    if (grabCancel) grabCancel.onclick = () => { cancelGrab(false); };
-    root.querySelectorAll('[data-preset-save]').forEach(el => el.onclick = () => {
-      const r = C().savePreset(+el.dataset.presetSave);
-      toast(r.msg || (r.ok ? '已保存编队预设' : '保存失败'));
-      sfx('click');
-      render();
-    });
-    root.querySelectorAll('[data-preset-use]').forEach(el => el.onclick = () => {
-      const r = C().applyPreset(+el.dataset.presetUse);
-      toast(r.msg);
-      sfx(r.ok ? 'success' : 'fail');
-      if (r.ok) render();
-    });
-    // 顶栏状态行的「轮回」那一格也开主角详情；队伍页的主角牌由 [data-pos] 接管（带长按换位）
-    root.querySelectorAll('[data-protag]:not([data-pos])').forEach(el => el.onclick = () => protagonistDetail());
-    // 成员一览里点主角那一行 = 打开主角详情
-    root.querySelectorAll('[data-protag-row]').forEach(el => el.onclick = () => protagonistDetail());
+    bindPartyBoard(root);
     root.querySelectorAll('[data-remove]').forEach(el => el.onclick = ev => {
       ev.stopPropagation();
       const S = C().S;
@@ -4834,6 +4839,7 @@ window.UI = (function () {
       applyPotionHp,
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
+      openPartyPanel, openGrowPanel,
     },
   };
 })();
