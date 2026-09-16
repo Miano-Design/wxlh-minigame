@@ -53,6 +53,25 @@ function renderPage(ctx, W, H, markup) {
   /* 自检：查不到上下文的元素 = 整套样式都没有（引擎按默认值画：黑底黑字、边距全丢） */
   const missing = [];
   CTX.walk(prepared.xml, (node) => { if (!styleSheet[node.path]) missing.push(node.path); });
+  /* 兜底：某个状态下的类名组合没编进样式表时，从"最近的、存在的祖先上下文"继承文字样式。
+     不然那个元素整套样式都没有 → 引擎按默认值画 = 黑底黑字（父亲大人截图里的那个）。 */
+  const INHERIT = ['color', 'fontSize', 'fontWeight', 'fontFamily', 'lineHeight', 'letterSpacing', 'textAlign', 'whiteSpace', 'wordBreak', 'textOverflow'];
+  const inheritFrom = (path) => {
+    let p2 = path;
+    for (let i = 0; i < 12; i++) {
+      const cut = p2.lastIndexOf('__');
+      if (cut < 0) break;
+      p2 = p2.slice(0, cut);
+      const src = styleSheet[p2];
+      if (src) {
+        const st = {};
+        INHERIT.forEach((k) => { if (src[k] !== undefined) st[k] = src[k]; });
+        if (Object.keys(st).length) styleSheet[path] = st;
+        return;
+      }
+    }
+  };
+  missing.forEach(inheritFrom);
   if (missing.length) {
     /* 兜底：把这些元素身上的行内样式（颜色 / 透明度这些）当场折一份挂到它们的类名上——
        上下文没了，但至少字是白的，不会"黑底黑字看不见"。 */

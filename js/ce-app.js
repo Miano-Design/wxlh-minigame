@@ -34,7 +34,7 @@ function screens() {
 
 /* 某个页签的整页标记（纯函数，构建脚本也用它来编译样式表） */
 function pageMarkup(tab, opts) {
-  if (tab === 'setup') return setupMarkup();
+  if (tab === 'setup') return setupMarkup(opts && opts.app);
   const S = screens();
   /* 弹窗：网页版往 #modal-root 里塞的内容（被 ce-dom 接住）→ 翻译成引擎标记，作为最上层 */
   const modals = (window.__CE_MODALS || []);
@@ -63,17 +63,53 @@ function pageMarkup(tab, opts) {
    所以"随便点几页都没对齐"。现在新档也走这套界面。 */
 const SETUP_NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊'];
 
-function setupMarkup() {
+/* ① 起名：小游戏有键盘 API，让他自己打字（老版只能随机，父亲大人指出过） */
+function askName(app) {
+  const Core = window.Core;
+  const done = (v) => {
+    const name = String(v || '').trim().slice(0, 12);
+    if (name) Core.setPlayerName(name);
+    try { wx.hideKeyboard && wx.hideKeyboard({}); } catch (e) {}
+    draw(app);
+  };
+  if (!(typeof wx !== 'undefined' && wx.showKeyboard)) {   // 万一没有键盘 API，退回随机
+    const cur = Core.S.player.name;
+    const i = SETUP_NAMES.indexOf(cur);
+    Core.setPlayerName(SETUP_NAMES[(i + 1 + SETUP_NAMES.length) % SETUP_NAMES.length]);
+    draw(app);
+    return;
+  }
+  try {
+    if (wx.onKeyboardConfirm) wx.onKeyboardConfirm((res) => done(res && res.value));
+    wx.showKeyboard({
+      defaultValue: Core.S.player.name || '',
+      maxLength: 12,
+      multiple: false,
+      confirmHold: false,
+      confirmType: 'done',
+      fail: () => {},
+    });
+  } catch (e) { console.warn('[CE] 打开键盘失败：' + e.message); }
+}
+
+function setupMarkup(app) {
   const D = window.DATA, Core = window.Core, S = Core.S;
-  const cur = S.player.bloodline || '';
+  // ③ 选中的血统先记在界面上（app.pendingBl），点"进入残域"才写进存档 —— 这样中途随时能换
+  const cur = (app && app.pendingBl) || S.player.bloodline || '';
   /* 三步照网页版来（文案就抄 ui.js 的 showTutorial / showCharCreate / bloodlineModal）：
      ① 欢迎 + 签订灯阁契约  ② 起名（canvas 里没有输入框，用"换一个"代替打字）  ③ 选血统 */
   const rows = Object.keys(D.BLOODLINES).map((k) => {
     const b = D.BLOODLINES[k] || {};
     const on = cur === k;
+    // ④ 选中标记改成右侧的 ✓（之前那个 tag 在引擎里渲染坏了）
     return `<view class="card" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold)' : ''}">
-      <view class="t1"><text class="t1-t" value="${b.name || k}"/>${on ? '<text class="tag" style="color:var(--gold)" value="已选"/>' : ''}</view>
-      <view class="t2"><text class="t2-t" value="${b.desc || ''}"/></view>
+      <view class="list-row" style="padding:0">
+        <view class="grow">
+          <view class="t1"><text class="t1-t" value="${b.name || k}"/></view>
+          <view class="t2"><text class="t2-t" value="${b.desc || ''}"/></view>
+        </view>
+        <text class="chev"${on ? ' style="color:var(--gold)"' : ''} value="${on ? '✓' : '›'}"/>
+      </view>
     </view>`;
   }).join('');
 
@@ -86,10 +122,17 @@ function setupMarkup() {
 
     <view class="section-title"><text class="section-title-t" value="创建你的执灯者"/></view>
     <view class="card">
+      <view class="list-row" data-name="type" style="cursor:pointer">
+        <view class="grow">
+          <view class="t1"><text class="t1-t" value="${S.player.name || '点这里输入名字'}"/></view>
+          <view class="t2"><text class="t2-t" value="灯阁需要一个名字来记录你的行程（点一下用键盘输入）"/></view>
+        </view>
+        <text class="chev" value="✎"/>
+      </view>
       <view class="list-row" data-name="roll" style="cursor:pointer">
         <view class="grow">
-          <view class="t1"><text class="t1-t" value="${S.player.name || '未命名'}"/></view>
-          <view class="t2"><text class="t2-t" value="灯阁需要一个名字来记录你的行程（点一下换一个）"/></view>
+          <view class="t1"><text class="t1-t" value="换一个"/></view>
+          <view class="t2"><text class="t2-t" value="懒得想就随机挑一个"/></view>
         </view>
         <text class="chev" value="🎲"/>
       </view>
@@ -152,6 +195,8 @@ function bind(app, out) {
     const ds = el.dataset || {};
     if (ds.tab) {
       el.on('click', () => { if (app.tab !== ds.tab) show(app, ds.tab); });
+    } else if (ds.name === 'type') {
+      el.on('click', () => askName(app));
     } else if (ds.name === 'roll') {
       el.on('click', () => {
         const cur = window.Core.S.player.name;
@@ -162,12 +207,14 @@ function bind(app, out) {
       });
     } else if (ds.bl) {
       el.on('click', () => {
-        try { window.Core.choosePlayerBloodline(ds.bl); } catch (e) { console.warn('[CE] 选血统失败：' + e.message); }
+        app.pendingBl = ds.bl;          // 只记在界面上，随时能改
         draw(app);
       });
     } else if (ds.setup === 'ok') {
       el.on('click', () => {
-        if (!window.Core.S.player.bloodline) return;
+        const pick = app.pendingBl || window.Core.S.player.bloodline;
+        if (!pick) return;
+        try { if (!window.Core.S.player.bloodline) window.Core.choosePlayerBloodline(pick); } catch (e) {}
         app.tab = 'home';
         draw(app);
       });
@@ -207,7 +254,7 @@ function watchBattle(app) {
 }
 
 function draw(app) {
-  const out = CEEngine.renderPage(app.view.ctx, app.view.W, app.view.H, pageMarkup(app.tab));
+  const out = CEEngine.renderPage(app.view.ctx, app.view.W, app.view.H, pageMarkup(app.tab, { app: app }));
   bind(app, out);
   app.out = out;
   console.log(`[CE] ${app.tab} 已渲染：画布 ${app.view.W}×${app.view.H} dpr${app.view.dpr}`

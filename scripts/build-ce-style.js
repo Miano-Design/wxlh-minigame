@@ -515,7 +515,7 @@ function loadMarkups() {
       Core.todayState = () => ({ claimable: 3, dailyDone: 1, dailyTotal: 6, achClaimable: 2 });
       Core.signState = () => ({ canDraw: false, tier: '上上' });
     } },
-    { name: '·已选血统', setup() {
+    { name: '·已选血统', app: { pendingBl: 'blood' }, setup() {
       /* 选完血统后，首页【境界】那一行的值会变成金色（行内 style）——这一套也得编进来 */
       try { Core.choosePlayerBloodline(window.DATA.BLOODLINES[0].id); } catch (e) { /* 数据改名了也不该让编译挂掉 */ }
     } },
@@ -554,7 +554,7 @@ function loadMarkups() {
     } catch (e) { /* 弹窗打不开也不该让编译挂掉 */ }
     PAGE_SPECS.forEach((p) => {
       try {
-        out.push({ name: p.name + st.name, markup: CEApp.pageMarkup(p.tab, { fn: p.fn }) });
+        out.push({ name: p.name + st.name, markup: CEApp.pageMarkup(p.tab, { fn: p.fn, app: st.app }) });
       } catch (e) {
         console.error('✗ 页面渲染失败：' + p.name + st.name + ' → ' + e.message);
       }
