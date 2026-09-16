@@ -52,7 +52,8 @@ window.Core = (function () {
       worldFirstClear: {},  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
       corridor: { floor: 1, best: 0 },
       // 保底按池分开记账：高级 / 限定 各自算 SSR / UR / 当期 UP 的累计数
-      recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '' },
+      recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '',
+        free: { date: '', normal: { used: 0, at: 0 }, advanced: { used: 0, at: 0 } } },   // V9.5.51 每日免费抽
       shop: { dailyDate: '', dailyItems: [], bought: {} },
       // bonus：额外扫荡额度（由玩法自行发放的临时加次数；网页版不发，恒为 0，跨天清零）
       sweep: { date: '', count: 0, bonus: 0 },
@@ -1511,21 +1512,35 @@ window.Core = (function () {
     save();
     return { results, usedTickets };
   }
-  function freeRecruitAvailable() {
-    const today = dailyDate();   // 与每日任务 / 商店 / 求签同一把钟（本地 0 点）
-    return S.recruit.lastFree !== today;
+  /* 每日免费抽（V9.5.51 父亲大人）：
+     普通池：每天 3 次，且**两次之间隔 10 分钟**；高级池：每天 1 次；
+     限定池没有免费。次数和"上次用的时间"都按自然日刷新（和每日任务同一把钟）。 */
+  const FREE_RULES = { normal: { daily: 3, gapSec: 600 }, advanced: { daily: 1, gapSec: 0 } };
+  function freeState(pool) {
+    const rule = FREE_RULES[pool];
+    if (!rule) return { daily: 0, used: 0, left: 0, ready: false, waitSec: 0 };
+    const today = dailyDate();
+    const f = S.recruit.free;
+    if (f.date !== today) { f.date = today; f.normal = { used: 0, at: 0 }; f.advanced = { used: 0, at: 0 }; }
+    const st = f[pool] || (f[pool] = { used: 0, at: 0 });
+    const left = Math.max(0, rule.daily - st.used);
+    // 次数用完就不再报冷却（界面也就不会再显示倒计时）
+    const wait = (rule.gapSec && left > 0) ? Math.max(0, Math.ceil((st.at + rule.gapSec * 1000 - Date.now()) / 1000)) : 0;
+    return { daily: rule.daily, used: st.used, left, ready: left > 0 && wait <= 0, waitSec: wait };
   }
-  function freeRecruit() {
-    if (!freeRecruitAvailable()) return { error: '今日已领取' };
-    S.recruit.lastFree = dailyDate();
-    // 出率与「普通池」完全同源：之前写的是另一套（SR 只有 7.5%，界面却写"走普通池出率"，V9.2 修）
-    const rar = rollRarityInPool('normal');
-    const base = pickCharOfRarity(rar, 'normal');
+  const freeRecruitAvailable = (pool = 'normal') => freeState(pool).ready;
+  function freeRecruit(pool = 'normal') {
+    const st = freeState(pool);
+    if (!st.ready) return { error: st.left <= 0 ? '今日免费次数已用完' : '还要再等一会儿' };
+    S.recruit.free[pool].used = st.used + 1;
+    S.recruit.free[pool].at = Date.now();
+    const rar = rollRarityInPool(pool);                       // 出率跟该池同源
+    const base = pickCharOfRarity(rar, pool);
     const res = addChar(base.id);
     S.stats.recruits++;
     task('recruit1', 1);
     save();
-    return { id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0 };
+    return { id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0, free: true, pool };
   }
   function ssrTicketUse(charId) {
     const base = D.charById[charId];
@@ -2595,7 +2610,8 @@ window.Core = (function () {
       idle: bank, idleReady, idleSeconds: bank.seconds,
       dailyDone: daily.filter(x => x.done).length, dailyTotal: daily.length, dailyClaimable,
       weeklyClaimable, achClaimable, codexClaimable,
-      freeRecruit: freeRecruitAvailable(), freeRecruitReady: freeRecruitAvailable() && isUnlocked('recruit'),
+      freeRecruit: freeRecruitAvailable('normal') || freeRecruitAvailable('advanced'),
+      freeRecruitReady: (freeRecruitAvailable('normal') || freeRecruitAvailable('advanced')) && isUnlocked('recruit'),
       signReady: signState().canDraw,          // 今日还没求签 → 首页给个提醒
       claimable: (idleReady ? 1 : 0) + dailyClaimable + weeklyClaimable + achClaimable + codexClaimable,
     };
@@ -2896,7 +2912,7 @@ window.Core = (function () {
     unequipEverywhere, equipWearer, dedupeEquips,
     playerRow, setPlayerRow, swapPartySlots, moveMemberRow, rowLayout, ROW_NAME, rowOfSlots, normalizeParty,
     parsePos, posRow, swapPositions,
-    recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, ssrTicketUse, ticketOf,
+    recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
     idleRates, idleBaseRates, idleLines, idleLineBonus, setIdleLeader, idleMatItem, grantIdleMat,
     settleOffline, onlineTick, idleBankGains, claimIdle, addPlayerExp, offlineCapHours, offlineEfficiency,
     upgradeBuilding, authority, authorityInfo, upgradeAuthority,

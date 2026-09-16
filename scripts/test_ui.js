@@ -1224,6 +1224,19 @@ t('招募结果页：继续招募＝同池同次数再来一次；返回＝回�
   if (seg.indexOf('runPull(again.pid, again.n)') < 0) throw new Error('「继续招募」没有"同一池子、同样次数再来一次"');
   if (seg.indexOf('recruitModal(w)') < 0) throw new Error('「返回」没有回到招募伙伴界面');
 });
+t('招募页：没有「每日免费」卡片，免费次数显示在单抽按钮上', () => {
+  Core.newGame(); Core.setPlayerName('免费UI');
+  Core.S.unlocks.recruit = true;
+  const html = UI._panels.recruitModal().innerHTML;
+  if (html.indexOf('每日免费') >= 0) throw new Error('「每日免费」那张卡还在');
+  if (html.indexOf('免费抽 1 次') < 0) throw new Error('单抽按钮上没显示免费次数');
+  // 抽掉普通池的 1 次后，按钮应该变成带倒计时的形态
+  Core.freeRecruit('normal');
+  const html2 = UI._panels.recruitModal().innerHTML;
+  if (html2.indexOf('免费抽（还剩 2 次 ·') < 0) throw new Error('冷却中没显示倒计时');
+  // 高级池还留着 1 次免费
+  if (html2.indexOf('免费抽 1 次（今日还剩 1 次）') < 0) throw new Error('高级池的免费没显示');
+});
 t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   const i = css.indexOf('.reward-chips {');

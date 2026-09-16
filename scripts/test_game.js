@@ -1799,5 +1799,30 @@ setParty(['C021']);
   })());
 }
 
+/* ---- V9.5.51：每日免费抽并进池子单抽（普通 3 次 / 隔 10 分钟；高级 1 次；限定无） ---- */
+{
+  Core.newGame(); Core.setPlayerName('免费抽');
+  const s0 = Core.freeState('normal');
+  t('普通池每天 3 次免费、开局就能抽', s0.daily === 3 && s0.left === 3 && s0.ready === true);
+  Core.freeRecruit('normal');
+  const s1 = Core.freeState('normal');
+  t('抽掉 1 次后剩 2 次，并进入 10 分钟冷却', s1.left === 2 && s1.ready === false && s1.waitSec > 590);
+  t('冷却中抽不了（会给提示）', !!Core.freeRecruit('normal').error);
+  Core.S.recruit.free.normal.at = Date.now() - 601000;
+  t('满 10 分钟后又能抽', Core.freeState('normal').ready === true);
+  Core.freeRecruit('normal');
+  Core.S.recruit.free.normal.at = Date.now() - 601000;
+  Core.freeRecruit('normal');
+  const s3 = Core.freeState('normal');
+  t('3 次用完后没有免费，也不再有倒计时', s3.left === 0 && s3.ready === false && s3.waitSec === 0);
+  const av0 = Core.freeState('advanced');
+  t('高级池每天 1 次免费', av0.daily === 1 && av0.left === 1 && av0.ready === true);
+  Core.freeRecruit('advanced');
+  t('高级池用掉后没免费、也不显示冷却（等第二天）', Core.freeState('advanced').left === 0 && Core.freeState('advanced').waitSec === 0);
+  t('限定池没有每日免费', Core.freeState('limited').daily === 0);
+  Core.S.recruit.free.date = '2000-01-01';
+  t('跨天：免费次数全部重置', Core.freeState('normal').left === 3 && Core.freeState('advanced').left === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

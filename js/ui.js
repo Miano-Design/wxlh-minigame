@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.50';
+  const GAME_VER = '9.5.51';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -473,7 +473,7 @@ window.UI = (function () {
     nav.innerHTML = TABS.map(t => {
       let dot = false;
       if (t.id === 'home') dot = idleClaimable();
-      else if (t.id === 'roster') dot = C().isUnlocked('recruit') && C().freeRecruitAvailable();
+      else if (t.id === 'roster') dot = C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready);
       return `<div class="nav-item ${curTab === t.id ? 'active' : ''}" data-tab="${t.id}">${t.name}${dot ? '<span class="dot"></span>' : ''}</div>`;
     }).join('');
     nav.querySelectorAll('.nav-item').forEach(el => { el.onclick = () => setTab(el.dataset.tab); });
@@ -822,7 +822,13 @@ window.UI = (function () {
       ['open-tasks', '每日任务', '主线 / 日常 / 周常', 'tasks'],
       ['open-ach', '成就', '长线目标', null, achDot],
       ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
-      ['open-recruit', '招募伙伴', C().freeRecruitAvailable() ? '今日免费 1 抽' : '攒碎片升星', 'recruit', C().isUnlocked('recruit') && C().freeRecruitAvailable()],
+      ['open-recruit', '招募伙伴', (() => {
+        const a = C().freeState('normal'), b = C().freeState('advanced');
+        const left = a.left + b.left;
+        if (!left) return '今日免费已用完';
+        if (!a.ready && !b.ready) return `免费冷却中（还剩 ${left} 次）`;
+        return `免费抽：普通 ${a.left} 次 · 高级 ${b.left} 次`;
+      })(), 'recruit', C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
       ['open-shop', '兑换大厅', '三档商店', 'shop'],
     ];
     return `<div class="section-title" data-sec="grow">养成</div>
@@ -2084,13 +2090,11 @@ window.UI = (function () {
   }
   function recruitModal(wrap) {
     const S = C().S;
-    const free = C().freeRecruitAvailable();
+    /* V9.5.51（父亲大人）：原来的「每日免费」卡片撤掉，免费次数并进各池的"单抽"按钮：
+       普通池每天 3 次（两次间隔 10 分钟）、高级池每天 1 次；有免费就显示"免费抽 1 次"，
+       冷却中显示倒计时，次数用完就恢复正常花券/货币（不再显示倒计时）。 */
+    const mmss = sec => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}`;
     const w = showPanel(wrap, '招募伙伴', `
-      <div class="card mb3">
-        <h3>每日免费 <span class="sub">${free ? '今日可领' : '明天再来'}</span></h3>
-        
-        <button class="btn primary block" data-free="1" ${free ? '' : 'disabled'}>免费招募 1 次</button>
-      </div>
       ${Object.entries(D.RECRUIT_POOLS).map(([pid, p]) => {
       const costText = Object.entries(p.cost).map(([k, v]) => `${curIcon(k)}${fmt(v)}`).join('');
       const tenText = Object.entries(p.ten || p.cost).map(([k, v]) => `${curIcon(k)}${fmt(v)}`).join('');
@@ -2099,7 +2103,12 @@ window.UI = (function () {
       const tk = C().ticketOf(pid);
       const tkName = tk ? (D.ITEMS[tk.id] || {}).name || tk.id : '';
       // 按钮文案如实反映"这次到底扣什么"：够券就写券，不够才写货币
-      const oneLabel = tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`;
+      const fst = C().freeState(pid);
+      const freeNow = fst.left > 0 && fst.ready;
+      const freeLabel = fst.left > 0
+        ? (fst.ready ? `免费抽 1 次（今日还剩 ${fst.left} 次）` : `免费抽（还剩 ${fst.left} 次 · ${mmss(fst.waitSec)}）`)
+        : '';
+      const oneLabel = freeLabel || (tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`);
       const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}·保底SR）`;
       return `<div class="card pool-card mb3">
         <!-- V9.5.50（父亲大人）：池名后面的"攒碎片/补图鉴/定向UP"标签、以及那一大段机制说明都不要了 -->
@@ -2120,7 +2129,7 @@ window.UI = (function () {
           ${pv.up ? `<span style="color:var(--gold)">UP 保底 <b>${pv.up.n}</b>/${pv.up.cap}</span>` : ''}
         </div>` : `<div class="pity-row"><span>没有保底，纯攒碎片</span></div>`}
         <div class="btn-row">
-          <button class="btn small" data-pull1="${pid}">${oneLabel}</button>
+          <button class="btn small ${freeNow ? 'gold' : ''}" data-pull1="${pid}" data-free1="${freeNow ? 1 : ''}" data-freelabel="${fst.left > 0 ? pid : ''}">${oneLabel}</button>
           <button class="btn small gold" data-pull10="${pid}">${tenLabel}</button>
         </div>
       </div>`;
@@ -2162,12 +2171,32 @@ window.UI = (function () {
       w.querySelector('[data-back]').onclick = () => recruitModal(w);
       refresh();
     };
-    w.querySelector('[data-free]').onclick = () => {
-      const r = C().freeRecruit();
-      if (r.error) { failToast(r.error); return; }
-      showResults([r], { pid: 'normal', n: 1 });     // 继续招募＝普通池再来 1 抽（免费一天只有一次）
-    };
-    w.querySelectorAll('[data-pull1]').forEach(b => b.onclick = () => runPull(b.dataset.pull1, 1, b));
+    w.querySelectorAll('[data-pull1]').forEach(b => b.onclick = () => {
+      const pid = b.dataset.pull1;
+      if (b.dataset.free1) {                            // 有免费就先免费抽（不弹确认、不扣钱）
+        const r = C().freeRecruit(pid);
+        if (r.error) { failToast(r.error); return; }
+        showResults([r], { pid, n: 1 });
+        return;
+      }
+      runPull(pid, 1, b);
+    });
+    // 冷却倒计时：每秒只改那几个按钮上的文字（不整页重画）
+    if (w._freeTimer) clearInterval(w._freeTimer);
+    w._freeTimer = setInterval(() => {
+      const root = document.getElementById ? document.getElementById('modal-root') : null;
+      if (!root || typeof root.contains !== 'function' || !root.contains(w)) { clearInterval(w._freeTimer); w._freeTimer = null; return; }
+      w.querySelectorAll('[data-freelabel]').forEach(el => {
+        const pid = el.dataset.freelabel;
+        if (!pid) return;
+        const st = C().freeState(pid);
+        if (st.left <= 0) {                                  // 次数用完 → 整层重画一次，回到正常按钮
+          clearInterval(w._freeTimer); w._freeTimer = null; recruitModal(w); return;
+        }
+        else if (st.ready) { el.dataset.free1 = '1'; el.classList.add('gold'); el.textContent = `免费抽 1 次（今日还剩 ${st.left} 次）`; }
+        else { el.dataset.free1 = ''; el.classList.remove('gold'); el.textContent = `免费抽（还剩 ${st.left} 次 · ${String(Math.floor(st.waitSec / 60)).padStart(2, '0')}:${String(Math.max(0, st.waitSec % 60)).padStart(2, '0')}）`; }
+      });
+    }, 1000);
     w.querySelectorAll('[data-pull10]').forEach(b => b.onclick = () => runPull(b.dataset.pull10, 10, b));
     const tk = w.querySelector('[data-ssrpick]');
     if (tk) tk.onclick = () => ssrPickModal(w);
