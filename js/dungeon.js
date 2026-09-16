@@ -138,14 +138,14 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     if (kind === 'elite' && Math.random() < Math.min(1, 0.35 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
     if (kind === 'boss') { const n = 1 + (Math.random() < 0.5 ? 1 : 0); if (Core.addItem(matId, n)) got.push({ k: 'item', v: matId, n }); }
     if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
-    /* 治疗剂：副本里唯一的补血手段。
-       V8.9 撤掉"途中补给箱"之后，这条来源必须自己产——不然"波间血量继承"就只剩挨打，
-       越是深层越缺药。所以把它挂在每一波战斗上：普通战小概率、精英中概率、Boss 必掉。 */
-    const healPool = stage <= 4 ? ['heal_s', 'heal_m'] : stage <= 8 ? ['heal_m', 'heal_l'] : ['heal_l', 'heal_x'];
-    const healChance = kind === 'boss' ? 1 : kind === 'elite' ? 0.40 : 0.20;
-    if (Math.random() < Math.min(1, healChance * dropBoost)) {
-      const pickHeal = healPool[Math.floor(Math.random() * healPool.length)];
-      if (Core.addItem(pickHeal)) got.push({ k: 'item', v: pickHeal, n: 1 });
+    /* V9.5.66（父亲大人）：探索消耗品（治疗剂 / 强化剂）整条线删掉，这里原来占着
+       "普通战 20% / 精英 40% / Boss 必掉"三档掉落位。直接空掉会让每一局的收益凭空缩水，
+       所以把这三档**换成同档位的强化材料**——材料有真实去处（强化装备、建筑、商店都在吃）。
+       老档里已经买到的消耗品在 core.js 的 migrate() 里按原价退点数。 */
+    const supplyChance = kind === 'boss' ? 1 : kind === 'elite' ? 0.40 : 0.20;
+    if (Math.random() < Math.min(1, supplyChance * dropBoost)) {
+      const sn = kind === 'boss' ? 2 : 1;
+      if (Core.addItem(matId, sn)) got.push({ k: 'item', v: matId, n: sn });
     }
     // 招募券掉落（对标《道友修仙》的"招徒卷"：券是玩法里会掉的，不是只能在商店买）。
     // 这样"打副本 → 掉券 → 去招募"自己就是一条循环，不必先攒够一大笔货币才敢点招募。
@@ -171,21 +171,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       const n = kind === 'boss' ? (tier >= 11 ? 1 : 2) : 1;
       if (Core.addItem(expId, n)) got.push({ k: 'item', v: expId, n });
     }
-    // 战斗增益补给：精英 25%、Boss 必掉，保证强化剂有稳定来源
-    const buffId = Math.random() < 0.5 ? 'buff_muscle' : 'buff_nerve';
-    if (kind === 'elite' && Math.random() < Math.min(1, 0.25 * dropBoost)) { if (Core.addItem(buffId)) got.push({ k: 'item', v: buffId, n: 1 }); }
-    if (kind === 'boss' && Core.addItem(buffId)) got.push({ k: 'item', v: buffId, n: 1 });
-    // 高阶探索消耗品：世界越深，掉的东西越"打出去"（护盾 / 狂暴 / 超频 / 全效回血）
-    const surgePool = [];
-    if (tier >= 2) surgePool.push('def_shield');
-    if (tier >= 6) surgePool.push('atk_surge');
-    if (tier >= 8) surgePool.push('spd_surge');
-    if (surgePool.length && kind !== 'combat' && Math.random() < Math.min(1, 0.30 * dropBoost)) {
-      const pick = surgePool[Math.floor(Math.random() * surgePool.length)];
-      if (Core.addItem(pick)) got.push({ k: 'item', v: pick, n: 1 });
-    }
-    if (tier >= 10 && kind === 'boss' && Math.random() < Math.min(1, 0.40 * dropBoost)) {
-      if (Core.addItem('heal_x')) got.push({ k: 'item', v: 'heal_x', n: 1 });
+    /* 原来的"增益补给 / 高阶消耗品"两段判定同样并进素材掉落：
+       精英/Boss 额外给一件当前档位材料，保证一局的实得收益不因删道具而变少。 */
+    if (kind !== 'combat' && Math.random() < Math.min(1, 0.30 * dropBoost)) {
+      if (Core.addItem(matId, 1)) got.push({ k: 'item', v: matId, n: 1 });
     }
     // 兽魂石：伴生体的唯一稳定来源。Boss 必掉 1~3 颗，精英 30% 掉 1 颗
     if (kind === 'boss') {

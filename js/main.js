@@ -12,6 +12,15 @@
     } else {
       Core.ensureDaily();
       UI.init();
+      /* V9.5.66：这次更新删掉了探索消耗品，老档里剩下的按原价退成了 ◈ 点数。
+         钱变了就得说一声——不然玩家只会看到点数莫名其妙多了（或者更糟：以为自己记错了）。
+         提示只弹一次（读完就清标记并落盘）。 */
+      if (Core.S.retiredRefundPending) {
+        Core.S.retiredRefundPending = false;
+        const got = Core.S.retiredRefund || 0;
+        Core.save();
+        setTimeout(() => UI.toast(`治疗剂 / 强化剂已下架，背包里剩的按原价退回：◈ ${got.toLocaleString()}`, 4200), 600);
+      }
       if (!Core.S.player.name) UI.showCharCreate();
       // 老档 / 中途退出的档：还没选血统的，进游戏先补这一步（境界线依赖血统）
       else if (!Core.S.player.bloodline) UI.showBloodlinePick();

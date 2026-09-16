@@ -259,8 +259,8 @@ setParty(['C021']);
   t('三池各 50 且互相独立', u0.eqCap === 50 && u0.matCap === 50 && u0.cap === 50);
   Core.S.bag.itemCap = u0.itemStacks; // 只把道具格塞满
   Core.S.settings.autoSellN = false; Core.S.settings.autoSellR = false;
-  t('道具格满时新道具失败', Core.addItem('heal_l') === false);
-  t('已满的堆叠仍可叠加', Core.addItem('heal_s') === true);
+  t('道具格满时新道具失败', Core.addItem('exp_l') === false);
+  t('已满的堆叠仍可叠加', Core.addItem('exp_s') === true);
   const eqFull = Core.grantEquip('W01', 'N');
   t('道具格满不影响装备入库', !!eqFull.equip && !eqFull.sold);
   Core.S.bag.eqCap = u0.eqUsed;       // 再把装备格塞满
@@ -286,7 +286,7 @@ setParty(['C021']);
   Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);   // 清掉新手道具，只看分池行为
   Core.S.bag.itemCap = 1;
   Core.S.bag.matCap = 3;
-  t('道具池先占满', Core.addItem('heal_s', 1) === true && Core.addItem('heal_m', 1) === false);
+  t('道具池先占满', Core.addItem('exp_s', 1) === true && Core.addItem('exp_m', 1) === false);
   t('道具池满不影响材料池入库', Core.addItem('mat_t1', 1) === true && Core.addItem('mat_t2', 1) === true);
   const u = Core.bagUsage();
   t('三个池分别报数', u.itemStacks === 1 && u.matStacks === 2 && u.cap === 1 && u.matCap === 3);
@@ -492,7 +492,8 @@ setParty(['C021']);
   Core.setPlayerName('回归');
   Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);
   Core.S.bag.itemCap = 2;
-  Core.S.items.heal_s = 1; Core.S.items.heal_m = 1;   // 道具池占满 2 格（材料走材料池）
+  // 道具池占满 2 格（用两件**不是**货架第 0 位的东西，这样"买不到"才说明是容量问题）
+  Core.S.items.exp_m = 1; Core.S.items.box_r = 1;
   Core.S.cur.points = 100000;
   const r = Core.buyShopItem('god', 0);                // 初级经验模块
   t('背包满时购买被拒', r.ok === false);
@@ -504,19 +505,33 @@ setParty(['C021']);
   })());
 }
 
-// 34. 强化剂有来源也有用：商店能买、探索增益可叠加
+// 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
+  const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];
   Core.newGame();
-  Core.setPlayerName('回归');
-  Core.S.cur.points = 100000;
-  const godShop = D.SHOPS.god.items;
-  t('灯阁市集上架肌肉强化剂', godShop.some(x => x.item === 'buff_muscle'));
-  t('灯阁市集上架神经刺激剂', godShop.some(x => x.item === 'buff_nerve'));
-  const idx = godShop.findIndex(x => x.item === 'buff_muscle');
-  const r = Core.buyShopItem('god', idx);
-  t('强化剂可购买', r.ok === true && Core.S.items.buff_muscle === 1);
-  t('强化剂带明确使用场景', D.ITEMS.buff_muscle.where === 'explore' && !!D.ITEMS.buff_muscle.use);
-  t('神经刺激剂效果是速度', D.ITEMS.buff_nerve.effect.spdPct === 0.2);
+  Core.setPlayerName('下架');
+  t('消耗品不在道具表里', GONE.every(k => !D.ITEMS[k]));
+  t('商店不再卖消耗品', Object.values(D.SHOPS).every(s => s.items.every(i => !GONE.includes(i.item))));
+  t('副本掉落里不再有消耗品', !fs.readFileSync('js/dungeon.js', 'utf8').match(/heal_[a-z]|buff_(muscle|nerve)|atk_surge|spd_surge|def_shield/));
+  t('开局补给不再发治疗剂', !(D.STARTER.items && D.STARTER.items.heal_s));
+  t('老档背包里剩的按原价退回点数', (() => {
+    Core.S.items = { heal_s: 3, buff_muscle: 2, exp_s: 1 };
+    const p0 = Core.S.cur.points;
+    Core.migrate();
+    return Core.S.items.heal_s === undefined && Core.S.items.buff_muscle === undefined
+      && Core.S.items.exp_s === 1 && Core.S.cur.points - p0 === 3 * 500 + 2 * 1500;
+  })());
+  t('待领箱里剩的也一起退，并留一次提示', (() => {
+    Core.S.stash = [{ id: 'heal_x', n: 1 }];
+    const p0 = Core.S.cur.points;
+    Core.migrate();
+    return Core.stashCount() === 0 && Core.S.cur.points - p0 === 9000 && Core.S.retiredRefundPending === true;
+  })());
+  t('退款不会重复发生', (() => {
+    const p0 = Core.S.cur.points;
+    Core.migrate();
+    return Core.S.cur.points === p0;
+  })());
 }
 
 // 35. 图鉴收集奖励
@@ -1451,10 +1466,18 @@ setParty(['C021']);
   t('每个世界都有 3 个杂兵 + 1 个精英', D.WORLDS.every(w => w.enemies.length === 3 && !!w.elite));
   t('世界主题都在克制映射里', D.WORLDS.every(w => window.Dungeon.THEME_FACTION[w.theme] !== undefined));
   t('世界套装跟着世界数一起长', Object.keys(D.SETS).length >= D.WORLDS.length);
-  t('道具 ≥38 种', Object.keys(D.ITEMS).length >= 38);
+  // 探索消耗品下架后是 30 种（V9.5.66）；这条是"别把道具表删空"的下限
+  t('道具 ≥30 种', Object.keys(D.ITEMS).length >= 30);
   t('每种道具都有名字/说明/来源', Object.keys(D.ITEMS).every(k => { const it = D.ITEMS[k]; return it.name && it.desc && it.src && it.use; }));
-  t('新道具都有真实用途', ['heal_x', 'def_shield', 'atk_surge', 'spd_surge', 'exp_xxl'].every(k => {
-    const it = D.ITEMS[k]; return it && (it.effect || it.exp);
+  /* V9.5.66：探索消耗品下架后，这里改成**按类型**检查"每件道具都真的能用"——
+     只列几个 id 点验，漏掉一整类也看不出来（这次删 9 件就是个提醒）。 */
+  t('每件道具都带"用得上"的字段', Object.entries(D.ITEMS).every(([k, it]) => {
+    if (it.type === 'exp') return it.exp > 0;
+    if (it.type === 'serum') return !!(it.serum && it.serum.key && it.serum.max > 0);
+    if (it.type === 'material') return it.tier > 0;
+    if (it.type === 'ticket') return !!(it.pool && D.RECRUIT_POOLS[it.pool]);
+    if (it.type === 'box') return !!it.rarity;
+    return false;                              // 出现没见过的类型 = 有人加了道具却没接入系统
   }));
 }
 
@@ -1691,14 +1714,14 @@ setParty(['C021']);
   Core.S.bag.itemCap = 1;
   Core.S.items.ticket_normal = 1;                    // 占满唯一的道具格
   const p0 = Core.S.cur.points;
-  const out = Core.applyRewardObj({ points: 100, item: 'heal_s' });
-  t('背包满：奖励道具进待领箱，不再静默蒸发', (Core.S.items.heal_s || 0) === 0 && Core.stashCount() === 1);
+  const out = Core.applyRewardObj({ points: 100, item: 'exp_s' });
+  t('背包满：奖励道具进待领箱，不再静默蒸发', (Core.S.items.exp_s || 0) === 0 && Core.stashCount() === 1);
   t('背包满：货币照常发放（只有道具会被寄存）', Core.S.cur.points - p0 === 100);
-  t('applyRewardObj 会回报"哪件道具被寄存了"', out.stashed.length === 1 && out.stashed[0] === 'heal_s');
-  t('待领箱里就是那件道具', Core.stashList()[0].id === 'heal_s' && Core.stashList()[0].n === 1);
+  t('applyRewardObj 会回报"哪件道具被寄存了"', out.stashed.length === 1 && out.stashed[0] === 'exp_s');
+  t('待领箱里就是那件道具', Core.stashList()[0].id === 'exp_s' && Core.stashList()[0].n === 1);
   Core.S.bag.itemCap = 10;                           // 扩容之后能领回
   const cs = Core.claimStash();
-  t('扩容后一键领回：进背包、待领箱清空', cs.ok && cs.moved === 1 && (Core.S.items.heal_s || 0) === 1 && Core.stashCount() === 0);
+  t('扩容后一键领回：进背包、待领箱清空', cs.ok && cs.moved === 1 && (Core.S.items.exp_s || 0) === 1 && Core.stashCount() === 0);
 }
 
 // V9.5-5：药园收获也不能被背包吞掉（地清了，东西必须在）

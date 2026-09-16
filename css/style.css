@@ -443,9 +443,9 @@ body {
 #battle-overlay .b-title { font-size: 0.875rem; font-weight: 700; flex: 1; }
 .b-field { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding: 0 0.875rem; }
 .b-row { display: flex; justify-content: center; gap: 0.625rem; flex-wrap: wrap; }
-/* 站位可见化：我方分两行（后排在上、前排在下），敌人优先打前排 */
-.b-line-label { text-align: center; font-size: 0.6875rem; color: var(--dim); letter-spacing: 1px; }
-.b-line-label[data-line="front"] { color: #ffd76a99; }
+/* 站位可见化：我方分两行（前排在上、后排在下），敌人优先打前排。
+   V9.5.66（父亲大人）：行首的「我方前排 / 我方后排」字条去掉了——
+   分两行本身就说明了站位，再挂两个字条只是把画面塞满。 */
 .b-seamless {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   background: #0d1220ee; border: 1px solid var(--gold); color: var(--gold);

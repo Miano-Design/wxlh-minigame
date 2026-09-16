@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.65';
+  const GAME_VER = '9.5.66';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -171,7 +171,7 @@ window.UI = (function () {
   // 3) 防连点：同一个小按钮 300ms 内只吃一次点击（连点会重复扣资源的那种）
   const GUARD_SEL = 'button, .nav-item, .pill, [data-act], [data-stage], [data-world],'
     + ' [data-char], [data-item], [data-pick], [data-serumtarget], [data-eq], [data-eqd],'
-    + ' [data-buy], [data-refine], [data-pull1], [data-pull10], [data-sstage], [data-stimes], [data-potion],'
+    + ' [data-buy], [data-refine], [data-pull1], [data-pull10], [data-sstage], [data-stimes],'
     + ' [data-attr], [data-lvup], [data-cur], [data-claim], [data-mclaim], [data-ach], [data-codex]';
   function installClickGuard() {
     if (!document.addEventListener) return;
@@ -283,7 +283,6 @@ window.UI = (function () {
     wrap.remove();
     if (wrap._onClose) wrap._onClose();
   }
-  function closeAllModals() { modalStack.forEach(w => w.remove()); modalStack = []; }
   // 重开弹窗时保持滚动位置（加点/穿装备等连续操作不跳顶）
   function modalScroll(w) { const sb = w.querySelector('.sheet-body'); return sb ? sb.scrollTop : 0; }
   function restoreModalScroll(w, st) { if (st) { const sb = w.querySelector('.sheet-body'); if (sb) sb.scrollTop = st; } }
@@ -793,10 +792,14 @@ window.UI = (function () {
       ['open-grow', '成长'],
       ['open-sect', '灯阁评级', `Lv.${sect.lv}`],
       ['open-keji', '秘术阁', `${kejiTotal} 级`],
-      ['open-fabao', '法宝', fbOwn ? `${fbOwn}/${D.FABAO.length} 件` : '去挑一件'],
+      /* V9.5.66（父亲大人）：这条元组的第 3 位是**状态**，不是说明——
+         以前「每日任务」写成 'tasks'、「兑换大厅」写成 'shop'（把解锁条件的 key 塞进了状态位），
+         界面上就直接把内部名字画出来了（父亲大人截图里那两处怪字就是这个）。
+         统一规矩：第 3 位只准放"当前状态"，没状态就留空。 */
+      ['open-fabao', '法宝', `${fbOwn}/${D.FABAO.length} 件`],
       ['open-garden', '药园', `${gardenBusy} 块在用`],
       ['open-arena', '斗法台', `第 ${arena.floor} 台 · 剩 ${arena.left} 次`],
-      ['open-mount', '坐骑', mountOwn ? `${mountOwn}/${D.MOUNTS.length} 匹` : '去驯一匹'],
+      ['open-mount', '坐骑', `${mountOwn}/${D.MOUNTS.length} 匹`],
       ['open-refine', '炼化台'],
       ['open-authority', '灯阁权限', `Lv.${au.lv}/${au.max}`, 'buildings'],
       ['open-buildings', '基地建设', `合计 Lv.${bLv}`, 'buildings'],
@@ -807,7 +810,11 @@ window.UI = (function () {
     ];
     const daily = [
       ['open-bounty', '限时悬赏', null, null, C().bountyState().list.some(x => x.done && !x.claimed)],
-      ['open-tasks', '每日任务', 'tasks'],
+      // 状态 = 今天完成了几项（以前这里误写成解锁 key 'tasks'，界面上直接露出英文）
+      ['open-tasks', '每日任务', (() => {
+        const st = C().todayState();
+        return st && st.dailyTotal ? `${st.dailyDone}/${st.dailyTotal} 项` : null;
+      })()],
       ['open-ach', '成就', null, null, achDot],
       ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
       // V9.5.52（父亲大人）：这一格的说明文字改成"本期 UP 是谁 · 什么阵营"，比堆免费次数有用
@@ -815,7 +822,7 @@ window.UI = (function () {
         const up = D.recruitUpChar();
         return up ? `本期 UP：${up.name} · ${up.faction}` : '去招募伙伴';
       })(), 'recruit', C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready)],
-      ['open-shop', '兑换大厅', 'shop'],
+      ['open-shop', '兑换大厅'],
     ];
     return `<div class="section-title" data-sec="grow">养成</div>
       ${tileGrid(lines)}
@@ -997,7 +1004,6 @@ window.UI = (function () {
       waves: window.Dungeon.wavePlan(stage),
       wave: 0,          // 当前打到第几波（0 起）
       hpPct: {},        // charId → 0~1
-      buffs: {},
       kills: 0,
       deaths: 0,        // 整关累计阵亡波数：星级评价按"整关有没有人倒下"算，不只看最后一波
     };
@@ -1017,44 +1023,8 @@ window.UI = (function () {
       return `<div style="flex:1;min-width:0"><div style="font-size:0.625rem;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
     }).join('');
   }
-  /* V9.5.65（产品体检）：探索消耗品的**唯一**使用入口就是这张道具卡。
-     副本里的药剂条已在 V9.5.64 按父亲大人要求撤掉，那条渲染函数（potionBarHtml）
-     和它的按钮绑定（bindPotionButtons）都成了死代码，一并删掉——
-     留着会让下一个人以为"副本里还有一条补给条"。 */
-  // 用一支探索消耗品。返回是否真的用掉了（由调用方决定要不要重画）
-  // 药剂回血只治"活着的人"（hpPct > 0.01），阵亡的成员不复活——
-  // 否则一支药就能把全队从灭团捞回来，星级评价里的"无人阵亡"就没意义了（V9.5 定死）。
-  // 抽成纯函数是为了能脱离 DOM 直接测（见 scripts/test_ui.js）。
-  function applyPotionHp(hpPct, healPct) {
-    const out = Object.assign({}, hpPct);
-    let down = 0;
-    Object.keys(out).forEach(cid => {
-      if (out[cid] <= 0.01) { down++; return; }
-      out[cid] = Math.min(1, out[cid] + healPct);
-    });
-    return { hpPct: out, down };
-  }
-  function usePotion(id) {
-    if (!run) return false;
-    const eff = (D.ITEMS[id] || {}).effect || {};
-    if (!C().removeItem(id)) { toast('道具不足'); return false; }
-    const parts = [];
-    if (eff.healPct) {
-      const r = applyPotionHp(run.hpPct, eff.healPct);
-      run.hpPct = r.hpPct;
-      parts.push(`全队恢复 ${Math.round(eff.healPct * 100)}% 生命${r.down ? `（${r.down} 名成员已阵亡，不复活）` : ''}`);
-    }
-    ['atkPct', 'spdPct', 'defPct'].forEach(k => {
-      if (!eff[k]) return;
-      run.buffs[k] = (run.buffs[k] || 0) + eff[k];
-      parts.push(`${D.CONSUMABLE_TAG[k] || k}+${Math.round(eff[k] * 100)}%`);
-    });
-    C().task('item1', 1);
-    C().save();
-    toast(`${eff.healPct ? '🧪' : '💉'} ${D.ITEMS[id].name}：${parts.join(' · ')}`);
-    persistRun();
-    return true;
-  }
+  /* V9.5.66（父亲大人）：探索消耗品整条线删除，这一块（药剂条渲染、按钮绑定、回血/增益结算）
+     全部撤掉。战斗的补给概念没有了：一场探索只看阵容、养成和站位，不带药进去。 */
   function runScreen() {
     if (!run) return worldsList();
     const w = D.WORLDS.find(x => x.id === run.worldId);
@@ -1074,7 +1044,6 @@ window.UI = (function () {
         <h3>${w.name} · ${{ normal: '普通', hard: '困难', hell: '地狱' }[run.diff]} · 第 ${run.stage}/12 关 <span class="sub">共 ${total} 波</span></h3>
         <div class="route-progress">${prog}</div>
         <div style="display:flex;gap:0.375rem">${partyHpHtml()}</div>
-        ${Object.keys(run.buffs).length ? `<div style="margin-top:0.5rem;font-size:0.6875rem;color:var(--green)">本关增益：${Object.entries(run.buffs).map(([k, v]) => `${D.CONSUMABLE_TAG[k] || k}+${Math.round(v * 100)}%`).join(' ')}</div>` : ''}
       </div>
       <div class="card"><h3>本关波次</h3>${waveList}</div>
       <div style="height:5.25rem"></div>
@@ -1284,16 +1253,18 @@ window.UI = (function () {
     const gcls = grabbed ? ' grabbed' : '';
     const slotTile = i => {
       const id = S.party[i];
-      const pos = i < 2 ? '前排' : '后排';
       const grabCls = grabbed === String(i) ? ' grabbing' : '';
       if (!id) {
         const freeHint = grabbed !== null && grabbed !== String(i) ? '放这里' : '＋ 上阵';
-        // V9.5.44（父亲大人）：空格子的「＋ 上阵」要真居中 —— 以前靠写死 padding-top 硬顶下来，必然偏
-        return `<div class="pslot${grabCls}" data-pos="${i}"><span class="pos-tag">${pos}</span><div class="pslot-ph">${freeHint}</div></div>`;
+        /* V9.5.44（父亲大人）：空格子的「＋ 上阵」要真居中 —— 以前靠写死 padding-top 硬顶下来，必然偏。
+           V9.5.66：格子左上角那个「前排 / 后排」角标去掉了——每一排的正上方已经写着"前排 / 后排"，
+           格子里再标一遍就是同一句话说两次。 */
+        return `<div class="pslot${grabCls}" data-pos="${i}"><div class="pslot-ph">${freeHint}</div></div>`;
       }
       if (id === '@player') {
+        // 主角这格保留角标：它不是"第几排"，而是"这一格是主角、只能点不能换"的身份标记
         return `<div class="pslot filled protag-slot${grabCls}" data-pos="${i}" data-protag="1">
-          <span class="pos-tag" style="color:var(--gold)">主角 · ${C().ROW_NAME[C().playerRow()]}</span>
+          <span class="pos-tag" style="color:var(--gold)">主角</span>
           ${charAvatar('@player', 40)}
           <div class="pname">${cname('@player')}</div>
           <div class="pmeta">Lv.${S.player.level} · 战力 ${fmt(C().playerPower())}</div>
@@ -1302,7 +1273,6 @@ window.UI = (function () {
       const ch = D.charById[id];
       const c = S.chars[id];
       return `<div class="pslot filled rarity-${ch.rarity}${grabCls}" data-pos="${i}">
-        <span class="pos-tag">${pos}</span>
         ${charAvatar(id, 40)}
         <div class="pname">${cname(id)}</div>
         <div class="pmeta">Lv.${c.lv} · ${ch.role} · ${ch.faction}</div>
@@ -1314,15 +1284,18 @@ window.UI = (function () {
     if (fb.hpPct) fbText.push(`生命+${Math.round(fb.hpPct * 100)}%`);
     if (fb.skillPct) fbText.push(`技能+${Math.round(fb.skillPct * 100)}%`);
     const fbCount = Object.entries(fb.count).map(([f, n]) => `${f}×${n}`).join(' ');
+    /* V9.5.66（父亲大人）：两排只留「前排 / 后排」两个定位词。
+       原来跟在后面的解释（受击概率更高、适合坦度高的 / 相对安全、适合输出与治疗）
+       是**说明性小字**，摆两次位就懂了，留在格子上只会把画面塞满。 */
     return `
       <div class="card">
         <h3>⚔️ 灯阁小队 <span class="sub">总战力 ${fmt(C().teamPower())}（主角必上阵）</span></h3>
         ${grabbed !== null ? `<div class="drag-bar">已抓起「${gname}」 · 拖到别的位置松手放下
           <button class="btn small ghost" data-grab-cancel="1">取消</button></div>` : ''}
         <div class="party-grid${gcls}">
-          <div class="pos-row-label" data-row="front">前排 <span>2 格 · 受击概率更高，适合坦度高的</span></div>
+          <div class="pos-row-label" data-row="front">前排</div>
           <div class="party-slots">${slotTile(0)}${slotTile(1)}</div>
-          <div class="pos-row-label" data-row="back">后排 <span>3 格 · 相对安全，适合输出与治疗</span></div>
+          <div class="pos-row-label" data-row="back">后排</div>
           <div class="party-slots">${slotTile(2)}${slotTile(3)}${slotTile(4)}</div>
         </div>
         <button class="btn small block mt3" data-act="auto-equip">⚡ 一键最优装备</button>
@@ -2066,7 +2039,7 @@ window.UI = (function () {
 
         <div class="btn-row">
           <button class="btn small ${freeNow ? 'gold' : ''}" data-pull1="${pid}" data-free1="${freeNow ? 1 : ''}"
-            data-freelabel="${fst.left > 0 && !fst.ready ? pid : ''}" data-freepool="${pid}">${oneLabel}</button>
+            data-freelabel="${fst.left > 0 && !fst.ready ? pid : ''}">${oneLabel}</button>
           <button class="btn small gold" data-pull10="${pid}">${tenLabel}</button>
         </div>
       </div>`;
@@ -2224,11 +2197,13 @@ window.UI = (function () {
     shopTab = tab || shopTab;
     const S = C().S;
     const shop = D.SHOPS[shopTab];
-    const info = D.CURRENCY_INFO[shop.currency] || {};
     const w = showPanel(wrap, '兑换大厅', `
       <div class="pill-tabs">${Object.entries(D.SHOPS).map(([k, s]) => `<div class="pill ${shopTab === k ? 'active' : ''}" data-shoptab="${k}">${s.name}（${curIcon(s.currency)}${fmt(S.cur[s.currency])}）</div>`).join('')}</div>
+      <!-- V9.5.66（父亲大人）：只留"本店用什么结算"这一句。
+           后面那串「用途：强化装备、普通招募、背包扩容、……」是货币图鉴里已有的内容，
+           贴在每家店头上只是重复信息，把货架往下挤。 -->
       <div style="font-size:0.6875rem;color:var(--dim);line-height:1.7;margin:2px 2px 0.5rem">
-        本店用 ${curIcon(shop.currency)}${curName(shop.currency)} 结算 · 用途：${info.use || '—'}
+        本店用 ${curIcon(shop.currency)}${curName(shop.currency)} 结算
       </div>
       ${shop.items.map((it, i) => {
         const key = shopTab + '_' + i + '_' + C().dailyDate();
@@ -3037,10 +3012,8 @@ window.UI = (function () {
       setTab('dungeon');
       dungeonView = { page: 'world', worldId: 'W01', diff: 'normal' };
       render();
-      /* V9.5.65（产品体检）：这句原来写"血线低了就在结算页点治疗剂"——
-         V9.5.64 把副本里的药剂条撤掉之后，结算页已经没有治疗剂了，引导在教一个不存在的按钮。
-         消耗品现在统一从背包用，话术跟着改。 */
-      coachmark('[data-stage="3"]', '每通关一关解锁下一关；一关是一口气打到底的，一波打完自动接下一波，血量会继承、不会自动回满。血线低了就回背包，点治疗剂那一格补给（阵亡的伙伴救不回来）。');
+      // V9.5.66：治疗剂整条线下架，这句引导不能再指向一个不存在的补给动作
+      coachmark('[data-stage="3"]', '每通关一关解锁下一关；一关是一口气打到底的，一波打完自动接下一波，血量会继承、不会自动回满。打不动就回头练队伍，再回来接着推。');
       return;
     }
     if (qid === 'q04') {
@@ -3478,22 +3451,6 @@ window.UI = (function () {
       <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
         永久生效，不是临时增益。${sd.bloodline ? `只有「${sd.bloodline}」血统能用；` : '任何伙伴（含主角）都能用；'}每人每种上限 ${sd.max} 支。
       </div>`;
-    } else if (it.type === 'consumable') {
-      /* V9.5.65（产品体检）：探索消耗品以前是个死路——
-         V9.5.64 按父亲大人要求撤掉了副本里的药剂条，结果这 9 种道具（商店里还要花点数买）
-         在界面上找不到任何使用入口：没在探索时点「进副本后使用」只是跳到残域首页，
-         到了副本里也没有入口，玩家会以为道具坏了。现在按"探索中回背包补给"这条链路写清楚，
-         并把当前波次直接写在按钮上，玩家知道自己正在第几波、点下去会发生什么。 */
-      const wv = run && run.waves ? run.waves.length : 0;
-      actions = run
-        ? `<div class="btn-row"><button class="btn small gold" data-runuse="1">在本次探索中使用（第 ${Math.min(run.wave + 1, wv)}/${wv} 波）</button></div>
-           <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
-             只对<b>本次探索</b>生效（回血 / 本关增益），探索结束就失效；阵亡的伙伴不会被救活。
-           </div>`
-        : `<div class="btn-row"><button class="btn small" data-gotoexplore="1">去残域开始探索 ›</button></div>
-           <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.375rem;line-height:1.7">
-             探索<b>进行中</b>时回到背包点这张卡就能用；没在探索时用不上，先去残域选一关开打。
-           </div>`;
     } else if (it.type === 'material') {
       actions = `<div class="note">强化装备时自动优先消耗</div>`;
     } else if (it.type === 'ticket') {
@@ -3555,24 +3512,6 @@ window.UI = (function () {
       const want = +b.dataset.serum;
       pickSerumTarget(itemId, want === 0 ? (C().S.items[itemId] || 0) : want, w, goBack);
     });
-    const runUse = w.querySelector('[data-runuse]');
-    if (runUse) runUse.onclick = () => {
-      /* V9.5.65（产品体检）：这里原来把 usePotion 的逻辑抄了一遍，而且抄漏了一条规矩——
-         抄的那版会把阵亡的成员也"奶活"（Math.min(1, hp + heal) 对 0 血也生效），
-         而 usePotion / applyPotionHp 明确不复活阵亡者（否则一支药能把灭团捞回来，三星评价就没意义了）。
-         同一个动作两套逻辑迟早会分叉，现在统一走 usePotion。 */
-      const eff = it.effect || {};
-      if (!usePotion(itemId)) return;
-      sfx(eff.healPct ? 'success' : 'coin');
-      render();
-      afterChange();
-    };
-    const go = w.querySelector('[data-gotoexplore]');
-    if (go) go.onclick = () => {
-      closeModal(w);
-      setTab('dungeon');
-      toast('选一关开始探索，中途回背包就能用这张卡', 2600);
-    };
     return w;
   }
   // 经验道具：先选伙伴
@@ -3937,14 +3876,15 @@ window.UI = (function () {
       <div class="b-head">
         <div class="b-title">${esc(cfg.title)}</div>
         <button class="btn small ghost" data-speedbtn>${S.settings.speed}×速度</button>
+        <!-- V9.5.66（父亲大人）："跳过战斗"撤掉之后，战斗画面就只剩"看着打完"了。
+             补一个小的「撤离」——不想打了能退出去，不用等这几十帧放完。 -->
+        <button class="btn small ghost" data-quit>撤离</button>
       </div>
       <div class="b-field">
         <div class="b-row enemies"></div>
         <!-- V9.5.64（父亲大人）：前排画在上面、后排画在下面，跟队伍页一个方向。
              以前是反的（后排在上、前排在下），看着就是"前后排颠倒了"。 -->
-        <div class="b-line-label" data-line="front">我方前排</div>
         <div class="b-row allies front"></div>
-        <div class="b-line-label" data-line="back">我方后排</div>
         <div class="b-row allies back"></div>
       </div>
       <div id="battle-log"></div>
@@ -4019,15 +3959,23 @@ window.UI = (function () {
     }
     const energyMap = {};
     let speed = S.settings.speed;
-    /* 战备补给条：副本里随时能喝，但一场战斗的帧是"开打前一次算完"的，
-       所以喝下去的药从**下一波**进场时生效（血线低就趁这波还没打完先喝）。 */
-    /* V9.5.64（父亲大人）：副本里的药剂条整个去掉了（战斗是一次算完的，喝了也白扣）。 */
     overlay.querySelector('[data-speedbtn]').onclick = ev => {
       speed = speed >= 3 ? 1 : speed + 1;
       S.settings.speed = speed; C().save();
       ev.target.textContent = speed + '×速度';
     };
-    let idx = 0, skipped = false, finished = false;
+    /* V9.5.66（父亲大人）：撤离要能把这场战斗**真正掐死**——
+       step() 是靠 setTimeout 一帧一帧放的，只把遮罩拿掉的话，后面的帧照样跑完、
+       照样走 onEnd 结算（等于"撤离了还把奖励发了"）。所以用一个 quiting 标位，
+       step 和 finish 开头都先看它。 */
+    let idx = 0, skipped = false, finished = false, quiting = false;
+    overlay.querySelector('[data-quit]').onclick = () => {
+      confirmBox('撤离', '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。', () => {
+        quiting = true;
+        overlay.remove();
+        if (typeof cfg.onQuit === 'function') cfg.onQuit();
+      });
+    };
     if (start.note) log(`⚠ 世界机制：${start.note}`);
     // 带血进场时把血线写出来：玩家才知道血是"继承"过来的，不是被刷新了
     const carried = start.allies.filter(u => u.hp < u.maxHp)
@@ -4088,6 +4036,7 @@ window.UI = (function () {
     function finish() {
       if (finished) return;
       finished = true;
+      if (quiting) return;      // 已经撤离：不结算、不发奖、不推进波次（V9.5.66）
       // 补算剩余帧（保证状态正确）
       for (; idx < res.frames.length; idx++) { const f = res.frames[idx]; if (['damage', 'dot', 'heal', 'revive'].includes(f.type)) applyFrame(f); }
       const endF = res.frames[res.frames.length - 1];
@@ -4099,7 +4048,7 @@ window.UI = (function () {
       const acts = outcome.actions || [];
       /* 波与波之间**不弹结算页**：这一波打完直接接下一波（父亲大人 2026-09-15 定）。
          只在战斗画面上停一瞬，飘一行"第 N 波已通过"，然后自己接着打。
-         用过的药剂已经在 run.hpPct / run.buffs 里，下一波进场时自然带上。 */
+         血量在 run.hpPct 里，下一波进场时自然带上。 */
       if (outcome.seamless && res.win) {
         if (outcome.log && outcome.log.length) log('📦 本波收获：' + outcome.log.join(' · '));
         const tip = document.createElement('div');
@@ -4165,7 +4114,7 @@ window.UI = (function () {
       }
     }
     function step() {
-      if (finished) return;
+      if (finished || quiting) return;
       if (skipped) { finish(); return; }
       const f = res.frames[idx++];
       if (!f || f.type === 'end') { finish(); return; }
@@ -4196,13 +4145,14 @@ window.UI = (function () {
   }
   function doNodeBattle(kind, onDone, premadeEnemies) {
     const Dun = window.Dungeon;
-    const allies = buildAllies(run.hpPct, run.buffs);
+    const allies = buildAllies(run.hpPct, null);
     if (!allies.length) { toast('全队重伤，探索失败'); endRun(false); return; }
     const enemies = premadeEnemies || Dun.makeEnemies(run.worldId, run.diff, run.stage, kind);
     const w = D.WORLDS.find(x => x.id === run.worldId);
     startBattle({
       title: `${w.name} 第 ${run.stage}/12 关 · 第 ${run.wave + 1}/${run.waves.length} 波 · ${WAVE_NAME[kind] || '遭遇战'}`,
       allies, enemies, worldId: run.worldId,
+      onQuit: () => quitRunToWorlds(),
       onEnd(win, res, units) {
         if (!win) {
           /* V9.5.65（产品体检）：失败页以前**一个动作都没有**，只剩「返回」——
@@ -4251,8 +4201,7 @@ window.UI = (function () {
   }
   /* 一波打完：直接推进到下一波，一路打到底。
      父亲大人 2026-09-15 定：副本要"纯粹"、要**无缝**——既不要"开打第 N 波"这种要按的按钮，
-     也不要每波停下来弹一次结算页。这一波结束直接在战斗画面上接下一波；
-     补血 / 上增益走战斗界面底部那条"战备补给"，喝了从下一波进场生效。 */
+     也不要每波停下来弹一次结算页。这一波结束直接在战斗画面上接下一波。 */
   function afterWave() {
     if (!run) return;
     run.wave++;
@@ -4267,7 +4216,7 @@ window.UI = (function () {
     // 先把这一轮的关卡坐标记下来：endRun 之后 run 会被清空
     const wid = run.worldId, df = run.diff, si = run.stageIdx;
     const kind = run.waves[run.waves.length - 1];
-    const allies = buildAllies(run.hpPct, run.buffs);
+    const allies = buildAllies(run.hpPct, null);
     if (!allies.length) { toast('全队重伤，探索失败'); endRun(false); return; }
     const enemies = premadeEnemies || Dun.makeEnemies(run.worldId, run.diff, run.stage, kind);
     const w = D.WORLDS.find(x => x.id === run.worldId);
@@ -4276,6 +4225,7 @@ window.UI = (function () {
       title: `${w.name} ${run.stage}/12 · ${isBoss ? w.boss : '区域决战'}`,
       allies, enemies, worldId: run.worldId,
       maxRounds: isBoss ? 50 : 30,
+      onQuit: () => quitRunToWorlds(),
       onEnd(win, res, units) {
         if (!win) return { rewards: [], sub: '再接再厉', after: () => endRun(false) };
         const g = Dun.grantRewards(run.worldId, run.diff, run.stage, kind);
@@ -4331,6 +4281,17 @@ window.UI = (function () {
     render();
     if (cleared) toast('关卡完成！', 2200);
   }
+  /* 撤离 / 放弃本次探索：清掉进行中的关卡、回到世界列表（已经拿到的奖励保留）。
+     「撤离副本」按钮和战斗界面右上角的「撤离」走的是同一个函数——两处必须同义，
+     否则玩家会遇到"在结算页撤离会回世界列表，在战斗里撤离却留在原地"这种诡异差别。 */
+  function quitRunToWorlds() {
+    const wid = (run && run.worldId) || dungeonView.worldId || 'W01';
+    const df = (run && run.diff) || dungeonView.diff || 'normal';
+    run = null;
+    C().clearPendingRun();
+    dungeonView = { page: 'world', worldId: wid, diff: df };
+    render();
+  }
   function fightCorridor() {
     const S = C().S;
     // 主角必上阵，无需检查
@@ -4343,6 +4304,8 @@ window.UI = (function () {
       title: `深井 · 第 ${floor} 层`,
       allies, enemies, worldId: null,
       maxRounds: spec.isBoss ? 50 : 30,
+      // 深井的撤离＝回到深井页（挑战层数不推进，次数也没消耗）
+      onQuit: () => { dungeonView = { page: 'corridor' }; render(); },
       onEnd(win, res) {
         // V9.5.65（产品体检）：深井失败原来也是"没动作"，退回深井页才能再点一次 → 现在直接重挑这一层。
         if (!win) {
@@ -4525,12 +4488,7 @@ switch (act) {
           case 'back-worlds': dungeonView = { page: 'worlds' }; run = null; C().clearPendingRun(); render(); break;
           case 'abandon-run':
             confirmBox('撤离副本', '确定撤离？本次探索进度将丢失，已获得的奖励会保留。', () => {
-              const wid = run ? run.worldId : dungeonView.worldId;
-              const df = run ? run.diff : (dungeonView.diff || 'normal');
-              run = null;
-              C().clearPendingRun();
-              dungeonView = { page: 'world', worldId: wid, diff: df };
-              render();
+              quitRunToWorlds();
             });
             break;
           case 'open-sweep':
@@ -4871,22 +4829,6 @@ switch (act) {
       bagEquipList, _setBagBatch: on => { batchMode = !!on; batchSel.clear(); },
       // 测试用：设置装备筛选（验"筛选后不再补空格子"）
       _setEquipFilter: (f, cat) => { equipFilter = f || 'all'; equipCatFilter = cat || 'all'; },
-      // 测试用：药剂回血（纯函数：阵亡成员不复活）
-      applyPotionHp,
-      /* 测试用：探索消耗品的两条分支要分别验（有探索 / 没探索）。
-         run 是模块内私有状态，不开口子就测不到"探索中回背包使用"这条链路。 */
-      _usePotion: usePotion,
-      _startRunStub: (worldId, diff, stageIdx, hpPct) => {
-        const stage = stageIdx + 1;
-        run = {
-          worldId, diff, stage, stageIdx,
-          waves: window.Dungeon.wavePlan(stage),
-          wave: 0, hpPct: hpPct || {}, buffs: {}, kills: 0, deaths: 0,
-        };
-        C().S.party.filter(Boolean).forEach(id => { if (run.hpPct[id] === undefined) run.hpPct[id] = 1; });
-        return run;
-      },
-      _clearRunStub: () => { run = null; C().clearPendingRun(); },
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
       openPartyPanel, openGrowPanel, charListSorted, pickPartyChar, slotMenu,

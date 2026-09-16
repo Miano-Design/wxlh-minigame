@@ -111,11 +111,19 @@ console.log('\n=== ③ 死内容：存在但找不到入口的 ===');
 const typeless = Object.entries(D.ITEMS).filter(([, it]) => !it.type).map(([k]) => k);
 console.log('  没有 type 的道具：', typeless.length ? typeless.join(' ') : '无');
 const consumables = Object.entries(D.ITEMS).filter(([, it]) => it.type === 'consumable').map(([k, it]) => k + '(' + it.name + ')');
-console.log(`  探索用消耗品 ${consumables.length} 种：` + consumables.join(' '));
-console.log('  它们的入口：', uiSrc.includes('[data-runuse]') ? '背包 → 道具详情 → 在本次探索中使用 ✓' : '⚠ 一个都没有');
+if (consumables.length) {
+  console.log(`  探索用消耗品 ${consumables.length} 种：` + consumables.join(' '));
+  console.log('  它们的入口：', uiSrc.includes('[data-runuse]') ? '背包 → 道具详情 → 在本次探索中使用 ✓' : '⚠ 一个都没有');
+} else {
+  console.log('  探索用消耗品：0 种（V9.5.66 整条线下架）✓');
+}
 const shopItems = Object.values(D.SHOPS).flatMap(s => s.items.map(i => i.item)).filter(Boolean);
-const noSource = Object.keys(D.ITEMS).filter(k => !shopItems.includes(k) && !(D.ITEMS[k].src || '').includes('掉落') && !(D.ITEMS[k].src || '').includes('奖励'));
-console.log('  既不在商店、也不在掉落/奖励里提到的道具：', noSource.length ? noSource.join(' ') : '无');
+/* 血清不是在商店/掉落里拿的，是在「炼化台」用材料 + 点数现做的——
+   体检脚本得知道这件事，否则会把 12 种血清全报成"没有来源"（假警报）。 */
+const crafted = D.SERUMS.map(s => D.SERUM_ITEM(s.id));
+const noSource = Object.keys(D.ITEMS).filter(k => !shopItems.includes(k) && !crafted.includes(k)
+  && !(D.ITEMS[k].src || '').includes('掉落') && !(D.ITEMS[k].src || '').includes('奖励'));
+console.log('  既不在商店、也不在掉落/奖励/炼化台里的道具：', noSource.length ? noSource.join(' ') : '无');
 
 /* ---------------- ④ 死代码 ---------------- */
 console.log('\n=== ④ 死代码：写了但没人调用 ===');
@@ -125,9 +133,10 @@ for (const src of [['ui.js', uiSrc], ['core.js', coreSrc]]) {
   const names = src[1].match(/^ {2}function [A-Za-z_][A-Za-z0-9_]*/gm) || [];
   names.map(s => s.replace(/^ {2}function /, '')).forEach(fn => {
     const n = (allSrc.match(new RegExp('\\b' + fn + '\\b', 'g')) || []).length;
-    // n=1：除了定义那一次之外没人提到 → 真死代码；n=2：只在导出表里出现（可能只给测试用）
-    if (n <= 1 && !/^_/.test(fn)) dead.push(`⚠ 真死代码 ${src[0]} → ${fn}()`);
-    else if (n === 2 && !/^_/.test(fn)) dead.push(`  （只出现在导出表）${src[0]} → ${fn}()`);
+    /* 计数口径：定义 1 次 + 每个调用点 1 次。
+       n≤1 = 除了定义没人提它 → 真死代码（改版删界面最容易留下的东西）；
+       n=2 = 只有一处调用，是正常写法，不报（以前一律报出来，噪音太大反而没人看）。 */
+    if (n <= 1 && !/^_/.test(fn)) dead.push(`${src[0]} → ${fn}()`);
   });
 }
 console.log(dead.length ? '  ' + dead.join('\n  ') : '  无');

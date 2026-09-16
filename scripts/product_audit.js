@@ -57,20 +57,33 @@ Core.S.corridor = { floor: 12, best: 12 };
 Core.S.arena = { floor: 8, best: 8, date: '', used: 1 };
 Core.S.quests = { claimed: [], progress: {} };
 Core.S.cur = { points: 500000, story: 5000, otherworld: 5000, holy: 500, skillChip: 5000, bloodCrystal: 500, corridor: 500, rp: 300 };
-['heal_s', 'buff_muscle', 'exp_s', 'box_r', 'ticket_normal'].forEach(k => { Core.S.items[k] = 5; });
+['exp_s', 'box_r', 'ticket_normal', 'serum_sr_atk'].forEach(k => { Core.S.items[k] = 5; });
 try { Core.grantEquip('W05', 'SR'); } catch (e) {}
 
-const HOLE = /\b(undefined|NaN|\[object Object\])/g;
+// 注意：`\b` 在 `[object Object]` 前面永远不成立（`[` 不是词字符），
+// 所以这里不能只写 \b(...)——那样会漏掉最常见的那个洞（V9.5.66 修）。
+const HOLE = /(undefined|NaN|\[object Object\])/g;
 let bad = 0;
 const problems = [];
 const htmls = [];
 function render(label, fn) {
   let html = '';
-  try { html = (fn() || '').toString(); } catch (e) { problems.push(`✗ ${label} 抛异常：${e.message}`); return; }
+  try {
+    /* 面板函数有两种返回：主界面返回 HTML 字符串，弹窗把 HTML 画进一个容器再返回那个容器。
+       以前直接 .toString() 容器对象，于是每个弹窗都被判成"[object Object]"——
+       是**体检脚本自己的**假警报（真要是这样，界面早就白屏了）。 */
+    const out = fn();
+    html = typeof out === 'string' ? out : (out && typeof out.innerHTML === 'string' ? out.innerHTML : '');
+  } catch (e) { problems.push(`✗ ${label} 抛异常：${e.message}`); return; }
   if (typeof html !== 'string' || !html) { problems.push(`✗ ${label} 画出来是空的`); return; }
   htmls.push([label, html]);
   const hit = html.match(HOLE);
-  if (hit) { problems.push(`✗ ${label} 里有 ${[...new Set(hit)].join(' / ')} ×${hit.length}`); bad++; }
+  if (hit) {
+    const i = html.search(HOLE);
+    const ctx = html.slice(Math.max(0, i - 80), i + 40).replace(/\s+/g, ' ').trim();
+    problems.push(`✗ ${label} 里有 ${[...new Set(hit)].join(' / ')} ×${hit.length}  …${ctx}…`);
+    bad++;
+  }
 }
 
 console.log('=== ① 每个界面画出来有没有洞（undefined / NaN / [object Object]）===');
@@ -88,7 +101,7 @@ Object.entries(screens).forEach(([k, fn]) => render('页签 ' + k, fn));
     return fn.apply(null, args);
   });
 });
-render('道具详情', () => P.itemDetail('heal_s'));
+render('道具详情', () => P.itemDetail('exp_s'));
 // 装备详情画在"传进来的那一层"上（弹窗形态），所以得给一个容器桩
 render('装备详情', () => { const box = El('div'); P.equipDetail(Object.keys(Core.S.equips)[0] || 'x', box); return box.innerHTML || '<已画到容器>'; });
 console.log(problems.length ? problems.join('\n') : '  全部界面无空洞 ✓');
@@ -96,15 +109,19 @@ console.log(problems.length ? problems.join('\n') : '  全部界面无空洞 ✓
 console.log('\n=== ② 画出来的按钮有没有人接（没人接 = 按了没反应）===');
 const allHtml = htmls.map(([, h]) => h).join('\n');
 const attrs = [...new Set((allHtml.match(/data-[a-z][a-z0-9-]*/g) || []))];
-const camel = a => a.replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+/* 一个开关可以被三种写法消费，三种都要认，否则会把"其实接了线"的按钮报成假按钮：
+   querySelector('[data-x]') / el.dataset.x / el.dataset.xY（data-x-y 的驼峰写法） */
+const camel = s => s.replace(/-([a-z])/g, (m, c) => c.toUpperCase());
 // data-act/data-close/data-back 由通用分发器处理；
 // data-sec 这类是"页面里的地标"（引导要高亮哪一段），不是按钮，不算假开关
 const ALWAYS = ['data-act', 'data-close', 'data-back', 'data-sec', 'data-card', 'data-line'];
 const orphans = [];
 attrs.forEach(a => {
   if (ALWAYS.includes(a)) return;
-  const has = uiSrc.includes('[' + a + ']') || new RegExp('\\.' + camel(a) + '\\b').test(uiSrc)
-    || uiSrc.includes('dataset["' + camel(a) + '"]');
+  const key = a.replace(/^data-/, '');
+  const has = uiSrc.includes('[' + a + ']')
+    || uiSrc.includes('dataset.' + key) || uiSrc.includes('dataset.' + camel(key))
+    || uiSrc.includes('dataset["' + camel(key) + '"]') || uiSrc.includes("dataset['" + camel(key) + "']");
   if (!has) orphans.push(a);
 });
 console.log(orphans.length ? '  ✗ 没人接的开关：' + orphans.join(' ') : '  所有开关都有接线 ✓');
@@ -121,9 +138,32 @@ htmls.forEach(([label, h]) => {
   const btns = h.match(/<button[^>]*>([\s\S]*?)<\/button>/g) || [];
   btns.forEach(b => {
     const text = b.replace(/<[^>]*>/g, '').replace(/[‹›✓×+]/g, '').trim();
-    if (!text && !/[\u{1F300}-\u{1FAFF}🧪💉📕🥚]/u.test(b)) empties.push(label + ' → ' + b.slice(0, 90));
+    // 图标按钮（内联 SVG / <i class>）没有文字是正常的，别当成空按钮
+    const hasIcon = /[\u{1F300}-\u{1FAFF}🧪💉📕🥚]/u.test(b) || /<svg\b|<i class=|class="ico/.test(b);
+    if (!text && !hasIcon) empties.push(label + ' → ' + b.slice(0, 90));
   });
 });
 console.log(empties.length ? '  ✗ ' + empties.join('\n  ✗ ') : '  没有空按钮 ✓');
 
-console.log(`\n结论：${problems.length + orphans.length + missing.length + empties.length === 0 ? '全绿 ✓' : '有 ' + (problems.length + orphans.length + missing.length + empties.length) + ' 项要看'}`);
+console.log('\n=== ⑤ 界面上漏出来的内部字（变量名 / id / 英文单词）===');
+/* 起因：主页「每日任务」那一格的副标题直接写着 `tasks`、「兑换大厅」写着 `shop`——
+   元组的第 3 位是"解锁条件"，被写成了名字旁边的说明，于是内部 key 就画到脸上了。
+   这类"漏字"只有把界面**真的画出来读一遍**才发现，所以在这里固化成检查。 */
+const ALLOW_WORD = new Set(['exp', 'hp', 'atk', 'def', 'spd', 'crit', 'up', 'new', 'ssr', 'ur', 'sr', 'lv', 'pvp',
+  'gm', 'id', 'qq', 'ios', 'android', 'web', 'ok', 'cd', 'afk']);
+const leaks = [];
+htmls.forEach(([label, h]) => {
+  const text = h.replace(/<script[\s\S]*?<\/script>/g, ' ')
+    .replace(/<[^>]*>/g, ' ')                                   // 剥标签：只看玩家真能看到的那层字
+    .replace(/&[a-z]+;/g, ' ');
+  const words = text.match(/\b[a-z][a-z0-9_]{2,}\b/g) || [];
+  [...new Set(words)].forEach(w => {
+    if (ALLOW_WORD.has(w)) return;
+    const i = text.search(new RegExp('\\b' + w + '\\b'));
+    leaks.push(`${label} → 「${w}」  …${text.slice(Math.max(0, i - 40), i + w.length + 16).replace(/\s+/g, ' ').trim()}…`);
+  });
+});
+console.log(leaks.length ? '  ✗ ' + leaks.join('\n  ✗ ') : '  没有漏出来的内部字 ✓');
+
+const total = problems.length + orphans.length + missing.length + empties.length + leaks.length;
+console.log(`\n结论：${total === 0 ? '全绿 ✓' : '有 ' + total + ' 项要看'}`);

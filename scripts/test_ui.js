@@ -229,14 +229,14 @@ function panel(name, fn) {
 }
 Core.addItem('exp_s', 3);
 Core.addItem('box_sr', 2);
-Core.addItem('heal_m', 2);
-Core.addItem('buff_nerve', 1);
+Core.addItem('ticket_adv', 2);
+Core.addItem('serum_sr_atk', 1);
 Core.addItem('mat_t2', 5);
 Core.stageComplete('W01', 'normal', 0, 3);
 panel('背包', () => UI._panels.bagModal());
 panel('道具详情-宝箱', () => UI._panels.itemDetail('box_sr'));
 panel('道具详情-经验模块', () => UI._panels.itemDetail('exp_s'));
-panel('道具详情-强化剂', () => UI._panels.itemDetail('buff_nerve'));
+panel('道具详情-血清', () => UI._panels.itemDetail('serum_sr_atk'));
 panel('道具详情-材料', () => UI._panels.itemDetail('mat_t2'));
 panel('货币图鉴', () => UI._panels.currencyModal('holy'));
 panel('玩法指南', () => UI._panels.guideModal());
@@ -636,58 +636,36 @@ t('招募券在背包格子里能看见，点进详情有「去招募」', () =>
 });
 t('道具详情-招募券', () => UI._panels.itemDetail('ticket_lim'));
 
-/* ---- V9.5.65：探索消耗品的两条分支（产品体检抓到"道具拿不到用"） ----
-   V9.5.64 撤掉副本里的药剂条之后，这 9 种道具一度在界面上找不到入口。 */
-t('没在探索时：消耗品给的是"去残域开始探索"，不是假装能用', () => {
-  Core.newGame(); Core.setPlayerName('药剂');
-  UI._panels._clearRunStub();
-  Core.addItem('heal_s', 2);
-  const html = UI._panels.itemDetail('heal_s').innerHTML;
-  if (!html.includes('去残域开始探索')) throw new Error('没给去残域的入口');
-  if (html.includes('在本次探索中使用')) throw new Error('没在探索却出现了"在本次探索中使用"');
-  if (!html.includes('没在探索时用不上')) throw new Error('没说明这张卡什么时候能用');
-});
-t('探索进行中：消耗品能直接用（按钮写出当前波次）', () => {
-  Core.newGame(); Core.setPlayerName('药剂');
-  Core.addItem('heal_s', 2);
-  UI._panels._startRunStub('W01', 'normal', 3, { '@player': 0.4 });
-  const html = UI._panels.itemDetail('heal_s').innerHTML;
-  if (!html.includes('在本次探索中使用')) throw new Error('探索中没有使用入口');
-  if (!html.includes('波）')) throw new Error('按钮上没写当前波次');
-  UI._panels._clearRunStub();
-});
-t('药剂用在探索里真的扣道具、真的回血，且不复活阵亡成员', () => {
-  Core.newGame(); Core.setPlayerName('药剂');
-  Core.addItem('heal_s', 2);
-  const run = UI._panels._startRunStub('W01', 'normal', 3, { '@player': 0.4, 'C021': 0 });
-  const before = Core.S.items.heal_s;
-  const ok = UI._panels._usePotion('heal_s');
-  if (!ok) throw new Error('使用失败');
-  if (Core.S.items.heal_s !== before - 1) throw new Error('道具没扣');
-  if (Math.abs(run.hpPct['@player'] - 0.6) > 1e-6) throw new Error('回血不对：' + run.hpPct['@player']);
-  if (run.hpPct['C021'] !== 0) throw new Error('阵亡成员被复活了（星级评价会失去意义）');
-  UI._panels._clearRunStub();
-});
-t('背包里的"在本次探索中使用"走的是同一套逻辑（不再有两份实现）', () => {
+/* ---- V9.5.66（父亲大人）：探索消耗品整条线删除，界面里不许再留半个入口 ---- */
+t('探索消耗品下架后，背包里点不到、界面上也找不到残留入口', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
-  const at = src.indexOf("const runUse = w.querySelector('[data-runuse]')");
-  if (at < 0) throw new Error('找不到 data-runuse 的处理');
-  const seg = src.slice(at, at + 700);
-  if (!seg.includes('usePotion(itemId)')) throw new Error('data-runuse 没走 usePotion，又抄了一份逻辑');
-  if (src.includes('function potionBarHtml') || src.includes('function bindPotionButtons')) {
-    throw new Error('副本药剂条的死代码还留着（potionBarHtml / bindPotionButtons）');
+  ['data-runuse', 'data-potion', 'usePotion', 'applyPotionHp', 'potionBarHtml', 'bindPotionButtons'].forEach(k => {
+    if (src.includes(k)) throw new Error('还有消耗品残留：' + k);
+  });
+  if (Object.values(D.ITEMS).some(it => it.type === 'consumable')) throw new Error('道具表里还有 consumable 类型');
+});
+t('删掉消耗品之后，副本结算仍然给得出东西（掉落位换成了强化材料）', () => {
+  const src = fs.readFileSync('js/dungeon.js', 'utf8');
+  if (/heal_[a-z]|buff_(muscle|nerve)|atk_surge|spd_surge|def_shield/.test(src)) {
+    throw new Error('副本掉落里还挂着已下架的消耗品');
   }
+  if (!src.includes('supplyChance')) throw new Error('撤掉的掉落位没有补回等价产出');
 });
 
 // ---- V8.2：胜利结算自动进下一关（5 秒倒计时） ----
 t('战斗界面按站位分前后两行（队伍页排的位在战斗里看得见）', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
-  ['b-row allies back', 'b-row allies front', 'b-line-label'].forEach(k => {
+  ['b-row allies back', 'b-row allies front'].forEach(k => {
     if (src.indexOf(k) < 0) throw new Error('战斗界面缺站位行：' + k);
   });
   if (src.indexOf("u.position === 'front'") < 0) throw new Error('没有按 position 分行的代码');
-  const css = fs.readFileSync('css/style.css', 'utf8');
-  if (css.indexOf('.b-line-label') < 0) throw new Error('缺站位行的样式');
+  // V9.5.66（父亲大人）：行首的「我方前排 / 我方后排」字条删掉了，别让它偷偷回来
+  if (src.indexOf('b-line-label') >= 0) throw new Error('战斗界面又把"我方前排/后排"字条挂回来了');
+});
+t('战斗界面有「撤离」小按钮（跳过战斗撤掉之后，需要留一个出口）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  if (src.indexOf('data-quit') < 0) throw new Error('战斗界面没有撤离按钮');
+  if (src.indexOf('cfg.onQuit') < 0) throw new Error('撤离没有回调，点了会卡在战斗里');
 });
 t('倒计时 8 秒（V9.5：5 秒看掉落偏赶，放宽到 8 秒）', () => { if (UI.AUTO_NEXT_SEC !== 8) throw new Error('不是 8 秒：' + UI.AUTO_NEXT_SEC); });
 t('胜利时自动目标＝主按钮（下一关）', () => {
@@ -886,7 +864,9 @@ t('队伍页：上阵固定前 2 后 3（不再多出一格）', () => {
   // 前排 2 格、后排 3 格：按 data-pos 数一遍（主角也算一格）
   const slots = (html.match(/data-pos="[0-4]"/g) || []).length;
   if (slots !== 5) throw new Error('上阵格子数不对：' + slots);
-  if (!html.includes('2 格 · 受击概率更高') || !html.includes('3 格 · 相对安全')) throw new Error('缺前后排格数说明');
+  // V9.5.66（父亲大人）：只留「前排 / 后排」两个定位词，解释性小字（受击概率/适合谁）已删
+  if (!html.includes('>前排</div>') || !html.includes('>后排</div>')) throw new Error('缺前后排标题');
+  if (html.includes('受击概率更高') || html.includes('相对安全')) throw new Error('解释性小字又回来了');
   // 主角站在前排时，前排是「主角 + 1 名队友」，不会变成 3 个
   const frontRow = html.slice(html.indexOf('data-row="front"'), html.indexOf('data-row="back"'));
   const frontSlots = (frontRow.match(/data-pos="[0-4]"/g) || []).length;
@@ -898,7 +878,7 @@ t('队伍页：上阵固定前 2 后 3（不再多出一格）', () => {
 t('队伍页：前后排分开显示', () => {
   const html = UI._panels._screens.partyScreen();
   if (!html.includes('pos-row-label')) throw new Error('缺前后排分组标题');
-  if (!html.includes('受击概率更高')) throw new Error('缺前排说明');
+  if (!html.includes('>前排</div>') || !html.includes('>后排</div>')) throw new Error('缺前后排标题文字');
 });
 t('战斗编队：主角站位跟着玩家选择走', () => {
   Core.addChar('C021');
@@ -1434,14 +1414,6 @@ t('主角也吃阵型加成（以前只有招募角色吃得到，队伍页却�
   if (!(mate.atk > mateSt.atk)) throw new Error('招募角色的阵型加成反而不见了');
 });
 
-t('药剂不复活阵亡成员（星级评价里的"无人阵亡"才有意义）', () => {
-  const r = UI._panels.applyPotionHp({ '@player': 0, C021: 0.4, C022: 1 }, 0.2);
-  if (r.hpPct['@player'] !== 0) throw new Error('阵亡成员被药剂复活了');
-  if (Math.abs(r.hpPct.C021 - 0.6) > 1e-9) throw new Error('活着的成员没回血');
-  if (r.hpPct.C022 !== 1) throw new Error('满血成员被治过头');
-  if (r.down !== 1) throw new Error('没有回报"有几名成员已阵亡"');
-});
-
 t('副本里没有药剂、没有跳过：战斗是一次算完的', () => {
   const src = fs.readFileSync('js/ui.js', 'utf8');
   ['data-bpotions', 'data-skip', 'paintPotions', '收官战 · 药剂'].forEach(k => {
@@ -1470,7 +1442,7 @@ t('待领箱：背包满时的奖励能在背包页领回', () => {
   Core.S.items = {};
   Core.S.bag.itemCap = 1;
   Core.S.items.ticket_normal = 1;                      // 占满唯一的道具格
-  Core.applyRewardObj({ item: 'heal_s' });
+  Core.applyRewardObj({ item: 'exp_s' });
   const html = UI._panels._screens.bagScreen();
   if (html.indexOf('待领箱') < 0) throw new Error('背包页没有待领箱入口');
   if (html.indexOf('data-stashclaim') < 0) throw new Error('待领箱缺"全部领回"按钮');

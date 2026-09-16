@@ -172,6 +172,25 @@ window.Core = (function () {
     S.auth = S.auth || 0;   // 灯阁权限等级
     S.sweep = Object.assign(def.sweep, S.sweep || {});
     S.sweep.bonus = S.sweep.bonus || 0;
+    /* V9.5.66（父亲大人）：探索消耗品整条线删掉（ITEMS 里已经没有它们了）。
+       老存档背包 / 待领箱里可能还躺着几个——不清理的话，背包会画出一格名字是 undefined 的空格子，
+       点进去还会报错。这里按**当时商店里的原价**退回 ◈ 点数（玩家是真买的，不能凭空吞掉）。
+       退款天然只做一次：清掉之后存档里就没有这些 id 了，下次读档退不到东西。 */
+    const retired = D.RETIRED_ITEMS || {};
+    let retiredRefund = 0;
+    Object.keys(retired).forEach(id => {
+      const n = S.items[id] || 0;
+      if (n > 0) { retiredRefund += n * retired[id]; delete S.items[id]; }
+    });
+    (S.stash || []).forEach(x => {
+      if (x && x.n > 0 && retired[x.id] !== undefined) { retiredRefund += x.n * retired[x.id]; x.n = 0; }
+    });
+    if (retiredRefund > 0) {
+      S.stash = (S.stash || []).filter(x => x && x.n > 0);
+      S.cur.points += retiredRefund;
+      S.retiredRefund = (S.retiredRefund || 0) + retiredRefund;
+      S.retiredRefundPending = true;      // main.js 读到这一位就在开局给一次提示，不静默改玩家的钱
+    }
     // 老存档补新字段：设置项 / 图鉴领取记录 / 登录轮次
     S.settings = Object.assign(def.settings, S.settings || {});
     S.tasks = Object.assign(def.tasks, S.tasks || {});
@@ -2910,7 +2929,7 @@ window.Core = (function () {
 
   return {
     get S() { return S; },
-    save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo,
+    save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,

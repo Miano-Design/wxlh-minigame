@@ -510,24 +510,16 @@ window.DATA = (function () {
     ticket_normal: { name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◈ 点数）', src: '副本战斗、扫荡、挂机、每日任务' },
     ticket_adv:    { name: '圣契招募令', type: 'ticket', where: 'recruit', pool: 'advanced', use: '在「招募伙伴」点高级池招募时自动先用它', desc: '高级招募 1 次（没券时会自动改花 ✦ 圣洁晶石）', src: '精英/Boss 掉落、限时悬赏、每周任务、兑换大厅' },
     ticket_lim:    { name: '异界征召令', type: 'ticket', where: 'recruit', pool: 'limited', use: '在「招募伙伴」点限定池招募时自动先用它', desc: '限定招募 1 次（没券时会自动改花 ◆ 异界结晶）', src: '深井、地狱难度、周常全清、异界商店' },
-    /* V9.5.65（产品体检）：副本里的药剂条在 V9.5.64 撤掉了，这 5 条说明还写着"点探索界面的药剂按钮"——
-       玩家照做会找不到按钮。使用入口统一改成"探索进行中，回背包点这张卡"。 */
-    heal_s: { name: '小型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.2 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 20% 生命', src: '灯阁市集、副本战斗掉落' },
-    heal_m: { name: '中型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.4 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 40% 生命', src: '灯阁市集、副本战斗掉落' },
-    heal_l: { name: '大型治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 0.7 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队回复 70% 生命', src: '副本战斗掉落（第 5 关起）、周常奖励' },
-    buff_muscle: { name: '肌肉强化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.15 }, use: '探索进行中，回背包点这张卡：本次探索全队攻击 +15%', desc: '副本探索中使用：本次探索全队攻击 +15%', src: '灯阁市集、精英/Boss 掉落' },
-    buff_nerve: { name: '神经刺激剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.20 }, use: '探索进行中，回背包点这张卡：本次探索全队速度 +20%', desc: '副本探索中使用：本次探索全队速度 +20%', src: '灯阁市集、精英/Boss 掉落' },
+    /* V9.5.66（父亲大人）：探索用消耗品整块删掉。
+       起因是副本药剂条撤掉之后，这 9 种东西（治疗剂 ×4、强化剂 ×5）既没有自然的用武之地，
+       又占着商店货架和掉落位。与其到处补入口，不如整条线砍掉——战斗改成"一波接一波、
+       只看阵容和养成"，补给不再是玩法的一部分。
+       老存档里已经买到的，migrate() 会按原价退回 ◈ 点数（见 RETIRED_ITEMS）。 */
     exp_s: { name: '初级经验模块', type: 'exp', where: 'character', exp: 500, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +500', src: '灯阁市集、副本战斗掉落、每日任务' },
     exp_m: { name: '中级经验模块', type: 'exp', where: 'character', exp: 2000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +2,000', src: '灯阁市集、副本战斗掉落、每日/周常奖励' },
     exp_l: { name: '高级经验模块', type: 'exp', where: 'character', exp: 10000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +10,000', src: '灯阁市集（通关 W04 后解锁）、精英/Boss 掉落、周常奖励' },
     exp_xl: { name: '超级经验模块', type: 'exp', where: 'character', exp: 50000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +50,000', src: '灯阁市集（通关 W07 后解锁）、地狱 Boss 掉落、周常全清奖励' },
     exp_xxl: { name: '究极经验模块', type: 'exp', where: 'character', exp: 200000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +200,000', src: '灯阁市集（通关 W15 后解锁）、W15+ 守关 Boss、周常全清、斗法台高阶' },
-    /* 探索增益的"后三档"：治疗剂管回血，这三支管打出去（对标别人的"丹药"矩阵）。
-       品质越高给得越多，但都只在一次探索里生效，不改变长期数值。 */
-    heal_x: { name: '全效治疗剂', type: 'consumable', where: 'explore', effect: { healPct: 1.0 }, use: '探索进行中，回背包点这张卡，全队回血', desc: '副本探索中使用：全队完全恢复生命', src: '灯阁市集、W10+ 守关 Boss、斗法台、深井商店' },
-    def_shield: { name: '合金护盾剂', type: 'consumable', where: 'explore', effect: { defPct: 0.20 }, use: '探索进行中，回背包点这张卡：本次探索全队防御 +20%', desc: '副本探索中使用：本次探索全队防御 +20%', src: '灯阁市集、精英/Boss 掉落' },
-    atk_surge: { name: '狂暴催化剂', type: 'consumable', where: 'explore', effect: { atkPct: 0.30 }, use: '探索进行中，回背包点这张卡：本次探索全队攻击 +30%', desc: '副本探索中使用：本次探索全队攻击 +30%', src: '灯阁市集（通关 W06）、W06+ 精英/Boss' },
-    spd_surge: { name: '超频注射剂', type: 'consumable', where: 'explore', effect: { spdPct: 0.35 }, use: '探索进行中，回背包点这张卡：本次探索全队速度 +35%', desc: '副本探索中使用：本次探索全队速度 +35%', src: '异界商店（通关 W08）、W08+ 精英/Boss' },
     mat_t1: { name: '基础金属', type: 'material', tier: 1, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +0~+4 时消耗（不足可用点数代用）', src: 'W01~W05 精英/Boss、灯阁市集、故事商店' },
     mat_t2: { name: '强化合金', type: 'material', tier: 2, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +5~+9 时消耗（不足可用点数代用）', src: 'W02~W06 精英/Boss、异界商店' },
     mat_t3: { name: '异界合金', type: 'material', tier: 3, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +10~+14 时消耗（不足可用点数代用）', src: 'W03~W07 精英/Boss、异界商店' },
@@ -544,7 +536,7 @@ window.DATA = (function () {
   // 材料不足时的点数代用价（每件）
   const MAT_SUBSTITUTE_POINTS = [0, 200, 500, 1200, 3000, 8000];
   // 消耗品在探索界面里的按钮文案
-  const CONSUMABLE_TAG = { healPct: '回血', atkPct: '攻击', spdPct: '速度', defPct: '防御' };
+
 
   /* ================= 血清（永久强化剂） =================
      对标同类放置修仙游戏的"丹药矩阵"：把大块成长拆成很多次小成长，
@@ -609,8 +601,8 @@ window.DATA = (function () {
       '主线→推荐路线：灯阁领挂机 → 残域选世界 → 选关卡 → **直接开打** → 拿奖励回灯阁。没有"先选路线"这一层。',
       '每关是 1~3 波连续战斗：1~4 关 1 波、5~8 关 2 波、9~12 关 3 波；第 4/8 关最后一波是精英，第 12 关是守关 Boss。',
       '**一口气打到底**：点关卡就开打，一波打完自动接下一波，中间不插事件、不插补给箱，也不用你按"开打第 N 波"。',
-      // V9.5.65（产品体检）：副本里的药剂条已撤，指南不能再说"结算页上就有药剂"
-      '队伍血量在波与波之间继承，不会自动回满：结算页上会显示每条血线，觉得吃紧就回背包点治疗剂补给。全队重伤算失败，已经拿到的奖励不会丢。',
+      // V9.5.66：消耗品整条线下架，指南不能再提"喝药补给"这件事
+      '队伍血量在波与波之间继承，不会自动回满：结算页上会显示每条血线。全队重伤算失败，已经拿到的奖励不会丢。',
       '打不过就不要硬上：先回灯阁领挂机收益、用经验模块换伙伴经验、强化装备，再回来。',
     ] },
     { id: 'party', title: '② 队伍与站位', body: [
@@ -1363,15 +1355,7 @@ window.DATA = (function () {
       { item: 'exp_m', name: '中级经验模块', price: 2000, stock: -1 },
       { item: 'exp_l', name: '高级经验模块', price: 12000, stock: -1, req: { world: 'W04' } },
       { item: 'exp_xl', name: '超级经验模块', price: 45000, stock: -1, req: { world: 'W07' } },
-      { item: 'heal_s', name: '小型治疗剂', price: 500, stock: -1 },
       { item: 'beast_egg', name: '兽魂石×5', price: 4000, count: 5, stock: -1, req: { world: 'W03' } },
-      { item: 'heal_m', name: '中型治疗剂', price: 1200, stock: -1 },
-      { item: 'heal_l', name: '大型治疗剂', price: 3000, stock: -1, req: { world: 'W03' } },
-      { item: 'buff_muscle', name: '肌肉强化剂', price: 1500, stock: -1 },
-      { item: 'buff_nerve', name: '神经刺激剂', price: 1500, stock: -1 },
-      { item: 'def_shield', name: '合金护盾剂', price: 2400, stock: -1, req: { world: 'W02' } },
-      { item: 'atk_surge', name: '狂暴催化剂', price: 3600, stock: -1, req: { world: 'W06' } },
-      { item: 'heal_x', name: '全效治疗剂', price: 9000, stock: -1, req: { world: 'W10' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 160000, stock: -1, req: { world: 'W15' } },
       { item: 'mat_t1', name: '基础金属×10', price: 300, count: 10, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 6000, count: 5, stock: -1, req: { world: 'W04' } },
@@ -1390,7 +1374,6 @@ window.DATA = (function () {
       { item: 'mat_t4', name: '虚空晶体×5', price: 300, count: 5, stock: -1, req: { world: 'W04' } },
       { item: 'mat_t5', name: '灯阁残片×3', price: 900, count: 3, stock: -1, req: { world: 'W06' } },
       { item: 'exp_l', name: '高级经验模块', price: 150, stock: -1, req: { world: 'W04' } },
-      { item: 'spd_surge', name: '超频注射剂', price: 260, stock: -1, req: { world: 'W08' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 4200, stock: -1, req: { world: 'W15' } },
       { item: 'ticket_adv', name: '圣契招募令', price: 120, stock: 2 },
       { item: 'ticket_lim', name: '异界征召令', price: 180, stock: 2 },
@@ -1474,7 +1457,15 @@ window.DATA = (function () {
   ];
   const STARTER = {
     points: 50000, holy: 1000,
-    items: { exp_s: 20, heal_s: 10 },
+    items: { exp_s: 20 },
+  };
+
+  /* V9.5.66（父亲大人）：被删掉的探索消耗品，只为**老存档退款**保留一张价目表。
+     玩家当时是真花 ◈ 点数买的，直接删档等于凭空吞掉他一笔钱，所以加载老档时按原价退回。
+     新档不会有这些东西（ITEMS 里已经没有它们了）。 */
+  const RETIRED_ITEMS = {
+    heal_s: 500, heal_m: 1200, heal_l: 3000, buff_muscle: 1500, buff_nerve: 1500,
+    def_shield: 2400, atk_surge: 3600, heal_x: 9000, spd_surge: 260,
   };
 
   /* ================= 功能解锁（随关卡进度） ================= */
@@ -1684,7 +1675,7 @@ window.DATA = (function () {
     ELEMENTS, ELEMENT_ICON, ELEMENT_COUNTER, ELEMENT_BONUS, ELEMENT_PENALTY, worldElement,
     BEASTS, beastById, beastDesc, beastPctAt, BEAST_PCT_NAME, BEAST_RARITY_RATE,
     BEAST_EGG_ITEM, BEAST_EGG_COST, BEAST_MAX_LV, BEAST_SOUL_PER_LV, BEAST_LV_PCT,
-    SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER,
+    SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER, RETIRED_ITEMS,
     WEEKLY_TASKS, WEEKLY_ALL_REWARD, ACHIEVEMENTS,
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
     corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,
@@ -1692,7 +1683,7 @@ window.DATA = (function () {
     DROP_RARITY, rollRarity, capRarity,
     UNLOCKS, MAIN_QUESTS, stageDropCap,
     CURRENCY_INFO, CODEX_REWARDS, enhanceMatTier, MAT_SUBSTITUTE_POINTS,
-    CONSUMABLE_TAG, GUIDE_CHAPTERS,
+    GUIDE_CHAPTERS,
     SERUMS, serumById, SERUM_ITEM, SERUM_KEYS,
     _ri: ri,
   };
