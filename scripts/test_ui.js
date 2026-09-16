@@ -1213,6 +1213,14 @@ t('文字不出格：卡片与关键文字行都有断行 / 省略兜底', () =>
   });
   if (!css.includes('flex-wrap: wrap')) throw new Error('按钮行没有换行兜底');
 });
+t('招募结果页：继续招募＝同池同次数再来一次；返回＝回「招募伙伴」界面', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('const showResults');
+  const seg = src.slice(i, i + 2000);
+  if (seg.indexOf('data-again') < 0 || seg.indexOf('data-back') < 0) throw new Error('结果页两个按钮不对');
+  if (seg.indexOf('runPull(again.pid, again.n)') < 0) throw new Error('「继续招募」没有"同一池子、同样次数再来一次"');
+  if (seg.indexOf('recruitModal(w)') < 0) throw new Error('「返回」没有回到招募伙伴界面');
+});
 t('奖励药丸那一排是"整宽容器 + 内容居中"（父亲大人：容器没写对才会看着歪在左边）', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   const i = css.indexOf('.reward-chips {');

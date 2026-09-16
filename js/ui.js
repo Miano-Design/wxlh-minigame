@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.48';
+  const GAME_VER = '9.5.49';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -2125,7 +2125,19 @@ window.UI = (function () {
       <button class="btn ghost block mb3" data-rates="1">📊 招募概率公示（每一档出率与保底规则）</button>
       ${S.ssrTicket > 0 ? `<button class="btn gold block" data-ssrpick="1">🎫 使用SSR自选券（剩 ${S.ssrTicket}）</button>` : ''}
     `);
-    const showResults = results => {
+    /* V9.5.49（父亲大人）：
+       「继续招募」＝同一池子、同样次数**再来一次**（十连就继续十连）；
+       「返回」＝回"招募伙伴"界面。以前两个按钮的作用正好拧了。 */
+    const runPull = (pid, n, btn) => {
+      const cost = n >= 10 ? (D.RECRUIT_POOLS[pid].ten || D.RECRUIT_POOLS[pid].cost) : D.RECRUIT_POOLS[pid].cost;
+      const when = n >= 10 ? `${D.RECRUIT_POOLS[pid].name} · 10 次（保底 SR，必出更高稀有度）` : `卡池：${D.RECRUIT_POOLS[pid].name} · 1 次`;
+      confirmSpend(cost, n >= 10 ? '确认十连' : '确认招募', when, () => {
+        const r = n >= 10 ? C().recruitTen(pid) : C().recruitOnce(pid);
+        if (r.error) { failToast(r.error, btn); return; }
+        showResults(n >= 10 ? r.results : [r], { pid, n });
+      });
+    };
+    const showResults = (results, again) => {
       sfx(results.some(x => ['SSR', 'UR'].includes(x.rarity)) ? 'level' : 'coin');
       // 就地换成结果页：不重建遮罩，避免每次抽卡整屏闪一下
       updateModal(w, '招募结果', `
@@ -2139,37 +2151,21 @@ window.UI = (function () {
         </div>`;
       }).join('')}</div>
         <div class="btn-row mt4">
-          <button class="btn primary" data-back>继续招募</button>
-          <button class="btn ghost" data-leave>返回</button>
+          <button class="btn primary" data-again>继续招募</button>
+          <button class="btn ghost" data-back>返回</button>
         </div>`);
-      // 「继续招募」= 回到卡池原地继续抽（不退出招募）；「返回」= 关掉招募回上一页
+      // 继续招募＝同一池子再来一次（十连继续十连）；返回＝回"招募伙伴"界面
+      w.querySelector('[data-again]').onclick = () => { if (again) runPull(again.pid, again.n); else recruitModal(w); };
       w.querySelector('[data-back]').onclick = () => recruitModal(w);
-      w.querySelector('[data-leave]').onclick = () => { closeModal(w); render(); };
       refresh();
     };
     w.querySelector('[data-free]').onclick = () => {
       const r = C().freeRecruit();
       if (r.error) { failToast(r.error); return; }
-      showResults([r]);
+      showResults([r], { pid: 'normal', n: 1 });     // 继续招募＝普通池再来 1 抽（免费一天只有一次）
     };
-    w.querySelectorAll('[data-pull1]').forEach(b => b.onclick = () => {
-      const pid = b.dataset.pull1;
-      const cost = D.RECRUIT_POOLS[pid].cost;
-      confirmSpend(cost, '确认招募', `卡池：${D.RECRUIT_POOLS[pid].name} · 1 次`, () => {
-        const r = C().recruitOnce(pid);
-        if (r.error) { failToast(r.error, b); return; }
-        showResults([r]);
-      });
-    });
-    w.querySelectorAll('[data-pull10]').forEach(b => b.onclick = () => {
-      const pid = b.dataset.pull10;
-      const cost = D.RECRUIT_POOLS[pid].ten || D.RECRUIT_POOLS[pid].cost;
-      confirmSpend(cost, '确认十连', `${D.RECRUIT_POOLS[pid].name} · 10 次（保底 SR，必出更高稀有度）`, () => {
-        const r = C().recruitTen(pid);
-        if (r.error) { failToast(r.error, b); return; }
-        showResults(r.results);
-      });
-    });
+    w.querySelectorAll('[data-pull1]').forEach(b => b.onclick = () => runPull(b.dataset.pull1, 1, b));
+    w.querySelectorAll('[data-pull10]').forEach(b => b.onclick = () => runPull(b.dataset.pull10, 10, b));
     const tk = w.querySelector('[data-ssrpick]');
     if (tk) tk.onclick = () => ssrPickModal(w);
     const rb = w.querySelector('[data-rates]');
