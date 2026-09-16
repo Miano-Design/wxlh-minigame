@@ -35,9 +35,11 @@ CV.setup = function (info) {
   CV.pxW = W; CV.pxH = H;
   CV.topInset = sa && sa.top ? sa.top : 0;
   CV.bottomInset = sa && sa.bottom != null ? Math.max(0, H - sa.bottom) : 0;
-  CV.scale = Math.min(520 / 375, W / 375);            // 上限 520/375 ≈ 1.39（平板别铺满）
-  CV.ox = Math.round((W - 375 * CV.scale) / 2);
-  CV.W = 375;
+  /* 父亲大人定的路线 A 重做：**按真实宽度排版**（和网页版一样，不是"375 设计 + 整体缩放"）。
+     网页版的容器上限是 520（#app max-width），这里照抄；超出部分居中留白。 */
+  CV.scale = 1;
+  CV.W = Math.min(520, W);
+  CV.ox = Math.round((W - CV.W) / 2);
   // 设计高度 = 可用物理高度 / 缩放；太矮的设备给个下限，避免界面被压扁
   CV.H = Math.max(560, Math.round((H - CV.topInset - CV.bottomInset) / CV.scale));
   CV.TOP = 30;
