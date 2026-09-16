@@ -1575,5 +1575,46 @@ t('主页功能格只留功能名，没有任何状态小字（V9.5.68 父亲大
   if (withSub.length) throw new Error('还有格子在带小字：' + withSub[0].replace(/\s+/g, ' ').slice(0, 80));
 });
 
+/* ---- V9.5.88：战斗里"中毒 / 流血 / 虚弱 / 破防 / 冰冻"必须真的飘到画面上 ----
+   十六度自审发现：世界机制给玩家上的状态，帧里一条提示都没有，界面里也没有一处显示状态，
+   世界说明写着"感染：敌人攻击附带中毒"，玩家却什么反馈都看不到。
+   这条用例把战斗帧按真实节奏播一遍，然后在画面上找那行飘字。 */
+t('战斗：世界机制上的异常状态会飘字（中毒看得见）', () => {
+  const timers = [];
+  const realSet = global.setTimeout;
+  global.setTimeout = (fn) => { timers.push(fn); return timers.length; };
+  try {
+    Core.newGame(); Core.setPlayerName('飘字'); Core.choosePlayerBloodline('修真');
+    Core.S.player.level = 60; Core.S.player.attrPoints = 180;
+    D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 6));
+    ['C021', 'C022'].forEach(id => { try { Core.addChar(id); Core.S.chars[id].lv = 56; } catch (e) {} });
+    Core.S.party = ['@player', 'C021', 'C022', null, null];
+    const eff = Core.effectivePlayerStats();
+    const ally = Object.assign({
+      name: '测试', kind: 'warrior', faction: null, position: 'front',
+      skills: D.PROTAGONIST.skills, skillLv: [1, 1, 1],
+    }, eff, { hp: Math.round(eff.hp * 0.2), maxHp: eff.hp });   // 残血进场：挨得久，机制才触发得到
+    const enemy = window.Dungeon.makeEnemies('W10', 'normal', 12, 'boss');   // W10 = 中毒
+    let found = false;
+    const realRandom = Math.random;
+    let s = 20260917;
+    Math.random = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+    try {
+      UI._panels._startBattle({ title: '飘字', allies: [ally], enemies: enemy, worldId: 'W10', maxRounds: 40, onEnd: () => ({}) });
+      for (let i = 0; i < 900 && timers.length && !found; i++) {
+        const fn = timers.shift();
+        fn();
+        const kids = byId['battle-root'].children;
+        const ov = kids[kids.length - 1];
+        if (!ov || !ov._qs) continue;
+        Object.keys(ov._qs).forEach(k => {
+          (ov._qs[k].children || []).forEach(c => { if (String(c.className || '').indexOf('floater debuff') >= 0) found = true; });
+        });
+      }
+    } finally { Math.random = realRandom; }
+    if (!found) throw new Error('打了 900 步都没在画面上看到状态飘字');
+  } finally { global.setTimeout = realSet; }
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

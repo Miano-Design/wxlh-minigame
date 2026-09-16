@@ -3,28 +3,40 @@ window.Battle = (function () {
   const D = window.DATA;
 
   /* ---------- 世界机制 ---------- */
+  /* V9.5.88（十六度自审）：世界机制给玩家上的状态一直是"闷声上"的 ——
+     `addStatus` 只管改数值，不往帧里写任何东西，界面里也没有一处显示状态（`.status-strip` 早被删了）。
+     于是"感染：敌人攻击附带中毒"这句世界说明，玩家在战斗里完全看不到反馈：
+     中毒只有回合开始的掉血飘字、眩晕只有一行"无法行动"，而**流血 / 虚弱 / 破防**连一个字都没有，
+     只会觉得"怎么突然打不动了 / 怎么突然挨打更疼了"。这里统一走 applyStatus：
+     状态真的挂上了就往帧里塞一条，界面飘一行状态名（被抗性挡掉就不飘，免得骗人）。 */
+  function applyStatus(target, frames, id, turns) {
+    if (!target || target.hp <= 0) return false;
+    if (!addStatus(target, id, turns)) return false;
+    if (frames) frames.push({ type: 'status', target: target.uid, status: id });
+    return true;
+  }
   const MECHANICS = {
-    W01: { onEnemyHit(t) { if (Math.random() < 0.30) addStatus(t, 'poison', 2); }, note: '感染' },
-    W02: { enemySpd: 1.2, onEnemyHit(t) { if (Math.random() < 0.30) addStatus(t, 'bleed', 2); }, note: '突袭/流血' },
-    W03: { onEnemyHit(t) { if (Math.random() < 0.25) addStatus(t, 'weak', 2); }, note: '恐惧' },
-    W04: { onEnemyHit(t) { if (Math.random() < 0.15) addStatus(t, 'stun', 1); }, bossRevive: true, note: '陷阱/复活' },
+    W01: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 2); }, note: '感染' },
+    W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭/流血' },
+    W03: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '恐惧' },
+    W04: { onEnemyHit(t, fr) { if (Math.random() < 0.15) applyStatus(t, fr, 'stun', 1); }, bossRevive: true, note: '陷阱/复活' },
     // 效果是"打到只剩 1 点血"（濒死），不是真的秒杀——飘字也跟着改成"濒死"（V9.2 对齐）
     W05: { onEnemyHit(t, frames) { if (Math.random() < 0.03 && t.hp > 1) { t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); } }, note: '濒死判定' },
     W06: { enemyShield: 0.2, note: '护盾' },
-    W07: { onEnemyHit(t) { if (Math.random() < 0.20) addStatus(t, 'stun', 1); }, note: '睡眠' },
+    W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠' },
     W08: { allyHitMod: -0.15, note: '浓雾' },
-    W09: { onEnemyHit(t) { if (Math.random() < 0.30) addStatus(t, 'bleed', 3); }, note: '撕裂' },
-    W10: { onEnemyHit(t) { if (Math.random() < 0.35) addStatus(t, 'poison', 3); }, note: '中毒' },
+    W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂' },
+    W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '中毒' },
     W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤/吸血' },
-    W12: { onEnemyHit(t) { if (Math.random() < 0.25) addStatus(t, 'sunder', 2); }, note: '腐化' },
-    W13: { onEnemyHit(t) { if (Math.random() < 0.20) addStatus(t, 'freeze', 1); }, note: '冰冻' },
+    W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '腐化' },
+    W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '冰冻' },
     W14: { randomRule: true, note: '随机规则' },
     /* W15~W20 的机制以前只写在世界表里、战斗引擎里根本没有（`MECHANICS[worldId] || {}` 直接落空），
        等于最后 6 个世界（180 关）是纯数值怪，但世界详情页照常写着"吸血 / 水压 / 幻觉…"。
        这里按世界表上的文案逐条补齐（V9.5）。 */
     W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '血月高悬：敌方攻击提升', note: '吸血/血月强化' },
     W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '水压/触手缠绕' },
-    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t) { if (Math.random() < 0.25) addStatus(t, 'weak', 2); }, note: '无人机群/电磁干扰' },
+    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '无人机群/电磁干扰' },
     W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉/死亡复活' },
     W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '星骸护盾/轨道扫射' },
     W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
@@ -406,7 +418,7 @@ window.Battle = (function () {
     const hitMod = u.side === 'ally' ? (cfg.allyHitMod || 0) : 0;
     dealDamage(u, target, 1.0, { hitMod }, frames);
     if (u.side === 'enemy' && mech.onEnemyHit) mech.onEnemyHit(target, frames);
-    if (sb.poisonOnHit && target.hp > 0) addStatus(target, 'poison', sb.poisonOnHit);
+    if (sb.poisonOnHit) applyStatus(target, frames, 'poison', sb.poisonOnHit);
   }
 
   function castSkill(u, sk, idx, foes, friends, frames, mech, cfg, lvMult, isUlt) {
@@ -433,8 +445,9 @@ window.Battle = (function () {
             if (sk.status && t.hp > 0) {
               const st = sk.status;
               if (!st.chance || Math.random() < st.chance) {
-                if (st.self) addStatus(u, st.id, st.turns);
-                else addStatus(t, st.id, st.turns);
+                // 技能挂状态同样要看得见（以前飘字/日志里一片安静，玩家只能靠"怎么打不动了"猜）
+                if (st.self) applyStatus(u, frames, st.id, st.turns);
+                else applyStatus(t, frames, st.id, st.turns);
               }
             }
           });

@@ -488,6 +488,7 @@ body {
 .floater.heal { color: var(--green); }
 .floater.dmg { color: #ff8080; }
 .floater.miss { color: var(--dim); font-size: 0.75rem; }
+.floater.debuff { color: #c8a2ff; font-size: 0.75rem; }
 @keyframes floatup { to { transform: translate(-50%, -34px); opacity: 0; } }
 #battle-log { height: 5.375rem; overflow-y: auto; margin: 0.5rem 0.875rem; padding: 0.5rem 0.75rem; background: #00000066; border: 1px solid var(--line); border-radius: 0.625rem; font-size: 0.6875rem; color: var(--dim); }
 #battle-log div { padding: 1px 0; }

@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.87';
+  const GAME_VER = '9.5.88';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -3989,6 +3989,12 @@ window.UI = (function () {
       el.appendChild(f);
       setTimeout(() => f.remove(), 850);
     }
+    /* 异常状态的中文名（飘字用）。这张表只服务"看得见"，
+       真正的数值效果全在 battle.js 的 getBuffs / 伤害公式里，别在这儿改平衡。 */
+    const STATUS_TEXT = {
+      poison: '中毒', burn: '燃烧', bleed: '流血', stun: '眩晕', freeze: '冰冻',
+      weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '回复',
+    };
     function flash(uid, cls) {
       const el = overlay.querySelector('#u-' + uid);
       if (!el) return;
@@ -4067,6 +4073,9 @@ window.UI = (function () {
         case 'dodge': floater(f.target, '闪避', 'miss'); break;
         case 'skip': log(`😵 ${nameOf(f.actor)} 无法行动`); break;
         case 'buff': floater(f.target, '↑ ' + f.name, 'heal'); break;
+        /* V9.5.88（十六度自审）：世界机制 / 技能给对方（或自己）挂的异常状态以前画面上一个提示都没有，
+           玩家只能靠"打不动了""怎么掉血了"反推。这里飘一行状态名，和伤害飘字同一套机制。 */
+        case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', 'debuff'); break;
         case 'phase': log(`🔥 ${f.text}`); break;
         case 'revive': {
           const u = units[f.boss];

@@ -2249,5 +2249,104 @@ setParty(['C021']);
   t('深井成就不再要求"这辈子到不了"的 200 层', !D.ACHIEVEMENTS.some(a => a.check && /best >= 200/.test(a.check.toString())));
 }
 
+/* ---- V9.5.88：世界机制 / 技能挂的异常状态，玩家必须看得见（十六度自审） ----
+   以前 addStatus 只改数值、不写帧，界面里也没有任何地方显示状态：
+   "感染：敌人攻击附带中毒"这句世界说明在战斗里毫无反馈，流血/虚弱/破防连一个字都没有。
+   现在状态挂上就推一条 status 帧，界面飘一行中文名。这里锁住"帧真的会出现"。 */
+{
+  const realRandom = Math.random;
+  let s = 20260917;
+  Math.random = () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; };
+  try {
+    const mkTeam = () => {
+      Core.newGame(); Core.setPlayerName('状态'); Core.choosePlayerBloodline('修真');
+      Core.S.player.level = 40; Core.S.player.attrPoints = 120;
+      D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 4));
+      ['C021', 'C022'].forEach(id => { try { Core.addChar(id); Core.S.chars[id].lv = 36; } catch (e) {} });
+      Core.S.party = ['@player', 'C021', 'C022', null, null];
+      return alliesFromParty();
+    };
+    const statusesIn = (wid) => {
+      const allies = mkTeam();
+      const r = Battle.run({ allies, enemies: Dungeon.makeEnemies(wid, 'normal', 12, 'boss'), worldId: wid, maxRounds: 60 });
+      return r.frames.filter(f => f.type === 'status').map(f => f.status);
+    };
+    t('W01「感染」会给玩家挂中毒，并且帧里看得见', statusesIn('W01').includes('poison'));
+    t('W09「撕裂」流血看得见', statusesIn('W09').includes('bleed'));
+    t('W12「腐化」破防看得见', statusesIn('W12').includes('sunder'));
+    t('W13「冰冻」看得见', statusesIn('W13').includes('freeze'));
+
+    /* 技能挂的状态同样要有帧（95 个技能带状态，以前一个提示都没有） */
+    {
+      Core.newGame(); Core.setPlayerName('技能'); Core.choosePlayerBloodline('修真');
+      Core.S.player.level = 40; Core.S.player.attrPoints = 120;
+      D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 4));
+      Core.addChar('C001'); Core.S.chars.C001.lv = 40;      // C001 的「裂空斩」带 sunder
+      Core.S.party = ['@player', 'C001', null, null, null];
+      const allies = alliesFromParty();
+      const foe = [{ name: '木桩', hp: 999999, atk: 1, def: 0, spd: 1, faction: null, eva: 0, resPct: 0 }];
+      const r = Battle.run({ allies, enemies: foe, worldId: null, maxRounds: 12 });
+      t('技能挂的破防（C001 裂空斩）也有飘字帧', r.frames.some(f => f.type === 'status' && f.status === 'sunder'));
+    }
+    /* 已经倒下的单位不该再挂状态（帧里飘在尸体上是骗人） */
+    {
+      const foe = [{ name: '尸体', hp: 1, atk: 1, def: 0, spd: 1, faction: null, eva: 0, resPct: 0 }];
+      Core.newGame(); Core.setPlayerName('尸体'); Core.choosePlayerBloodline('修真');
+      Core.S.player.level = 40; Core.S.player.attrPoints = 120;
+      D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 4));
+      const r = Battle.run({ allies: alliesFromParty(), enemies: foe, worldId: 'W01', maxRounds: 6 });
+      const kills = new Set(r.frames.filter(f => f.type === 'damage' && f.killed).map(f => f.target));
+      const bad = r.frames.filter(f => f.type === 'status' && kills.has(f.target) &&
+        r.frames.indexOf(f) > r.frames.findIndex(x => x.type === 'damage' && x.killed && x.target === f.target)).length;
+      t('状态不会挂在已经倒下的单位上', bad === 0);
+    }
+  } finally { Math.random = realRandom; }
+}
+
+/* ---- V9.5.88：连点两次不许重复领取（十六度自审，最经典的白拿漏洞）---- */
+{
+  const snap = () => {
+    const S = Core.S, o = {};
+    ['points', 'otherworld', 'bloodCrystal', 'holy', 'corridor', 'skillChip', 'story', 'rp'].forEach(k => { o[k] = Math.round(S.cur[k] || 0); });
+    o.__items = Object.values(S.items || {}).reduce((a, b) => a + b, 0);
+    o.__floor = S.corridor.floor; o.__lv = S.player.level;
+    return o;
+  };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const idem = (label, fn) => {
+    const before = snap(); const r1 = fn(); const mid = snap();
+    const r2 = fn(); const after = snap();
+    t(label + '：第一次有效、第二次不再发（连点白拿）', !same(before, mid) && same(mid, after));
+    return r1 && r2;
+  };
+  Core.newGame(); Core.setPlayerName('幂等'); Core.choosePlayerBloodline('修真'); Core.ensureDaily();
+  Core.S.idle.bankSec = 3600;
+  idem('挂机领取', () => Core.claimIdle());
+  {
+    const task = D.DAILY_TASKS[0];
+    Core.S.tasks.daily[task.id] = task.target;
+    idem('每日任务', () => Core.claimTask(task.id));
+  }
+  {
+    D.DAILY_TASKS.forEach(x => { Core.S.tasks.daily[x.id] = x.target; });
+    idem('每日一键领取', () => Core.claimAllTasks());
+  }
+  idem('登录奖励', () => Core.loginReward());
+  {
+    Core.S.corridor.best = 60;
+    idem('成就领取', () => Core.claimAchievement('a_floor50'));
+  }
+  idem('今日一键收取', () => Core.claimEverything());
+  /* 买东西不是"幂等"，但必须每次各扣各的钱（连点不能白拿或只扣一次） */
+  {
+    Core.addCur('points', 100000);
+    const b = snap();
+    Core.buyBagCap('item'); const m = snap();
+    Core.buyBagCap('item'); const a = snap();
+    const cost1 = b.points - m.points, cost2 = m.points - a.points;
+    t('背包扩容连点两次：各扣各的钱，且第二次更贵（×1.3 曲线）', cost1 === 1500 && cost2 === 1950);
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
