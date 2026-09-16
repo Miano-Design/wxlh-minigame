@@ -1740,7 +1740,17 @@ window.Core = (function () {
     return { seconds: elapsedSec, gains, efficiency: eff };
   }
   // 在线挂机：每秒累计
-  function onlineTick(dtSec) { S.idle.bankSec += dtSec; travelTick(dtSec); }
+  /* V9.5.80（自审）：**在线挂机也要吃同一个上限**。
+     以前只有离线结算那条有 min(…, offlineCapHours)，在线是 `bankSec += dtSec` 无限累加——
+     把游戏开着挂一整天就能攒到 24 小时收益，"离线上限 6 小时"形同虚设（我实测挂 23 小时
+     bankSec 就是 23 小时）。现在在线累到上限就停住，和离线口径一致。 */
+  function onlineTick(dtSec) {
+    const capSec = offlineCapHours() * 3600;
+    if (S.idle.bankSec < capSec) S.idle.bankSec = Math.min(capSec, S.idle.bankSec + dtSec);
+    travelTick(dtSec);
+  }
+  // 挂机收益是否已顶到上限（界面用它标"已满"，免得玩家以为卡住了）
+  function idleFull() { return S.idle.bankSec >= offlineCapHours() * 3600 - 1; }
   function idleBankGains() {
     const r = idleRates();
     const mins = S.idle.bankSec / 60;
@@ -3008,7 +3018,7 @@ window.Core = (function () {
     parsePos, posRow, swapPositions,
     recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
     idleRates, idleBaseRates, idleLines, idleLineBonus, setIdleLeader, idleMatItem, grantIdleMat,
-    settleOffline, onlineTick, idleBankGains, claimIdle, addPlayerExp, offlineCapHours, offlineEfficiency,
+    settleOffline, onlineTick, idleBankGains, claimIdle, addPlayerExp, offlineCapHours, offlineEfficiency, idleFull,
     upgradeBuilding, authority, authorityInfo, upgradeAuthority,
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,

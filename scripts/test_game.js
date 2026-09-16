@@ -674,6 +674,19 @@ setParty(['C021']);
   t('打输不加评级经验', (Core.S.sect.exp + Core.S.sect.lv * 1000) === e1);
 }
 
+/* ===== V9.5.80（自审）：在线挂机也要吃离线上限 =====
+   以前只有离线结算那条 min(…, 上限)，在线是无限累加——把游戏开着挂一整天能攒到 24 小时收益，
+   "离线上限 6 小时"形同虚设（实测挂 23 小时 bankSec 就是 23 小时）。 */
+{
+  Core.newGame(); Core.setPlayerName('挂机上限'); Core.choosePlayerBloodline('修真');
+  const capH = Core.offlineCapHours();
+  t('新档挂机上限额是 6 小时起', capH >= 6);
+  for (let i = 0; i < (capH + 6) * 3600; i++) Core.onlineTick(1);
+  t('在线挂超过上限后不再累加', Core.S.idle.bankSec <= capH * 3600 + 1);
+  t('挂满时界面能标"已满"', Core.idleFull() === true);
+  t('收一次之后又从头开始攒', (() => { Core.claimIdle(); return Core.S.idle.bankSec === 0 && !Core.idleFull(); })());
+}
+
 // 34. 探索消耗品整条线已删除（V9.5.66 父亲大人定）
 {
   const GONE = ['heal_s', 'heal_m', 'heal_l', 'heal_x', 'buff_muscle', 'buff_nerve', 'def_shield', 'atk_surge', 'spd_surge'];

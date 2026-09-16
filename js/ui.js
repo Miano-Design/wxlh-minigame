@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.79';
+  const GAME_VER = '9.5.80';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -752,7 +752,8 @@ window.UI = (function () {
       </div>
       <div class="idle-line">
         <span class="il-k">【已挂】</span>
-        <span class="il-v" id="idle-time">${formatDuration(bank.seconds)}</span>
+        <!-- V9.5.80：挂满上限时标一下"已满"，不然玩家会以为收益卡住了 -->
+        <span class="il-v" id="idle-time">${formatDuration(bank.seconds)}${C().idleFull() ? ' <span class="tag">已满</span>' : ''}</span>
         <span class="il-k" style="margin-left:auto">【待领】</span>
         <span class="il-r" id="idle-gains">${idleGainsText(bank)}</span>
       </div>
@@ -4832,7 +4833,8 @@ switch (act) {
       const timeEl = document.getElementById('idle-time');
       if (!timeEl) return;
       const bank = C().idleBankGains();
-      timeEl.textContent = formatDuration(bank.seconds);
+      // 每秒刷新走 innerHTML（要能带"已满"标签）；文案与首帧由同一处拼出来，不会两边不一致
+      timeEl.innerHTML = formatDuration(bank.seconds) + (C().idleFull() ? ' <span class="tag">已满</span>' : '');
       const gainsEl = document.getElementById('idle-gains');
       if (gainsEl) gainsEl.textContent = idleGainsText(bank);
       // 游历奇遇那条：倒计时每秒跟着走；走到点出了奇遇，就把这一段重画一次
