@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.53';
+  const GAME_VER = '9.5.54';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -175,8 +175,8 @@ window.UI = (function () {
   // 3) 防连点：同一个小按钮 300ms 内只吃一次点击（连点会重复扣资源的那种）
   const GUARD_SEL = 'button, .nav-item, .pill, [data-act], [data-stage], [data-world],'
     + ' [data-char], [data-item], [data-pick], [data-target], [data-serumtarget], [data-eq], [data-eqd],'
-    + ' [data-buy], [data-refine], [data-pull1], [data-pull10], [data-free], [data-sstage], [data-stimes], [data-potion],'
-    + ' [data-attr], [data-lvup], [data-roster], [data-cur], [data-claim], [data-mclaim], [data-ach], [data-codex]';
+    + ' [data-buy], [data-refine], [data-pull1], [data-pull10], [data-sstage], [data-stimes], [data-potion],'
+    + ' [data-attr], [data-lvup], [data-cur], [data-claim], [data-mclaim], [data-ach], [data-codex]';
   function installClickGuard() {
     if (!document.addEventListener) return;
     const last = new WeakMap();
@@ -426,11 +426,6 @@ window.UI = (function () {
     { id: 'roster', name: '执灯者' },
     { id: 'bag', name: '背包' },
   ];
-  const ROSTER_TABS = [
-    { id: 'party', name: '队伍' },
-    { id: 'chars', name: '伙伴' },
-    { id: 'grow', name: '成长' },
-  ];
   const BAG_TABS = [
     { id: 'item', name: '道具' },
     { id: 'mat', name: '材料' },
@@ -439,9 +434,7 @@ window.UI = (function () {
   // 旧页签名当子页处理（任务"前往"、每日跳转、引导高亮都靠这张表，不用改各处调用）
   const TAB_ALIAS = { party: 'roster', chars: 'roster', equip: 'bag' };
   let curTab = 'home';
-  let rosterView = 'party';
   let bagView = 'item';
-  const rosterScroll = {};   // 三个子页各自记住滚动位置，来回切不丢
   let pendingScroll = null;  // 渲染完要恢复到的位置（切子页用）
   function renderTopbar() {
     const S = C().S;
@@ -513,7 +506,6 @@ window.UI = (function () {
     const sub = (id === 'party' || id === 'chars' || id === 'equip') ? id : null;
     curTab = TAB_ALIAS[id] || id;
     if (sub === 'equip') bagView = 'equip';
-    else if (sub) rosterView = sub;
     dungeonView = { page: 'worlds' };
     batchMode = false; batchSel.clear();
     cancelGrab(true);                     // 换页时清掉"抓起"状态与拖动监听，别把上次的高亮带过去
@@ -1793,31 +1785,6 @@ window.UI = (function () {
     Object.entries(st.affix).forEach(([k, v]) => parts.push(`${D.AFFIX_POOL[k].name}+${(v * 100).toFixed(1)}%`));
     return parts.join(' ');
   }
-  function pickExpItem(id, wrap) {
-    const S = C().S;
-    const items = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
-    const w = showPanel(wrap, '使用经验道具', `
-      <div class="note mb3">喂给 <b>${cname(id)}</b></div>
-      ${items.map(([k, n]) => `
-      <div class="list-row">
-        <div class="grow"><div class="t1">${D.ITEMS[k].name}</div><div class="t2">+${fmt(D.ITEMS[k].exp)} EXP · 拥有 ${n}</div></div>
-        <button class="btn small" data-use="${k}" data-n="1">用 1</button>
-        <button class="btn small" data-use="${k}" data-n="10" ${n >= 10 ? '' : 'disabled'}>用 10</button>
-        <button class="btn small gold" data-use="${k}" data-n="0">全用</button>
-      </div>`).join('') || '<div class="empty">没有经验道具</div>'}
-      <button class="btn ghost block mt4" data-back>‹ 返回伙伴</button>`);
-    w.querySelector('[data-back]').onclick = () => charDetail(id, 0, w);
-    w.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
-      const want = +b.dataset.n;
-      const cnt = want === 0 ? (S.items[b.dataset.use] || 0) : want;
-      const r = C().useExpItem(id, b.dataset.use, cnt);
-      toast(r.msg);
-      renderTopbar();
-      pickExpItem(id, w);
-    });
-    return w;
-  }
-  // 与当前穿戴对比：新装备 - 旧装备，正数绿、负数红
   function equipDelta(curEq, newEq) {
     if (!curEq) return '';
     const a = C().equipStats(curEq), b = C().equipStats(newEq);
@@ -2149,6 +2116,7 @@ window.UI = (function () {
       sfx(results.some(x => ['SSR', 'UR'].includes(x.rarity)) ? 'level' : 'coin');
       // 就地换成结果页：不重建遮罩，避免每次抽卡整屏闪一下
       updateModal(w, '招募结果', `
+        <div class="recruit-result">
         <div class="char-grid">${results.map(r => {
         const ch = D.charById[r.id];
         return `<div class="char-card rarity-${r.rarity} ${['SSR', 'UR'].includes(r.rarity) ? 'shine' : ''}">
@@ -2158,9 +2126,12 @@ window.UI = (function () {
           <div class="cmeta">${r.isNew ? '<span style="color:var(--green)">NEW</span>' : `碎片+${r.shards}`}</div>
         </div>`;
       }).join('')}</div>
-        <div class="btn-row mt4">
+        <!-- V9.5.54（父亲大人）：这两个按钮位置固定（矮内容贴底、长内容滚到底也停在可视区底部），
+             不再跟着"抽了 1 张还是 10 张"上下跳 -->
+        <div class="btn-row result-actions">
           <button class="btn primary" data-again>继续招募</button>
           <button class="btn ghost" data-back>返回</button>
+        </div>
         </div>`);
       // 继续招募＝同一池子再来一次（十连继续十连）；返回＝回"招募伙伴"界面
       w.querySelector('[data-again]').onclick = () => { if (again) runPull(again.pid, again.n); else recruitModal(w); };
@@ -3056,7 +3027,7 @@ window.UI = (function () {
       setTab('home');
       setTimeout(() => {
         openRecruit();
-        coachmark('[data-free="1"]', '每天有一次免费招募，先把它领了——免费抽也计入这条主线。想多抽就往下选池子：普通池花点数、高级池花圣洁晶石、限定池花异界结晶。');
+        coachmark('[data-pull1]', '每天有免费的招募次数，先用掉——免费抽也计入这条主线。想多抽就往下选池子。');
       }, 250);
       return;
     }
@@ -3345,9 +3316,12 @@ window.UI = (function () {
      只做 refresh()/render() 是**不够**的：那只重画了背后的页面，弹窗还盖在上面，
      玩家看到的就是"按了返回没反应"。所以这里加了兜底：回调要是没重画也没关掉，就由面板自己关。 */
   function lootPanel(title, chipsHtml, backFn, wrap) {
+    // V9.5.54：结算页也做成"内容在上、按钮固定在底部"，不跟着奖励多少上下跳
     const w = showPanel(wrap, title, `
-      <div class="reward-chips" style="margin:0.625rem 0">${chipsHtml || '<span class="reward-chip">没有变化</span>'}</div>
-      <button class="btn block" data-back>‹ 返回</button>`);
+      <div class="loot-result">
+        <div class="reward-chips" style="margin:0.625rem 0">${chipsHtml || '<span class="reward-chip">没有变化</span>'}</div>
+        <button class="btn block result-actions" data-back>‹ 返回</button>
+      </div>`);
     w.querySelector('[data-back]').onclick = () => {
       const seq = w._drawSeq;
       backFn(w);
@@ -3608,41 +3582,6 @@ window.UI = (function () {
     return w;
   }
   // 经验道具：先选伙伴
-  function pickExpTarget(itemId, count, wrap, backFn) {
-    const S = C().S;
-    const owned = Object.keys(S.chars);
-    const goBack = backFn || (w2 => itemDetail(itemId, w2));
-    if (!D.ITEMS[itemId] || (S.items[itemId] || 0) <= 0) { failToast('道具不足'); return goBack(wrap); }
-    if (!owned.length) {
-      setTab('home');
-      if (wrap) closeModal(wrap);
-      setTimeout(() => openRecruit(), 250);
-      return;
-    }
-    const body = `
-      <div class="note mb3">选择要吃「${D.ITEMS[itemId].name} ×${count}」的伙伴</div>
-      ${owned.map(id => {
-        const ch = D.charById[id], c = S.chars[id];
-        return `<div class="list-row" data-target="${id}" style="cursor:pointer">
-          ${charAvatar(id, 40)}
-          <div class="grow"><div class="t1">${rarityTag(ch.rarity)} ${cname(id)}</div>
-          <div class="t2">Lv.${c.lv} · ${ch.role} · EXP ${fmt(c.exp)}</div></div>
-        </div>`;
-      }).join('')}
-      <button class="btn ghost block mt4" data-back>‹ 返回</button>`;
-    const w = showPanel(wrap, '使用经验道具', body);
-    w.querySelector('[data-back]').onclick = () => goBack(w);
-    w.querySelectorAll('[data-target]').forEach(el => el.onclick = () => {
-      const r = C().useExpItem(el.dataset.target, itemId, count);
-      if (r.ok) toast(r.msg); else failToast(r.msg);
-      sfx(r.ok ? 'level' : 'fail');
-      renderTopbar();
-      if ((C().S.items[itemId] || 0) > 0) pickExpTarget(itemId, Math.min(count, C().S.items[itemId]), w, backFn);
-      else goBack(w);
-    });
-    return w;
-  }
-  // 血清：先选伙伴（血统血清只列对应血统的人）
   function pickSerumTarget(itemId, count, wrap, backFn) {
     const S = C().S;
     const it = D.ITEMS[itemId];
@@ -4501,15 +4440,6 @@ window.UI = (function () {
     const root = $view();
     // 背包页签的按钮与弹窗共用一套绑定
     if (curTab === 'bag') bindBag(root, false);
-    // 执灯者的三个子页：切换时各自保留滚动位置
-    root.querySelectorAll('[data-roster]').forEach(el => el.onclick = () => {
-      const next = el.dataset.roster;
-      if (next === rosterView) return;
-      rosterScroll[rosterView] = (typeof window !== 'undefined' && window.scrollY) || 0;
-      rosterView = next;
-      pendingScroll = rosterScroll[next] || 0;
-      render();
-    });
     root.querySelectorAll('[data-act]').forEach(el => el.onclick = () => {
       const act = el.dataset.act;
       const S = C().S;

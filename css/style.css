@@ -85,6 +85,17 @@ body {
 #topbar .tb-spacer { flex: 1; }
 #curbar { display: flex; gap: 0.375rem; overflow-x: auto; padding: 2px 0.75rem var(--sp2); scrollbar-width: none; }
 #curbar::-webkit-scrollbar { display: none; }
+/* 招募结果页：卡片区在上、两个按钮固定在同一个位置（V9.5.54 父亲大人） */
+.recruit-result { display: flex; flex-direction: column; min-height: 100%; }
+.recruit-result .char-grid { align-content: start; }
+.result-actions {
+  margin-top: auto; position: sticky; bottom: 0; padding-top: 0.75rem; padding-bottom: 0.25rem;
+  background: linear-gradient(180deg, transparent, var(--bg2) 0.75rem);
+}
+
+/* 结算页：内容在上、返回键固定在底部（和招募结果页同一套） */
+.loot-result { display: flex; flex-direction: column; min-height: 100%; }
+
 /* 概率公示页：纯文字排版（V9.5.53 父亲大人：不分卡片，卡片会把字裁掉） */
 .rate-block { font-size: var(--fs-sm); color: var(--text2); line-height: 1.9; padding: 0 2px 2px; }
 .rate-line { display: flex; gap: 0.5rem; align-items: baseline; }
@@ -734,8 +745,6 @@ body {
 /* 出率行 / 保底行：招募页和「概率公示」页共用同一套样式（原来只在 .pool-card 内生效，
    导致公示页里 SR/SSR/UR 挤成一行没有间隔） */
 .rate-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.6875rem; margin-bottom: 0.375rem; }
-.pity-row { display: flex; flex-wrap: wrap; gap: 0.625rem; font-size: 0.6875rem; color: var(--dim); margin-bottom: 0.5rem; }
-.pity-row b { color: var(--text); }
 .up-banner { background: linear-gradient(90deg, #ffd76a22, transparent); border-left: 3px solid var(--gold); border-radius: 0.375rem; padding: 0.375rem 0.625rem; font-size: 0.6875rem; line-height: 1.6; margin-bottom: 0.5rem; }
 
 /* 招募券状态行：一眼看清"这次到底扣券还是扣货币" */
