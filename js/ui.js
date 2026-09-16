@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.56';
+  const GAME_VER = '9.5.57';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -192,17 +192,9 @@ window.UI = (function () {
 
   // 4) 大额消费二次确认：单笔任一币种 ≥1000 就先报一次账（带数字），可在设置里关掉。
   // 目的不是拦人，是治"不知道自己花的是什么"——确认框里直接把货币名和余额摆出来。
-  function confirmSpend(cost, title, text, onOk) {
-    const S = C().S;
-    const big = Object.values(cost).some(v => v >= 1000);
-    if (!big || S.settings.confirmBig === false) { onOk(); return; }
-    const detail = Object.entries(cost).map(([k, v]) => `${curIcon(k)}${fmt(v)} ${curName(k)}`).join(' + ');
-    const mine = Object.keys(cost).map(k => `${curIcon(k)}${fmt(S.cur[k] || 0)}`).join(' · ');
-    confirmBox(title, `<div style="margin-bottom:0.375rem">将花费 <b style="color:var(--gold)">${detail}</b></div>
-      <div style="font-size:0.75rem">当前持有：${mine}</div>
-      ${text ? `<div style="font-size:0.75rem;margin-top:0.375rem">${text}</div>` : ''}
-      <div style="font-size:0.6875rem;color:var(--dim);margin-top:0.625rem">设置存档 → 大额消费二次确认，可以关掉这个提示。</div>`, onOk);
-  }
+  /* V9.5.57（父亲大人）：大额消费的二次确认不要了 —— 点了就直接花。
+     函数保留成"直通"，调用处不用改；cost/title/text 留作签名兼容。 */
+  function confirmSpend(cost, title, text, onOk) { onOk(); }
 
   /* ================= 返回键接管（手机手势/返回键先退面板、再退页面） ================= */
   // 做法：在历史里放一条"哨兵"记录。按返回时先被哨兵挡住 → 关掉最上面的弹窗/子页面 → 再补一条哨兵。
@@ -3696,10 +3688,6 @@ window.UI = (function () {
           <button class="btn small ${S.settings.sfx !== false ? 'primary' : ''}" data-toggle="sfx">${S.settings.sfx !== false ? '已开启' : '已关闭'}</button>
         </div>
         <div class="list-row">
-          <div class="grow"><div class="t1">大额消费二次确认</div><div class="t2">单笔花费达到 1000 时，先把"花的是哪种货币、还剩多少"报一遍再扣</div></div>
-          <button class="btn small ${S.settings.confirmBig !== false ? 'primary' : ''}" data-toggle="confirmBig">${S.settings.confirmBig !== false ? '已开启' : '已关闭'}</button>
-        </div>
-        <div class="list-row">
           <div class="grow"><div class="t1">通关结算自动进下一关</div><div class="t2">胜利结算 ${AUTO_NEXT_SEC} 秒内没做选择，就自动接着打下一关；关掉之后结算页会一直等你点</div></div>
           <button class="btn small ${S.settings.autoNext !== false ? 'primary' : ''}" data-toggle="autoNext">${S.settings.autoNext !== false ? '已开启' : '已关闭'}</button>
         </div>
@@ -3775,7 +3763,7 @@ window.UI = (function () {
       const cur = C().S.settings[k] !== false;
       C().S.settings[k] = !cur;
       C().save();
-      const toggleName = { sfx: '音效', autoBattle: '自动战斗', confirmBig: '大额消费二次确认', autoNext: '结算自动进下一关' }[k] || k;
+      const toggleName = { sfx: '音效', autoBattle: '自动战斗', autoNext: '结算自动进下一关' }[k] || k;   // confirmBig 已废弃（父亲大人要求去掉二次确认）
       toast(`${toggleName}已${C().S.settings[k] !== false ? '开启' : '关闭'}`);
       if (k === 'sfx' && C().S.settings.sfx !== false) sfx('success');
       settingsModal(w);
