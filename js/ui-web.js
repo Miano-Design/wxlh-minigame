@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.61';
+  const GAME_VER = '9.5.62';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -170,7 +170,7 @@ window.UI = (function () {
 
   // 3) 防连点：同一个小按钮 300ms 内只吃一次点击（连点会重复扣资源的那种）
   const GUARD_SEL = 'button, .nav-item, .pill, [data-act], [data-stage], [data-world],'
-    + ' [data-char], [data-item], [data-pick], [data-target], [data-serumtarget], [data-eq], [data-eqd],'
+    + ' [data-char], [data-item], [data-pick], [data-serumtarget], [data-eq], [data-eqd],'
     + ' [data-buy], [data-refine], [data-pull1], [data-pull10], [data-sstage], [data-stimes], [data-potion],'
     + ' [data-attr], [data-lvup], [data-cur], [data-claim], [data-mclaim], [data-ach], [data-codex]';
   function installClickGuard() {
@@ -3677,7 +3677,6 @@ window.UI = (function () {
         
         <div class="btn-row">
           <button class="btn small" data-act="open-guide">❓ 玩法指南</button>
-          <button class="btn small" data-act="open-curdoc">▤ 货币图鉴</button>
         </div>
       </div>
       <div class="card">
@@ -4516,7 +4515,6 @@ window.UI = (function () {
         }
         case 'open-guide': guideModal(); break;
         case 'open-codex': codexModal(); break;
-        case 'open-curdoc': currencyModal(); break;
         case 'open-ach': tasksModal('ach'); break;
         case 'auto-equip': {
           const r = C().autoEquipBest();
