@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.40';
+  const GAME_VER = '9.5.41';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -85,15 +85,15 @@ window.UI = (function () {
     const eq = S.equipped[ownerId] || {};
     const slotAttr = kind === 'player' ? 'data-peqslot' : 'data-eqslot';
     const unAttr = kind === 'player' ? 'data-punequip' : 'data-unequip';
+    /* V9.5.41（父亲大人）：装备卡片只写装备名（+强化等级），不写属性详情——
+       点卡片才弹窗看详情。卡片本来就只有一格宽，塞属性会挤成一片。 */
     const tiles = slots.map(slot => {
       const e = eq[slot] && S.equips[eq[slot]];
-      const brief = e ? equipBrief(e) : '';
-      return `<div class="eq-tile${e ? '' : ' off'}" ${slotAttr}="${slot}">
+      return `<div class="eq-tile${e ? '' : ' off'}" ${slotAttr}="${slot}" data-owner="${ownerId}">
         <div class="eq-slot">${D.EQUIP_SLOTS[slot]}</div>
         ${e
           ? `<button class="eq-un" ${unAttr}="${slot}">卸下</button>
-             <div class="eq-name rtext-${e.rarity}">${e.name}</div>
-             <div class="eq-brief">+${e.enhance}${brief ? ' · ' + brief : ''}</div>`
+             <div class="eq-name rtext-${e.rarity}">${e.name} <span class="eq-plus">+${e.enhance}</span></div>`
           : `<div class="eq-none">未装备</div>`}
       </div>`;
     }).join('');
@@ -1500,6 +1500,9 @@ window.UI = (function () {
       if (r.ok) reopenSelf();
     });
     w.querySelectorAll('[data-peqslot]').forEach(el => el.onclick = () => {
+      // V9.5.41（父亲大人）：装着装备的格子点一下弹「装备详情」；空格子才进选择列表
+      const uid = (C().S.equipped['@player'] || {})[el.dataset.peqslot];
+      if (uid) { equipDetail(uid, null, '@player'); return; }
       const st = modalScroll(w);
       pickEquipFor('@player', el.dataset.peqslot, w2 => protagonistDetail(st, w2), w);
     });
@@ -1724,6 +1727,8 @@ window.UI = (function () {
     const expBtn = w.querySelector('[data-expitem]');
     if (expBtn) expBtn.onclick = () => pickExpItem(id, w);
     w.querySelectorAll('[data-eqslot]').forEach(el => el.onclick = () => {
+      const uid = (C().S.equipped[id] || {})[el.dataset.eqslot];
+      if (uid) { equipDetail(uid, null, id); return; }
       const st = modalScroll(w);
       pickEquipFor(id, el.dataset.eqslot, w2 => charDetail(id, st, w2), w);
     });
@@ -1899,7 +1904,7 @@ window.UI = (function () {
       <div class="hint">${shown.length ? `筛出 ${shown.length} 件` : ''}</div>
       ${equipBatchBar()}`;
   }
-  function equipDetail(uid, wrap) {
+  function equipDetail(uid, wrap, ownerId) {
     const S = C().S;
     const eq = S.equips[uid];
     if (!eq) return;
@@ -1908,29 +1913,76 @@ window.UI = (function () {
     const set = D.SETS[eq.set];
     const cs = eq.classSet ? D.CLASS_SETS[eq.classSet] : null;
     const equippedBy = Object.entries(S.equipped).find(([cid, slots]) => Object.values(slots).includes(uid));
+    /* 套装信息单独出一张卡片（父亲大人：别只留一排小字在名字下面） */
+    const setOwner = ownerId || (equippedBy ? equippedBy[0] : null);
+    const wornOf = (which, key) => setOwner
+      ? Object.values(S.equipped[setOwner] || {}).filter(u => S.equips[u] && S.equips[u][key] === which).length
+      : Object.values(S.equips).filter(e2 => e2[key] === which).length;
     const catLine = eq.charId
       ? `专属装备 · 仅限 ${cname(eq.charId)} 装备${eq.sigText ? ' · ' + eq.sigText : ''}`
-      : cs ? `${cs.name}（${cs.text}）· 限${D.KIND_NAMES[eq.classSet]}定位激活`
-      : set ? `${set.name}（${set.text}）`
+      : cs ? `职业套装 · 限${D.KIND_NAMES[eq.classSet]}定位激活`
+      : set ? '世界套装'
       : '普通装备';
+    const setCard = (function () {
+      const mk = (title, name, text, cnt, max) => `<div class="card mb3">
+        <h3>🧩 ${title} <span class="sub">${name} · ${cnt}/${max} 件</span></h3>
+        ${text.split('　').map(part => {
+          const i = part.indexOf(':');
+          const need = parseInt(part.slice(0, i), 10) || 0;
+          const on = cnt >= need;
+          return `<div class="kv"><span class="k"${on ? ' style="color:var(--gold)"' : ''}>${part.slice(0, i + 1)}</span>`
+            + `<span style="color:${on ? 'var(--gold)' : 'var(--dim)'}">${part.slice(i + 1)}${on ? ' · 已激活' : ''}</span></div>`;
+        }).join('')}
+        ${setOwner ? '' : '<div class="hint">还没穿在某个人身上，这里按你拥有的件数算。</div>'}
+      </div>`;
+      if (cs) return mk('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
+      if (set) return mk('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
+      return '';
+    })();
+    /* 属性逐条列出来（父亲大人给的参考样式）：一条一行「标签：数值」，不再挤成一行 */
+    const est = C().equipStats(eq);
+    const statRows = [];
+    if (est.flat.atk) statRows.push(['攻击', '+' + Math.round(est.flat.atk)]);
+    if (est.flat.def) statRows.push(['防御', '+' + Math.round(est.flat.def)]);
+    if (est.flat.hp) statRows.push(['生命', '+' + Math.round(est.flat.hp)]);
+    if (est.flat.spd) statRows.push(['速度', '+' + Math.round(est.flat.spd)]);
+    Object.entries(est.affix).forEach(([k, v]) => statRows.push([(D.AFFIX_POOL[k] || {}).name || k, '+' + (v * 100).toFixed(1) + '%']));
     const w = showCenterPanel(wrap, `${eq.name}`, `
-      <div class="mb3">
-        <span class="rtext-${eq.rarity}" style="font-size:1.0625rem;font-weight:800">${eq.rarity}</span>
-        <b style="font-size:1.0625rem"> ${eq.name} <span style="color:var(--gold)">+${eq.enhance}</span></b>
-        <div class="hint mt1">${D.EQUIP_SLOTS[eq.slot]} · ${catLine}${equippedBy ? ` · ${cname(equippedBy[0])}装备中` : ''}</div>
+      <div class="card mb3">
+        <h3><span class="rtext-${eq.rarity}">${eq.rarity}</span> ${eq.name}
+          <span class="sub">+${eq.enhance}${equippedBy ? ' · ' + cname(equippedBy[0]) + '装备中' : ''}</span></h3>
+        <div class="kv"><span class="k">部位</span><span>${D.EQUIP_SLOTS[eq.slot]}</span></div>
+        <div class="kv"><span class="k">品质</span><span class="rtext-${eq.rarity}">${eq.rarity}</span></div>
+        <div class="kv"><span class="k">强化</span><span>+${eq.enhance} / 20</span></div>
+        ${eq.charId ? `<div class="kv"><span class="k">专属</span><span>仅限 ${cname(eq.charId)} 装备</span></div>` : ''}
+        ${cs ? `<div class="kv"><span class="k">职业套装</span><span>限${D.KIND_NAMES[eq.classSet]}定位激活</span></div>` : ''}
+        <div class="kv"><span class="k">分解可得</span><span>◆ ${D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3}</span></div>
       </div>
-      <div class="skill-row"><div class="sdesc" style="font-size:0.75rem;color:var(--text)">${equipBrief(eq)}</div></div>
+      <div class="card mb3">
+        <h3>📊 属性 <span class="sub">共 ${statRows.length} 条</span></h3>
+        ${statRows.map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span style="color:var(--text)">${v}</span></div>`).join('')
+          || '<div class="hint">这件装备没有附加属性</div>'}
+      </div>
+      ${setCard}
+      ${eq.sigText ? `<div class="card mb3"><h3>📜 说明</h3><div class="note">${esc(eq.sigText)}</div></div>` : ''}
       <div class="section-title">强化（+${eq.enhance}/20）</div>
       <div class="btn-row">
         <button class="btn small" data-enh="1" ${eq.enhance >= 20 ? 'disabled' : ''}>强化（◈ ${fmt(cost.points)} + ◆ ${cost.otherworld} · ${rate}%）</button>
       </div>
       <div class="section-title">操作</div>
       <div class="btn-row">
+        ${ownerId ? '<button class="btn small primary" data-swap="1">更换装备</button>' : ''}
         <button class="btn small" data-equipto="1">装备给伙伴</button>
         <button class="btn small ${eq.lock ? 'primary' : 'ghost'}" data-lock="1">${eq.lock ? '🔒 已锁定' : '🔓 锁定保护'}</button>
         <button class="btn small ghost" data-decomp="1" ${eq.lock ? 'disabled' : ''}>分解（◆ ${D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3}）</button>
       </div>
     `);
+    const swapBtn = w.querySelector('[data-swap]');
+    if (swapBtn) swapBtn.onclick = () => {
+      const slot = eq.slot;
+      closeModal(w);
+      pickEquipFor(ownerId, slot, null, null);
+    };
     w.querySelector('[data-lock]').onclick = () => {
       const r = C().toggleEquipLock(uid);
       toast(r.lock ? '🔒 已锁定这件装备' : '🔓 已解锁');
