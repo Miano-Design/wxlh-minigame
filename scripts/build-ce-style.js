@@ -592,6 +592,22 @@ function main() {
   });
 
   /* 收集所有页面的元素（含祖先链），顺便算每个元素的 inline style */
+  /* 文字宽度提示：折算层要按"兄弟实际占多宽"分配弹性项的宽度，
+     自动宽度的兄弟不能当 0（当 0 就会出现"该贴右的数值飘了/两段文字挤在一起"）。
+     编译期拿不到 canvas 测量，就按字形估：CJK≈1.0×字号、西文/数字≈0.55×字号。 */
+  function estTextW(text, fontSize) {
+    const fs = fontSize || 15;
+    let w = 0;
+    for (const ch of String(text)) w += /[\u4e00-\u9fa5\u3000-\u303f\uff00-\uffef]/.test(ch) ? fs : fs * 0.55;
+    return Math.round(w);
+  }
+  function collectText(el) {
+    let out = '';
+    const node = el.node;
+    if (node.attrs && node.attrs.value) out += node.attrs.value;
+    return out;
+  }
+
   const elements = [];
   loadMarkups().forEach((page) => {
     const prepared = ctxMod.prepare(page.markup);
@@ -637,6 +653,8 @@ function main() {
     conv.ancestors = ancestors;
     conv.inline = el.inlineDecls ? convertDecls(el.inlineDecls, {}).style : null;
     conv.grid = conv.meta;
+    const myText = collectText(el);
+    if (myText) conv.textW = estTextW(myText, conv.style.fontSize);
     styles[node.path] = conv;
     if (conv.inline) inlineOf[node.path] = conv.inline;
   });
@@ -765,6 +783,7 @@ function main() {
       cleaned.color = PAGE_TEXT;
       note('兜底', '文字颜色', k.split('__').slice(-1)[0] + ' → ' + PAGE_TEXT);
     }
+    if (styles[k].textW && cleaned.width === undefined) cleaned.__textW = styles[k].textW;
     if (Object.keys(cleaned).length) out[k] = cleaned;
   });
 

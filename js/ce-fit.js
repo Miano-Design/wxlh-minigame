@@ -63,7 +63,9 @@
          所以这里替引擎把宽度先分好：父级内容宽 − 已有明确宽度的兄弟 = 弹性项可分的空间。 */
       const fixedSum = kids.reduce((sum, k) => {
         const c = out[k];
-        const cw = typeof c.width === 'number' ? c.width : 0;
+        // 已定宽的按宽度算；没定宽的用"文字宽度提示"（__textW）估，别当 0——
+        // 当 0 的话弹性兄弟会分到整个空余宽度，右边的东西就飘了。
+        const cw = typeof c.width === 'number' ? c.width : (c.__textW || 0);
         return sum + cw + (c.marginLeft || 0) + (c.marginRight || 0);
       }, 0);
       const flexKids = kids.filter((k) => out[k].flex && typeof out[k].width !== 'number');

@@ -1,6 +1,6 @@
 /* 自动生成，不要手改：node scripts/build-ce-style.js
    来源：../wxlh-game/css/style.css + ce-extra.css，按元素上下文算好的引擎样式表。
-   生成时间：2026-09-16 11:09 */
+   生成时间：2026-09-16 11:11 */
 module.exports = {
  "cur-chip": {
   "flex": 0,
@@ -555,7 +555,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 45
  },
  "view#app__view#topbar__view.player-row__text.plv": {
   "color": "#e6b64c",
@@ -571,7 +572,8 @@ module.exports = {
   "paddingRight": 6,
   "paddingBottom": 0,
   "paddingLeft": 6,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 24
  },
  "view#app__view#topbar__view.player-row__view.tb-spacer": {
   "color": "#e9edf6",
@@ -612,22 +614,26 @@ module.exports = {
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh5spr3": {
   "color": "#ffd76a",
   "fontSize": 12,
-  "marginRight": 5
+  "marginRight": 5,
+  "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-val": {
   "color": "#e9edf6",
   "fontSize": 12,
-  "marginRight": 5
+  "marginRight": 5,
+  "__textW": 17
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isx1l3rubl": {
   "color": "#6ec6ff",
   "fontSize": 12,
-  "marginRight": 5
+  "marginRight": 5,
+  "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip__text.cur-ico.isxh4wp74": {
   "color": "#ff9ecb",
   "fontSize": 12,
-  "marginRight": 5
+  "marginRight": 5,
+  "__textW": 8
  },
  "view#app__view#topbar__view#curbar__view.cur-chip.more": {
   "color": "#7a849b",
@@ -653,7 +659,8 @@ module.exports = {
  "view#app__view#topbar__view#curbar__view.cur-chip.more__text.cur-val": {
   "color": "#7a849b",
   "fontSize": 12,
-  "marginRight": 5
+  "marginRight": 5,
+  "__textW": 77
  },
  "view#app__scrollview#view": {
   "color": "#e9edf6",
@@ -708,7 +715,8 @@ module.exports = {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxwtv0ps.rv": {
   "color": "#d43a4f",
@@ -720,13 +728,15 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 52
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rs": {
   "color": "#7a849b",
   "fontSize": 11,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 123
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.rv": {
   "color": "#e9edf6",
@@ -738,7 +748,8 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 27
  },
  "view#app__scrollview#view__view.screen__view.card": {
   "color": "#e9edf6",
@@ -790,7 +801,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 115
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
@@ -809,7 +821,8 @@ module.exports = {
   "paddingLeft": 6,
   "alignSelf": "center",
   "lineHeight": 15,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 58
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__view.t2": {
   "color": "#7a849b",
@@ -853,7 +866,8 @@ module.exports = {
   ":active": {
    "backgroundColor": "#1d2534"
   },
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 49
  },
  "view#app__scrollview#view__view.screen__text.section-title": {
   "color": "#b6bfd0",
@@ -970,7 +984,8 @@ module.exports = {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 72
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.rv": {
   "color": "#e9edf6",
@@ -982,13 +997,15 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 104
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.rs": {
   "color": "#7a849b",
   "fontSize": 11,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card": {
   "color": "#e9edf6",
@@ -1024,30 +1041,35 @@ module.exports = {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-v": {
   "color": "#e6b64c",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 65
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-s": {
   "color": "#7a849b",
   "fontSize": 11,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 200
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 23
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-k.isxmg8sha": {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line__text.il-r": {
   "color": "#e9edf6",
@@ -1057,7 +1079,8 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "78%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 66
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line.idle-mini": {
   "color": "#e9edf6",
@@ -1076,13 +1099,15 @@ module.exports = {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.idle-line.idle-mini__text.il-s": {
   "color": "#7a849b",
   "fontSize": 11,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 299
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.btn-row.mt2": {
   "color": "#e9edf6",
@@ -1119,7 +1144,8 @@ module.exports = {
    "backgroundColor": "#1d2534"
   },
   "lineHeight": 15,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.card.idle-card__view.btn-row.mt2__text.btn.primary": {
   "color": "#e9edf6",
@@ -1149,7 +1175,8 @@ module.exports = {
    "backgroundColor": "#1d2534"
   },
   "lineHeight": 16,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 85
  },
  "view#app__view#navbar": {
   "color": "#e9edf6",
@@ -1265,7 +1292,8 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__text": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 60
  },
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x": {
   "color": "#7a849b",
@@ -1298,7 +1326,8 @@ module.exports = {
  "view#app__view#modal-root__view.center.sheet__view.sheet-head__view.close-x__text.ce-ico": {
   "color": "#7a849b",
   "fontSize": 15,
-  "lineHeight": 15
+  "lineHeight": 15,
+  "__textW": 8
  },
  "view#app__view#modal-root__view.center.sheet__text.sheet-body": {
   "color": "#e9edf6",
@@ -1366,12 +1395,14 @@ module.exports = {
  "view#app__view#modal-root__view.page__view.page-head__view.back-x__text.ce-ico": {
   "color": "#b6bfd0",
   "fontSize": 20,
-  "lineHeight": 20
+  "lineHeight": 20,
+  "__textW": 8
  },
  "view#app__view#modal-root__view.page__view.page-head__text": {
   "color": "#e9edf6",
   "fontSize": 15,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 60
  },
  "view#app__view#modal-root__view.page__view.page-head__view.page-pad": {
   "color": "#e9edf6",
@@ -1462,12 +1493,14 @@ module.exports = {
   "fontSize": 13,
   "flex": 0,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 75
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card.isxmw2bas__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 58
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card": {
   "color": "#e9edf6",
@@ -1509,17 +1542,20 @@ module.exports = {
   "fontSize": 13,
   "flex": 0,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 175
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text.isxmq1bso": {
   "color": "#e6b64c",
   "fontSize": 13,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 41
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 86
  },
  "view#app__view#modal-root__view.page__view.sheet-body__view.card__text.hint.mb2": {
   "color": "#7a849b",
@@ -1532,7 +1568,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 13,
   "whiteSpace": "nowrap",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 124
  },
  "view#app__view#battle-root": {
   "color": "#e9edf6",
@@ -1690,7 +1727,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 90
  },
  "view#app__scrollview#view__view.screen__view.card__view.t2": {
   "color": "#7a849b",
@@ -1721,7 +1759,8 @@ module.exports = {
   "fontSize": 12,
   "fontWeight": "bold",
   "letterSpacing": 1,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 60
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row": {
   "color": "#e9edf6",
@@ -1754,7 +1793,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 45
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1lwcmvy.list-row__view.grow__view.t2": {
   "color": "#7a849b",
@@ -1774,7 +1814,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.blk.hint.mt2": {
   "color": "#7a849b",
@@ -1838,7 +1879,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 45
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx__view.isxv4i8ee.list-row__view.grow__view.t2": {
   "color": "#7a849b",
@@ -1858,7 +1900,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.btn-row.mt2": {
   "color": "#e9edf6",
@@ -1905,7 +1948,8 @@ module.exports = {
   "lineHeight": 16,
   "textAlign": "center",
   "whiteSpace": "normal",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 105
  },
  "view#app__scrollview#view__view.screen__text.blk.hint.mt2": {
   "color": "#7a849b",
@@ -1973,7 +2017,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 30
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
@@ -1992,7 +2037,8 @@ module.exports = {
   "paddingLeft": 6,
   "alignSelf": "center",
   "lineHeight": 15,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 44
  },
  "view#app__scrollview#view__view.screen__view.card.isxa4xx1i.locked.world-card__view.grow__text.t2": {
   "color": "#7a849b",
@@ -2007,7 +2053,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 12
+  "marginRight": 12,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.card.isx1runjyx.world-card": {
   "color": "#e9edf6",
@@ -2077,7 +2124,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 12
+  "marginRight": 12,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.card.isxc7pc6b.world-card": {
   "color": "#e9edf6",
@@ -2148,7 +2196,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 12
+  "marginRight": 12,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.card__view": {
   "color": "#e9edf6",
@@ -2183,7 +2232,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 12,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 236
  },
  "view#app__scrollview#view__view.screen__view.card__view.party-grid__view.party-slots": {
   "color": "#e9edf6",
@@ -2437,7 +2487,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 30
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.isxc4hjzl.tag": {
   "color": "#b6bfd0",
@@ -2456,7 +2507,8 @@ module.exports = {
   "paddingLeft": 6,
   "alignSelf": "center",
   "lineHeight": 15,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 22
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
@@ -2475,7 +2527,8 @@ module.exports = {
   "paddingLeft": 6,
   "alignSelf": "center",
   "lineHeight": 15,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 22
  },
  "view#app__scrollview#view__view.screen__view.card__view.isxc5zrlg.list-row__view.grow__text.t2": {
   "color": "#7a849b",
@@ -2538,17 +2591,20 @@ module.exports = {
   "fontSize": 13,
   "flex": 0,
   "minWidth": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 30
  },
  "view#app__scrollview#view__view.screen__view.card__view.kv__text": {
   "color": "#e9edf6",
   "fontSize": 13,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 8
  },
  "view#app__scrollview#view__view.screen__view.card__view.kv__text.isx13m278j": {
   "color": "#56c894",
   "fontSize": 13,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 15
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list": {
   "color": "#e9edf6",
@@ -2576,21 +2632,24 @@ module.exports = {
   "fontSize": 11,
   "fontWeight": "bold",
   "minWidth": 62,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 45
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-req": {
   "color": "#7a849b",
   "fontSize": 11,
   "flex": 1,
   "minWidth": 0,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 115
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__text.fm-buff": {
   "color": "#56c894",
   "fontSize": 11,
   "flex": 0,
   "whiteSpace": "nowrap",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 136
  },
  "view#app__scrollview#view__view.screen__view.card__view.formation-list__view.fm-row__view.fm-on": {
   "color": "#56c894",
@@ -2625,7 +2684,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#d43a4f",
   "backgroundColor": "#d43a4f22",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.pill-tabs__text.pill": {
   "color": "#7a849b",
@@ -2646,7 +2706,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#232b3b",
   "backgroundColor": "#111621",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 13
  },
  "view#app__scrollview#view__view.screen__view.filter-bar": {
   "color": "#e9edf6",
@@ -2659,7 +2720,8 @@ module.exports = {
   "color": "#7a849b",
   "fontSize": 11,
   "flex": 0,
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 22
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs": {
   "color": "#e9edf6",
@@ -2689,7 +2751,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#d43a4f",
   "backgroundColor": "#d43a4f22",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.grow-pills.pill-tabs__text.pill": {
   "color": "#7a849b",
@@ -2710,7 +2773,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#232b3b",
   "backgroundColor": "#111621",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 48
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__view.search-input#char-search": {
   "color": "#e9edf6",
@@ -2729,7 +2793,8 @@ module.exports = {
   "paddingRight": 12,
   "paddingBottom": 0,
   "paddingLeft": 12,
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 53
  },
  "view#app__scrollview#view__view.screen__view.filter-bar__text.btn.ghost.small": {
   "color": "#b6bfd0",
@@ -2755,7 +2820,8 @@ module.exports = {
   ":active": {
    "backgroundColor": "#1d2534"
   },
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 37
  },
  "view#app__scrollview#view__view.screen__text.isxao4oo7": {
   "color": "#7a849b",
@@ -2831,7 +2897,8 @@ module.exports = {
   "fontSize": 22,
   "flex": 0,
   "opacity": 0.92,
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 12
  },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain__view.gr-grow": {
   "color": "#e9edf6",
@@ -2859,7 +2926,8 @@ module.exports = {
   "flex": 0,
   "textAlign": "right",
   "maxWidth": "42%",
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 36
  },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap": {
   "color": "#e9edf6",
@@ -2885,7 +2953,8 @@ module.exports = {
   "fontSize": 22,
   "flex": 0,
   "opacity": 0.92,
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 12
  },
  "view#app__scrollview#view__view.screen__view.card.grow-row.plain.tap__view.gr-grow": {
   "color": "#e9edf6",
@@ -2913,7 +2982,8 @@ module.exports = {
   "flex": 0,
   "textAlign": "right",
   "maxWidth": "42%",
-  "marginRight": 14
+  "marginRight": 14,
+  "__textW": 25
  },
  "view#app__scrollview#view__view.screen__view.tab-cards": {
   "color": "#e9edf6",
@@ -2944,7 +3014,8 @@ module.exports = {
   "borderBottomLeftRadius": 7,
   "backgroundColor": "#d43a4f22",
   "fontWeight": "bold",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.tab-cards__text.tab-card": {
   "color": "#7a849b",
@@ -2964,7 +3035,8 @@ module.exports = {
   "borderBottomLeftRadius": 7,
   "backgroundColor": "#111621",
   "fontWeight": "bold",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.card.mb3": {
   "color": "#e9edf6",
@@ -2993,12 +3065,14 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-head__text": {
   "color": "#e9edf6",
   "fontSize": 12,
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 45
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-head__text.sub": {
   "color": "#7a849b",
   "fontSize": 11,
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 36
  },
  "view#app__scrollview#view__view.screen__view.card.mb3__view.bg-grid": {
   "color": "#e9edf6",
@@ -3137,7 +3211,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#d43a4f",
   "backgroundColor": "#d43a4f22",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 22
  },
  "view#app__scrollview#view__view.screen__view.mb2.pill-tabs.tight__text.pill.sm": {
   "color": "#7a849b",
@@ -3158,7 +3233,8 @@ module.exports = {
   "borderWidth": 1,
   "borderColor": "#232b3b",
   "backgroundColor": "#111621",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 24
  },
  "view#app__scrollview#view__view.screen__view.eq-bar": {
   "color": "#7a849b",
@@ -3169,7 +3245,8 @@ module.exports = {
  "view#app__scrollview#view__view.screen__view.eq-bar__text": {
   "color": "#7a849b",
   "fontSize": 11,
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 126
  },
  "view#app__scrollview#view__view.screen__view.eq-bar__text.btn.ghost.push.small": {
   "color": "#b6bfd0",
@@ -3196,7 +3273,8 @@ module.exports = {
   ":active": {
    "backgroundColor": "#1d2534"
   },
-  "marginRight": 8
+  "marginRight": 8,
+  "__textW": 61
  },
  "view#app__scrollview#view__view.screen__view.hint": {
   "color": "#7a849b",
@@ -3287,7 +3365,8 @@ module.exports = {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 30
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__view.t1__text.tag": {
   "color": "#b6bfd0",
@@ -3306,7 +3385,8 @@ module.exports = {
   "paddingLeft": 6,
   "alignSelf": "center",
   "lineHeight": 15,
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 44
  },
  "view#app__scrollview#view__view.screen__view.card.isx1fjgejf.world-card__view.grow__text.t2": {
   "color": "#7a849b",
@@ -3321,7 +3401,8 @@ module.exports = {
   "flex": 0,
   "alignSelf": "center",
   "lineHeight": 16,
-  "marginRight": 12
+  "marginRight": 12,
+  "__textW": 9
  },
  "view#app__scrollview#view__view.screen__view.card.isx1lwcmvy.text-rows__view.row__text.isxmq1bso.rv": {
   "color": "#e6b64c",
@@ -3333,13 +3414,15 @@ module.exports = {
   "minWidth": 0,
   "maxWidth": "62%",
   "textOverflow": "ellipsis",
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 154
  },
  "view#app__scrollview#view__view.screen__view.card.isxhq2htm.text-rows__view.row__text.isxmq1bso.rk": {
   "color": "#7a849b",
   "fontSize": 12,
   "flex": 0,
-  "marginRight": 10
+  "marginRight": 10,
+  "__textW": 72
  },
  "view#app__scrollview#view__view.screen__view.card__view.isx1yd8pbd.list-row__view.grow__text.t1": {
   "color": "#e9edf6",
@@ -3357,7 +3440,7 @@ module.exports = {
   "lineHeight": 18,
   "width": "100%"
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa": {
   "color": "#e9edf6",
   "fontSize": 15,
   "borderColor": "#232b3b",
@@ -3374,7 +3457,7 @@ module.exports = {
   "paddingLeft": 14,
   "marginBottom": 14
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row": {
   "color": "#e9edf6",
   "fontSize": 15,
   "padding": 0,
@@ -3387,14 +3470,14 @@ module.exports = {
   "borderBottomWidth": 1,
   "borderBottomColor": "#ffffff0d"
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow": {
   "color": "#e9edf6",
   "fontSize": 15,
   "flex": 1,
   "minWidth": 0,
   "marginRight": 14
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t1": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t1": {
   "color": "#e9edf6",
   "fontSize": 15,
   "fontWeight": "bold",
@@ -3402,31 +3485,24 @@ module.exports = {
   "alignItems": "center",
   "flexWrap": "wrap"
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t1__text.t1-t": {
-  "color": "#e9edf6",
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t1__text.isxmq1bso.t1-t": {
+  "color": "#e6b64c",
   "fontSize": 15,
   "fontWeight": "bold",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 30
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t2": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t2": {
   "color": "#7a849b",
   "fontSize": 11,
   "marginTop": 3,
   "lineHeight": 18
  },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t2__text.t2-t": {
+ "view#app__scrollview#view__view.screen__view.card.isx1egwjpa__view.isxv4i8ee.list-row__view.grow__view.t2__text.t2-t": {
   "color": "#7a849b",
   "fontSize": 11,
   "lineHeight": 18,
   "width": "100%"
- },
- "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__text.chev.isxmq1bso": {
-  "color": "#7a849b",
-  "fontSize": 16,
-  "flex": 0,
-  "alignSelf": "center",
-  "lineHeight": 16,
-  "marginRight": 14
  },
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary": {
   "color": "#e9edf6",
@@ -3466,6 +3542,7 @@ module.exports = {
   "lineHeight": 16,
   "textAlign": "center",
   "whiteSpace": "normal",
-  "marginRight": 6
+  "marginRight": 6,
+  "__textW": 135
  }
 };

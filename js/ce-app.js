@@ -101,14 +101,14 @@ function setupMarkup(app) {
   const rows = Object.keys(D.BLOODLINES).map((k) => {
     const b = D.BLOODLINES[k] || {};
     const on = cur === k;
-    // ④ 选中标记改成右侧的 ✓（之前那个 tag 在引擎里渲染坏了）
-    return `<view class="card" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold)' : ''}">
+    // ④ 父亲大人：选中就"高亮"（金边 + 淡金底 + 金名字），别在右边打勾（勾看不清）
+    return `<view class="card" data-bl="${k}" style="cursor:pointer;${on ? 'border-color:var(--gold);background:#e6b64c14' : ''}">
       <view class="list-row" style="padding:0">
         <view class="grow">
-          <view class="t1"><text class="t1-t" value="${b.name || k}"/></view>
+          <view class="t1"><text class="t1-t" value="${b.name || k}"${on ? ' style="color:var(--gold)"' : ''}/></view>
           <view class="t2"><text class="t2-t" value="${b.desc || ''}"/></view>
         </view>
-        <text class="chev"${on ? ' style="color:var(--gold)"' : ''} value="${on ? '✓' : '›'}"/>
+        ${on ? '' : '<text class="chev" value="›"/>'}
       </view>
     </view>`;
   }).join('');
