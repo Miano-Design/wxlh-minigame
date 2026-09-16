@@ -1024,11 +1024,42 @@ t('站位：按住拖到另一格，松手就落在那里（走真实指针事�
       throw new Error('拖放没落下去：' + Core.S.party.join(','));
     }
     if (UI._panels.grabState().grabbed !== null) throw new Error('放下之后手里还留着东西');
+    /* V9.5.87（自审·泄漏）：拖动会在 window 上挂 pointermove/pointerup 监听，
+       松手后必须摘干净——不然玩家拖几十次，监听器就叠几十层（越玩越卡，还难查）。 */
+    const leak = (winListeners.pointermove || []).length + (winListeners.pointerup || []).length;
+    if (leak !== 0) throw new Error('拖放结束后 window 监听没摘干净，还剩 ' + leak + ' 个');
   } finally {
     global.document.elementFromPoint = () => null;
     h.restore();
     settleGrab();
   }
+});
+t('反复开关面板不会漏弹窗（开合 60 次后弹窗栈回到 0）', () => {
+  Core.newGame(); Core.setPlayerName('泄漏'); Core.choosePlayerBloodline('修真');
+  Core.addChar('C021');
+  const base = UI._panels._modalCount();
+  const panels = [
+    () => UI._panels.protagonistDetail(),
+    () => UI._panels.charDetail('C021'),
+    () => UI._panels.bagModal(),
+    () => UI._panels.shopModal('god'),
+    () => UI._panels.idleLinesModal(),
+    () => UI._panels.arenaModal(),
+  ];
+  for (let i = 0; i < 60; i++) {
+    const w = panels[i % panels.length]();
+    if (w) UI._panels._closeModal(w);
+  }
+  if (UI._panels._modalCount() !== base) {
+    throw new Error('开合 60 次后弹窗栈还剩 ' + UI._panels._modalCount() + '（应该回到 ' + base + '）');
+  }
+  // 嵌套两层也一样（点进二级面板再退出来，是最常见的操作）
+  for (let i = 0; i < 30; i++) {
+    const w = UI._panels.shopModal('god');
+    const w2 = UI._panels.currencyModal('holy');
+    UI._panels._closeModal(w2); UI._panels._closeModal(w);
+  }
+  if (UI._panels._modalCount() !== base) throw new Error('嵌套开合后弹窗栈没清干净');
 });
 t('站位：长按之后紧接着那一下点击会被吞掉', () => {
   UI._setTab('party');
