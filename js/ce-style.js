@@ -3357,6 +3357,77 @@ module.exports = {
   "lineHeight": 18,
   "width": "100%"
  },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "borderColor": "#232b3b",
+  "backgroundColor": "#111621",
+  "borderWidth": 1,
+  "borderRadius": 10,
+  "borderTopLeftRadius": 10,
+  "borderTopRightRadius": 10,
+  "borderBottomRightRadius": 10,
+  "borderBottomLeftRadius": 10,
+  "paddingTop": 14,
+  "paddingRight": 14,
+  "paddingBottom": 14,
+  "paddingLeft": 14,
+  "marginBottom": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "padding": 0,
+  "paddingTop": 10,
+  "paddingRight": 4,
+  "paddingBottom": 10,
+  "paddingLeft": 4,
+  "flexDirection": "row",
+  "alignItems": "center",
+  "borderBottomWidth": 1,
+  "borderBottomColor": "#ffffff0d"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "flex": 1,
+  "minWidth": 0,
+  "marginRight": 14
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t1": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "flexDirection": "row",
+  "alignItems": "center",
+  "flexWrap": "wrap"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t1__text.t1-t": {
+  "color": "#e9edf6",
+  "fontSize": 15,
+  "fontWeight": "bold",
+  "marginRight": 6
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t2": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "marginTop": 3,
+  "lineHeight": 18
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__view.grow__view.t2__text.t2-t": {
+  "color": "#7a849b",
+  "fontSize": 11,
+  "lineHeight": 18,
+  "width": "100%"
+ },
+ "view#app__scrollview#view__view.screen__view.card.isx1efqx3r__view.isxv4i8ee.list-row__text.chev.isxmq1bso": {
+  "color": "#7a849b",
+  "fontSize": 16,
+  "flex": 0,
+  "alignSelf": "center",
+  "lineHeight": 16,
+  "marginRight": 14
+ },
  "view#app__scrollview#view__view.screen__view.btn-row.mt2__view.block.btn.primary": {
   "color": "#e9edf6",
   "fontSize": 13,

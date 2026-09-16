@@ -515,7 +515,7 @@ function loadMarkups() {
       Core.todayState = () => ({ claimable: 3, dailyDone: 1, dailyTotal: 6, achClaimable: 2 });
       Core.signState = () => ({ canDraw: false, tier: '上上' });
     } },
-    { name: '·已选血统', app: { pendingBl: 'blood' }, setup() {
+    { name: '·已选血统', app: { pendingBl: Object.keys(window.DATA.BLOODLINES)[0] }, setup() {
       /* 选完血统后，首页【境界】那一行的值会变成金色（行内 style）——这一套也得编进来 */
       try { Core.choosePlayerBloodline(window.DATA.BLOODLINES[0].id); } catch (e) { /* 数据改名了也不该让编译挂掉 */ }
     } },
