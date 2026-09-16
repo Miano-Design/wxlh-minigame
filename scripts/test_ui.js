@@ -1190,8 +1190,15 @@ t('顶栏不再重复放"设置 / 指南"图标（首页最后一段是唯一入
   const html = fs.readFileSync('index.html', 'utf8');
   if (html.includes('tb-guide') || html.includes('tb-settings')) throw new Error('顶栏还有设置 / 指南按钮');
   const home = UI._panels._screens.homeScreen();
-  ['open-guide', 'open-curdoc', 'open-settings'].forEach(a => {
+  ['open-guide', 'open-settings'].forEach(a => {
     if ((home.match(new RegExp('data-act="' + a + '"', 'g')) || []).length !== 1) throw new Error('首页缺唯一入口：' + a);
+  });
+  // V9.5.60（父亲大人）：货币图鉴从首页设置里撤掉（跟顶栏"全部货币"重复）
+  if (home.indexOf('open-curdoc') >= 0) throw new Error('货币图鉴还挂在首页设置里');
+  if (home.indexOf('货币图鉴') >= 0) throw new Error('首页还印着"货币图鉴"');
+  // 那两个入口也不再写小字注释
+  ['分章图文', '存档 / 音效 / 导出'].forEach(t2 => {
+    if (home.indexOf(t2) >= 0) throw new Error('设置里的入口还带小字注释：' + t2);
   });
 });
 t('主角能洗点：六维 + 技能都能退回点数', () => {
@@ -1288,6 +1295,14 @@ t('GM 门禁：线上默认关；带 ?gm=1 开一次就在这台设备记住', (
   if (run('localhost', '', {})._panels._gmAllowed() !== true) throw new Error('本机调试被挡了');
   global.location = prevLoc;
   global.localStorage = prevStore;
+});
+t('免费抽倒计时的刷新不能用 textContent（会把货币图标的 HTML 显示成乱码）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  // 冷却那段必须用 innerHTML（文案里带货币图标的 HTML）；
+  // 精确匹配那一句，避免误伤"就绪"分支里合法的 textContent 纯文本写法
+  if (src.indexOf('el.innerHTML = `${pay} · 免费还差') < 0) {
+    throw new Error('倒计时没有用 innerHTML 写（会显示成 <span style=...> 乱码）');
+  }
 });
 t('图鉴：按阵营分开，每个阵营里从低稀有度排到高稀有度', () => {
   const html = UI._panels.codexModal().innerHTML;

@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.59';
+  const GAME_VER = '9.5.60';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -844,9 +844,10 @@ window.UI = (function () {
      这三样全站只在这里出现一次（顶栏原来那两个图标按钮已经撤掉）。 */
   function settingsBlock() {
     const list = [
-      ['open-guide', '玩法指南', '分章图文'],
-      ['open-curdoc', '货币图鉴', '币的用途与来源'],
-      ['open-settings', '设置与存档', '存档 / 音效 / 导出'],
+      // V9.5.60（父亲大人）：货币图鉴跟顶栏"全部货币"重复 → 去掉；
+      // 玩法指南 / 设置与存档 不用小字注释
+      ['open-guide', '玩法指南'],
+      ['open-settings', '设置与存档'],
     ];
     return menuGroup('设置', 'settings', list);
   }
@@ -2179,7 +2180,9 @@ window.UI = (function () {
           const pay = tk2 && tk2.n >= 1 ? `抽 1 次（🎫 ${(D.ITEMS[tk2.id] || {}).name || tk2.id}×1）` : `抽 1 次（${costText2}）`;
           el.dataset.free1 = ''; el.classList.remove('gold');
           const sec = st.waitSec;
-          el.textContent = `${pay} · 免费还差 ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}`;
+          // 注意：pay 里有带颜色的货币图标（HTML），这里必须用 innerHTML，
+          // 用 textContent 会把 <span style=...> 原样显示出来（父亲大人看到的乱码）
+          el.innerHTML = `${pay} · 免费还差 ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}`;
         }
       });
     }, 1000);
