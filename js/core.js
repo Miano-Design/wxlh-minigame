@@ -42,6 +42,7 @@ window.Core = (function () {
       sect: { lv: 1, exp: 0 },   // 灯阁评级（对标"宗门等级"：随关卡推进自动涨的全局长线）
       keji: {},                  // 秘术阁（对标"KeJi"）：id → 等级
       travel: { bankSec: 0, pending: null, got: 0, round: 0, day: '' },   // 挂机游历奇遇（对标"YouLi"）
+      charExp: 0,               // 伙伴经验池（V9.5.46）：所有伙伴共用这一份，升级从这里扣、重生返还回来
       garden: Array(4).fill(null),       // 药园（对标"洞府·药园"）：每块地 null 或 {kind, at}
       arena: { floor: 1, best: 1, date: '', used: 0 },   // 斗法台（对标"Arena"）
       fabao: { own: [], on: null },      // 法宝（对标"FaBao"）：own = 已拥有，on = 主角佩戴的那件
@@ -129,6 +130,9 @@ window.Core = (function () {
     S.sect = Object.assign({ lv: 1, exp: 0 }, S.sect || {});
     S.keji = S.keji || {};
     S.travel = Object.assign({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }, S.travel || {});
+    if (typeof S.charExp !== 'number') S.charExp = 0;
+    // 老档：把每个人身上攒的零散经验并进共享池（不丢东西）
+    Object.values(S.chars || {}).forEach(c => { if (c && c.exp) { S.charExp += c.exp; c.exp = 0; } });
     S.garden = Object.assign(Array(def.garden.length).fill(null), S.garden || {});
     S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
     S.fabao = Object.assign({ own: [], on: null }, S.fabao || {});
@@ -505,6 +509,10 @@ window.Core = (function () {
     if (!c || c.lv >= 100) return null;
     return { exp: D.EXP_TABLE[c.lv], points: D.LEVEL_POINTS[c.lv] };
   }
+  /* V9.5.46（父亲大人）：伙伴升级统一吃**共享的伙伴经验池**（S.charExp）——
+     经验模块往池子里加，升级从池子里扣，伙伴重生把花掉的加回池子。
+     这样前期练的低稀有度伙伴，后期重生就能把经验让给高稀有度伙伴。 */
+  function partnerExp() { return S.charExp || 0; }
   function levelUp(charId, times = 1) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
@@ -512,27 +520,46 @@ window.Core = (function () {
     for (let i = 0; i < times; i++) {
       if (c.lv >= 100) break;
       const cost = levelCost(charId);
-      if (c.exp < cost.exp || S.cur.points < cost.points) break;
-      c.exp -= cost.exp; S.cur.points -= cost.points;
+      if ((S.charExp || 0) < cost.exp || S.cur.points < cost.points) break;
+      S.charExp -= cost.exp; S.cur.points -= cost.points;
       c.lv++; ups++;
     }
     save();
-    return { ok: ups > 0, ups, msg: ups > 0 ? `升到 Lv.${c.lv}` : '经验或点数不足' };
+    return { ok: ups > 0, ups, msg: ups > 0 ? `升到 Lv.${c.lv}` : (S.charExp < 1 ? '伙伴经验不够（用经验模块补）' : '点数不够') };
   }
-  function useExpItem(charId, itemId, n = 1) {
-    const item = D.ITEMS[itemId];
-    if (!item || item.type !== 'exp') return { ok: false, msg: '不是经验道具' };
+  // 一个伙伴从 Lv.1 练到此刻，一共吃掉多少伙伴经验（重生就返还这么多）
+  function expSpentOn(charId) {
+    const c = S.chars[charId];
+    if (!c) return 0;
+    let sum = (c.exp || 0);
+    for (let lv = 1; lv < c.lv; lv++) sum += D.EXP_TABLE[lv] || 0;
+    return sum;
+  }
+  /* 伙伴重生：等级回到 Lv.1，把这级路上吃掉的伙伴经验全数退回池子（点数不返还）。
+     装备 / 星级 / 血统 / 血清 都不动 —— 只重置"等级"这一条线。 */
+  function rebornChar(charId) {
     const c = S.chars[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
+    if (c.lv <= 1 && !c.exp) return { ok: false, msg: '已经是 Lv.1 了' };
+    const refund = expSpentOn(charId);
+    c.lv = 1; c.exp = 0;
+    S.charExp = (S.charExp || 0) + refund;
+    save();
+    return { ok: true, refund, msg: `重生完成：返还 ${fmtNum(refund)} 伙伴经验` };
+  }
+  // V9.5.46：经验模块不再"选一个人喂"，直接进共享池（谁要练谁就从池子里扣）
+  function useExpItem(itemId, n = 1) {
+    const item = D.ITEMS[itemId];
+    if (!item || item.type !== 'exp') return { ok: false, msg: '不是经验道具' };
     const have = S.items[itemId] || 0;
     if (have < 1) return { ok: false, msg: '道具不足' };
     const use = Math.max(1, Math.min(n, have));
     S.items[itemId] -= use;
     if (S.items[itemId] <= 0) delete S.items[itemId];
-    c.exp += item.exp * use;
+    S.charExp = (S.charExp || 0) + item.exp * use;
     task('item1', use);
     save();
-    return { ok: true, msg: `+${(item.exp * use).toLocaleString()} EXP（×${use}）`, count: use };
+    return { ok: true, msg: `+${(item.exp * use).toLocaleString()} 伙伴经验（×${use}）`, count: use, pool: S.charExp };
   }
   /* ================= 血清（永久强化剂） =================
      对标同类放置游戏的"丹药矩阵"：成长被拆成很多次小成长，喂一支就有一次可见的跳动。
@@ -2814,8 +2841,9 @@ window.Core = (function () {
   }
   function addCharExp(charIds, exp) {
     // 天赋「灯阁恩赐」的经验加成在这里统一生效（副本 / 深井角色经验）
+    // V9.5.46：统一进**共享的伙伴经验池**（charIds 只作兼容参数保留）
     const n = Math.round(exp * graceExpMult());
-    charIds.forEach(id => { const c = S.chars[id]; if (c) c.exp += n; });
+    S.charExp = (S.charExp || 0) + n;
     return n;
   }
   // 战斗获得的玩家经验（同样吃经验天赋）；挂机经验已在 idleRates 里算过，不重复加成
@@ -2829,7 +2857,7 @@ window.Core = (function () {
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
-    addChar, addShards, levelCost, levelUp, useExpItem, starUp, skillUp, SKILL_CHIP_COST,
+    addChar, addShards, levelCost, levelUp, useExpItem, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
     craftSerum, useSerum, serumTaken, serumApplied,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,

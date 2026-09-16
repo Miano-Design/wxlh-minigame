@@ -729,6 +729,41 @@ t('指南正文的重点是加粗，不是星号', () => {
 });
 
 // ---- V8.3：队伍页（主角可换排 · 成员一览排到阵型前面） ----
+t('伙伴默认排序：上阵 → 等级 → 稀有度 → 星级', () => {
+  Core.newGame(); Core.setPlayerName('排序');
+  ['C021', 'C022', 'C023', 'C024'].forEach(id => { try { Core.addChar(id); } catch (e) {} });
+  const ids = Object.keys(Core.S.chars);
+  ids.forEach((id, i) => { Core.S.chars[id].lv = 1 + (i % 3); Core.S.chars[id].star = 1; });
+  const hi = ids[ids.length - 1];
+  Core.S.chars[hi].lv = 99;                       // 最高等级，但没上阵
+  Core.S.chars[hi].star = 1;
+  Core.S.party = ['@player', ids[0], null, null, null];
+  const order = UI._panels.charListSorted();
+  if (order[0] !== '@player' && order[0] !== ids[0]) throw new Error('上阵的没有排最前：' + order.join(','));
+  const front = ids.filter(id => Core.S.party.includes(id));
+  if (order.slice(0, front.length).some(id => !front.includes(id))) throw new Error('上阵的没全排在前面');
+  const lvs = order.map(id => Core.S.chars[id].lv);
+  const idxHi = order.indexOf(hi);
+  if (idxHi < front.length) throw new Error('上阵优先级被等级盖掉了');
+  const rest = order.slice(front.length).map(id => Core.S.chars[id].lv);
+  for (let i = 1; i < rest.length; i++) if (rest[i] > rest[i - 1]) throw new Error('同阵营优先级里等级没降序：' + rest.join(','));
+});
+t('换将无损：新上阵的继承被换下那位的等级', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('function pickPartyChar');
+  const seg = src.slice(i, i + 2200);
+  if (seg.indexOf('继承 Lv.') < 0 || seg.indexOf('Math.max(') < 0) {
+    throw new Error('换将里没有"继承等级"的逻辑');
+  }
+});
+t('预设独立成卡（不跟小队挤在一起）', () => {
+  const html = UI._panels._screens.partyScreen();
+  const iSquad = html.indexOf('灯阁小队');
+  const iPreset = html.indexOf('编队预设');
+  if (iPreset < 0) throw new Error('没有「编队预设」卡片');
+  const squadCard = html.slice(iSquad, iPreset);
+  if (squadCard.indexOf('data-preset-save') >= 0) throw new Error('存预设按钮还在小队卡里');
+});
 t('队伍页：没有「成员一览」了（下阵/换人直接在阵容格子上做）', () => {
   const html = UI._panels._screens.partyScreen();
   if (html.indexOf('成员一览') >= 0) throw new Error('成员一览还在（父亲大人要求删掉）');

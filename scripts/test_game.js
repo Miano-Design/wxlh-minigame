@@ -1648,11 +1648,12 @@ setParty(['C021']);
   Core.S.party = ['@player', null, null, null, null];
   Core.addChar('C021');
   Core.S.party[1] = 'C021';
-  const ce0 = Core.S.chars.C021.exp, pe0 = Core.S.player.exp, b0 = Core.S.stats.battles;
+  const ce0 = Core.partnerExp(), pe0 = Core.S.player.exp, b0 = Core.S.stats.battles;
   const r = Dungeon.sweep('W01', 'normal', 5, 3);
   const shown = r.total.reduce((s, x) => s + x.got.filter(gg => gg.k === 'exp').reduce((a, gg) => a + gg.v, 0), 0);
   t('扫荡返回的 EXP 合计 > 0（界面显示这一项）', r.ok && shown > 0);
-  t('扫荡的角色经验 = 界面显示的口径', Core.S.chars.C021.exp - ce0 === shown);
+  // V9.5.46：伙伴经验改成**共享池**，扫荡给的伙伴经验直接进池子
+  t('扫荡的伙伴经验 = 界面显示的口径（进共享池）', Core.partnerExp() - ce0 === shown);
   t('扫荡的主角经验 = 界面口径的一半', Core.S.player.exp - pe0 === Math.round(shown * 0.5));
   t('扫荡会累计战斗次数（扫荡党也能完成日常/成就）', Core.S.stats.battles - b0 === 3);
 }
@@ -1773,6 +1774,29 @@ setParty(['C021']);
   Core.S.buildings.medical = 50;                      // 三条线全点满
   Core.S.auth = D.AUTHORITY_MAX;
   t('三条点满：正好 12 小时（不溢不欠）', Core.offlineCapHours() === 12);
+}
+
+/* ---- V9.5.46：伙伴经验池 / 等级重生 / 无损换将 ---- */
+{
+  Core.newGame(); Core.setPlayerName('经验池');
+  Core.S.cur.points = 999999; Core.S.items = { exp_s: 10 };
+  t('新档伙伴经验池是 0', Core.partnerExp() === 0);
+  const u = Core.useExpItem('exp_s', 10);
+  const per = D.ITEMS.exp_s.exp;
+  t('经验模块直接进共享池（不再选人）', u.ok && Core.partnerExp() === per * 10);
+  Core.addChar('C021');
+  const need = Core.levelCost('C021').exp;
+  const up = Core.levelUp('C021', 1);
+  t('升级从共享池扣经验', up.ok && Core.S.chars.C021.lv === 2 && Core.partnerExp() === per * 10 - need);
+  t('这个伙伴已投入的经验算得对', Core.expSpentOn('C021') === need);
+  const rb = Core.rebornChar('C021');
+  t('重生：回到 Lv.1 并把经验全数退回池子', rb.ok && Core.S.chars.C021.lv === 1 && Core.partnerExp() === per * 10);
+  t('Lv.1 不能重生（没东西可退）', Core.rebornChar('C021').ok === false);
+  t('经验不够时升不动（不会扣成负数）', (() => {
+    Core.S.charExp = 0;
+    const r2 = Core.levelUp('C021', 1);
+    return r2.ok === false && Core.partnerExp() === 0;
+  })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

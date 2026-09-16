@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.45';
+  const GAME_VER = '9.5.46';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1327,17 +1327,21 @@ window.UI = (function () {
           <div class="party-slots">${slotTile(2)}${slotTile(3)}${slotTile(4)}</div>
         </div>
         <button class="btn small block mt3" data-act="auto-equip">⚡ 一键最优装备</button>
-        <div class="btn-grid3 mt2">
+      </div>
+      <!-- V9.5.46（父亲大人）：编队预设独立成一张卡，不再跟小队挤在一起 -->
+      <div class="card">
+        <h3>📌 编队预设 <span class="sub">存下来一键换阵容</span></h3>
+        <div class="btn-grid3">
           <button class="btn small ghost" data-preset-save="0">存预设 1</button>
           <button class="btn small ghost" data-preset-save="1">存预设 2</button>
           <button class="btn small ghost" data-preset-save="2">存预设 3</button>
         </div>
-        <div class="btn-grid3 mt1">
+        <div class="btn-grid3 mt2">
           <button class="btn small gold" data-preset-use="0">套用预设 1</button>
           <button class="btn small gold" data-preset-use="1">套用预设 2</button>
           <button class="btn small gold" data-preset-use="2">套用预设 3</button>
         </div>
-        <div class="hint mt1">
+        <div class="hint mt2">
           当前预设：${C().S.presets.map((p, i) => `${i + 1}${p && p.filter(Boolean).length ? '✓' : '—'}`).join(' ')}
         </div>
       </div>
@@ -1535,20 +1539,29 @@ window.UI = (function () {
         const oldId = S.party[slotIdx];
         if (oldId === '@player') return;     // 主角那一格不能被顶掉
         S.party[slotIdx] = id;
+        // V9.5.46（父亲大人）：换将无损 —— 新上阵的直接继承被换下那位的等级（取较高者，绝不掉级）
+        let inheritMsg = '';
+        if (oldId && C().S.chars[oldId] && C().S.chars[id]) {
+          const keep = Math.max(C().S.chars[oldId].lv, C().S.chars[id].lv);
+          if (keep !== C().S.chars[id].lv) {
+            C().S.chars[id].lv = keep;
+            inheritMsg = `，继承 Lv.${keep}`;
+          }
+        }
         C().save();
         closeModal(w);
         render();
-        toast(`${D.charById[id].name} 已上阵${oldId ? `（${D.charById[oldId].name} 已下阵）` : ''}`);
+        toast(`${D.charById[id].name} 已上阵${inheritMsg}${oldId ? `（${D.charById[oldId].name} 已下阵）` : ''}`);
       };
     });
   }
 
   /* ================= 角色 ================= */
   let charFilter = 'all';
-  let charSort = 'power';
+  let charSort = 'default';   // V9.5.46（父亲大人）：默认＝上阵优先 → 等级 → 稀有度 → 星级
   let charQuery = '';
   // 排序里最有用的两条是「未满级优先」和「没穿装备优先」——它们直接回答"我下一步该练谁"
-  const CHAR_SORTS = [['power', '战力'], ['level', '等级'], ['star', '星级'], ['notmax', '未满级'], ['noequip', '没穿装备']];
+  const CHAR_SORTS = [['default', '默认'], ['power', '战力'], ['level', '等级'], ['star', '星级'], ['notmax', '未满级'], ['noequip', '没穿装备']];
   function equippedCount(id) {
     const sl = C().S.equipped[id] || {};
     return Object.keys(sl).filter(k => sl[k]).length;
@@ -1563,6 +1576,16 @@ window.UI = (function () {
     if (q) list = list.filter(id => cname(id).toLowerCase().indexOf(q) >= 0);
     const rar = id => D.RARITIES.indexOf(D.charById[id].rarity);
     const cmps = {
+      // 父亲大人定的默认顺序：①上阵的排前面 ②等级高的 ③稀有度高的 ④同稀有度看星级
+      default: (a, b) => {
+        const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        const la = S.chars[a].lv, lb = S.chars[b].lv;
+        if (la !== lb) return lb - la;
+        const ra = rar(a), rb = rar(b);
+        if (ra !== rb) return rb - ra;
+        return S.chars[b].star - S.chars[a].star;
+      },
       power: (a, b) => C().power(b) - C().power(a),
       level: (a, b) => S.chars[b].lv - S.chars[a].lv,
       star: (a, b) => S.chars[b].star - S.chars[a].star,
@@ -1570,7 +1593,8 @@ window.UI = (function () {
       notmax: (a, b) => (C().levelCost(a) ? 0 : 1) - (C().levelCost(b) ? 0 : 1) || C().power(b) - C().power(a),
       noequip: (a, b) => equippedCount(a) - equippedCount(b) || C().power(b) - C().power(a),
     };
-    const cmp = cmps[charSort] || cmps.power;
+    const cmp = cmps[charSort] || cmps.default;
+    if (charSort === 'default') return list.sort(cmp);     // 默认排序里已经含稀有度/星级
     return list.sort((a, b) => cmp(a, b) || rar(b) - rar(a));
   }
   function charGridHtml() {
@@ -1644,12 +1668,14 @@ window.UI = (function () {
             <div class="hint">战力</div>
           </div>
         </div>
+        <div class="kv mt2"><span class="k">伙伴经验</span><span style="color:var(--gold)">${fmt(C().partnerExp())}</span></div>
+        <div class="kv"><span class="k">这个伙伴已投入</span><span>${fmt(C().expSpentOn(id))}</span></div>
         <div class="btn-row mt3">
           <button class="btn small" data-lvup="1" ${!cost ? 'disabled' : ''}>升 1 级</button>
           <button class="btn small" data-lvup="10" ${!cost ? 'disabled' : ''}>升 10 级</button>
-          <button class="btn small ghost" data-expitem="1" ${expItems.length ? '' : 'disabled'}>用经验道具</button>
+          <button class="btn small ghost" data-reborn="1" ${c.lv > 1 ? '' : 'disabled'}>重生</button>
         </div>
-        <div class="hint mt2">${cost ? `升下一级需要 EXP ${fmt(cost.exp)} + ◈ ${fmt(cost.points)}` : '已满级'}</div>
+        <div class="hint mt2">${cost ? `升下一级需要 ${fmt(cost.exp)} 伙伴经验 + ◈ ${fmt(cost.points)}` : '已满级'} · 经验模块在背包里用，直接进这个池子</div>
       </div>
       <div class="card">
         <h3>⭐ 星级 <span class="sub">${c.star} / ${maxStar} · 碎片 ${c.shards}</span></h3>
@@ -1713,8 +1739,16 @@ window.UI = (function () {
       if (r.ok) reopenSelf();
       renderTopbar();
     };
-    const expBtn = w.querySelector('[data-expitem]');
-    if (expBtn) expBtn.onclick = () => pickExpItem(id, w);
+    const rebornBtn = w.querySelector('[data-reborn]');
+    if (rebornBtn) rebornBtn.onclick = () => {
+      const refund = C().expSpentOn(id);
+      confirmBox('伙伴重生', `把 <b>${cname(id)}</b> 重置回 Lv.1，返还 <b>${fmt(refund)}</b> 伙伴经验（点数不返还）。<br>星级 / 血统 / 装备 / 血清都不动。确定吗？`, () => {
+        const r = C().rebornChar(id);
+        toast(r.msg, 2600);
+        sfx(r.ok ? 'level' : 'fail');
+        if (r.ok) { reopenSelf(); renderTopbar(); }
+      });
+    };
     w.querySelectorAll('[data-eqslot]').forEach(el => el.onclick = () => {
       const uid = (C().S.equipped[id] || {})[el.dataset.eqslot];
       if (uid) { equipDetail(uid, null, id); return; }
@@ -3489,7 +3523,10 @@ window.UI = (function () {
     });
     w.querySelectorAll('[data-exp]').forEach(b => b.onclick = () => {
       const want = +b.dataset.exp;
-      pickExpTarget(itemId, want === 0 ? (C().S.items[itemId] || 0) : want, w, goBack);
+      const r = C().useExpItem(itemId, want === 0 ? (C().S.items[itemId] || 0) : want);
+      if (!r.ok) { toast(r.msg); return; }
+      toast(r.msg, 2200); sfx('coin'); renderTopbar();
+      if ((C().S.items[itemId] || 0) > 0) itemDetail(itemId, w, backFn); else goBack(w);
     });
     w.querySelectorAll('[data-serum]').forEach(b => b.onclick = () => {
       const want = +b.dataset.serum;
@@ -4839,7 +4876,7 @@ window.UI = (function () {
       applyPotionHp,
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
-      openPartyPanel, openGrowPanel,
+      openPartyPanel, openGrowPanel, charListSorted, pickPartyChar,
     },
   };
 })();
