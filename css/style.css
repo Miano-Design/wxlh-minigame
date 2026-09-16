@@ -47,10 +47,13 @@ button, input, select, textarea {
   -webkit-user-select: none; user-select: none;
 }
 input, textarea { -webkit-user-select: text; user-select: text; }
-/* 根字号＝全局缩放旋钮：整套设计令牌（字号 / 间距 / 圆角 / 行高 / 控件高度）都是 rem，
-   所以只改这一行，全站等比缩放。
-   ≥416px 屏 → 16px（跟以前 px 版逐像素一致）；越窄越往下收，320px 老机收到 14.5px。 */
-html { font-size: clamp(14.5px, 3.85vw, 16px); }
+/* 根字号＝全局缩放旋钮：整套设计令牌（字号 / 间距 / 圆角 / 行高 / 控件高度）都是 rem。
+   V9.5.84（自审）：原来写的是 clamp(14.5px, 3.85vw, 16px)——320~400px 的手机上根字号只有 14.5px，
+   于是"最小字号"那一档 0.6875rem 实际渲染成 **10px**（0.625rem 更是只有 9.1px），
+   比 V9.5.21 定的"字号下限 11px"还小——这正是父亲大人一直说的"字都看不到"。
+   rem 是跟着根字号缩的，所以"下限"这件事只能靠**根字号不缩**来保证：现在固定 16px。
+   代价是窄屏上间距/卡片跟着大 10%（多滚一点），换来的是所有字都真的 ≥11px。 */
+html { font-size: 16px; }
 html, body { margin: 0; padding: 0; height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* iOS 上字号 <16px 的输入框，一聚焦就会被系统把整页放大一下（点搜索框整页"跳"一下）——
    这里必须写死 16px（不能跟着根字号缩，1rem 在窄屏只有 14.5px 就又会被放大）。 */

@@ -306,7 +306,28 @@ console.log('\n=== ⑦ 边界状态：同一批界面在极端档位下是否还
     if (bad.length) { console.log(`  ✗ ${label}：${[...new Set(bad)].join(' / ')}`); bound += bad.length; }
     else console.log(`  ✓ ${label}`);
   });
-  if (!bound) console.log('  6 种极端档位 × 全部界面：没有空白页、没有 undefined、没有崩溃 ✓');
+  if (!bound) console.log('  7 种极端档位 × 全部界面：没有空白页、没有 undefined、没有崩溃 ✓');
+}
+
+console.log('\n=== ⑧ 字号下限：全站最小的字必须 ≥ 11px ===');
+/* 起因（V9.5.84 自审）：字号全用 rem，而根字号原来是 clamp(14.5px, 3.85vw, 16px)——
+   320~400px 的手机上根字号只有 14.5px，于是"最小那一档" 0.6875rem 实际只有 **10px**
+   （0.625rem 更是 9.1px），比 V9.5.21 定的"下限 11px"还小，正是父亲大人说的"字看不到"。
+   现在根字号固定 16px，这条检查把"最小字号 ≥ 11px"钉死：谁再把字号写小、或把根字号改小，都会报红。 */
+{
+  const rootM = cssSrc.match(/html\s*\{[^}]*font-size:\s*([0-9.]+)px/);
+  const rootPx = rootM ? parseFloat(rootM[1]) : 16;
+  const remSizes = [...cssSrc.matchAll(/font-size:\s*([0-9.]+)rem/g)].map(m => parseFloat(m[1]))
+    .concat([...jsAll.matchAll(/font-size:\s*([0-9.]+)rem/g)].map(m => parseFloat(m[1])));
+  const pxSizes = [...cssSrc.matchAll(/font-size:\s*([0-9.]+)px/g)].map(m => parseFloat(m[1]))
+    .concat([...jsAll.matchAll(/font-size:\s*([0-9.]+)px/g)].map(m => parseFloat(m[1])));
+  const smallRem = [...new Set(remSizes.filter(v => v * rootPx < 10.99))];
+  // 输入框那条 16px 是"防 iOS 聚焦放大"的规则，本来就 ≥11 ✓；这里只抓 <11 的 px 写法
+  const smallPx = [...new Set(pxSizes.filter(v => v < 10.99))];
+  const sizeBad = smallRem.length + smallPx.length;
+  if (smallRem.length) console.log('  ✗ 这些 rem 字号小于 11px：' + smallRem.map(v => v + 'rem(' + (v * rootPx).toFixed(1) + 'px)').join(' '));
+  if (smallPx.length) console.log('  ✗ 这些 px 字号小于 11px：' + smallPx.map(v => v + 'px').join(' '));
+  if (!sizeBad) console.log(`  根字号 ${rootPx}px · 最小字号 ${Math.min.apply(null, remSizes)}rem = ${(Math.min.apply(null, remSizes) * rootPx).toFixed(1)}px ✓`);
 }
 
 const total3 = total2 + bound;

@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.83';
+  const GAME_VER = '9.5.84';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -1022,7 +1022,7 @@ window.UI = (function () {
   function partyHpHtml() {
     return C().S.party.filter(Boolean).map(id => {
       const pct = run && run.hpPct[id] !== undefined ? run.hpPct[id] : 1;
-      return `<div style="flex:1;min-width:0"><div style="font-size:0.625rem;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
+      return `<div style="flex:1;min-width:0"><div style="font-size:0.6875rem;color:var(--dim);text-align:center">${cname(id)}</div><div class="bar hp ${pct < 0.35 ? 'low' : ''}"><i style="width:${pct * 100}%"></i></div></div>`;
     }).join('');
   }
   /* V9.5.66（父亲大人）：探索消耗品整条线删除，这一块（药剂条渲染、按钮绑定、回血/增益结算）
@@ -1387,7 +1387,7 @@ window.UI = (function () {
           <div class="note">🔒 主角 Lv.${D.BLOODLINE_UNLOCK_LV} 觉醒血统（当前 Lv.${S.player.level}）</div>
         ` : `
           
-          <div class="grid2">${Object.entries(D.BLOODLINES).map(([id, bl]) => `<button class="btn small" data-pbl="${id}">${id}<br><span style="font-size:0.625rem;font-weight:400;color:var(--dim)">${bl.desc.split('。')[0]}</span></button>`).join('')}</div>
+          <div class="grid2">${Object.entries(D.BLOODLINES).map(([id, bl]) => `<button class="btn small" data-pbl="${id}">${id}<br><span style="font-size:0.6875rem;font-weight:400;color:var(--dim)">${bl.desc.split('。')[0]}</span></button>`).join('')}</div>
         `}
       </div>
       <div class="card">
@@ -3716,7 +3716,7 @@ window.UI = (function () {
         <h3>危险区</h3>
         <button class="btn small ghost" data-reset="1" style="color:var(--accent)">删除当前进度，重新开始</button>
       </div>
-      <div style="text-align:center;font-size:0.625rem;color:var(--dim);padding:0.5rem;opacity:.6" data-ver>残域 V${GAME_VER}</div>
+      <div style="text-align:center;font-size:0.6875rem;color:var(--dim);padding:0.5rem;opacity:.6" data-ver>残域 V${GAME_VER}</div>
     `;
     const w = showPanel(wrap, '设置与存档', body);
     let verTaps = 0, verTimer = null;
