@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.36';
+  const GAME_VER = '9.5.37';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1290,7 +1290,7 @@ window.UI = (function () {
           <span class="pos-tag" style="color:var(--gold)">主角 · ${C().ROW_NAME[C().playerRow()]}</span>
           ${charAvatar('@player', 40)}
           <div class="pname">${cname('@player')}</div>
-          <div class="pmeta">Lv.${S.player.level} · 战力${fmt(C().playerPower())}</div>
+          <div class="pmeta">Lv.${S.player.level} · 战力 ${fmt(C().playerPower())}</div>
         </div>`;
       }
       const ch = D.charById[id];
@@ -1343,7 +1343,7 @@ window.UI = (function () {
             return `<div class="list-row" data-protag-row="1" style="cursor:pointer;border-color:#e6b64c55">
               ${charAvatar('@player', 40)}
               <div class="grow"><div class="t1">${cname('@player')} <span class="tag" style="color:var(--gold);border-color:var(--gold)">主角</span> <span class="tag">${inFront ? '前排' : '后排'}</span></div>
-                <div class="t2">Lv.${S.player.level} · 战力${fmt(C().playerPower())} · 必上阵，不能下阵</div></div>
+                <div class="t2">Lv.${S.player.level} · 战力 ${fmt(C().playerPower())} · 必上阵，不能下阵</div></div>
             </div>`;
           }
           const ch = D.charById[id];
@@ -1369,8 +1369,8 @@ window.UI = (function () {
         return `<div class="fm-row ${on ? 'on' : ''}">
           <span class="fm-name">${f.name}</span>
           <span class="fm-req">${f.reqText}</span>
-          <span class="fm-buff">${Object.entries(f.buff).map(([k, v]) => `${({ atkPct: '攻', hpPct: '命', skillPct: '技' })[k] || k}+${Math.round(v * 100)}%`).join(' ')}</span>
           <span class="fm-on">${on ? '已激活' : ''}</span>
+          <span class="fm-buff">${Object.entries(f.buff).map(([k, v]) => `${({ atkPct: '攻', hpPct: '命', skillPct: '技' })[k] || k}+${Math.round(v * 100)}%`).join(' ')}</span>
         </div>`;
       }).join('')}</div>
         <div class="hint mt1">克制环：先锋→策略→科技→异能→先锋（克制伤害+15%）</div>
@@ -1391,16 +1391,16 @@ window.UI = (function () {
     const lvlPct = Math.min(100, S.player.exp / (D.EXP_TABLE[S.player.level] || 1) * 100);
     const w = showPanel(wrap, `${cname('@player')}（主角）`, `
       <div class="card">
-        <div style="display:flex;gap:0.75rem;align-items:flex-start">
+        <div style="display:flex;gap:0.875rem;align-items:flex-start">
           ${charAvatar('@player', 56)}
           <div style="flex:1;min-width:0">
             <div><b>${cname('@player')}</b> <span class="tag" style="color:var(--gold);border-color:var(--gold)">执灯者本人</span></div>
             <div class="hint mt1">Lv.${S.player.level}（玩家等级）· ${S.player.bloodline ? S.player.bloodline + '血统 Lv.' + S.player.bloodlineLv : '未选血统'}</div>
             <div class="hint">铭刻 ${gl > 0 ? D.GENE_LOCKS[gl - 1].name : '未解锁'} · 六维待分 ${S.player.attrPoints || 0} 点</div>
           </div>
-          <div style="text-align:right;flex:0 0 auto">
-            <div style="font-size:1.25rem;font-weight:700;color:var(--gold)">${fmt(C().playerPower())}</div>
-            <div class="hint">战力</div>
+          <div style="text-align:right;flex:0 0 auto;margin-left:0.625rem;line-height:1.35">
+            <div style="font-size:1.25rem;font-weight:700;color:var(--gold);line-height:1.25">${fmt(C().playerPower())}</div>
+            <div class="hint" style="margin-top:0.25rem">战力</div>
           </div>
         </div>
         <div class="bar exp mt3"><i style="width:${lvlPct}%"></i></div>
@@ -1526,7 +1526,7 @@ window.UI = (function () {
       const inParty = S.party.includes(id);
       return `<div class="list-row" data-pick="${id}" style="cursor:pointer;${inParty ? 'opacity:.4' : ''}">
         ${charAvatar(id, 40)}
-        <div class="grow"><div class="t1">${rarityTag(ch.rarity)} ${cname(id)}</div><div class="t2">Lv.${c.lv} · ${ch.role} · ${ch.faction} · 战力${fmt(C().power(id))}</div></div>
+        <div class="grow"><div class="t1">${rarityTag(ch.rarity)} ${cname(id)}</div><div class="t2">Lv.${c.lv} · ${ch.role} · ${ch.faction} · 战力 ${fmt(C().power(id))}</div></div>
         ${inParty ? '<span class="tag">已上阵</span>' : ''}
       </div>`;
     }).join('') || '<div class="empty">还没有伙伴，去招募吧</div>');
@@ -1586,7 +1586,7 @@ window.UI = (function () {
         ${charAvatar(id)}
         <div class="cname">${cname(id)}</div>
         <div class="stars">${stars(c.star, D.RARITY_MAXSTAR[ch.rarity])}</div>
-        <div class="cmeta">Lv.${c.lv} · 战力${fmt(C().power(id))}</div>
+        <div class="cmeta">Lv.${c.lv} · 战力 ${fmt(C().power(id))}</div>
         <div class="cmeta">${eq ? `装备 ${eq}/6` : '<span style="color:var(--gold)">未穿装备</span>'}${C().levelCost(id) ? ' · 可升级' : ''}</div>
       </div>`;
     }).join('');
@@ -1634,7 +1634,7 @@ window.UI = (function () {
     const expItems = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
     const w = showPanel(wrap, `${cname(id)}`, `
       <div class="card">
-        <div style="display:flex;gap:0.75rem;align-items:flex-start">
+        <div style="display:flex;gap:0.875rem;align-items:flex-start">
           ${charAvatar(id, 56)}
           <div style="flex:1;min-width:0">
             <div>${rarityTag(ch.rarity)} <b>${cname(id)}</b> <span class="stars">${stars(c.star, maxStar)}</span></div>
@@ -1956,7 +1956,7 @@ window.UI = (function () {
         if (id === '@player') {
           return `<div class="list-row tap" data-to="@player">
             ${charAvatar('@player', 36)}
-            <div class="grow"><div class="t1">${cname('@player')}（主角）${wearer === '@player' ? ' <span class="tag" style="color:var(--gold)">当前穿戴</span>' : ''}</div><div class="t2">Lv.${S.player.level} · 战力${fmt(C().playerPower())}</div></div>
+            <div class="grow"><div class="t1">${cname('@player')}（主角）${wearer === '@player' ? ' <span class="tag" style="color:var(--gold)">当前穿戴</span>' : ''}</div><div class="t2">Lv.${S.player.level} · 战力 ${fmt(C().playerPower())}</div></div>
           </div>`;
         }
         const ch = D.charById[id];

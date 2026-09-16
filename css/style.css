@@ -239,9 +239,9 @@ body {
 .pslot { background: var(--panel2); border: 1px dashed var(--line); border-radius: 0.75rem; min-height: 6rem; padding: 0.625rem; cursor: pointer; position: relative; }
 .pslot .pos-tag { position: absolute; top: 0.375rem; left: 0.5rem; font-size: 0.6875rem; color: var(--dim); }
 .pslot.filled { border-style: solid; }
-.pslot .avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #232c42; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0.5rem auto 0.25rem; }
-.pslot .pname { text-align: center; font-size: 0.8125rem; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pslot .pmeta { text-align: center; font-size: 0.6875rem; color: var(--dim); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pslot .avatar { width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #232c42; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0.5rem auto; }
+.pslot .pname { text-align: center; font-size: 0.8125rem; font-weight: 600; line-height: 1.35; margin-bottom: 0.25rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pslot .pmeta { text-align: center; font-size: 0.6875rem; color: var(--dim); line-height: 1.4; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- 进度条 ---------- */
 .bar { height: 0.5rem; background: #0d1120; border-radius: 0.375rem; overflow: hidden; position: relative; }
@@ -262,14 +262,14 @@ body {
    这里补一条通用规则：任何容器里的 .grow 都撑开、且允许收窄。 */
 .grow { flex: 1; min-width: 0; }
 .list-row .t1 { font-size: var(--fs-1); font-weight: 600; display: flex; align-items: center; gap: 0.375rem; }
-.list-row .t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 3px; line-height: 1.6; }
+.list-row .t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 0.25rem; line-height: 1.55; }
 
 /* V9.5.10（父亲大人）：标题行/副标题行不只出现在 .list-row 里——残域的世界卡、深井卡、
    队伍卡都直接写 .t1/.t2，以前吃不到上面那两条规则：标签按基线挂下去（比文字低一截）、
    还跟下面那行贴在一起。这里补一套通用规则，任何卡片里的 .t1/.t2 长相一致。 */
-.t1 { font-size: var(--fs-1); font-weight: 600; display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.t1 { font-size: var(--fs-1); font-weight: 600; line-height: 1.35; display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
 .t1 .tag { align-self: center; line-height: 1.4; }
-.t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 3px; line-height: 1.6; }
+.t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 0.25rem; line-height: 1.55; }
 .tag { font-size: var(--fs-xs); border: 1px solid var(--line2); border-radius: var(--radius-sm); padding: 1px 0.375rem; color: var(--text2); font-weight: 400; }
 
 /* ---------- 弹窗（底部抽屉） ---------- */
@@ -499,8 +499,11 @@ body {
 .bg-slot {
   aspect-ratio: 1 / 1; min-height: 3.875rem; border-radius: 0.625rem;
   border: 1px solid var(--line); background: #00000022;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  gap: 2px; padding: 0.3125rem 0.375rem 0.6875rem; overflow: hidden;   /* 底部留 0.6875rem：数量往上挪一点（V9.5.17） */
+  /* V9.5.37：一格里就两件东西——名字（固定占两行位置）和数量。整体上下居中、内边距对称，
+     这样同一行里所有格子的"名字顶边""数量底边"都在同一条线上（以前名字用 auto 外边距居中，
+     两行的名字和一行名字位置不一样，一行里看着就乱）。 */
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.125rem; padding: 0.375rem; overflow: hidden;
   font-family: inherit; color: var(--text); text-align: center;
 }
 .bg-slot.filled { background: var(--panel2); cursor: pointer; }
@@ -510,9 +513,11 @@ body {
 /* V9.5.12（父亲大人）：名字占上方（左右留安全边、每行约 4 个字、能断行），数量贴到格子底部。
    注意：格子里是 flex column + align-items:center，子项默认按内容撑宽 —— 不给 width:100% 就永远不换行，
    只会把长名字顶出格子（"初级经验模块"当时就是这样被切掉的）。 */
-.bg-slot .bg-name { width: 100%; margin: auto 0; position: relative; top: 2px;   /* V9.5.18：名称整体下移 2px */
+.bg-slot .bg-name {
+  width: 100%; height: 2.0625rem;              /* 固定两行位置：一行名字也占两行，行与行才对得上 */
+  display: flex; align-items: flex-start; justify-content: center; text-align: center;
   font-size: 0.8125rem; line-height: 1.25; font-weight: 600;
-  word-break: break-all; overflow-wrap: anywhere; max-height: 2.0625rem; overflow: hidden; }
+  word-break: break-all; overflow-wrap: anywhere; overflow: hidden; }
 .bg-slot .bg-count { font-size: 0.75rem; color: var(--gold); font-weight: 700; }
 .bg-slot .bg-sub { font-size: 0.6875rem; color: var(--dim); }
 .bg-slot.add {
@@ -662,7 +667,7 @@ body {
 .grow-row .gr-ico { font-size: 1.375rem; flex: 0 0 auto; opacity: .92; }
 .grow-row .gr-grow { flex: 1; min-width: 0; }
 .grow-row .gr-t1 { font-size: var(--fs-1); font-weight: 600; }
-.grow-row .gr-t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 3px; line-height: 1.55; }
+.grow-row .gr-t2 { font-size: var(--fs-sm); color: var(--dim); margin-top: 0.25rem; line-height: 1.55; }
 .grow-row .gr-cur { flex: 0 0 auto; font-size: var(--fs-md); color: var(--gold); text-align: right; max-width: 42%; }
 
 /* ---------- 列表工具栏（筛选 / 排序 / 搜索） ---------- */
@@ -728,11 +733,12 @@ body {
 .fm-row .fm-name { font-weight: 700; min-width: 3.875rem; }
 .fm-row.on .fm-name { color: var(--gold); }
 .fm-row .fm-req { flex: 1 1 auto; min-width: 0; color: var(--dim); }
-.fm-row .fm-buff { margin-left: auto; flex: 0 0 auto; color: var(--green); white-space: nowrap; }
+.fm-row .fm-buff { flex: 0 0 auto; color: var(--green); white-space: nowrap; text-align: right; }
 /* V9.5.22：未激活的那几行，加成用灰字（激活的仍是绿色） */
 .fm-row:not(.on) .fm-buff { color: var(--dim); }
-/* V9.5.20（父亲大人）：每一行都留出「已激活」那一列（固定宽度、空着也占位），
-   这样所有加成值都右对齐到同一条线；没激活的加成用灰字。 */
+/* V9.5.20（父亲大人）：每一行都留出「已激活」那一列（固定宽度、空着也占位）。
+   V9.5.37：这一列挪到加成**前面** —— 加成列放在最后才能贴到卡片右边，
+   跟上面"加成：无"那一行同一条线（原来加成右边永远空着 46px）。 */
 .fm-row .fm-on { flex: 0 0 auto; width: 2.875rem; color: var(--green); font-size: 0.6875rem; text-align: right; }
 
 /* ---------- 结算页奖励逐条浮入 ---------- */
