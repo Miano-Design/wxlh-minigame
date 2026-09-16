@@ -1469,6 +1469,58 @@ t('装备页筛选后不再补一屏空格子（否则看着像筛选没生效�
   UI._panels._setEquipFilter('all', 'all');            // 还原，别影响后面的用例
 });
 
+/* ================= V9.5.67 红点体检 =================
+   父亲大人：「也会有一些奇奇怪怪的红点，就明明没有新的东西，或者没有未领取的东西，他还是亮着红点。」
+   规矩：**红点必须和"这里真的能领"同源**——点进去领不到东西的，一律不许亮。 */
+function tileHtml(html, act) {
+  const i = html.indexOf(`data-act="${act}"`);
+  if (i < 0) return '';
+  const j = html.indexOf('</button>', i);
+  return html.slice(i, j < 0 ? i + 400 : j);
+}
+t('过期的悬赏不再亮红点（以前只判"完成且未领"，过期了还永远亮着）', () => {
+  Core.newGame(); Core.setPlayerName('红点');
+  Core.S.player.level = 60;
+  Core.S.bounty.list = null;
+  Core.S.bounty.start = Date.now() - 999 * 3600 * 1000;      // 全部过期
+  Core.S.bounty.claimed = {};
+  const st = Core.bountyState();
+  if (st.claimable !== 0) throw new Error('过期悬赏被算成了可领');
+  const html = UI._panels._screens.homeScreen();
+  if (tileHtml(html, 'open-bounty').includes('tt-dot')) throw new Error('过期了还亮红点');
+});
+t('有可领悬赏时才亮红点', () => {
+  Core.newGame(); Core.setPlayerName('红点');
+  Core.S.player.level = 60;
+  Core.S.bounty.list = null;
+  Core.S.bounty.start = Date.now();                          // 没过期
+  Core.S.bounty.claimed = {};
+  // 「修炼有成」的判定就是"玩家等级到达 Lv.N"，把目标压到当前等级即可立刻达成
+  Core.S.bounty.list = Core.S.bounty.list || window.DATA.makeBounties(Core.S);
+  const lvB = Core.S.bounty.list.find(x => x.kind === 'level');
+  if (lvB) lvB.param.n = Core.S.player.level;
+  const st = Core.bountyState();
+  if (!st.claimable) throw new Error('构造出来的可领悬赏没生效');
+  const html = UI._panels._screens.homeScreen();
+  if (!tileHtml(html, 'open-bounty').includes('tt-dot')) throw new Error('可领却没亮红点');
+});
+t('做完但没领的每日任务会亮红点', () => {
+  Core.newGame(); Core.setPlayerName('红点');
+  Core.ensureDaily();                                        // 不先跑一次，注入的进度会被跨天重置吃掉
+  Core.S.tasks.daily.battle5 = 5;                            // 战斗 5 次：达成、未领
+  const html = UI._panels._screens.homeScreen();
+  if (!tileHtml(html, 'open-tasks').includes('tt-dot')) throw new Error('每日任务可领却没红点');
+});
+t('底栏：执灯者不再有红点（那里没有待领的东西），背包有待领箱时才亮', () => {
+  Core.newGame(); Core.setPlayerName('红点');
+  const noStash = UI._panels.navbarHtml();
+  const rosterSeg = noStash.slice(noStash.indexOf('data-tab="roster"'));
+  if (rosterSeg.slice(0, 120).includes('class="dot"')) throw new Error('执灯者又亮起了误报红点');
+  Core.S.stash = [{ id: 'exp_s', n: 1 }];
+  const withStash = UI._panels.navbarHtml();
+  const bagSeg = withStash.slice(withStash.indexOf('data-tab="bag"'));
+  if (!bagSeg.slice(0, 120).includes('class="dot"')) throw new Error('待领箱有东西却没提示');
+});
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

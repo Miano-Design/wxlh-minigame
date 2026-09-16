@@ -221,8 +221,6 @@ body {
 .btn { overflow-wrap: anywhere; }
 /* 一排正好三个小按钮：用网格钉死三列，不会被长标签挤成"2 + 1"两行 */
 .btn-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp2); }
-.btn .dot { position: absolute; top: 0.3125rem; right: 0.4375rem; width: 0.4375rem; height: 0.4375rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel2), 0 0 0.5rem rgba(212,58,79,.85); }
-
 /* ---------- 底部导航 ---------- */
 #navbar {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);

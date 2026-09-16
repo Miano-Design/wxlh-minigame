@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.66';
+  const GAME_VER = '9.5.67';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -458,13 +458,24 @@ window.UI = (function () {
   }
   function renderNavbar() {
     const nav = document.getElementById('navbar');
-    nav.innerHTML = TABS.map(t => {
+    nav.innerHTML = navbarHtml();
+    nav.querySelectorAll('.nav-item').forEach(el => { el.onclick = () => setTab(el.dataset.tab); });
+  }
+  /* V9.5.67（红点体检）：底栏的 HTML 抽成纯函数，测试才能直接断言"哪一格该亮、哪一格不该亮"。
+     这一版改掉两处：执灯者那格的红点删掉（那里没有"待领"的东西，纯误报）、
+     背包那格补上红点（待领箱里有东西才是真的等你处理）。 */
+  function navbarHtml() {
+    return TABS.map(t => {
       let dot = false;
       if (t.id === 'home') dot = idleClaimable();
-      else if (t.id === 'roster') dot = C().isUnlocked('recruit') && (C().freeState('normal').ready || C().freeState('advanced').ready);
+      /* V9.5.67（红点体检）：执灯者页签的点去掉了。
+         这个点写于"招募在执灯者里"的年代——V9.5.45 起执灯者只剩伙伴总览，
+         招募搬去了主页→日常。于是玩家点着执灯者进去，里面没有任何"待领"的东西，
+         就是一个纯误报的红点。免费次数该亮的是主页那颗「招募伙伴」，那里才有入口。
+         同时补上「背包」的点：待领箱里有东西没领回时，那才是真的"有东西等你"。 */
+      else if (t.id === 'bag') dot = C().stashCount() > 0;
       return `<div class="nav-item ${curTab === t.id ? 'active' : ''}" data-tab="${t.id}">${t.name}${dot ? '<span class="dot"></span>' : ''}</div>`;
     }).join('');
-    nav.querySelectorAll('.nav-item').forEach(el => { el.onclick = () => setTab(el.dataset.tab); });
   }
   function idleClaimable() {
     const g = C().idleBankGains();
@@ -698,7 +709,8 @@ window.UI = (function () {
       <div class="row">
         <span class="rk">【境界】</span>
         <span class="rv" style="color:${st.hasBloodline ? 'var(--gold)' : 'var(--accent)'}">${st.curName || '未定血统'}</span>
-        <span class="rs">${st.hasBloodline ? `第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶` : '点【主角】卡里选血统'}</span>
+        <!-- V9.5.67：血统是开局必经的一步，"点主角卡里选血统"这句永远不该出现（而且指错了入口） -->
+        <span class="rs">${st.hasBloodline ? `第 ${Math.min(st.realm + 1, D.REALM_STAGE_COUNT)} / ${D.REALM_STAGE_COUNT} 阶` : ''}</span>
       </div>
       <div class="row">
         <span class="rk">【等级】</span>
@@ -809,12 +821,17 @@ window.UI = (function () {
       ['open-codex', '灯录', `${C().codexState().owned}/${C().codexState().total} 名`, 'recruit'],
     ];
     const daily = [
-      ['open-bounty', '限时悬赏', null, null, C().bountyState().list.some(x => x.done && !x.claimed)],
-      // 状态 = 今天完成了几项（以前这里误写成解锁 key 'tasks'，界面上直接露出英文）
+      /* V9.5.67（红点体检）：悬赏的红点原来只判 "done && !claimed"，**漏了 expired**——
+         悬赏过期之后再也领不出来（点击只会提示"已经过期"），可这个红点却永远亮着。
+         红点必须和"真的能领"同源，这里改成直接用 bountyState() 已经算好的 claimable。 */
+      ['open-bounty', '限时悬赏', null, null, C().bountyState().claimable > 0],
+      /* 状态 = 今天完成了几项（以前这里误写成解锁 key 'tasks'，界面上直接露出英文）；
+         红点 = 有做完但没领的（日常或周常）——以前这颗格**完全没有点**，
+         做完了每日任务却什么提示都没有，属于"该亮不亮"（V9.5.67 红点体检）。 */
       ['open-tasks', '每日任务', (() => {
         const st = C().todayState();
         return st && st.dailyTotal ? `${st.dailyDone}/${st.dailyTotal} 项` : null;
-      })()],
+      })(), null, (() => { const st = C().todayState(); return st.dailyClaimable + st.weeklyClaimable > 0; })()],
       ['open-ach', '成就', null, null, achDot],
       ['open-sign', '求签', signToday ? `今日【${signToday.tier}】` : '今日还没求'],
       // V9.5.52（父亲大人）：这一格的说明文字改成"本期 UP 是谁 · 什么阵营"，比堆免费次数有用
@@ -2479,7 +2496,10 @@ window.UI = (function () {
 
   /* ================= 血统（境界线跟着血统走） =================
      对标《道友修仙》：境界不是人人相同的公共阶梯，而是跟着你选的路走。
-     所以"选血统"被提到开局第一步——没血统就没有境界，也不再显示"凡体"这种占位。 */
+     所以"选血统"被提到开局第一步——没血统就没有境界，也不再显示"凡体"这种占位。
+     V9.5.67（文案体检）：这个面板的**唯一入口**现在是开局那一步（showBloodlinePick）。
+     主角的血统升级在「主页最上面的主角卡」里、境界在「主页 → 养成 → 成长 → 境界渡劫」，
+     所以这里不再挂"去选血统 / 去渡劫"这类引路按钮——那会造成"玩到一半还能选血统"的误解。 */
   function bloodlineModal(wrap, opts) {
     opts = opts || {};
     const S = C().S;
@@ -2902,16 +2922,14 @@ window.UI = (function () {
   function realmModal(wrap) {
     const S = C().S;
     const st = C().realmState();
-    if (!st.hasBloodline) {
-      return showPanel(wrap, '境界 · 渡劫', `
-        <div class="card" style="border-color:#e6b64c66">
-          <h3>还没有境界线</h3>
-          <button class="btn gold block mt3" data-act="open-bloodline">去选血统</button>
-        </div>`);
-    }
+    /* V9.5.67（文案体检）：这里原来有一块"还没有境界线 → 去选血统"的分支。
+       但血统从 V9.5.23 起是**开局必经的一步**（onboarded() 没血统就不渲染任何界面，
+       main.js 还会给老档补一次选择），所以这个分支永远走不到——留着只会让人误以为
+       "玩到一半还能去选血统"。血统名缺失时退回中性那套大境名，保证不崩即可。 */
     // 36 小阶按"大境界"分组展示：每个大境界一行，行内 4 个小阶（初期/中期/后期/大圆满）——
     // 大境界名取自当前血统（D.BLOODLINES[x].realms），不再是所有人共用一套名字。
-    const majors = D.BLOODLINES[st.bloodline].realms;
+    const majorLine = D.BLOODLINES[st.bloodline] || { realms: D.REALM_MAJORS };
+    const majors = majorLine.realms;
     const groups = majors.map((mj, mi) => {
       const base = mi * D.REALM_TIERS.length;
       const cells = D.REALM_TIERS.map((tier, ti) => {
@@ -2996,8 +3014,11 @@ window.UI = (function () {
       setTab('home');
       setTimeout(() => {
         protagonistDetail();
-        // 三种形态都要能高亮到：还没选血统（[data-pbl] 一排选择按钮）/ 已选可升级（[data-pblup]）/ 等级不够（退回整张血统卡）
-        coachmark('[data-pblup], [data-pbl], [data-card="blood"]', '血统升级消耗血统结晶 + 点数，是中期最猛的成长线；还没选就先在下面挑一种（不可更改）。主角 Lv.10 之后还能在「🌌 境界」里渡劫——每突破一小阶全属性永久 +1.4%，36 阶合计 +50.4%。');
+        /* V9.5.67（文案体检）：这段话原来还带一句"还没选就先在下面挑一种"——
+           血统从 V9.5.23 起是开局必经的一步，主角卡里**不会**出现"挑血统"的界面了，
+           这句会把玩家引到一个不存在的东西上。另外 Lv.10 的说法也过期了（现在是 Lv.10 起、
+           但入口在"主页→养成→成长→境界渡劫"）。 */
+        coachmark('[data-pblup], [data-card="blood"]', '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。境界渡劫在「主页 → 养成 → 成长 → 境界渡劫」：每突破一小阶全属性永久 +1.4%，36 阶合计 +50.4%。');
       }, 250);
       return;
     }
@@ -3629,7 +3650,9 @@ window.UI = (function () {
         </div>
       </div>
       <div class="card">
-        <h3>自动分解 <span class="sub">背包满之前就开始省格子</span></h3>
+        <!-- V9.5.67（文案体检）"背包满之前就开始省格子"这句删掉：下面两行已经写清了
+             开关各自干什么，"省格子"属于重复解释。 -->
+        <h3>自动分解</h3>
         <div class="list-row">
           <div class="grow"><div class="t1">自动分解 N 装备</div><div class="t2">掉到 N 品质直接换成 ◆ 异界结晶</div></div>
           <button class="btn small ${S.settings.autoSellN ? 'primary' : ''}" data-autosell="autoSellN">${S.settings.autoSellN ? '已开启' : '已关闭'}</button>
@@ -4434,7 +4457,6 @@ switch (act) {
             render(); renderTopbar();
             break;
           }
-          case 'open-bloodline': bloodlineModal(); break;
           case 'open-garden': gardenModal(); break;
           case 'open-refine': refineModal(); break;
           case 'open-arena': arenaModal(); break;
@@ -4831,6 +4853,8 @@ switch (act) {
       _setEquipFilter: (f, cat) => { equipFilter = f || 'all'; equipCatFilter = cat || 'all'; },
       stashBar,
       _screens: { homeScreen, dungeonScreen, rosterScreen, bagScreen, partyScreen, charsScreen, equipScreen, growScreen },
+      // 测试用：底栏那一排（红点归属的正确性只有把它画出来才验得了）
+      navbarHtml,
       openPartyPanel, openGrowPanel, charListSorted, pickPartyChar, slotMenu,
       _gmAllowed: gmAllowed,
     },
