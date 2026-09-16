@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.54';
+  const GAME_VER = '9.5.55';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   function gmAllowed() {
@@ -1643,14 +1643,14 @@ window.UI = (function () {
     const filters = [['all', '全部'], ['party', '已上阵'], ['SSR', 'SSR+'], ['N', 'N'], ['R', 'R'], ['SR', 'SR']];
     const cs = C().codexState();
     return `
-      <div class="pill-tabs">${filters.map(([k, n]) => `<div class="pill ${charFilter === k ? 'active' : ''}" data-filter="${k}">${n}</div>`).join('')}</div>
+      <!-- V9.5.55（父亲大人）：搜名字输入框去掉；图鉴挪到筛选那一行右上角 -->
+      <div class="filter-bar">
+        <div class="pill-tabs" style="flex:1 1 auto;min-width:0">${filters.map(([k, n]) => `<div class="pill ${charFilter === k ? 'active' : ''}" data-filter="${k}">${n}</div>`).join('')}</div>
+        <button class="btn small ghost" data-act="open-codex" style="flex:0 0 auto">📕 图鉴</button>
+      </div>
       <div class="filter-bar">
         <span class="flabel">排序</span>
         <div class="pill-tabs grow-pills">${CHAR_SORTS.map(([k, n]) => `<div class="pill ${charSort === k ? 'active' : ''}" data-charsort="${k}">${n}</div>`).join('')}</div>
-      </div>
-      <div class="filter-bar">
-        <input id="char-search" class="search-input" type="text" placeholder="🔍 搜名字" value="${esc(charQuery)}" />
-        <button class="btn small ghost" data-act="open-codex">📕 图鉴</button>
       </div>
       <div style="font-size:0.6875rem;color:var(--dim);margin:0 2px 0.5rem">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
       <div class="char-grid" id="char-list">${charGridHtml()}</div>`;
@@ -2070,11 +2070,13 @@ window.UI = (function () {
       // 按钮文案如实反映"这次到底扣什么"：够券就写券，不够才写货币
       const fst = C().freeState(pid);
       const freeNow = fst.left > 0 && fst.ready;
-      /* V9.5.53（父亲大人）：只要还有免费次数，按钮就一直是"免费抽"这个形态
-         （冷却中就把倒计时挂在后面），不再切成付费文案——不然两个形态来回跳。 */
+      /* V9.5.55（父亲大人给的样式）：
+         · 还能免费抽（已就绪）→ 「免费抽 1 次（今日还剩 N 次）」，点了就是白拿；
+         · 还有免费次数但正在冷却 → 「抽 1 次（花什么）· 免费还差 mm:ss」，点了就是**花券/货币**抽；
+         · 免费次数用完 → 就是普通的「抽 1 次（花什么）」。 */
       const payLabel = tk && tk.n >= 1 ? `抽 1 次（🎫 ${tkName}×1）` : `抽 1 次（${costText}）`;
       const oneLabel = fst.left > 0
-        ? (fst.ready ? `免费抽 1 次（今日还剩 ${fst.left} 次）` : `免费抽（还剩 ${fst.left} 次 · ${mmss(fst.waitSec)}）`)
+        ? (fst.ready ? `免费抽 1 次（今日还剩 ${fst.left} 次）` : `${payLabel} · 免费还差 ${mmss(fst.waitSec)}`)
         : payLabel;
       const tenLabel = tk && tk.n >= 10 ? `十连（🎫 ${tkName}×10）` : `十连（${tenText}）`;
       return `<div class="card pool-card mb3">
@@ -2146,11 +2148,6 @@ window.UI = (function () {
         showResults([r], { pid, n: 1 });
         return;
       }
-      const stNow = C().freeState(pid);
-      if (stNow.left > 0) {                             // 还有免费次数但在冷却 → 只提示，不抢着收费
-        failToast(`免费还差 ${String(Math.floor(stNow.waitSec / 60)).padStart(2, '0')}:${String(stNow.waitSec % 60).padStart(2, '0')}`);
-        return;
-      }
       runPull(pid, 1, b);
     });
     // 冷却倒计时：每秒只改那几个按钮上的文字（不整页重画）
@@ -2167,9 +2164,14 @@ window.UI = (function () {
         }
         else if (st.ready) { el.dataset.free1 = '1'; el.dataset.freelabel = ''; el.classList.add('gold'); el.textContent = `免费抽 1 次（今日还剩 ${st.left} 次）`; }
         else {
+          // 现算"花什么"（与首帧同一套写法），再跟"免费还差 mm:ss"
+          const p = D.RECRUIT_POOLS[pid] || {};
+          const tk2 = C().ticketOf(pid);
+          const costText2 = Object.entries(p.cost || {}).map(([k, v]) => `${curIcon(k)}${fmt(v)}`).join('');
+          const pay = tk2 && tk2.n >= 1 ? `抽 1 次（🎫 ${(D.ITEMS[tk2.id] || {}).name || tk2.id}×1）` : `抽 1 次（${costText2}）`;
           el.dataset.free1 = ''; el.classList.remove('gold');
           const sec = st.waitSec;
-          el.textContent = `免费抽（还剩 ${st.left} 次 · ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}）`;
+          el.textContent = `${pay} · 免费还差 ${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}`;
         }
       });
     }, 1000);
@@ -4597,8 +4599,6 @@ window.UI = (function () {
     root.querySelectorAll('[data-eqd]').forEach(el => el.onclick = () => equipDetail(el.dataset.eqd));
     root.querySelectorAll('[data-filter]').forEach(el => el.onclick = () => { charFilter = el.dataset.filter; render(); });
     root.querySelectorAll('[data-charsort]').forEach(el => el.onclick = () => { charSort = el.dataset.charsort; render(); });
-    const charSearch = root.querySelector('#char-search');
-    if (charSearch) charSearch.oninput = () => { charQuery = charSearch.value; paintCharGrid(root); };
     root.querySelectorAll('[data-efilter]').forEach(el => el.onclick = () => { equipFilter = el.dataset.efilter; render(); });
     root.querySelectorAll('[data-ecat]').forEach(el => el.onclick = () => { equipCatFilter = el.dataset.ecat; render(); });
     // 批量分解
