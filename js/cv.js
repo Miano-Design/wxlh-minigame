@@ -71,6 +71,7 @@
     CV.FS = { xs: 11 * k, sm: 11 * k, md: 12 * k, lg: 13 * k, f1: 15 * k, f2: 17 * k };
     CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k;
     CV.NAV_H = 62 * k;
+    CV.NAV_BASE = 62 * k;      // 底栏基准高：战斗页会把它清成 0（整屏接管），离开时必须恢复
     try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
     return CV;
   };
@@ -260,7 +261,12 @@
     /* 战斗页也是整屏接管：网页版战斗遮罩盖住了顶栏和底栏，这里同样不画标准顶栏/底栏，
        由战斗页自己画"标题 / 速度 / 撤离"那一条（V9.5.93）。 */
     const chromeless = ['welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
+    /* V9.6.29（父亲大人："战斗撤离后出来的界面，下面的导航栏出画了"）：
+       战斗页是整屏接管，会把 NAV_H 清成 0；但**以前只有清、没有恢复** ——
+       于是打完/撤离回到普通页，底栏还按 H-0 画，整条掉到屏幕外。
+       现在非 chromeless 一律恢复成基准值。 */
     if (chromeless) { CV.TOP = CV.safeTop; CV.NAV_H = 0; }
+    else { CV.NAV_H = CV.NAV_BASE || (62 * CV.SCALE); }
     c.save();
     /* V9.6.10（父亲大人："整体画面笨重、没网页版精致"自审）：
        网页版 #app 是 `linear-gradient(180deg, --bg2, --bg)`（上略亮、下压暗），
