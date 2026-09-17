@@ -133,6 +133,9 @@
     if (qid === 'q11') { CV.cur = 'home'; CV.reset('home'); CV.push('corridor'); return; }
     CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
   }
+  /* 首页的「去完成」也要用它 —— 挂到 G 上共用（sc-home 比 sc-last 先加载，但按钮是点击时才跑，拿得到） */
+  G.goQuest = goQuest;
+
   function goDaily(key) {
     if (key === 'recruit1') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
     if (key === 'idle1') { CV.cur = 'home'; CV.reset('home'); return; }

@@ -247,7 +247,16 @@
     CV.toast(r && r.ok ? '🎁 ' + r.msg : (r && r.msg) || '还没有新的游历');
     CV.render();
   });
-  CV.on('goto_quest', () => CV.toast('主线任务：点右侧按钮领取'));
+  /* V9.6.31（父亲大人："我点去完成，他给我一个弹窗，内容还不对，而不是引导我去完成任务"）：
+     这里原来是一句占位 toast（而且文案抄错了）—— 点了最没用。改成**真的带路**：
+     找到当前主线，交给 sc-last 里那张已经写好的跳转表（goQuest：属性面板 / 招募 / 建筑 /
+     队伍 / 装备 / 残域对应世界 / 深井…）。 */
+  CV.on('goto_quest', function () {
+    const cu = Core.currentQuest && Core.currentQuest();
+    if (!cu || !cu.q) { CV.toast('主线已经走完了'); return; }
+    if (G.goQuest) G.goQuest(cu.q.id);
+    else CV.toast('这一步要去「' + (cu.q.desc || '对应页面') + '」完成');
+  });
   /* V9.6.21（父亲大人："主线任务点领取奖励没反应"）：
      原来调的是 `Core.claimMainQuest` —— **这个函数压根不存在**（core 只有 claimQuest(id)），
      于是 `r` 一直是 undefined，只弹一句"已领取"、奖励根本没发，看着就像点了没反应。 */
