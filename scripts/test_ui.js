@@ -1652,5 +1652,47 @@ t('装备详情：强化按钮写的是实价，并且列出材料/代用', () =
   if (src.indexOf('这是你的属性面板') < 0) throw new Error('属性面板的引导被整段删掉了（只该删后半句）');
 });
 
+/* ---- V9.5.92（父亲大人："战斗界面的撤离按钮点了没用"）----
+   两处真因：① 确认框被战斗遮罩压在下面（弹窗层 z-index 80 < 战斗 90）；
+             ② 斗法台那场战斗没写 onQuit，确认了也只是把画面关掉、什么也没发生。 */
++t('弹窗层必须画在战斗遮罩之上（撤离的确认框曾被压在最底下）', () => {
+  const css = fs.readFileSync('css/style.css', 'utf8');
+  const zOf = (sel) => {
+    const m = css.match(new RegExp(sel.replace(/[#.]/g, '\\$&') + '\\s*\\{[^}]*z-index:\\s*(\\d+)'));
+    return m ? +m[1] : null;
+  };
+  const modal = zOf('#modal-root'), battle = zOf('#battle-overlay');
+  if (modal === null || battle === null) throw new Error('找不到 z-index 声明');
+  if (!(modal > battle)) throw new Error(`弹窗层 z-index ${modal} 没有高于战斗遮罩 ${battle}（确认框会被压住）`);
+});
++t('战斗里点「撤离」会弹出确认框，确认后能真的退出去', () => {
+  Core.newGame(); Core.setPlayerName('撤离'); Core.choosePlayerBloodline('修真');
+  const eff = Core.effectivePlayerStats();
+  const ally = Object.assign({ name: '测试', kind: 'warrior', faction: null, position: 'front',
+    skills: D.PROTAGONIST.skills, skillLv: [1, 1, 1] }, eff, { hp: eff.hp, maxHp: eff.hp });
+  const enemy = window.Dungeon.makeEnemies('W01', 'normal', 1, 'combat');
+  let quitCalled = false;
+  UI._panels._startBattle({
+    title: '撤离测试', allies: [ally], enemies: enemy, worldId: 'W01', maxRounds: 5,
+    onEnd: () => ({}), onQuit: () => { quitCalled = true; },
+  });
+  const kids = byId['battle-root'].children;
+  const ov = kids[kids.length - 1];
+  const quitBtn = ov.querySelector('[data-quit]');
+  if (typeof quitBtn.onclick !== 'function') throw new Error('撤离按钮根本没绑事件');
+  quitBtn.onclick();
+  const before = byId['modal-root'].children.length;
+  const box = byId['modal-root'].children[before - 1];
+  if (!box) throw new Error('点了撤离没有弹确认框（弹在最底下也算没弹）');
+  box.querySelector('[data-ok]').onclick();
+  if (!quitCalled) throw new Error('确认了撤离却没有执行 onQuit（撤了没去处）');
+});
++t('斗法台的战斗也带撤离去处（原来缺 onQuit）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  const i = src.indexOf('title: `斗法台 · 第 ${cur.floor} 台`');
+  if (i < 0) throw new Error('找不到斗法台的战斗入口');
+  if (src.slice(i, i + 700).indexOf('onQuit') < 0) throw new Error('斗法台战斗没有 onQuit，撤离会没反应');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

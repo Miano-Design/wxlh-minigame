@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.91';
+  const GAME_VER = '9.5.92';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -2399,6 +2399,9 @@ window.UI = (function () {
       startBattle({
         title: `斗法台 · 第 ${cur.floor} 台`,
         allies, enemies: cur.enemies, worldId: null, maxRounds: 40,
+        /* V9.5.92（父亲大人："撤离点了没用"）：这一处原来**没写 onQuit**，
+           点撤离只会把战斗画面关掉，既不回页面也不消耗次数——现在撤了回斗法台。 */
+        onQuit: () => { arenaModal(w); },
         onEnd(win) {
           const r = C().arenaSettle(win);
           refresh(); renderTopbar();
@@ -4055,7 +4058,12 @@ window.UI = (function () {
       confirmBox('撤离', '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。', () => {
         quiting = true;
         overlay.remove();
+        /* V9.5.92（父亲大人："战斗界面的撤离按钮点了没用"）：两个原因，都修了 ——
+           ① 确认框原来画在战斗遮罩底下（弹窗层 z-index 80 < 战斗 90），看起来就是没反应；
+           ② 斗法台那一处**没写 onQuit**，就算确认了也只是把画面关掉、什么都没发生。
+           这里再加一层兜底：任何战斗都必须有去处，没写就退回上一页，绝不允许"撤了没反应"。 */
         if (typeof cfg.onQuit === 'function') cfg.onQuit();
+        else { toast('已撤离本场（这场不算数）', 2200); render(); }
       });
     };
     if (start.note) log(`⚠ 世界机制：${start.note}`);

@@ -336,7 +336,10 @@ body {
 .tag { font-size: var(--fs-xs); border: 1px solid var(--line2); border-radius: var(--radius-sm); padding: 1px 0.375rem; color: var(--text2); font-weight: 400; }
 
 /* ---------- 弹窗（底部抽屉） ---------- */
-#modal-root { position: fixed; inset: 0; z-index: 80; pointer-events: none; }
+/* V9.5.92（父亲大人："战斗界面的撤离按钮点了没用"）——
+   战斗遮罩 #battle-overlay 是 z-index 90，而弹窗层原来是 80：撤离的确认框**画在战斗界面底下**，
+   玩家点撤离看到的就是"什么都没发生"。弹窗层必须高于战斗遮罩，但仍然低于 toast(120) 与引导(900)。 */
+#modal-root { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
 .modal-mask { position: absolute; inset: 0; background: rgba(0,0,0,.62); pointer-events: auto; animation: fadein .15s; }
 .sheet {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 0;
