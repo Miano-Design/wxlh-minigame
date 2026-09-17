@@ -80,6 +80,69 @@
     }
   };
 
+  /* ============================================================================
+     V9.6.59 紧急恢复：上一版我重写 coachHero 时用切片替换，
+     **把 TUT（主线步）和 UNLOCK_GUIDE（解锁指引）两张表连同它们的两个函数一起切掉了** ——
+     而 G.coachFor 仍在调用它们 → 每次渲染都抛 ReferenceError（页面画一半就断）。
+     教训：用"首尾标记切片"改代码，一定要先确认两个标记之间**只有**要替换的内容。
+     下面按原内容恢复（并保留之前审计过的去重与锚点修正）。
+     ============================================================================ */
+
+  /* 主线每一步 = 引导的一步（父亲大人：合并成一套） */
+  const TUT = {
+    q01:  { page: 'home',    run: coachHero },                       // 熟悉身体（逐项讲主角卡）
+    q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
+    q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
+    /* q03（招募）/ q04（上阵）的引导只在开场三区块里讲一次，不在主线里重复（审计结论）。 */
+    q05:  { page: 'world',   s: ['stage:1'], t: '第 2 关开始出现多波敌人 —— 血量会继承，不会自动回满。' },
+    q06:  { page: 'world',   s: ['stage:2'], t: '第 3 关打完就解锁「装备强化」这条线，回头记得把装备拉一拉。' },
+    q07:  { page: 'bag',     s: ['eqd:*', 'bagview:equip'], t: '强化在这里：切到「装备」，点一件装备进去花材料强化。' },
+    q08:  { page: 'world',   s: ['stage:3'], t: '第 4 关是精英关：敌人更硬、掉落更好，打不动就先回首页收挂机收益。' },
+    q09:  { page: 'buildings', s: ['bup:*'], t: '建筑每升一级都是永久加成 —— 灯芯加挂机产出、训练室加经验、医疗室加离线效率；花的是挂机就能刷的点数。' },
+    q10:  { page: 'world',   s: ['stage:11'], t: '第 12 关是这一世界的守关 Boss —— 打完解锁下一个世界。' },
+    q11:  { page: 'corridor', s: ['corridor_fight'], t: '深井：一直往上打、没有重置。每 10 层给一枚深井印记，井内全属性加成。' },
+    q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
+  };
+  function coachByQuest(page) {
+    const cu = Core.currentQuest && Core.currentQuest();
+    const qid = cu && cu.q && cu.q.id;
+    const rule = qid && TUT[qid];
+    if (!rule || rule.page !== page) return false;
+    const key = 'tut_' + qid;
+    if (U.coachSeen(key)) return false;
+    if (rule.run) { rule.run(); return true; }
+    U.coach(rule.s, rule.t, { key: key, mustTap: true });
+    return true;
+  }
+
+  /* 新解锁的功能也自动开指引（父亲大人第 2 条：解锁时弹窗打断）。
+     判定是"该模块已解锁 + 这一课没讲过"，所以新号刚解锁、老号从没进过，都会补一次。
+     锚点可以写前缀（'bup:*' / 'eqd:*'），动态 id 也能锚。 */
+  const UNLOCK_GUIDE = {
+    recruit:  { page: 'recruit',  s: ['pull1:normal', 'pull1:normal:free'], t: '招募解锁了：每天有免费次数先用掉，抽到的伙伴记得去「队伍」上阵。' },
+    shop:     { page: 'shop',     s: ['shoptab:god'], t: '兑换大厅：四家店各用不同货币，日常用券和材料都在这儿补。' },
+    enhance:  { page: 'bag',      s: ['bagview:equip', 'eqd:*'], t: '装备强化解锁了：切到「装备」、点一件进去，花材料提升数值。' },
+    buildings:{ page: 'buildings', s: ['bup:*'], t: '基地建设：五栋建筑每升一级都是永久加成，花的是挂机就能刷的点数。' },
+    tasks:    { page: 'tasks',    s: ['tasktab:main'], t: '任务解锁了：主线 / 日常 / 周常 / 成就四个标签，做完记得回来领。' },
+    corridor: { page: 'corridor', s: ['corridor_fight'], t: '深井解锁了：一直往上打、没有重置，每 10 层给一枚印记加成。' },
+    bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗血统结晶 + 点数，每级全属性都涨。' },
+    geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是血统结晶。' },
+    beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
+    reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
+  };
+  function coachByUnlock(page) {
+    const ids = Object.keys(UNLOCK_GUIDE);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i], g = UNLOCK_GUIDE[id];
+      if (g.page !== page) continue;
+      if (!(Core.isUnlocked && Core.isUnlocked(id))) continue;
+      if (U.coachSeen('tut_unlock_' + id)) continue;
+      U.coach(g.s.length ? g.s : 'page_back', g.t, { key: 'tut_unlock_' + id, mustTap: g.s.length > 0 });
+      return true;
+    }
+    return false;
+  }
+
   G.coachFor = function (page) {
     if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
