@@ -75,6 +75,46 @@
     return CV;
   };
 
+  /* ---------- 字体缺的符号：自己画（V9.6.26，父亲大人："缺少的图标都重新画进去"） ----------
+     微信画布的中文字体里没有 ♜（象棋车），直接写会渲染成"豆腐块"。
+     以前用 ◇ 顶替 —— 能看，但跟网页版/别处对不上（父亲大人："随便搞个替代既不好看、
+     又容易跟别的界面联系不上"）。这里给这些符号配**矢量画法**，并挂在 CV.GLYPHS 上；
+     CV.text / CV.measure 会自动识别：遇到这些字符就按图标宽（= 字号）走，其余照常排版。
+     代价为零，调用点一行都不用改（页面里照旧写 '♜ 深井印记'）。 */
+  CV.GLYPHS = {
+    '♜': function (c, x, y, s, color) {           // x = 图标中心，y = 垂直中线
+      const w = s * 0.86, h = s, L = x - w / 2, R = x + w / 2;
+      const top = y - h * 0.42, bot = y + h * 0.42;
+      const rr = function (rx, ry, rw, rh, rad) {
+        const r2 = Math.min(rad, rw / 2, rh / 2);
+        c.beginPath();
+        c.moveTo(rx + r2, ry);
+        c.arcTo(rx + rw, ry, rx + rw, ry + rh, r2);
+        c.arcTo(rx + rw, ry + rh, rx, ry + rh, r2);
+        c.arcTo(rx, ry + rh, rx, ry, r2);
+        c.arcTo(rx, ry, rx + rw, ry, r2);
+        c.closePath(); c.fill();
+      };
+      c.save(); c.fillStyle = color;
+      rr(L, bot - h * 0.16, w, h * 0.16, h * 0.05);                 // 底座
+      c.beginPath();                                                 // 塔身（上窄下宽）
+      c.moveTo(L + w * 0.17, bot - h * 0.16);
+      c.lineTo(L + w * 0.27, top + h * 0.30);
+      c.lineTo(R - w * 0.27, top + h * 0.30);
+      c.lineTo(R - w * 0.17, bot - h * 0.16);
+      c.closePath(); c.fill();
+      const mw = w * 0.21, gap = w * 0.115;                          // 顶冠三垛
+      for (let i = 0; i < 3; i++) rr(L + i * (mw + gap), top, mw, h * 0.30, h * 0.04);
+      c.restore();
+    },
+  };
+  CV.hasGlyph = function (str) {
+    const t = String(str == null ? '' : str);
+    for (const k in CV.GLYPHS) if (t.indexOf(k) >= 0) return true;
+    return false;
+  };
+  CV.glyphWidth = function (ch, size) { return CV.GLYPHS[ch] ? size : 0; };
+
   /* ---------- 绘制原语（数值都对齐网页版） ---------- */
   CV.text = function (str, x, y, opt) {
     opt = opt || {};
@@ -87,13 +127,39 @@
     if (lsOk && opt.ls) { try { c.letterSpacing = opt.ls + 'px'; } catch (e) {} }
     c.textAlign = opt.align || 'left';
     c.textBaseline = opt.baseline || 'middle';
-    c.fillText(String(str), x, y);
+    const raw = String(str);
+    if (CV.hasGlyph(raw)) {
+      /* 分段：普通文字照旧 fillText，缺字形的字符交给 CV.GLYPHS 画 */
+      const size = opt.size || CV.FS.lg;
+      /* 必须按**码点**切（Array.from），不能用逐码元切 —— emoji 是代理对，
+         切开就变成两个半字符（🏪 会被劈成两半）。 */
+      const segs = Array.from(raw);
+      let total = 0;
+      segs.forEach(function (t) { total += CV.GLYPHS[t] ? size : CV.measure(t, size, opt.bold); });
+      let px = opt.align === 'center' ? x - total / 2 : (opt.align === 'right' ? x - total : x);
+      segs.forEach(function (t) {
+        if (CV.GLYPHS[t]) { CV.GLYPHS[t](c, px + size / 2, y, size, opt.color || CV.C.text); px += size; }
+        else { const ta = c.textAlign; c.textAlign = 'left'; c.fillText(t, px, y); c.textAlign = ta; px += CV.measure(t, size, opt.bold); }
+      });
+      if (lsOk && opt.ls) { try { c.letterSpacing = '0px'; } catch (e) {} }
+      return;
+    }
+    c.fillText(raw, x, y);
     if (lsOk && opt.ls) { try { c.letterSpacing = '0px'; } catch (e) {} }
   };
   CV.measure = function (str, size, bold) {
     const c = CV.ctx;
     c.font = `${bold ? '600 ' : ''}${size}px ${CV.FONT}`;
-    try { return c.measureText(String(str)).width || 0; } catch (e) { return String(str).length * size * 0.9; }
+    const raw = String(str);
+    if (CV.hasGlyph(raw)) {
+      let w = 0;
+      Array.from(raw).forEach(function (t) {
+        if (!t) return;
+        w += CV.GLYPHS[t] ? size : (function () { try { return c.measureText(t).width || 0; } catch (e) { return t.length * size * 0.9; } })();
+      });
+      return w;
+    }
+    try { return c.measureText(raw).width || 0; } catch (e) { return raw.length * size * 0.9; }
   };
   /* 圆角矩形（网页版 .card：bg #111621 / 边 #232b3b / 圆角 10） */
   CV.round = function (x, y, w, h, r, fill, stroke, lw) {

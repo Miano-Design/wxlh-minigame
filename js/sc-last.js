@@ -665,7 +665,7 @@
       U.y = top + 100 * CV.SCALE;
     });
     U.card(function () {
-      U.h3('◇ 深井印记', Core.corridorMarks() + '/' + D.CORRIDOR_MARK_CAP + ' 枚');
+      U.h3('♜ 深井印记', Core.corridorMarks() + '/' + D.CORRIDOR_MARK_CAP + ' 枚');
       U.note('当前深井内加成：+' + (Core.corridorMarkBonus() * 100).toFixed(1) + '%', 2 * CV.SCALE);
     });
     U.card(function () {
@@ -675,11 +675,11 @@
       U.kv('攻击', fmt(e.atk));
       U.kv('防御', fmt(e.def));
       U.space(CV.SP[1]);
-      U.kv('通关奖励', '◈ ' + fmt(rw.points) + ' · ❖ ' + rw.story + ' · ◇ ' + rw.corridor + (rw.bloodCrystal ? (' · ❥ ' + rw.bloodCrystal) : ''), CV.C.gold);
+      U.kv('通关奖励', '◈ ' + fmt(rw.points) + ' · ❖ ' + rw.story + ' · ♜ ' + rw.corridor + (rw.bloodCrystal ? (' · ❥ ' + rw.bloodCrystal) : ''), CV.C.gold);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '⚔️ 挑战本层', style: 'primary', id: 'corridor_fight' }]);
     });
-    U.btnRow([{ label: '🏪 深井商店（◇ ' + fmt(S.cur.corridor || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
+    U.btnRow([{ label: '🏪 深井商店（♜ ' + fmt(S.cur.corridor || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
   });
   CV.on('corridor_fight', function () {
     const S = Core.S;
@@ -708,9 +708,9 @@
         S.corridor.best = Math.max(S.corridor.best, floor);
         S.corridor.floor = floor + 1;
         Core.save();
-        const rewards = ['◈+' + fmt(rw.points), '❖+' + rw.story, '◇+' + rw.corridor]
+        const rewards = ['◈+' + fmt(rw.points), '❖+' + rw.story, '♜+' + rw.corridor]
           .concat(rw.bloodCrystal ? ['❥+' + rw.bloodCrystal] : [])
-          .concat(gotMark ? ['◇ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
+          .concat(gotMark ? ['♜ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
         return {
           title: '第 ' + floor + ' 层通过', sub: '', rewards: rewards,
           acts: [{ label: '› 继续第 ' + S.corridor.floor + ' 层', style: 'primary', id: 'corridor_fight' }, { label: '返回深井', style: 'ghost', id: 'corridor_back' }],
