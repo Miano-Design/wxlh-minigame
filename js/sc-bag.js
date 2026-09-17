@@ -24,7 +24,8 @@
   /* 装备页的两行分类（照网页版 equipFilterBar 的 .pill-tabs.tight）。
      V9.6.8（父亲大人）：分类保留，但去掉「普通」和「SSR+」——
      "普通"跟"全部"几乎重合；"SSR+"原来挂在部位那行末尾，七个部位 + 它挤到第三行、孤零零一个。 */
-  const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
+  // 血统神装（神话）单独一枚 —— 末段玩家会攒一整队，混在"全部"里翻不出来（V9.6.76，与网页版同口径）
+  const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['class', '职业套装'], ['god', '血统神装'], ['sig', '专属']];
   const EQ_SLOTS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
   let eqCat = 'all', eqSlot = 'all';
   /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字） */
@@ -269,6 +270,7 @@
       if (eqSlot !== 'all') list = list.filter((e) => e.slot === eqSlot);
       if (eqCat === 'world') list = list.filter((e) => !!e.set);
       else if (eqCat === 'class') list = list.filter((e) => !!e.classSet);
+      else if (eqCat === 'god') list = list.filter((e) => !!e.godSet);
       else if (eqCat === 'sig') list = list.filter((e) => !!e.charId);
       used = list.length;
       list.slice(0, cap).forEach((e) => {
@@ -370,6 +372,7 @@
     const est = Core.equipStats(eq);
     const set = D.SETS[eq.set];
     const cs = eq.classSet ? D.CLASS_SETS[eq.classSet] : null;
+    const gs = eq.godSet ? D.GOD_SETS[eq.godSet] : null;
     const wearer = Object.keys(S.equipped).find((cid) => Object.values(S.equipped[cid] || {}).indexOf(eqUid) >= 0);
     U.card(function () {
       U.h3(eq.name + ' +' + eq.enhance, wearer ? (Core.charName(wearer) + '装备中') : '未装备');
@@ -377,6 +380,7 @@
       U.kv('品质', eq.rarity, rarColor(eq.rarity));
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
+      if (gs) U.kv('血统神装', '仅限' + eq.godSet + '血统装备（穿戴者血统要对得上）');
       if (cs) U.kv('职业套装', '限' + (D.KIND_NAMES[eq.classSet] || '') + '定位激活');
       U.kv('分解可得', '◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3));
     });
@@ -425,7 +429,8 @@
         /* V9.6.16（父亲大人）：这行解释多余 —— 件数是 0/3、效果一条条都列着，不用再解释一遍。 */
       });
     };
-    if (cs) mkSetCard('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
+    if (gs) mkSetCard('血统神装', gs.name, gs.text, wornOf(eq.godSet, 'godSet'), 6);
+    else if (cs) mkSetCard('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
     else if (set) mkSetCard('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
     U.card(function () {
       U.h3('强化', '+' + eq.enhance + '/20');
@@ -630,6 +635,7 @@
   }
   function eqTag(e) {
     if (e.charId) return '专属·' + (((D.charById || {})[e.charId] || {}).name || '?');
+    if (e.godSet) return ((D.GOD_SETS || {})[e.godSet] || {}).name || '血统神装';
     if (e.classSet) return ((D.CLASS_SETS || {})[e.classSet] || {}).name || '职业套装';
     if (e.set) return ((D.SETS || {})[e.set] || {}).name || '世界套装';
     return '普通';

@@ -245,13 +245,17 @@
        这里却按对象用（can.ok / can.msg）—— 于是"条件"永远显灰、**「开始转生」按钮永远没有 id**
        （看着在、点不动，玩家根本转生不了）。 */
     const can = { ok: Core.canReincarnate() };
-    can.msg = can.ok ? '' : ('条件未满足：玩家 Lv.' + S.player.level + '/100 · 铭刻 ' + S.player.geneLock + '/5 · 灯芯 Lv.' + (S.buildings.core || 0) + '/30');
+    /* V9.6.76：门槛改成**逐次抬高**（第 1 次铭刻 2+灯芯 20、之后 3/30、4/35、5/40）——
+       页面上的数字必须跟着下一次转生走，不能再写死 "铭刻 x/5 · 灯芯 y/30"。 */
+    const need = Core.reincarnNeed();
+    can.msg = can.ok ? '' : ('条件未满足：玩家 Lv.' + S.player.level + '/' + need.lv + ' · 铭刻 ' + S.player.geneLock + '/' + need.geneLock + ' · 灯芯 Lv.' + (S.buildings.core || 0) + '/' + need.core);
     U.begin(); head('转生天赋');
     U.card(function () {
       U.h3('转生', '已转生 ' + (S.player.reincarnations || 0) + ' 次');
       U.note('会重置：玩家等级（回到 Lv.0）、残域世界进度、深井层数。', 2 * CV.SCALE);
       U.note('会保留：伙伴（含等级与技能）、装备、主角技能与属性、血统、铭刻、天赋、全部货币。', 2 * CV.SCALE);
-      U.kv('条件', '玩家Lv.' + S.player.level + '/100 · 铭刻' + S.player.geneLock + '/5 · 灯芯Lv.' + (S.buildings.core || 0) + '/30',
+      U.kv('第 ' + ((S.player.reincarnations || 0) + 1) + ' 次转生条件',
+        '玩家Lv.' + S.player.level + '/' + need.lv + ' · 铭刻' + S.player.geneLock + '/' + need.geneLock + ' · 灯芯Lv.' + (S.buildings.core || 0) + '/' + need.core,
         can.ok ? CV.C.green : CV.C.dim);
       if (!can.ok && can.msg) U.hint(can.msg, 4 * CV.SCALE);
       U.space(CV.SP[1]);

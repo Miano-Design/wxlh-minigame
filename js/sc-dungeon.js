@@ -81,6 +81,16 @@
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
         cleared ? '已通关' : '', 'w:' + w.id, false);
     });
+    /* 转生门：门后那一张要显示出来（跟网页版同一口径）。
+       "没解锁的不显示"说的是**还没走到**的世界；转生门是"走到了、过不去"，
+       藏起来玩家就不知道下一步在哪 —— 这是 V9.6.76 加的，两边保持一致。 */
+    const nextLocked = D.WORLDS.find((w) => !(S.worlds[w.id] && S.worlds[w.id].unlocked));
+    const gateNeed = nextLocked ? Core.worldReincarnNeed(nextLocked.id) : 0;
+    if (gateNeed) {
+      worldCard('🔒', nextLocked.name,
+        '需要转生 ' + gateNeed + ' 次才能进入 · 当前 ' + (S.player.reincarnations || 0) + ' 次',
+        '', 'w:' + nextLocked.id, true);
+    }
   });
 
   /* ================= ② 世界详情 ================= */
@@ -312,6 +322,15 @@
   CV.on('w:W01', function () {});      // 具体世界在下面统一绑定
   D.WORLDS.forEach(function (w) {
     CV.on('w:' + w.id, function () {
+      /* 转生门后的世界也会出现在列表里（V9.6.76，见世界列表那段）——点它要说清门槛，
+         不能"点了跳进去"，也不能点了没反应（父亲大人对死键零容忍）。 */
+      const st = Core.S.worlds[w.id];
+      if (!st || !st.unlocked) {
+        const need = Core.worldReincarnNeed(w.id);
+        const has = Core.S.player.reincarnations || 0;
+        CV.toast(need > 0 ? ('🔒 需要转生 ' + need + ' 次才能进入（当前 ' + has + ' 次）') : '🔒 通关上一世界后解锁');
+        return;
+      }
       view.worldId = w.id; view.diff = 'normal';
       CV.push('world');
     });

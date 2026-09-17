@@ -15,7 +15,9 @@ window.DATA = (function () {
   /* ================= 基础常量 ================= */
   const ATTR_NAMES = { muscle: '肌肉', immune: '免疫', cell: '细胞', nerve: '神经', intelligence: '智力', spirit: '精神' };
   const RARITIES = ['N', 'R', 'SR', 'SSR', 'UR'];
-  const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff4d6d' };
+  /* MYTH 是**装备**的最高档（血统神装），角色永远不会有这个稀有度；
+     放进来是为了让"按稀有度取颜色"的界面（小游戏 canvas 就是这么取的）不用各自兜底。 */
+  const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff4d6d', MYTH: '#ffd76a' };
   const STAR_MULT = [1, 1.10, 1.22, 1.36, 1.52, 1.70];
   const RARITY_MAXSTAR = { N: 3, R: 4, SR: 5, SSR: 6, UR: 6 };
   const STAR_COST = [0, 50, 100, 180, 300, 500];            // 1→2…5→6 所需碎片
@@ -353,8 +355,19 @@ window.DATA = (function () {
   const charById = {};
   characters.forEach(ch => { charById[ch.id] = ch; });
 
-  /* ================= 14 个世界 ================= */
-  // 敌人基准：普通怪 HP/ATK/DEF；精英 ×(2.4/1.5/1.4)；关卡倍率 1.16^(stage-1)；Hard ×1.8；Hell ×3.2
+  /* ================= 36 个世界 =================
+     V9.6.76（父亲大人："20 有点少了，做到 36 吧"）：从 20 张扩到 36 张，分 6 段弧光，
+     每 6 张一道**转生门**（W13 要转生 1 次、W19 要 2 次、W25 要 3 次、W31 要 4 次）。
+     终局跟着终点走：原来在 W20 的「灯阁王座 / 终焉·灯主」挪到 W36，W20 改成「灯阁回廊」。
+
+     ⚠ 末段强度是**量出来的**，不是拍的。两轮实测（scripts/world_curve.js + 探针）：
+       ① 只有传说（UR）装备时，玩家过完第 20 张图之后**总共还能强 1.87 倍** ——
+          末段 16 张图如果按前 20 张那样每张 +20%，第 21 张开始就全是硬墙，
+          这正是父亲大人说的"装备不也有成长空间？"的由来。
+       ② 补上**血统神装（神话）**之后，天花板从 1.87 倍抬到 **3.00 倍** ——
+          末段每张图才敢按 HP +5.3% / 攻 +4.6% 往上走（16 张共 ×2.29 / ×2.06）。
+       所以末段曲线的真正支撑是：装备档位（tier 21→36，武器攻击 +68%）+ 血统神装 + 转生天赋。
+     敌人基准：普通怪 HP/ATK/DEF；精英 ×(2.4/1.5/1.4)；关卡倍率 1.13^(stage-1)；Hard ×1.8；Hell ×3.2 */
   const WORLDS = [
     { id: 'W01', name: '菌毯巢穴', theme: 'bio',    desc: 'T病毒泄露的地下研究所，感染者游荡在蜂巢深处。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '菌毯母巢', bossHp: [92111, 165799, 294754],
       enemies: ['感染研究员', '裂舌兽', '猎杀体α'], elite: '变异猎杀体', unlock: null },
@@ -380,7 +393,8 @@ window.DATA = (function () {
       enemies: '骷髅水手|诅咒炮手|腐尸船员'.split('|'), elite: '骷帆大副', unlock: 'W10' },
     { id: 'W12', name: '蚀环远征', theme: 'mystic', desc: '魔多大军压境，黑暗侵蚀中土。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
       enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环幽灵', unlock: 'W11' },
-    { id: 'W13', name: '寒冠王座', theme: 'mystic', desc: '白女巫的冰封王座，永冬笼罩王国。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
+    /* ---- 第二巡：转生 1 次开启 ---- */
+    { id: 'W13', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '白女巫的冰封王座，永冬笼罩王国。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
       enemies: '冰狼|雪魔|霜冻武士'.split('|'), elite: '冰宫禁卫', unlock: 'W12' },
     { id: 'W14', name: '灯阁试炼场', theme: 'god', desc: '灯阁亲自设下的试炼，规则由它书写。', hp: 7000, atk: 600, def: 500, mechanic: '随机规则：每回合变化', boss: '试炼执刑者', bossHp: [1125798, 2026437, 3602554],
       enemies: '试炼傀儡|规则执行体|灯阁幻影'.split('|'), elite: '灯阁代行者', unlock: 'W13' },
@@ -392,10 +406,45 @@ window.DATA = (function () {
       enemies: '哨戒机兵|电磁猎犬|数据幽灵'.split('|'), elite: '核心守卫', unlock: 'W16' },
     { id: 'W18', name: '白墙疗养院', theme: 'ghost', desc: '这间医院的病历上，写满了你的名字。', hp: 14600, atk: 980, def: 840, mechanic: '幻觉：概率攻击队友；死亡复活', boss: '白衣院长', bossHp: [2334456, 4202019, 7470257],
       enemies: '无影护士|手术怨灵|病房幻影'.split('|'), elite: '重症监护者', unlock: 'W17' },
-    { id: 'W19', name: '星骸坟场', theme: 'tech', desc: '无数文明在这里终结，残骸还在呼吸。', hp: 17500, atk: 1110, def: 960, mechanic: '星骸护盾；轨道扫射', boss: '星骸巨兽', bossHp: [2801347, 5042423, 8964308],
+    /* ---- 第三巡：转生 2 次开启 ---- */
+    { id: 'W19', reincarn: 2, name: '星骸坟场', theme: 'tech', desc: '无数文明在这里终结，残骸还在呼吸。', hp: 17500, atk: 1110, def: 960, mechanic: '星骸护盾；轨道扫射', boss: '星骸巨兽', bossHp: [2801347, 5042423, 8964308],
       enemies: '星舰残魂|虚空掠夺者|机械残骸'.split('|'), elite: '坟场拾荒者', unlock: 'W18' },
-    { id: 'W20', name: '灯阁王座', theme: 'god', desc: '走到这里的人，才有资格问一句为什么。', hp: 21000, atk: 1250, def: 1090, mechanic: '规则改写：每 3 回合变换；全场压制', boss: '终焉·灯主', bossHp: [3361616, 6050908, 10757170],
-      enemies: '王座侍者|终焉使者|另一个你'.split('|'), elite: '王座禁卫', unlock: 'W19' },
+    { id: 'W20', name: '灯阁回廊', theme: 'god', desc: '灯阁第一次把门开给你。走进去的人，回来都换了名字。', hp: 21000, atk: 1250, def: 1090, mechanic: '规则轮转：每 4 回合变换；灯影压制', boss: '回廊守望者', bossHp: [3361616, 6050908, 10757170],
+      enemies: '侍灯者|规则残响|镜中之你'.split('|'), elite: '执灯代行', unlock: 'W19' },
+    { id: 'W21', name: '无声戏院', theme: 'ghost', desc: '幕布拉开，台下坐满了不鼓掌的观众。', hp: 22100, atk: 1310, def: 1140, mechanic: '静默：攻击附带恐惧；护幕', boss: '终场演员', bossHp: [3536000, 6364800, 11315200],
+      enemies: '提线伶人|默剧幽灵|鼓掌的手'.split('|'), elite: '后台主管', unlock: 'W20' },
+    { id: 'W22', name: '锈蚀方舟', theme: 'tech', desc: '最后一艘方舟停在轨道上，舱里全是不该活下来的东西。', hp: 23300, atk: 1370, def: 1200, mechanic: '锈壳护盾；电磁干扰', boss: '方舟主机', bossHp: [3728000, 6710400, 11929600],
+      enemies: '锈蚀机兵|舱壁猎犬|导航残魂'.split('|'), elite: '方舟守门人', unlock: 'W21' },
+    { id: 'W23', name: '巢母产房', theme: 'bio', desc: '这里的每一声啼哭，都有三条舌头。', hp: 24500, atk: 1430, def: 1260, mechanic: '感染：攻击附带中毒；召唤幼体', boss: '巢母', bossHp: [3920000, 7056000, 12544000],
+      enemies: '初生体|哺育者|黏菌仆从'.split('|'), elite: '产房守卫', unlock: 'W22' },
+    { id: 'W24', name: '灰烬圣所', theme: 'mystic', desc: '香灰底下压着前一任执灯者的名字。', hp: 25800, atk: 1500, def: 1320, mechanic: '腐化：降低防御；焚香灼烧', boss: '灰袍祭司', bossHp: [4128000, 7430400, 13209600],
+      enemies: '灰烬信徒|焚香者|无名执灯者'.split('|'), elite: '圣所执事', unlock: 'W23' },
+    /* ---- 第四巡：转生 3 次开启 ---- */
+    { id: 'W25', reincarn: 3, name: '镜界法庭', theme: 'god', desc: '判决书上写的是你的死法。', hp: 27200, atk: 1570, def: 1390, mechanic: '规则轮转；镜面幻觉', boss: '镜面法官', bossHp: [4352000, 7833600, 13926400],
+      enemies: '律令执行体|镜中证人|无罪之影'.split('|'), elite: '庭上执行官', unlock: 'W24' },
+    { id: 'W26', name: '零号实验舱', theme: 'tech', desc: '实验记录最后一页，只写了两个字：成功。', hp: 28600, atk: 1640, def: 1460, mechanic: '培养护盾；轨道扫射', boss: '零号样本', bossHp: [4576000, 8236800, 14643200],
+      enemies: '失败样本|培养舱守卫|研究员残影'.split('|'), elite: '项目负责人', unlock: 'W25' },
+    { id: 'W27', name: '百鬼夜行', theme: 'ghost', desc: '灯笼亮起来的时候，街上的人全都不是人。', hp: 30100, atk: 1710, def: 1530, mechanic: '召唤恶鬼；吸血', boss: '提灯鬼王', bossHp: [4816000, 8668800, 15411200],
+      enemies: '灯笼鬼|无面行者|夜巡恶鬼'.split('|'), elite: '百鬼之首', unlock: 'W26' },
+    { id: 'W28', name: '活体森林', theme: 'bio', desc: '树会呼吸，也记得你砍过谁。', hp: 31700, atk: 1790, def: 1610, mechanic: '中毒：持续掉血；藤蔓缠绕', boss: '森之心', bossHp: [5072000, 9129600, 16230400],
+      enemies: '绞杀藤|腐叶兽|树语者'.split('|'), elite: '林中之主', unlock: 'W27' },
+    { id: 'W29', name: '第九碑陵', theme: 'mystic', desc: '碑上刻着九个名字。第八个是你。', hp: 33400, atk: 1870, def: 1690, mechanic: '诅咒：降低防御；碑灵复活', boss: '碑陵守誓者', bossHp: [5344000, 9619200, 17100800],
+      enemies: '碑灵|守誓卫士|第九个名字'.split('|'), elite: '碑陵司命', unlock: 'W28' },
+    { id: 'W30', name: '熔芯之炉', theme: 'tech', desc: '炉火不能停。停了，它就会醒。', hp: 35200, atk: 1960, def: 1780, mechanic: '灼烧：持续掉血；炉温强化', boss: '熔芯核心', bossHp: [5632000, 10137600, 18022400],
+      enemies: '熔渣机兵|炉心兽|过载体'.split('|'), elite: '炉前工头', unlock: 'W29' },
+    /* ---- 终巡：转生 4 次开启 ---- */
+    { id: 'W31', reincarn: 4, name: '哭墙回音', theme: 'ghost', desc: '你喊什么，它就还你什么。', hp: 37100, atk: 2050, def: 1860, mechanic: '幻觉：概率攻击队友；诅咒', boss: '回音之主', bossHp: [5936000, 10684800, 18995200],
+      enemies: '回声幽魂|哭墙残影|另一个你'.split('|'), elite: '墙内之物', unlock: 'W30' },
+    { id: 'W32', name: '万灯之座', theme: 'god', desc: '每一盏灯，都是一个文明的临终。', hp: 39000, atk: 2140, def: 1960, mechanic: '规则改写：每 3 回合变换；灯影压制', boss: '掌灯者', bossHp: [6240000, 11232000, 19968000],
+      enemies: '守灯使|万灯之影|燃尽的执灯者'.split('|'), elite: '座前禁卫', unlock: 'W31' },
+    { id: 'W33', name: '吞噬环带', theme: 'bio', desc: '它不吃人，它吃"存在"。', hp: 41100, atk: 2240, def: 2060, mechanic: '撕裂：流血；吞噬护盾', boss: '吞噬之口', bossHp: [6576000, 11836800, 21043200],
+      enemies: '噬形体|虚空孢|遗忘者'.split('|'), elite: '环带之心', unlock: 'W32' },
+    { id: 'W34', name: '时序废墟', theme: 'tech', desc: '这里的钟，全都指着同一个时刻。', hp: 43300, atk: 2350, def: 2160, mechanic: '冰冻：无法行动；时序加速', boss: '时之守望', bossHp: [6928000, 12470400, 22169600],
+      enemies: '锈钟机偶|逆行者|秒针兵'.split('|'), elite: '钟塔管理员', unlock: 'W33' },
+    { id: 'W35', name: '九幽渡口', theme: 'mystic', desc: '渡船上的乘客，都已经死过一次了。', hp: 45600, atk: 2450, def: 2270, mechanic: '吸血：敌人攻击回复自身；摆渡', boss: '摆渡人', bossHp: [7296000, 13132800, 23347200],
+      enemies: '渡魂使|黄泉船工|无归客'.split('|'), elite: '渡口判官', unlock: 'W34' },
+    { id: 'W36', name: '灯阁王座', theme: 'god', desc: '走到这里的人，才有资格问一句为什么。', hp: 48000, atk: 2570, def: 2380, mechanic: '规则改写：每 3 回合变换；全场压制', boss: '终焉·灯主', bossHp: [7680000, 13824000, 24576000],
+      enemies: '王座侍者|终焉使者|另一个你'.split('|'), elite: '王座禁卫', unlock: 'W35' },
   ];
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
@@ -415,9 +464,14 @@ window.DATA = (function () {
   const RECRUIT_SLOTS = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
   const PLAYER_SLOTS = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory']; // 主角 6 槽（V5 §22）
   const DROP_SLOTS = ['weapon', 'armor', 'accessory', 'head', 'hands', 'legs'];
-  const EQUIP_RARITY_MULT = { N: 1.00, R: 1.15, SR: 1.35, SSR: 1.65, UR: 2.00 };
-  const EQUIP_AFFIX_COUNT = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4 };
-  const DECOMPOSE_GAIN = { N: 5, R: 15, SR: 50, SSR: 180, UR: 600 };
+  /* V9.6.76：装备品质多一档 **神话（MYTH）** —— 见下面"阵营神装"那一段。
+     ⚠ 装备品质和**伙伴稀有度是两条线**：D.RARITIES 是角色用的，别往里塞 MYTH，
+       不然抽卡概率表、星级上限、重复碎片全都会被带偏。装备自己一条 EQUIP_RARITIES。 */
+  const EQUIP_RARITIES = ['N', 'R', 'SR', 'SSR', 'UR', 'MYTH'];
+  const EQUIP_RARITY_NAME = { N: '普通', R: '精良', SR: '稀有', SSR: '史诗', UR: '传说', MYTH: '神话' };
+  const EQUIP_RARITY_MULT = { N: 1.00, R: 1.15, SR: 1.35, SSR: 1.65, UR: 2.00, MYTH: 2.80 };
+  const EQUIP_AFFIX_COUNT = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, MYTH: 5 };
+  const DECOMPOSE_GAIN = { N: 5, R: 15, SR: 50, SSR: 180, UR: 600, MYTH: 2400 };
   const ENHANCE_RATE = [1, 1, 1, 1, 1, 1, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25]; // +0→+1…+19→+20
   // 世界套装：2 件 / 3 件加成
   const SETS = {};
@@ -472,10 +526,38 @@ window.DATA = (function () {
     resPct: { name: '异常抗性', min: 0.02, max: 0.16, pct: true },
     evaPct: { name: '闪避', min: 0.01, max: 0.07, pct: true },
   };
-  const AFFIX_BY_RARITY = { N: 0.25, R: 0.4, SR: 0.6, SSR: 0.8, UR: 1.0 }; // 词条取值位置（区间内）
+  const AFFIX_BY_RARITY = { N: 0.25, R: 0.4, SR: 0.6, SSR: 0.8, UR: 1.0, MYTH: 1.35 }; // 词条取值位置（区间内；神话可以越过区间上限，这是它的价值所在）
 
-  // 装备实例生成：worldTier 1-14，rarity 指定，slot 指定
-  // opts: { setType: 'plain'|'world'|'class', classKind }
+  /* ================= 血统神装（MYTH · 2/4/6 件） =================
+     V9.6.76（父亲大人："装备不也有成长空间？不同套装，几套不同血统的神装"）——
+     末段 16 张图的成长**不靠把世界数值做平**，靠这条线给玩家真的还能变强：
+
+       · 神话品质：基础值 2.80×（传说 2.00×）、5 条词条（传说 4 条）、词条能越过区间上限
+       · **六套血统神装**，一支血统一套，效果按那支血统的性格给：
+         血族=吸血暴击 / 狼人=血肉 / 修真=全能 / 魔法=术法 / 科技=速度命中 / 念动力=精神控制
+       · **穿对人**：神装只有**同血统**的人穿得上（和职业套装"限对应定位"同一条规矩）——
+         主角穿自己那支，伙伴穿各自那支。所以"凑齐 6 件"= 给一个人配满，不是随便找件衣服套上
+       · 只在残域第 21 张图之后掉落（前面给了也没用，面板还不到那儿）
+       · 六件全穿才有 6 件效果 —— 一件顶六件那种写法会让"凑套装"这件事失去意义
+     ⚠ 档位比例（相对整套传说）：2 件≈+15% / 4 件≈+25% / 6 件≈+45%，
+       加上基础值 1.4 倍，一套神装大概把一个人在末段的面板抬到 1.8~2.2 倍。 */
+  const GOD_SETS = {
+    '血族':   { name: '血族神装', b2: { critPct: 0.08 }, b4: { atkPct: 0.18, lifesteal: 0.08 }, b6: { atkPct: 0.28, critDmg: 0.40, lifesteal: 0.10 },
+      text: '2件:暴击+8%　4件:攻击+18%·吸血+8%　6件:攻击+28%·暴击伤害+40%·吸血+10%' },
+    '狼人':   { name: '狼人神装', b2: { hpPct: 0.15 }, b4: { defPct: 0.18, atkPct: 0.12 }, b6: { hpPct: 0.30, defPct: 0.28, atkPct: 0.20 },
+      text: '2件:生命+15%　4件:防御+18%·攻击+12%　6件:生命+30%·防御+28%·攻击+20%' },
+    '修真':   { name: '修真神装', b2: { atkPct: 0.10, hpPct: 0.10 }, b4: { skillPct: 0.20, defPct: 0.12 }, b6: { atkPct: 0.25, hpPct: 0.25, defPct: 0.20, spdPct: 0.10 },
+      text: '2件:攻击+10%·生命+10%　4件:技能伤害+20%·防御+12%　6件:攻击/生命+25%·防御+20%·速度+10%' },
+    '魔法':   { name: '魔法神装', b2: { skillPct: 0.15 }, b4: { spiritPct: 0.20, critPct: 0.06 }, b6: { skillPct: 0.35, atkPct: 0.22, critDmg: 0.30 },
+      text: '2件:技能伤害+15%　4件:精神+20%·暴击+6%　6件:技能伤害+35%·攻击+22%·暴击伤害+30%' },
+    '科技':   { name: '科技神装', b2: { spdPct: 0.15 }, b4: { critPct: 0.08, evaPct: 0.05 }, b6: { spdPct: 0.20, critPct: 0.12, skillPct: 0.25 },
+      text: '2件:速度+15%　4件:暴击+8%·闪避+5%　6件:速度+20%·暴击+12%·技能伤害+25%' },
+    '念动力': { name: '念动神装', b2: { spiritPct: 0.15 }, b4: { skillPct: 0.18, resPct: 0.15 }, b6: { spiritPct: 0.25, skillPct: 0.30, atkPct: 0.18 },
+      text: '2件:精神+15%　4件:技能伤害+18%·异常抗性+15%　6件:精神+25%·技能伤害+30%·攻击+18%' },
+  };
+
+  // 装备实例生成：worldTier 1-36，rarity 指定，slot 指定
+  // opts: { setType: 'plain'|'world'|'class'|'god', classKind, godSet }
   function makeEquip(worldId, slot, rarity, uid, opts) {
     opts = opts || {};
     const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
@@ -484,7 +566,9 @@ window.DATA = (function () {
     const setType = opts.setType || (rarity === 'N' || rarity === 'R' ? 'plain' : 'world');
     let name;
     const names = EQUIP_NAMES[slot][w.theme];
-    if (setType === 'class') name = KIND_NAMES[opts.classKind] + '·' + names[Math.floor(Math.random() * names.length)];
+    const godSet = opts.godSet || Object.keys(GOD_SETS)[0];      // 血统名（'血族' / '修真' …）
+    if (setType === 'god') name = (GOD_SETS[godSet] || GOD_SETS[Object.keys(GOD_SETS)[0]]).name + '·' + names[Math.floor(Math.random() * names.length)];
+    else if (setType === 'class') name = KIND_NAMES[opts.classKind] + '·' + names[Math.floor(Math.random() * names.length)];
     else name = names[Math.floor(Math.random() * names.length)];
     const base = {};
     if (slot === 'weapon') base.atk = Math.round((22 + tier * 20) * mult);
@@ -507,6 +591,7 @@ window.DATA = (function () {
       uid, name, slot, rarity, enhance: 0, base, affixes,
       set: setType === 'world' ? worldId : null,
       classSet: setType === 'class' ? opts.classKind : null,
+      godSet: setType === 'god' ? godSet : null,
     };
   }
 
@@ -638,7 +723,9 @@ window.DATA = (function () {
       '克制环：先锋 → 策略 → 科技 → 异能 → 先锋，克制伤害 +15%。',
     ] },
     { id: 'equip', title: '③ 装备与强化', body: [
-      '装备 6 种品质：N / R / SR / SSR / UR，品质越高基础值和词条越多。',
+      '装备 6 种品质：普通 / 精良 / 稀有 / 史诗 / 传说 / **神话**，品质越高基础值和词条越多。',
+      '神话（血统神装）：残域第 21 张图起，**守关 Boss** 才有概率掉；六套各对应一支血统（血族/狼人/修真/魔法/科技/念动力），' +
+      '只有**同血统的人**穿得上，凑齐 2/4/6 件各有一档效果——末段想继续变强，就靠给主力一人配齐一套。',
       '主角和每名伙伴都是 6 个槽位：武器 / 头部 / 胸甲 / 手部 / 腿部 / 饰品，六个部位都能穿。',
       '强化最高 +20，消耗对应等级的强化材料（不够时用点数代用）+ 异界结晶；强化失败不会降级。',
       '材料按强化等级分 5 档：+0~4 基础金属、+5~9 强化合金、+10~14 异界合金、+15~19 虚空晶体、+20 灯阁残片。',
@@ -662,7 +749,8 @@ window.DATA = (function () {
     { id: 'corridor', title: '⑥ 深井与转生', body: [
       '深井：层数无限递增的终局玩法，奖励深井徽记，可以在深井商店换稀有道具。',
       '深井印记：历史最高层每 10 层积 1 枚（上限 30 枚），每枚在深井内给全队 +1.5% 属性——推不动了就靠它一点点往前啃。',
-      '转生：玩家 Lv.100 + 铭刻 5 阶 + 灯芯 Lv.30 后开启，重置等级与世界进度，换成永久天赋点。',
+      '转生：玩家 Lv.100 + 铭刻 + 灯芯（要求逐次抬高：第 1 次铭刻 2 阶·灯芯 Lv.20，之后 3/30、4/35、5/40）后开启，重置等级与世界进度，换成永久天赋点。',
+      '残域第 13 / 19 / 25 / 31 个世界各有一道转生门：不转生就到不了下一段。转生点数是攒出来的，门只是起步线，不是上限。',
       '转生天赋是永久加成，越早开始攒越划算——但不要为了转生硬堆，先把当前进度打穿。',
       '天赋分四支：永恒之躯（生命/防御/减伤）、无限能源（精神/技能/开场能量）、超维神经（速度/暴击/先制）、灯阁恩赐（挂机/经验/掉落）。每支点满 6200 转生点，量力而行。',
     ] },
@@ -856,6 +944,21 @@ window.DATA = (function () {
     { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 1000 } },
     { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2500 } },
     { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 6250 } },
+  ];
+
+  /* ================= 转生阶梯 =================
+     V9.6.76（长线模拟体检逼出来的改动）：原来的三道转生门**每一道都要"铭刻 5 阶"**，
+     而铭刻 5 阶 = 累计 10250 枚血统结晶。实测（scripts/longrun_sim.js 180 天）：
+     第 60 天到第 180 天，玩家一步都没动过 —— 全程卡在 W17，铭刻只走到 2 阶。
+     也就是说那三道门的实际效果是**把游戏锁死**，不是"该卡就卡"。
+     改成阶梯：第一道门只要铭刻 2 阶（累计 500 枚，第一周就摸得到），越往后越贵，
+     最后一道门才要铭刻 5 阶。门还是门，但每一道都真的迈得过去。
+     第 4 次之后（想一直转生刷天赋的人）沿用最后一档。 */
+  const REINCARN_REQS = [
+    { lv: 100, geneLock: 2, core: 20 },
+    { lv: 100, geneLock: 3, core: 30 },
+    { lv: 100, geneLock: 4, core: 35 },
+    { lv: 100, geneLock: 5, core: 40 },
   ];
 
   /* ================= 建筑 ================= */
@@ -1767,12 +1870,17 @@ window.DATA = (function () {
     const table = DROP_RARITY[diff] || DROP_RARITY.normal;
     let r = Math.random(), acc = 0, result = 'N';
     for (const [rar, p] of table) { acc += p; if (r <= acc) { result = rar; break; } }
-    if (minRarity && RARITIES.indexOf(result) < RARITIES.indexOf(minRarity)) result = minRarity;
+    /* 比较用 **EQUIP_RARITIES**（装备自己的档位表）。
+       以前用的是 RARITIES（角色稀有度）—— 两张表前五项同名所以一直没露馅，
+       加了神话（MYTH）之后角色表里没有它，indexOf 会返回 -1，把最高档判成最低档。 */
+    if (minRarity && EQUIP_RARITIES.indexOf(result) < EQUIP_RARITIES.indexOf(minRarity)) result = minRarity;
     return result;
   }
   function capRarity(rar, cap) {
     if (!cap) return rar;
-    return RARITIES.indexOf(rar) > RARITIES.indexOf(cap) ? cap : rar;
+    const a = EQUIP_RARITIES.indexOf(rar), b = EQUIP_RARITIES.indexOf(cap);
+    if (a < 0 || b < 0) return rar;        // 表里没有的档位不参与封顶（别把神话封成普通）
+    return a > b ? cap : rar;
   }
 
   return {
@@ -1785,9 +1893,10 @@ window.DATA = (function () {
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
+    EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,
     ITEMS,
-    BLOODLINES, BLOODLINE_MAX, bloodlineCost, GENE_LOCKS,
+    BLOODLINES, BLOODLINE_MAX, bloodlineCost, GENE_LOCKS, REINCARN_REQS,
     BUILDINGS, buildingCost,
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
     KEJI, KEJI_COIN, kejiById, kejiCost,

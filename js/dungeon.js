@@ -96,6 +96,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       base.bloodCrystal = diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5;
       base.equipChance = 1;
       base.equipMin = diff === 'hell' ? 'SSR' : 'SR';
+      /* V9.6.76：第 21 张图起，守关 Boss 有概率掉**血统神装（神话）** ——
+         末段真正的成长线在这里（见 data.js 的 GOD_SETS）。只给 Boss，不给杂兵/精英：
+         "刷神话"该是一件有目标的事，不是刷两关就顺出来的货。 */
+      if (tier >= 21) base.mythChance = diff === 'hell' ? 0.35 : diff === 'hard' ? 0.20 : 0.10;
     } else if (kind === 'elite') {
       base.points = Math.round((80 + tier * 40) * rm * 2.5);
       base.exp = Math.round((60 + tier * 20) * rm * 2.5);
@@ -140,6 +144,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       const cap = D.stageDropCap(stage);
       let rarity = guarantee ? guarantee.rarity : D.rollRarity(diff, r.equipMin);
       if (!r.equipMin) rarity = D.capRarity(rarity, cap);   // Boss保底不受上限影响
+      if (r.mythChance && Math.random() < r.mythChance) rarity = 'MYTH';
       const res = Core.grantEquip(worldId, rarity, guarantee ? guarantee.slot : undefined);
       if (res.equip) got.push({ k: 'equip', v: res.equip });
       else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true });

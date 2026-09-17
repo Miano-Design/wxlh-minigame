@@ -1791,8 +1791,21 @@ setParty(['C021']);
 // ---- V8.2 内容扩充：世界 / 道具数量（对标产品是 28 副本、169 道具） ----
 {
   Core.newGame();
-  t('世界扩到 20 个', D.WORLDS.length === 20);
+  t('世界扩到 36 个', D.WORLDS.length === 36);
   t('每个世界都有解锁链（除第一个）', D.WORLDS.every((w, i) => i === 0 ? w.unlock === null : w.unlock === D.WORLDS[i - 1].id));
+  /* V9.6.76：转生门 —— 门要落在"每 6 张一道"，且必须能一路走到最后一张。
+     没有这条断言的话，以后谁把 reincarn 挪错位置（比如门后跟不不上的世界），
+     世界链看起来还是对的，但玩家会被永久卡住。 */
+  t('转生门一次只加一档、且最后一张图本身不是门', (() => {
+    let last = 0;
+    for (const w of D.WORLDS) {
+      const r = w.reincarn || 0;
+      if (!r) continue;
+      if (r !== last + 1) return false;      // 1 → 2 → 3 → 4，不许跳档
+      last = r;
+    }
+    return last === 4 && !D.WORLDS[D.WORLDS.length - 1].reincarn;
+  })());
   t('每个世界都有 3 档 Boss 血量', D.WORLDS.every(w => Array.isArray(w.bossHp) && w.bossHp.length === 3 && w.bossHp[0] > 0));
   // 血量严格递增；攻击允许小幅回落（有几个世界靠机制换强度，不是纯数值爬坡），但不能掉太多
   t('世界血量单调递增', (() => { for (let i = 1; i < D.WORLDS.length; i++) if (D.WORLDS[i].hp <= D.WORLDS[i - 1].hp) return false; return true; })());
@@ -2129,8 +2142,10 @@ setParty(['C021']);
 {
   const missing = ['W15', 'W16', 'W17', 'W18', 'W19', 'W20'].filter(id => !Battle.MECHANICS[id]);
   t('W15~W20 都有世界机制（不再是"只写在文案里"）', missing.length === 0);
-  const worlds = ['W01', 'W02', 'W03', 'W04', 'W05', 'W06', 'W07', 'W08', 'W09', 'W10', 'W11', 'W12', 'W13', 'W14', 'W15', 'W16', 'W17', 'W18', 'W19', 'W20'];
-  t('20 个世界全都有机制', worlds.every(id => Battle.MECHANICS[id] && Battle.MECHANICS[id].note));
+  /* V9.6.76：改成"**每一个**世界都有机制"（原来是手写 20 个 id 的数组）。
+     手写清单的毛病是：加了新世界它不会自己长 —— 36 张图里漏掉 16 张也照样绿。 */
+  t('每一个世界都有机制', D.WORLDS.every(w => Battle.MECHANICS[w.id] && Battle.MECHANICS[w.id].note));
+  t('战斗引擎里没有多余的机制（世界删了、机制没删也是脏）', Object.keys(Battle.MECHANICS).every(id => D.WORLDS.some(w => w.id === id)));
   // 机制要真的跑得动：拿 W16（每回合全队掉血）与 W18（幻觉）各跑一场，确认不崩且有效果
   const spec = {
     name: '测试', kind: 'warrior', faction: null, position: 'front', skills: D.PROTAGONIST.skills, skillLv: [1, 1, 1],

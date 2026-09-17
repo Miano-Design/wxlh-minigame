@@ -21,7 +21,7 @@ for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js']) e
 const Core = window.Core, D = window.DATA;
 
 const LV = Math.max(1, Math.min(100, +(process.argv[2] || 30)));
-const TIER = Math.max(1, Math.min(15, +(process.argv[3] || 3)));
+const TIER = Math.max(1, Math.min(36, +(process.argv[3] || 3)));   // V9.6.76：世界扩到 36 张
 const WORLD = 'W' + String(TIER).padStart(2, '0');
 
 /* ---- 日收入模型（与 design_audit 同一套口径，别各算各的） ---- */
@@ -156,14 +156,23 @@ D.REALMS.forEach((r, i) => {
 });
 if (D.BLOODLINE_UNLOCK_LV > D.PLAYER_MAX_LV) { gateFail.push('血统觉醒门槛超过等级上限'); gate++; }
 {
-  // 转生：Lv.100 + 铭刻 5 + 灯芯 Lv.30 —— 三个门槛都要够得着
-  const need = { lv: 100, geneLock: 5, core: 30 };
-  if (need.lv > D.PLAYER_MAX_LV) { gateFail.push('转生要求等级超过上限'); gate++; }
-  if (need.geneLock > D.GENE_LOCKS.length) { gateFail.push('转生要求铭刻阶数超过上限'); gate++; }
-  if (need.core > 50) { gateFail.push('转生要求灯芯等级超过建筑上限'); gate++; }
+  /* 转生阶梯（V9.6.76）：**每一档**的三个门槛都要够得着，不能只看最后一档。
+     这是"死锁体检"：上一版三次转生都写着"铭刻 5 阶"，长线模拟 180 天证明那根本到不了。 */
+  (D.REINCARN_REQS || []).forEach((need, i) => {
+    const nth = i + 1;
+    if (need.lv > D.PLAYER_MAX_LV) { gateFail.push(`第 ${nth} 次转生要求 Lv.${need.lv} > 等级上限`); gate++; }
+    if (need.geneLock > D.GENE_LOCKS.length) { gateFail.push(`第 ${nth} 次转生要求铭刻 ${need.geneLock} 阶 > 铭刻上限`); gate++; }
+    if (need.core > 50) { gateFail.push(`第 ${nth} 次转生要求灯芯 Lv.${need.core} > 建筑上限`); gate++; }
+  });
+  const reqs = D.REINCARN_REQS || [];
+  if (!reqs.length) { gateFail.push('转生阶梯是空的（转生会变成无门槛）'); gate++; }
+  reqs.forEach((r, i) => {
+    if (i && (r.geneLock < reqs[i - 1].geneLock || r.core < reqs[i - 1].core)) { gateFail.push(`第 ${i + 1} 次转生比上一次还容易（阶梯倒挂了）`); gate++; }
+  });
 }
 console.log('\n=== 门槛 vs 上限（有没有"这辈子到不了"的解锁条件）===');
-console.log(`  铭刻 5 阶要 Lv.${[1, 20, 40, 60, 80].slice(-1)[0]} · 境界 36 阶要 Lv.${D.REALMS[D.REALMS.length - 1].lv} · 转生要 Lv.100 + 铭刻 5 + 灯芯 30 · 评级上限 Lv.${D.SECT_MAX}`);
+console.log(`  铭刻 5 阶要 Lv.${[1, 20, 40, 60, 80].slice(-1)[0]} · 境界 36 阶要 Lv.${D.REALMS[D.REALMS.length - 1].lv} · 评级上限 Lv.${D.SECT_MAX}`);
+console.log('  转生阶梯：' + (D.REINCARN_REQS || []).map((r, i) => `第${i + 1}次=Lv.${r.lv}+铭刻${r.geneLock}+灯芯${r.core}`).join(' · '));
 console.log(gateFail.length ? '  ' + gateFail.map(x => '✗ ' + x).join('\n  ') : '  所有门槛都在上限之内 ✓');
 
 /* ---- 深井曲线单调性 + 段界连续性（V9.5.87 十五度自审新增） ----

@@ -171,7 +171,7 @@
     q_arena:   { page: 'arena',     s: ['arena_fight'],    t: '斗法台：每天 5 次，赢了升一台拿 ◆ + ♜，输了退一台。' },
     q_mount:   { page: 'mount',     s: ['mount_buy:*'],    t: '坐骑：花 ◈ 点数驯服一匹，「乘骑」它给全队加属性。' },
     q_realm:   { page: 'realm',     s: ['realm_try'],      t: '境界渡劫：攒够材料就突破一小阶，全属性永久上涨；失败只扣材料、等级不掉。' },
-    q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：重置等级与世界进度换永久天赋点（条件：Lv.100 + 铭刻 5 阶 + 灯芯 Lv.30）。' },
+    q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：重置等级与世界进度换永久天赋点（条件逐次抬高，第 1 次 Lv.100 + 铭刻 2 阶 + 灯芯 Lv.20）。' },
     /* V9.6.75（父亲大人："你安排"）：再补两条每天都会碰的系统 —— 挂机分工 / 限时悬赏 */
     q_idle:    { page: 'idlelines', s: ['pickleader:*'],   t: '挂机分工：4 条产线各派 1 名领队（看领队**对应那一维**，不是战力）；没派领队的产线不产出。' },
     q_bounty:  { page: 'bounty',    s: ['bounty_claim:*'], t: '限时悬赏：达成后手动领奖，到点作废 —— 别让它白白过期。' },

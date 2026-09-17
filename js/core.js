@@ -434,6 +434,14 @@ window.Core = (function () {
         if (n >= 3 && cs.b3) Object.entries(cs.b3).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
         return;
       }
+      if (setId.startsWith('god:')) {              // 血统神装：2 / 4 / 6 件
+        const gs = D.GOD_SETS[setId.slice(4)];
+        if (!gs) return;
+        if (n >= 2 && gs.b2) Object.entries(gs.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 4 && gs.b4) Object.entries(gs.b4).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 6 && gs.b6) Object.entries(gs.b6).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        return;
+      }
       const set = D.SETS[setId];
       if (!set) return;
       if (n >= 2 && set.b2) Object.entries(set.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
@@ -892,6 +900,8 @@ window.Core = (function () {
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) sets[e.set] = (sets[e.set] || 0) + 1;
       if (e.classSet && e.classSet === base.kind) sets['class:' + e.classSet] = (sets['class:' + e.classSet] || 0) + 1;
+      /* 血统神装：只有**同血统**的人穿上的那几件才算数（V9.6.76） */
+      if (e.godSet && e.godSet === base.bloodline) sets['god:' + e.godSet] = (sets['god:' + e.godSet] || 0) + 1;
     });
     applySetBonuses(pct, sets);
     // 主攻击属性
@@ -978,6 +988,7 @@ window.Core = (function () {
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) psets[e.set] = (psets[e.set] || 0) + 1;
       if (e.classSet && e.classSet === 'warrior') psets['class:warrior'] = (psets['class:warrior'] || 0) + 1;
+      if (e.godSet && e.godSet === S.player.bloodline) psets['god:' + e.godSet] = (psets['god:' + e.godSet] || 0) + 1;
     });
     applySetBonuses(pct, psets);
     // 法宝：数值类并进百分比区（要放在伤害公式之前），效果类并进战斗额外区
@@ -1076,10 +1087,15 @@ window.Core = (function () {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     const slots = slot ? [slot] : D.DROP_SLOTS;
     const s = slots[Math.floor(Math.random() * slots.length)];
-    // 装备类别：普通 / 世界套装 / 职业套装
+    // 装备类别：普通 / 世界套装 / 职业套装 / 血统神装（神话专属）
     let opts = { setType: 'plain' };
     const roll = Math.random();
-    if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
+    /* 神话只会是血统神装，没有"普通神话"这一说。
+       血统怎么挑（V9.6.76）：**七成偏向上阵那 5 个人的血统**，剩下三成六支里随机。
+       全随机的话，想给主力凑一套要刷到天荒地老；全按队伍给又变成"没有选择"。
+       偏差给到七三，既照顾主力，又留着"别的血统也能刷出来"的空间。 */
+    if (rarity === 'MYTH') opts = { setType: 'god', godSet: randomGodSet() };
+    else if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
     else if (rarity === 'SR') opts = roll < 0.7 ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
     else if (rarity === 'SSR' || rarity === 'UR') opts = roll < 0.6 ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
     const eq = D.makeEquip(worldId, s, rarity, uid, opts);
@@ -1104,6 +1120,13 @@ window.Core = (function () {
   function randomKind() {
     const kinds = Object.keys(D.CLASS_SETS);
     return kinds[Math.floor(Math.random() * kinds.length)];
+  }
+  /* 神装该给哪支血统（见 grantEquip 里的说明：七成偏队伍，三成随机） */
+  function randomGodSet() {
+    const sets = Object.keys(D.GOD_SETS);
+    const party = (S.party || []).filter(Boolean).map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] || {}).bloodline)).filter(b => b && D.GOD_SETS[b]);
+    if (party.length && Math.random() < 0.7) return party[Math.floor(Math.random() * party.length)];
+    return sets[Math.floor(Math.random() * sets.length)];
   }
   // SSR 专属装备（UR，绑定角色）
   function grantSignatureEquip(sigId) {
@@ -1340,13 +1363,19 @@ window.Core = (function () {
     save();
     return { ok: true, changed, members: targets.length, detail };
   }
-  // 穿戴规则：专属限本人；职业套装限对应定位（主角=战士）；槽位受角色类型限制（头/手/腿仅主角）
+  // 穿戴规则：专属限本人；职业套装限对应定位（主角=战士）；血统神装限对应血统；槽位受角色类型限制
   function canEquip(charId, eq) {
     if (!eq) return false;
     if (eq.charId && eq.charId !== charId) return false;
     if (charId !== '@player' && !S.chars[charId]) return false;
     const kind = charId === '@player' ? D.PROTAGONIST.kind : (D.charById[charId] || {}).kind;
     if (eq.classSet && eq.classSet !== kind) return false;
+    /* 血统神装：只有同血统的人穿得上（V9.6.76）。
+       这是"凑齐一套"的代价 —— 六件都得是这支血统，别人代穿不算。 */
+    if (eq.godSet) {
+      const bl = charId === '@player' ? S.player.bloodline : (D.charById[charId] || {}).bloodline;
+      if (eq.godSet !== bl) return false;
+    }
     return (charId === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS).includes(eq.slot);
   }
   function unequipItem(charId, slot) {
@@ -2479,9 +2508,21 @@ window.Core = (function () {
 
   /* ================= 世界进度 ================= */
   function unlockWorld(id) {
+    /* V9.6.76（父亲大人："中后期合理关是可以的，不然还没转生或一次转生就通关了，就不好玩了"）：
+       最后几个世界**要求转生次数**才开 —— 满配但不转生也进不去。
+       这样"转生"才是通关路上真正的一环，而不是可有可无的彩蛋。 */
+    const w = D.WORLDS.find(x => x.id === id);
+    if (w && w.reincarn && (S.player.reincarnations || 0) < w.reincarn) return;   // 条件没到：保持锁着
     if (!S.worlds[id]) {
       S.worlds[id] = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+    } else if (!S.worlds[id].unlocked) {
+      S.worlds[id].unlocked = true;
     }
+  }
+  /* 这个世界的转生门槛（0 = 没门槛）；界面用它显示"需要转生 N 次" */
+  function worldReincarnNeed(id) {
+    const w = D.WORLDS.find(x => x.id === id);
+    return (w && w.reincarn) || 0;
   }
   function worldCleared(id, diff) {
     const w = S.worlds[id];
@@ -2789,11 +2830,30 @@ window.Core = (function () {
   }
 
   /* ================= 转生 ================= */
+  /* 这一次转生要什么（V9.6.76：从"三次都要铭刻 5 阶"改成阶梯，见 D.REINCARN_REQS 的说明） */
+  function reincarnNeed(count) {
+    const list = D.REINCARN_REQS || [];
+    if (!list.length) return { lv: 100, geneLock: 5, core: 30 };
+    const i = Math.min(Math.max(0, count === undefined ? (S.player.reincarnations || 0) : count), list.length - 1);
+    return list[i];
+  }
+  function reincarnGap(count) {
+    const r = reincarnNeed(count);
+    return {
+      lv: Math.max(0, r.lv - S.player.level),
+      geneLock: Math.max(0, r.geneLock - S.player.geneLock),
+      core: Math.max(0, r.core - (S.buildings.core || 0)),
+    };
+  }
   function canReincarnate() {
-    return S.player.level >= 100 && S.player.geneLock >= 5 && S.buildings.core >= 30;
+    const g = reincarnGap();
+    return !g.lv && !g.geneLock && !g.core;
   }
   function reincarnate() {
-    if (!canReincarnate()) return { ok: false, msg: '条件未满足（玩家Lv100 + 铭刻5阶 + 灯芯Lv30）' };
+    if (!canReincarnate()) {
+      const r = reincarnNeed();
+      return { ok: false, msg: `条件未满足（玩家 Lv.${r.lv} + 铭刻 ${r.geneLock} 阶 + 灯芯 Lv.${r.core}）` };
+    }
     const n = S.player.reincarnations + 1;
     const rp = Math.floor(100 * Math.pow(n, 1.15));
     S.player.reincarnations = n;
@@ -3205,8 +3265,8 @@ window.Core = (function () {
     todayState, claimEverything, nextStage,
     bountyState, claimBounty, renewBounties, realmState, realmBonusPct, attemptRealm, realmChainOf, pityView, pityOf,
     beastState, hatchBeast, setActiveBeast, beastLevelUp, beastPct, activeBeastElem, elementMultiplier,
-    setPendingRun, clearPendingRun, corridorMarks, corridorMarkBonus,
-    canReincarnate, reincarnate, buyTalent,
+    setPendingRun, clearPendingRun, corridorMarks, corridorMarkBonus, worldReincarnNeed,
+    canReincarnate, reincarnate, reincarnNeed, reincarnGap, buyTalent,
     codexState, claimCodexReward,
     battleSettle, addCharExp, addPlayerBattleExp, graceExpMult, graceDropMult, graceIdleMult, talentAll,
   };

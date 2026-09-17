@@ -40,6 +40,26 @@ window.Battle = (function () {
     W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉/死亡复活' },
     W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '星骸护盾/轨道扫射' },
     W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
+    /* W21~W36（V9.6.76 世界扩到 36 张时补的）。
+       规矩照旧：**世界表上写什么，战斗引擎里就得真有什么** —— W15~W20 当年就是这个坑
+       （文案写着吸血/水压，引擎里落空，180 关纯数值怪）。这里 16 条逐条对上，
+       规则名也改成可配置的（镜界/灯阁说的不是同一句话）。 */
+    W21: { onEnemyHit(t, fr) { if (Math.random() < 0.28) applyStatus(t, fr, 'weak', 2); }, enemyShield: 0.15, note: '静默/护幕' },
+    W22: { enemyShield: 0.22, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '锈壳护盾/电磁干扰' },
+    W23: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, bossSummon: true, note: '感染/召唤幼体' },
+    W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '腐化/焚香灼烧' },
+    W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '规则轮转/镜面幻觉' },
+    W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '培养护盾/轨道扫射' },
+    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤恶鬼/吸血' },
+    W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '中毒/藤蔓缠绕' },
+    W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '诅咒/碑灵复活' },
+    W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '灼烧/炉温强化' },
+    W31: { confuseChance: 0.18, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '幻觉/诅咒' },
+    W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '规则改写/灯影压制' },
+    W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.20, note: '撕裂/吞噬护盾' },
+    W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '冰冻/时序加速' },
+    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '吸血/摆渡' },
+    W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
   };
 
   let uidSeq = 0;
@@ -223,7 +243,8 @@ window.Battle = (function () {
           : rule === 'spdUp' ? { kind: 'buff', buff: { spdPct: 0.15 } }
             : { kind: 'debuff', buff: { defPct: -0.2 } };
         pool.forEach(u => { if (u.hp > 0) addStatus(u, st.kind, 2, st.buff); });
-        frames.push({ type: 'rule', text: rule === 'atkUp' ? '灯阁规则：敌方攻击提升' : rule === 'defDown' ? '灯阁规则：我方防御下降' : '灯阁规则：敌方速度提升' });
+        const ruleWho = mech.ruleName || '灯阁规则';   // 镜界法庭、万灯之座说的不是同一句话
+        frames.push({ type: 'rule', text: rule === 'atkUp' ? `${ruleWho}：敌方攻击提升` : rule === 'defDown' ? `${ruleWho}：我方防御下降` : `${ruleWho}：敌方速度提升` });
       }
       // 回合开始：DOT / 恢复
       for (const u of all) {
