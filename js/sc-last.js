@@ -382,6 +382,8 @@
       CV.text('残域 V' + (G.GAME_VER || ''), CV.W / 2, U.y + 8 * CV.SCALE,
         { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     });
+    /* 版本号连点 7 下进调试面板（和网页版同一个暗门，父亲大人要的"GM 后门"） */
+    CV.hit('gm_tap', CV.W / 2 - 70 * CV.SCALE, U.y, 140 * CV.SCALE, 18 * CV.SCALE);
     U.space(18 * CV.SCALE);
   }
   CV.register('settings', settingsPage);
@@ -469,6 +471,70 @@
       Core.wipeSave();
       CV.reset('welcome');
     });
+  });
+
+  /* ---------- GM 调试页（V9.6.12，父亲大人："小程序的 GM 后门先给我开开"）----------
+     小游戏原来**没有** GM 面板，导致很多界面（没解锁的 / 需要资源的）根本进不去。
+     这里补一个：设置与存档 → 连点版本号 7 次进入。能 ① 直接跳任意页面 ② 一键发资源。 */
+  let gmTaps = 0, gmTimer = null;
+  CV.on('gm_tap', function () {
+    gmTaps++;
+    clearTimeout(gmTimer);
+    gmTimer = setTimeout(function () { gmTaps = 0; }, 2000);
+    if (gmTaps >= 7) { gmTaps = 0; CV.push('gm'); }
+    else if (gmTaps >= 3) CV.toast('再点 ' + (7 - gmTaps) + ' 下打开调试面板');
+  });
+  CV.register('gm', function () {
+    const S = Core.S;
+    U.begin();
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
+    CV.text('调试面板（GM）', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.card(function () {
+      U.h3('一键发资源');
+      U.btnRow([
+        { label: '◈ 点数 +10万', style: 'ghost', id: 'gm_points' },
+        { label: '✦ 圣洁 +1万', style: 'ghost', id: 'gm_holy' },
+      ]);
+      U.space(CV.SP[1]);
+      U.btnRow([
+        { label: '◆ 结晶 +1万', style: 'ghost', id: 'gm_other' },
+        { label: '❖ 故事 +1万', style: 'ghost', id: 'gm_story' },
+      ]);
+      U.space(CV.SP[1]);
+      U.btnRow([
+        { label: '🎫 普通券 ×100', style: 'ghost', id: 'gm_tk' },
+        { label: '🔓 全解锁', style: 'primary', id: 'gm_unlock' },
+      ]);
+    });
+    U.card(function () {
+      U.h3('跳转到任意页面', Object.keys(CV.panels).length + ' 页');
+      /* 每页一颗小按钮。CV.panels 里注册过的都能进，包括平时解锁不了的那些。 */
+      const keys = Object.keys(CV.panels).sort();
+      const cols = 3, gap = 8 * CV.SCALE;
+      const w = (U.iw() - gap * (cols - 1)) / cols, h = 32 * CV.SCALE;
+      const y0 = U.y;
+      keys.forEach(function (k, i) {
+        const x = U.ix() + (i % cols) * (w + gap);
+        const y = y0 + Math.floor(i / cols) * (h + gap);
+        U.btn(x, y, w, h, k, 'ghost', 'gm_go:' + k);
+      });
+      U.y = y0 + Math.ceil(keys.length / cols) * (h + gap);
+    });
+    U.hint('当前：' + CV.top().name + ' · 存档 v' + (S.v || '?') + ' · 点页面名直接跳过去', 4 * CV.SCALE);
+  });
+  CV.on('gm_go:*', function (k) { CV.reset(k); });
+  CV.on('gm_points', function () { Core.addCur('points', 100000); CV.toast('◈ +10万'); CV.render(); });
+  CV.on('gm_holy', function () { Core.addCur('holy', 10000); CV.toast('✦ +1万'); CV.render(); });
+  CV.on('gm_other', function () { Core.addCur('otherworld', 10000); CV.toast('◆ +1万'); CV.render(); });
+  CV.on('gm_story', function () { Core.addCur('story', 10000); CV.toast('❖ +1万'); CV.render(); });
+  CV.on('gm_tk', function () {
+    Core.addItem('ticket_normal', 100); Core.addItem('ticket_adv', 100);
+    CV.toast('招募券 +100'); CV.render();
+  });
+  CV.on('gm_unlock', function () {
+    D.UNLOCKS.forEach(function (u) { Core.S.unlocks[u.id] = true; });
+    Core.save(); CV.toast('功能全解锁'); CV.render();
   });
 
   /* ---------- 挂机分工 ---------- */

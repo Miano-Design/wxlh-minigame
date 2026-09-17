@@ -537,7 +537,8 @@ body {
 /* V9.3：分类胶囊比主标签小一号——主标签 > 分类 > 内容，层次一眼分得出来。
    仍然留 2.125rem 高（不小于手指能点中的尺寸），只是视觉上退到第二层。 */
 .pill-tabs.tight { gap: 0.25rem; padding-bottom: 0; flex-wrap: wrap; overflow: visible; }
-.pill.sm { min-height: 2.125rem; padding: 0.3125rem 0.6875rem; font-size: 0.6875rem; }
+/* V9.6.12（父亲大人）：分类/部位这些小胶囊做得更小 —— 34 高在手机上显得很笨重 */
+.pill.sm { min-height: 1.75rem; padding: 0.1875rem 0.5rem; font-size: 0.6875rem; }
 
 /* ---------- 页面顶部的主标签：矩形卡片 + 吸顶（V9.5.2，父亲大人定的） ---------- */
 /* 背包（道具/材料/装备）与执灯者（队伍/伙伴/成长）共用这一套：
@@ -556,14 +557,24 @@ body {
   background: rgba(11, 14, 21, .96);
   backdrop-filter: blur(0.375rem);
 }
+/* V9.6.12（父亲大人）：三个主标签就是"词 + 竖线"，不画外框；
+   选中的那个高亮、下面一条金色下划线。 */
 .tab-cards .tab-card {
-  flex: 1 1 0; min-width: 0; min-height: 2.75rem;
+  flex: 1 1 0; min-width: 0; min-height: 2rem; position: relative;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--panel); color: var(--dim);
-  font-size: var(--fs-md); font-weight: 600; cursor: pointer;
+  border: none; background: none; color: var(--dim);
+  font-size: var(--fs-lg); font-weight: 600; cursor: pointer;
 }
-.tab-cards .tab-card.active { color: #fff; border-color: var(--accent); background: #d43a4f22; }
+/* 竖线分隔：画在每张卡的左边界（第一张不画） */
+.tab-cards .tab-card + .tab-card::before {
+  content: ''; position: absolute; left: -0.3125rem; top: 22%; bottom: 22%;
+  width: 1px; background: var(--line2);
+}
+.tab-cards .tab-card.active { color: var(--gold); }
+.tab-cards .tab-card.active::after {
+  content: ''; position: absolute; left: 26%; right: 26%; bottom: 0.1875rem;
+  height: 2px; border-radius: 2px; background: var(--gold);
+}
 /* 分类条右边的"计数 / 批量分解"：跟分类同层，不再压到内容最下面 */
 .eq-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.6875rem; color: var(--dim); }
 .eq-bar .push { margin-left: auto; }
@@ -571,8 +582,7 @@ body {
 
 /* 背包（V9.2）：三池格子制——道具 / 材料 / 装备各 50 格起，
    格子只写名字和数量，末尾多一格「＋」用来扩容（+10 格一次）。 */
-.bg-head { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.75rem; margin-bottom: 0.5rem; }
-.bg-head .sub { color: var(--dim); font-size: 0.6875rem; }
+/* V9.6.12：.bg-head（格子上面那行「道具格 2/50」）跟着行一起删了，类也清掉 */
 .bg-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.375rem; }
 .bg-slot {
   aspect-ratio: 1 / 1; min-height: 3.875rem; border-radius: 0.625rem;

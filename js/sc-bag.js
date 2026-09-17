@@ -29,17 +29,18 @@
   let eqCat = 'all', eqSlot = 'all';
   /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字） */
   function pillRow(list, cur, prefix) {
-    const h = 40 * CV.SCALE, gap = 6 * CV.SCALE, top = U.y;
+    /* V9.6.12（父亲大人）：这一排原来 40 高，在手机上显得很笨重 → 收到 28 */
+    const h = 28 * CV.SCALE, gap = 6 * CV.SCALE, top = U.y;
     let x = U.pad();
     list.forEach(function (t) {
       const on = cur === t[0];
-      const w = CV.measure(t[1], CV.FS.sm) + 22 * CV.SCALE;
+      const w = CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE;
       CV.round(x, top, w, h, 999, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.sm, align: 'center', color: on ? '#fff' : CV.C.dim });
+      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit(prefix + t[0], x, top, w, h);
       x += w + gap;
     });
-    U.y = top + h + 8 * CV.SCALE;
+    U.y = top + h + 6 * CV.SCALE;
   }
   /* .eq-bar：左边「未穿戴 x / y 格」，右边「🧹 批量分解」（开了批量就换成一行状态文字） */
   function eqBarRow() {
@@ -136,18 +137,28 @@
   function tabCards() {
     /* 只占位（标签本身由 CV.sticky 画）：让内容从"标签 + 下面那条空"之后开始。
        内容原点在顶栏下方 8px，标签从顶栏下方 TAB_TOP_GAP 起，所以减掉这 8px 的基准差。 */
-    U.y += U.BTN_H * CV.SCALE + TAB_TOP_GAP + TAB_SAFE_GAP - 8 * CV.SCALE;
+    U.y += 32 * CV.SCALE + TAB_TOP_GAP + TAB_SAFE_GAP - 8 * CV.SCALE;   // 32 = 标签行高（跟 drawTabCards 一致）
   }
   /* 在给定 y（屏幕坐标）画三张标签卡 */
   function drawTabCards(y) {
-    const gap = CV.SP[2], h = U.BTN_H * CV.SCALE;
-    const w = (U.cw() - gap * (TABS.length - 1)) / TABS.length;
+    /* V9.6.12（父亲大人："直接用这样表示就行，不用画外框，选到那个就高亮、下面加一条线"）：
+       三个词均分整行、中间用竖线分隔，选中的走金色 + 下面一条金色下划线。 */
+    const h = 32 * CV.SCALE;
+    const w = U.cw() / TABS.length;
     const mode = CV.hitMode;
     TABS.forEach(function (t, i) {
-      const x = U.pad() + i * (w + gap);
+      const x = U.pad() + i * w;
       const on = view === t[0];
-      CV.round(x, y, w, h, CV.RADIUS_SM, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
+      if (i) {   // 竖线分隔（第一张左边不画）
+        CV.ctx.strokeStyle = CV.C.line2; CV.ctx.lineWidth = 1;
+        CV.ctx.beginPath();
+        CV.ctx.moveTo(x - .5, y + h * 0.22); CV.ctx.lineTo(x - .5, y + h * 0.78);
+        CV.ctx.stroke();
+      }
+      CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.lg, bold: true, align: 'center', color: on ? CV.C.gold : CV.C.dim });
+      if (on) {  // 选中：下面一条金色下划线（左右各留 26%）
+        CV.round(x + w * 0.26, y + h - 5 * CV.SCALE, w * 0.48, 2 * CV.SCALE, 2 * CV.SCALE, CV.C.gold);
+      }
       CV.hit('bagview:' + t[0], x, y, w, h);
     });
     CV.hitMode = mode;
@@ -226,7 +237,7 @@
          页面是竖向渐变，平色会显出一条接缝（父亲大人说的"边框"）。
          这里把**和页面完全同一条渐变**重画一遍、只填这一条带：
          颜色逐像素对上，等于没画底，却又能挡住内容。 */
-      const h = U.BTN_H * CV.SCALE;
+      const h = 32 * CV.SCALE;    // 标签行高（和 drawTabCards / 占位一致）
       const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
       bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
       CV.ctx.fillStyle = bgGrad;
@@ -283,14 +294,8 @@
        上一版排格子的循环只补了空格，把这一格漏掉了（grid() 里画 add 格的分支一直没被触发）。 */
     cells.push({ add: true });
     U.card(function () {
-      const full = used >= cap;
-      const top = U.y;
-      CV.text(pool.label, U.ix(), top + 9 * CV.SCALE, { size: CV.FS.lg, bold: true });
-      /* V9.6.8：「🧹 批量分解」搬去上面的 .eq-bar 行（原来挤在这一行、贴着卡片上沿），
-         标题行就只剩「装备格」+ 数量，不再有两截数字叠在一起的问题。 */
-      CV.text(used + ' / ' + cap + (full ? ' · 满了' : ''), U.ix() + U.iw(), top + 9 * CV.SCALE,
-        { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
-      U.y = top + 26 * CV.SCALE;
+      /* V9.6.12（父亲大人："这些文字都去掉"）：格子上面那行「XX格 N / 50」撤掉 ——
+         格子本身已经把内容说清楚了，多一行标题只是白占一条高度。 */
       grid(cells, used, cap, 'bag_expand:' + view, cost, false);
     });
     if (view === 'equip' && batchMode) CV.pageOverlay = batchBar;
