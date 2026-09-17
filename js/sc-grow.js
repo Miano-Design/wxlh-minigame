@@ -22,13 +22,13 @@
     const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
     const kejiLv = D.KEJI.reduce((s, k) => s + Core.kejiLv(k.id), 0);
     const rows = [
-      { act: 'open_buildings', unlock: 'buildings', ico: '🏗', name: '基地建设', cur: '五栋合计 Lv.' + bLv,
+      { act: 'open_buildings', unlock: 'buildings', ico: '🏗', name: '基地建设', cur: 'Lv.' + bLv + ' / ' + Object.keys(S.buildings).length * 50,
         desc: '花 ◈ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
       { act: 'open_authority', unlock: 'buildings', ico: '🔑', name: '灯阁权限', cur: 'Lv.' + au.lv + ' / ' + au.max,
         desc: '花 ✦ 圣洁晶石 + ◆ 异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
       { act: 'open_sect', unlock: null, ico: '🏯', name: '灯阁评级', cur: 'Lv.' + Core.sectInfo().lv + ' / ' + D.SECT_MAX,
         desc: '打关卡自动涨的全局评级，每级全队全属性 +0.5%，不用手动点' },
-      { act: 'open_keji', unlock: null, ico: '📜', name: '秘术阁', cur: '已修 ' + kejiLv + ' 级',
+      { act: 'open_keji', unlock: null, ico: '📜', name: '秘术阁', cur: '已修 ' + kejiLv + ' / ' + D.KEJI.reduce(function (a, k) { return a + k.max; }, 0) + ' 级',
         desc: D.KEJI.length + ' 条百分比长线（战斗 + 挂机经济），花 ◆ 异界结晶，点一下立刻生效' },
       { act: 'open_fabao', unlock: null, ico: '🔮', name: '法宝', cur: '已得 ' + Core.fabaoState().own.length + ' / ' + D.FABAO.length + ' 件',
         desc: '装备给数值、法宝给效果（吸血 / 开场能量 / 减伤），主角同时带 1 件，花 ◆ 异界结晶买' },

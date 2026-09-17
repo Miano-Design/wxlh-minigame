@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.22';
+  const GAME_VER = '9.6.23';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -580,13 +580,13 @@ window.UI = (function () {
     const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
     const rows = [
       { act: 'open-buildings', unlock: 'buildings', ico: '🏗', name: '基地建设',
-        cur: `五栋合计 Lv.${bLv}`, desc: '花 ◈ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
+        cur: `Lv.${bLv} / ${Object.keys(S.buildings).length * 50}`, desc: '花 ◈ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
       { act: 'open-authority', unlock: 'buildings', ico: '🔑', name: '灯阁权限',
         cur: `Lv.${au.lv} / ${au.max}`, desc: '花 ✦ 圣洁晶石 + ◆ 异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
       { act: 'open-sect', unlock: null, ico: '🏯', name: '灯阁评级',
         cur: `Lv.${C().sectInfo().lv} / ${D.SECT_MAX}`, desc: '打关卡自动涨的全局评级，每级全队全属性 +0.5%，不用手动点' },
       { act: 'open-keji', unlock: null, ico: '📜', name: '秘术阁',
-        cur: `已修 ${D.KEJI.reduce((s, k) => s + C().kejiLv(k.id), 0)} 级`,
+        cur: `已修 ${D.KEJI.reduce((s, k) => s + C().kejiLv(k.id), 0)} / ${D.KEJI.reduce((s, k) => s + k.max, 0)} 级`,
         desc: `${D.KEJI.length} 条百分比长线（战斗 + 挂机经济），花 ◆ 异界结晶，点一下立刻生效` },
       { act: 'open-fabao', unlock: null, ico: '🔮', name: '法宝',
         cur: `已得 ${C().fabaoState().own.length} / ${D.FABAO.length} 件`,
@@ -766,7 +766,7 @@ window.UI = (function () {
       </div>
       <div class="idle-line idle-mini">
         <span class="il-k">【分工】</span>
-        <!-- V9.6.22（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
+        <!-- V9.6.23（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
              颜色本身就是状态：没派领队（没激活）灰、派了（激活）金。 -->
         <span class="il-s">${lines.map(l => `<span style="color:${l.leaderId ? 'var(--gold)' : 'var(--dim)'}">${l.line.name}</span>`).join('<span style="color:var(--line2)"> · </span>')}</span>
       </div>
@@ -1533,14 +1533,14 @@ window.UI = (function () {
         toast(`${D.charById[id].name} 已上阵${sw.inheritLv ? `，继承 Lv.${sw.inheritLv}` : ''}`
           + `${sw.moved ? `，带走 ${sw.moved} 件装备` : ''}`
           + `${sw.outId ? `（${D.charById[sw.outId].name} 已下阵）` : ''}`, 2600);
-        /* V9.6.22（父亲大人）：换完之后**回队伍界面**，不要停在新伙伴的详情里 ——
+        /* V9.6.23（父亲大人）：换完之后**回队伍界面**，不要停在新伙伴的详情里 ——
            换将本来就是在队伍页反复调阵，停在详情里还得先退出来。（上一版的 charDetail 撤掉） */
       };
     });
   }
 
   /* ================= 角色 ================= */
-  /* V9.6.22（父亲大人）：执灯者的**分类和排序两行都删掉了** ——
+  /* V9.6.23（父亲大人）：执灯者的**分类和排序两行都删掉了** ——
      "默认的排序顺序就已经能很好的区分这些了，没必要了"。
      所以这里只保留一条默认顺序（上阵优先 → 等级 → 稀有度 → 星级），
      charFilter / charSort / CHAR_SORTS 连同它们的入口一起删，不留"没有 UI 的状态"。 */
@@ -1590,10 +1590,10 @@ window.UI = (function () {
     const S = C().S;
     const cs = C().codexState();
     return `
-      <!-- V9.6.22（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
+      <!-- V9.6.23（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
            默认顺序已经够用。图鉴留着，还是在这一行的右上角。 -->
       <div class="filter-bar">
-        <!-- V9.6.22（父亲大人）："已收集"这行本来就该跟图鉴**同一行**（左边文字、右边按钮），
+        <!-- V9.6.23（父亲大人）："已收集"这行本来就该跟图鉴**同一行**（左边文字、右边按钮），
              单独占一行纯属浪费一条高度。小游戏那边上一轮已经这么改了，网页版漏了 —— 现在补上。 -->
         <span style="font-size:0.6875rem;color:var(--dim)">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</span>
         <button class="btn small ghost push" data-act="open-codex" style="margin-left:auto">图鉴</button>
@@ -1622,7 +1622,7 @@ window.UI = (function () {
     const skillNames = ['技能1', '技能2', '必杀技'];
     const expItems = Object.entries(S.items).filter(([k]) => D.ITEMS[k] && D.ITEMS[k].type === 'exp');
     const w = showPanel(wrap, `${cname(id)}`, `
-      <!-- V9.6.22（父亲大人）：从队伍点进来的「队伍操作」原来压在最底下，要滑半天才够得着。
+      <!-- V9.6.23（父亲大人）：从队伍点进来的「队伍操作」原来压在最底下，要滑半天才够得着。
            现在挪到**等级上面** —— 进这一页最想做的就是换将/下阵。 -->
       ${opts.fromSlot !== undefined ? `
       <div class="card" style="border-color:#e6b64c66">
@@ -1871,7 +1871,7 @@ window.UI = (function () {
     return shown;
   }
   function equipFilterBar() {
-    /* V9.6.22（父亲大人）：装备页的分类**保留**，但去掉「普通」和「SSR+」两枚 ——
+    /* V9.6.23（父亲大人）：装备页的分类**保留**，但去掉「普通」和「SSR+」两枚 ——
        "普通"跟"全部"几乎重合、看不出区别；"SSR+"原来挂在部位那一行末尾，
        七个部位 + 它正好挤到第三行、孤零零一个，看着像掉出来的。 */
     const filters = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
@@ -1948,7 +1948,7 @@ window.UI = (function () {
           return `<div class="kv"><span class="k"${on ? ' style="color:var(--gold)"' : ''}>${part.slice(0, i + 1)}</span>`
             + `<span style="color:${on ? 'var(--gold)' : 'var(--dim)'}">${part.slice(i + 1)}${on ? ' · 已激活' : ''}</span></div>`;
         }).join('')}
-        <!-- V9.6.22（父亲大人）：这行解释多余 —— 件数写的是 0/3、效果一条条都列着，
+        <!-- V9.6.23（父亲大人）：这行解释多余 —— 件数写的是 0/3、效果一条条都列着，
              不用再解释一遍为什么是 0。删掉。 -->
       </div>`;
       if (cs) return mk('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
@@ -2797,7 +2797,7 @@ window.UI = (function () {
       </div>
       ${rows.map(r => {
       const leader = r.leaderId;
-      /* V9.6.22（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
+      /* V9.6.23（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
          派了领队才算激活，标题 / 产出 / 边框一律金色高亮。一眼就能看出哪条线在干活。
          灰色只压文字与边框，操作按钮（＋ 派一名领队）保持正常，别看着像点不动。 */
       return `<div class="card" style="${leader
@@ -2805,7 +2805,7 @@ window.UI = (function () {
         : 'border-style:dashed;border-color:var(--line)'}">
         <h3 style="color:${leader ? 'var(--gold)' : 'var(--dim)'}">${r.line.ico} ${r.line.name}
           <span class="sub" style="${leader ? 'color:var(--gold)' : ''}">${r.per}</span></h3>
-        <!-- V9.6.22（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
+        <!-- V9.6.23（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
              外面只留"这条线在不在干活"（颜色）+ 一个入口。 -->
         <div class="hint mb2"${leader ? '' : ' style="color:var(--dim);opacity:.85"'}>${r.line.desc}</div>
         <button class="btn small block" data-idlepick="${r.line.id}" ${leader || bench.length ? '' : 'disabled'}>${
@@ -2829,7 +2829,7 @@ window.UI = (function () {
     const line = D.IDLE_LINES.find(l => l.id === lineId);
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const cur = S.idle.lines[lineId];
-    /* V9.6.22（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
+    /* V9.6.23（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
        所以这一层要先把自己当前的领队摆出来（含撤下），下面才是备选名单。 */
     const curBlock = cur ? `
       <div class="card" style="border-color:#e6b64c66">
@@ -3426,7 +3426,7 @@ window.UI = (function () {
     // 筛选状态下**不补空格子**：筛出 3 件武器后面跟着 47 个空格，玩家会以为筛选没生效（V9.5）。
     const filtering = pool === 'equip' && (equipFilter !== 'all' || equipCatFilter !== 'all');
     if (!filtering) while (cells.length < cap) cells.push(bagEmptyCell());
-    /* V9.6.22（父亲大人："这些文字都去掉"）：格子上面那行「道具格 2/50」撤掉 ——
+    /* V9.6.23（父亲大人："这些文字都去掉"）：格子上面那行「道具格 2/50」撤掉 ——
        格子本身已经把内容说清楚了，多一行标题只是白占一条高度。 */
     return `
       <div class="bg-grid">
@@ -3456,7 +3456,7 @@ window.UI = (function () {
   }
   // 背包作为一级页签：三栏共用一条顶部胶囊
   function bagScreen() {
-    /* V9.6.22（父亲大人）：三个主标签不再画外框 —— 就是三个词 + 竖线分隔，
+    /* V9.6.23（父亲大人）：三个主标签不再画外框 —— 就是三个词 + 竖线分隔，
        选中的那个高亮 + 下面一条金色下划线。仍然吸在顶栏（货币条）下方。 */
     return `<div class="tab-cards">
         ${BAG_TABS.map(t => `<div class="tab-card ${bagView === t.id ? 'active' : ''}" data-bagview="${t.id}"><span class="tc-t">${t.name}</span></div>`).join('')}
@@ -3986,7 +3986,7 @@ window.UI = (function () {
           <div class="b-row allies back"></div>
         </div>
       </div>
-      <!-- V9.6.22（父亲大人）：速度 / 撤离 从顶部挪到**右下角、战斗日志上面**（和小游戏一致） -->
+      <!-- V9.6.23（父亲大人）：速度 / 撤离 从顶部挪到**右下角、战斗日志上面**（和小游戏一致） -->
       <div class="b-actions">
         <button class="btn small ghost" data-speedbtn>${S.settings.speed}×速度</button>
         <!-- V9.5.66：跳过战斗撤掉之后补的「撤离」——不想打了能退出去，不用等这几十帧放完。 -->
@@ -4664,7 +4664,7 @@ switch (act) {
     });
     root.querySelectorAll('[data-char]').forEach(el => el.onclick = () => charDetail(el.dataset.char));
     root.querySelectorAll('[data-eqd]').forEach(el => el.onclick = () => equipDetail(el.dataset.eqd));
-    /* [data-filter] / [data-charsort] 随执灯者的分类+排序一起删掉了（V9.6.22） */
+    /* [data-filter] / [data-charsort] 随执灯者的分类+排序一起删掉了（V9.6.23） */
     root.querySelectorAll('[data-efilter]').forEach(el => el.onclick = () => { equipFilter = el.dataset.efilter; render(); });
     root.querySelectorAll('[data-ecat]').forEach(el => el.onclick = () => { equipCatFilter = el.dataset.ecat; render(); });
     // 批量分解
