@@ -101,7 +101,8 @@
     ];
     C.forEach(function (row) {
       if (row[0] !== page) return;
-      U.coach(row[1], row[2]);
+      /* 页面级的基础引导也走「必须点中」（父亲大人要的是完全强制）—— 之前这几个是「看到就过」。 */
+      U.coach(row[1], row[2], { key: 'tut_page_' + row[0] + '_' + [].concat(row[1]).join('_'), mustTap: true, queue: true });
     });
   };
 
