@@ -100,6 +100,14 @@
       t: '主线让你打副本：进「残域」，点这个世界，再点第 1 关就开打。' },
     { key: 'tour_world', page: 'world',   s: ['stage:0'],
       t: '点第 1 关就开始 —— 一关要一口气打完所有波次，血量继承、不会自动回满。' },
+    /* V9.6.44：链子接着往下走 —— 打完回来领奖励 → 去招募 → 去队伍上阵。
+       这几步也是"进到对应页面且没讲过就播"，所以哪怕玩家中途退出，下次进那一页也会续上。 */
+    { key: 'tour_back',   page: 'home',    s: ['claim_quest', 'goto_quest'],
+      t: '打完了？回首页把这一步的奖励领掉 —— 主线奖励不领，后面那步不会解锁。' },
+    { key: 'tour_rec',    page: 'recruit', s: ['pull1:normal', 'pull1:normal:free'],
+      t: '主线下一步要一名伙伴：每天有免费抽，先用掉 —— 免费抽也计入主线。' },
+    { key: 'tour_team',   page: 'party',   s: ['pslot:0', 'pslot:1', 'pslot:2'],
+      t: '抽到的伙伴来这儿上阵：点空格子放人；长按任意一格可以拖着换位置。' },
   ];
   G.tourNext = function () {
     const S = Core.S;
