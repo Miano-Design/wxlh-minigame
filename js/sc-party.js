@@ -163,7 +163,10 @@
     CV.text('无损换将', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     const from = G.__swapFrom;
-    const own = Object.keys(S.chars).filter((id) => id !== from && S.party.indexOf(id) < 0);
+    /* V9.6.19（父亲大人）：换将列表的排序要**跟执灯者那边一样** ——
+       直接复用 G.charSortDefault（那边是唯一实现），不再各排各的。 */
+    const own = (G.charSortDefault ? G.charSortDefault(Object.keys(S.chars)) : Object.keys(S.chars))
+      .filter((id) => id !== from && S.party.indexOf(id) < 0);
     U.card(function () {
       U.h3('换谁上阵', own.length + ' 名可选');
       U.hint('新上阵的继承被换下那位的等级；装备能穿的一起转过去，穿不了的留在原伙伴身上。', 4 * CV.SCALE);

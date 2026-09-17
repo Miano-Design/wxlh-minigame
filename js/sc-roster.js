@@ -33,16 +33,23 @@
   const rarIdx = (id) => D.RARITIES.indexOf(D.charById[id].rarity);
   /* 卡片右下角「未穿装备 / 可升级」要用它（V9.6.8 删排序时误删过一次，卡片只画出一张就抛异常了） */
   const eqCount = (id) => Object.keys(Core.S.equipped[id] || {}).filter((k) => Core.S.equipped[id][k]).length;
-  function listSorted() {
+  /* 默认排序的**唯一实现**：上阵 → 等级 → 稀有度 → 星级（父亲大人定的）。
+     V9.6.19：换将页（sc-party）也要用同一套顺序，所以挂到 G 上共用一份，
+     不要各写一遍 —— 两处排序一旦分家，就会出现"这边和那边不一样"。 */
+  G.charSortDefault = function (ids) {
     const S = Core.S;
-    /* 网页版默认排序（父亲大人定的）：上阵 → 等级 → 稀有度 → 星级 */
-    return Object.keys(S.chars).sort((a, b) => {
+    return [].concat(ids).sort((a, b) => {
       const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
       if (pa !== pb) return pb - pa;
       if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
       if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
       return S.chars[b].star - S.chars[a].star;
     });
+  };
+  function listSorted() {
+    const S = Core.S;
+    /* 网页版默认排序（父亲大人定的）：上阵 → 等级 → 稀有度 → 星级 */
+    return G.charSortDefault(Object.keys(S.chars));
   }
 
   CV.register('roster', function () {
@@ -154,6 +161,19 @@
       U.y = top + h;
     });
 
+    /* ② 队伍操作（从队伍点进来才有）—— V9.6.19（父亲大人）：从"装备下面"挪到**等级上面**。
+       「换将 / 下阵」是进这一页最想做的事，压在最底下得滑半天；现在跟身份信息挨着。 */
+    if (opts && opts.fromSlot !== undefined && opts.fromSlot !== null) {
+      U.card(function () {
+        U.h3('队伍操作', '当前第 ' + (opts.fromSlot + 1) + ' 位');
+        U.btnRow([
+          { label: '无损换将', style: 'gold', id: 'swap' },
+          { label: '下阵', style: 'ghost', id: 'off' },
+        ]);
+        U.hint('无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。', 4 * CV.SCALE);
+      });
+    }
+
     /* ② 等级：共享的伙伴经验池 + 升 1 级 / 升 10 级 / 重生（V9.5.46/47） */
     U.card(function () {
       U.h3('等级', 'Lv.' + c.lv + ' / ' + D.PLAYER_MAX_LV);
@@ -225,18 +245,6 @@
       });
       U.y = y0 + Math.ceil(slots.length / cols) * (th + gap) - gap;
     });
-
-    /* ⑤b 从队伍点进来：底部给「无损换将 / 下阵」（网页版"队伍操作"卡） */
-    if (opts && opts.fromSlot !== undefined && opts.fromSlot !== null) {
-      U.card(function () {
-        U.h3('队伍操作', '当前第 ' + (opts.fromSlot + 1) + ' 位');
-        U.btnRow([
-          { label: '无损换将', style: 'gold', id: 'swap' },
-          { label: '下阵', style: 'ghost', id: 'off' },
-        ]);
-        U.hint('无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。', 4 * CV.SCALE);
-      });
-    }
 
     /* ⑦ 属性面板（照网页版：装备/血统/星级都算进来） */
     const st = Core.effectiveStats(id);
