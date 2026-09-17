@@ -253,11 +253,15 @@
        所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
     const CONTENT_H = CV.H - CV.safeBottom - (CV.TOP + 8) - 8;
     const FIELD_BOTTOM = CONTENT_H - LOG_H;
+    /* V9.6.8（父亲大人）：「撤离 / 速度」挪到右下角、战斗日志**上面** ——
+       这一行要占位置，所以单位摆放的下边界要再往上让出它的高度，免得挤在一起。 */
+    const CORNER_H = U.BTN_SM * CV.SCALE + 10 * CV.SCALE;
+    const FIELD_BOTTOM_UNITS = FIELD_BOTTOM - CORNER_H;
     /* V9.6.1（父亲大人给的批注）：中间那块不能是空的 —— 敌方 / 我方 / 日志要**紧凑占满一屏**。
        把余量**四等分**（上留白 / 敌我之间×2 / 下留白），也就是敌我空档 = 上下留白的 2 倍，
        和网页版 .b-field 的 `justify-content: space-around` 是同一套几何。 */
     const stackH = CARD_H * 3 + SIDE_GAP;
-    const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM - FIELD_TOP) - stackH) / 4);
+    const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
     const allyTop = enemyY + CARD_H + space * 2;
     const rows = [
@@ -275,6 +279,8 @@
       const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
       list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
     });
+    /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */
+    battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
     /* 战斗日志（最近 4 行，网页版 #battle-log） */
@@ -295,7 +301,9 @@
   }
 
   /* 网页版 .reward-chip：bg --panel2 / 边 --line / 胶囊 / 左右 12px / 12px 字 */
-  function drawChips(list, cx, y) {
+  /* 先算再画：结算层要**先知道胶囊占多高**才能把下面的按钮排开
+     （V9.6.8 父亲大人真机截图：胶囊换行到第二排、下面的按钮却还按一排算，直接压上去）。 */
+  function chipLayout(list) {
     const gap = 6 * CV.SCALE, h = 24 * CV.SCALE;
     const widths = list.map((t) => CV.measure(t, CV.FS.md) + 24 * CV.SCALE);
     // 先按一行排，超宽就换行（网页版是 flex-wrap）
@@ -307,6 +315,10 @@
       if (need > U.cw() && cur.length) { lines.push([i]); w = wd; }
       else { cur.push(i); w = need; }
     });
+    return { lines, widths, h, gap, height: lines.length * h + (lines.length - 1) * gap };
+  }
+  function drawChips(list, cx, y) {
+    const L = chipLayout(list), gap = L.gap, h = L.h, widths = L.widths, lines = L.lines;
     let yy = y;
     lines.forEach((idx) => {
       const total = idx.reduce((a, i) => a + widths[i], 0) + gap * (idx.length - 1);
@@ -318,7 +330,7 @@
       });
       yy += h + gap;
     });
-    return yy - y;
+    return L.height;
   }
   function drawSettle(res, p) {
     const c = CV.ctx;
@@ -329,11 +341,13 @@
     const cx = CV.W / 2;
     const rewards = (p.rewards || []).slice(0, 8);
     const acts = p.acts || [];
-    const chipH = 0;
     // 竖直居中：按内容总高反推起始 y（网页版是 flex 居中）
     const CH = 40 * CV.SCALE, SUB = 18 * CV.SCALE;
+    /* V9.6.8（父亲大人真机截图："结算界面乱的"）：奖励胶囊会换行，这里必须用**真实高度**，
+       以前写死 28px —— 胶囊换到第二排时按钮就压在胶囊上。 */
+    const chipsH = rewards.length ? chipLayout(rewards).height : 0;
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
-    if (rewards.length) total += 28 * CV.SCALE + 10 * CV.SCALE;
+    if (rewards.length) total += chipsH + 10 * CV.SCALE;
     if (acts.length) total += 44 * CV.SCALE + 12 * CV.SCALE;
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
@@ -347,19 +361,21 @@
     y += SUB + 12 * CV.SCALE;
     if (rewards.length) {
       drawChips(rewards, cx, y);
-      y += 28 * CV.SCALE + 10 * CV.SCALE;
+      y += chipsH + 10 * CV.SCALE;
     }
     // 动作按钮（最多两个并排，和网页版 .btn-row 一致）
     if (acts.length) {
-      const gap = 10 * CV.SCALE, h = 44 * CV.SCALE;
-      const n = acts.length;
-      const w = (U.cw() - gap * (n - 1)) / n;
-      acts.forEach(function (a, i) {
+      /* V9.6.8：宽度按文字比例分（网页版 .btn-row 是 flex:1 1 auto + min-width 86）——
+         等分的话「下一关（菌毯巢穴 3/12）」这种长标签会被挤成两行、还可能压到旁边的按钮。
+         这里借 U.btnRow 的分宽逻辑，结束后把 U.y 还原（结算层是覆盖层，不参与页面排版）。 */
+      const keepY = U.y, keepInCard = U.inCard;
+      U.inCard = false; U.y = y;
+      const rowH = U.btnRow(acts.map(function (a, i) {
         const auto = (B.autoLeft > 0 && i === B.autoIdx);
-        const label = auto ? a.label + '  ' + B.autoLeft + 's' : a.label;
-        U.btn(U.pad() + i * (w + gap), y, w, h, label, a.style || 'ghost', a.id);
-      });
-      y += h + 12 * CV.SCALE;
+        return { label: auto ? (a.label + '  ' + B.autoLeft + 's') : a.label, style: a.style || 'ghost', id: a.id };
+      }));
+      U.y = keepY; U.inCard = keepInCard;
+      y += rowH + 12 * CV.SCALE;
     }
     // 收起奖励并返回（网页版最后一个按钮）
     U.btn(cx - 100 * CV.SCALE, y, 200 * CV.SCALE, 44 * CV.SCALE,
@@ -376,21 +392,30 @@
     const y = CV.safeTop;
     c.fillStyle = 'rgba(16,12,18,.98)';
     c.fillRect(0, y, CV.W, 44 * CV.SCALE);
-    /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）三件事一起修：
+    /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）：
        ① 这一条画在**屏幕坐标**里（在内容裁剪之前），命中区也必须按屏幕坐标登记 ——
-          以前默认按内容坐标登记，手指得往上偏一整个顶栏才点得到（真机同样点不动）；
-       ② 「撤离 / 速度」挪到标题**左边**：微信开发者工具右上角有自己的悬浮面板（真机没有），
-          放右端会被它压住、模拟器里根本点不到（好几位同事都踩过这个坑）；
-       ③ 按钮尺寸按网页版 .btn.small = 40 高。 */
+          以前默认按内容坐标登记，手指得往上偏一整个顶栏才点得到（真机同样点不动）。
+       V9.6.8（父亲大人）：「撤离 / 3×速度」从这一条挪到**右下角、战斗日志上面** ——
+       顶栏这一条现在只放战斗标题，不占按钮位。 */
     CV.hitMode = 'screen';
-    const bw = 66 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, PAD = 12 * CV.SCALE;
-    U.btn(PAD, y + 2 * CV.SCALE, bw, bh, '撤离', 'ghost', 'battle_quit');
-    U.btn(PAD + bw + 8 * CV.SCALE, y + 2 * CV.SCALE, bw, bh, (B.speed || 1) + '×速度', 'ghost', 'battle_speed');
     CV.hitMode = 'content';
-    const titleX = PAD + bw * 2 + 20 * CV.SCALE;
-    CV.text(CV.fit(title, CV.W - titleX - PAD, CV.FS.f1, true), titleX, y + 22 * CV.SCALE, { size: CV.FS.f1, bold: true });
+    const PAD = 12 * CV.SCALE;
+    CV.text(CV.fit(title, CV.W - PAD * 2, CV.FS.f1, true), PAD, y + 22 * CV.SCALE, { size: CV.FS.f1, bold: true });
     CV.TOP = y + 44 * CV.SCALE;
   };
+
+  /* 右下角「撤离 / N×速度」：贴在战斗日志上方，右对齐（V9.6.8 父亲大人） */
+  function battleCornerButtons(bottomY) {
+    const bh = U.BTN_SM * CV.SCALE, gap = 8 * CV.SCALE;
+    const w1 = CV.measure('撤离', CV.FS.md) + 26 * CV.SCALE;
+    const spd = (B.speed || 1) + '×速度';
+    const w2 = CV.measure(spd, CV.FS.md) + 26 * CV.SCALE;
+    const x2 = U.pad() + U.cw() - w2, x1 = x2 - gap - w1;
+    const y = bottomY - bh;
+    U.btn(x1, y, w1, bh, '撤离', 'ghost', 'battle_quit');
+    U.btn(x2, y, w2, bh, spd, 'ghost', 'battle_speed');
+    return bh;
+  }
 
   CV.on('battle_speed', function () {
     B.speed = B.speed >= 3 ? 1 : B.speed + 1;

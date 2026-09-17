@@ -41,7 +41,7 @@ else {
   Core.ensureDaily && Core.ensureDaily();
   if (!Core.S.player.name) CV.reset('create');
   else if (!Core.S.player.bloodline) CV.reset('bloodline');
-  else CV.reset('bag');
+  else CV.reset('home');
 }
 
 /* 开发期截图（devtools 里画布是 HTMLCanvasElement → 自己导出 PNG，康康好对比） */
