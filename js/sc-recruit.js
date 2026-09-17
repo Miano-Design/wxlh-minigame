@@ -136,7 +136,37 @@
       : [{ label: '返回', style: 'ghost', id: 'rec_back' }]);
   });
 
-  /* ---------- 概率公示（网页版 recruitRatesModal：纯文字排版） ---------- */
+  /* ---------- 概率公示（网页版 recruitRatesModal：**纯文字排版**，不是卡片） ----------
+     V9.6.4（父亲大人："概率公式不是说用文字排版去排吗，现在还是卡片、还有字被截掉"）：
+     网页版这里是 section-title（池名）+ .rate-block（一段文字）——
+       .rate-block：11px、行高 1.9、左右内边距 2
+       .rate-line ：标签列固定 3.25rem(52px) 灰字 + 值列（可换行，不许裁字）
+       .rate-note ：11px 灰字、行高 1.85（保底说明 / 当前进度）
+     照它重做，别再套 U.card / U.kv（那两个会裁字）。 */
+  function rateBlock(rows, notes) {
+    const size = CV.FS.sm, lh = size * 1.9, gap = 8 * CV.SCALE, labelW = 52 * CV.SCALE;
+    rows.forEach(function (r) {
+      const valW = U.iw() - labelW - gap;
+      const lines = CV.wrap(r[1], valW, size, 4);
+      const top = U.y;
+      CV.text(r[0], U.ix() + 2 * CV.SCALE, top + lh / 2, { size, color: CV.C.dim });
+      lines.forEach(function (ln, i) {
+        CV.text(ln, U.ix() + labelW + gap, top + lh * (i + 0.5), { size, color: CV.C.text2 });
+      });
+      U.y = top + lh * lines.length;
+    });
+    (notes || []).forEach(function (n) {
+      const noteSize = CV.FS.xs, nlh = noteSize * 1.85;
+      const lines = CV.wrap(n.t, U.iw() - 4 * CV.SCALE, noteSize, 6);
+      const top = U.y + 2 * CV.SCALE;
+      lines.forEach(function (ln, i) {
+        CV.text(ln, U.ix() + 2 * CV.SCALE, top + nlh * (i + 0.5), { size: noteSize, color: n.color || CV.C.dim });
+      });
+      U.y = top + nlh * lines.length;
+    });
+    U.y += 4 * CV.SCALE;
+    U.lastBottom = 0;
+  }
   CV.register('recruit_rates', function () {
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'rec_back');
@@ -145,25 +175,21 @@
     Object.keys(D.RECRUIT_POOLS).forEach(function (pid) {
       const p = D.RECRUIT_POOLS[pid];
       const pv = Core.pityView(pid);
-      U.card(function () {
-        U.h3(p.name);
-        let rx = U.ix();
-        Object.keys(p.rates).forEach(function (r) {
-          const s = r + ' ' + (p.rates[r] * 100).toFixed(1) + '%';
-          CV.text(s, rx, U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true, color: rarColor(r) });
-          rx += CV.measure(s, CV.FS.lg, true) + 12 * CV.SCALE;
-        });
-        U.y += 20 * CV.SCALE;
-        const cost = Object.keys(p.cost).map((k) => curIcon(k) + fmt(p.cost[k])).join(' + ');
-        const ten = Object.keys(p.ten || p.cost).map((k) => curIcon(k) + fmt((p.ten || p.cost)[k])).join(' + ');
-        U.kv('单抽', cost);
-        U.kv('十连', ten + ' · 保底至少 1 个 SR');
-        U.hint(D.pityText(pid), 4 * CV.SCALE);
-        if (pv) {
-          U.hint('SSR 还差 ' + Math.max(0, pv.ssr.cap - pv.ssr.n) + ' 抽 · UR 还差 ' + Math.max(0, pv.ur.cap - pv.ur.n) + ' 抽'
-            + (pv.up ? (' · UP 还差 ' + Math.max(0, pv.up.cap - pv.up.n) + ' 抽') : ''), 2 * CV.SCALE);
-        }
-      });
+      const tk = Core.ticketOf(pid);
+      const tkName = tk ? ((D.ITEMS[tk.id] || {}).name || tk.id) : '';
+      const rate = Object.keys(p.rates).map((r) => r + ' ' + (p.rates[r] * 100).toFixed(1) + '%').join('　');
+      const cost = Object.keys(p.cost).map((k) => curIcon(k) + fmt(p.cost[k])).join(' + ');
+      const ten = Object.keys(p.ten || p.cost).map((k) => curIcon(k) + fmt((p.ten || p.cost)[k])).join(' + ');
+      U.sectionTitle(p.name);
+      rateBlock([
+        ['', rate],
+        ['单抽', cost + (tk ? ' · 或 🎫 ' + tkName + '×1（现有 ' + tk.n + ' 张）' : '')],
+        ['十连', ten + (tk ? ' · 或 🎫 ' + tkName + '×10' : '') + ' · 保底至少 1 个 SR'],
+      ], [
+        { t: D.pityText(pid) },
+        pv ? { t: 'SSR 还差 ' + Math.max(0, pv.ssr.cap - pv.ssr.n) + ' 抽 · UR 还差 ' + Math.max(0, pv.ur.cap - pv.ur.n) + ' 抽'
+          + (pv.up ? ' · UP 还差 ' + Math.max(0, pv.up.cap - pv.up.n) + ' 抽' : ''), color: CV.C.gold } : null,
+      ].filter(Boolean));
     });
   });
 

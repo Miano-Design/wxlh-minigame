@@ -130,6 +130,10 @@
       });
     }
     while (cells.length < cap) cells.push({ empty: true });
+    /* V9.6.4（父亲大人："背包的扩容格也没了"）：格子补满 cap 个之后，**必须再补最后一格**
+       —— 网页版是"第 cap+1 格：灰色虚线框 + ＋"，点了问"是否支付 ◈x 扩容"。
+       上一版排格子的循环只补了空格，把这一格漏掉了（grid() 里画 add 格的分支一直没被触发）。 */
+    cells.push({ add: true });
     U.card(function () {
       const full = used >= cap;
       const top = U.y;
