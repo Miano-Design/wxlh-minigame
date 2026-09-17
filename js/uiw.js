@@ -377,7 +377,8 @@
     const key = opts.key || [].concat(targetId).join('|');
     if (S.coachSeen[key]) return;                      // 看过就不再弹
     const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false, onDone: opts.onDone,
-      waitFor: opts.waitFor };   // waitFor：**这件事真的做完了**才算过（父亲大人拍板的第 2 条）
+      waitFor: opts.waitFor,   // waitFor：**这件事真的做完了**才算过（父亲大人拍板的第 2 条）
+      where: opts.where };     // where：这一步要在哪一页做（目标不在本页时告诉玩家去哪）
     /* V9.6.43 自审：同一个 key 不能重复入队 —— 链式引导每帧都会问一次，
        不拦的话队列会**无限堆积**（每渲染一帧塞一条）。 */
     if (coachState && coachState.key === key) return;
@@ -488,7 +489,12 @@
       c.clearRect ? null : null;
       CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, 12 * CV.SCALE, 'rgba(0,0,0,0)', CV.C.gold, 2);
     }
-    const lines = CV.wrap(coachState.text, CV.W - 60 * CV.SCALE, CV.FS.lg, 5);
+    /* V9.6.63（父亲大人："高亮没了、去别的界面又跳回来、回来也没高亮、不知道要干嘛"）：
+       高亮只画在"目标就在本页"时；如果这一步的目标在**别的页**，就必须在提示卡里
+       写清"去「XX」做这一步" —— 否则玩家只看到一张没有指向的卡。
+       如果那一步的按钮**当前不可用**（比如资源不够），也照样写明，别让人对着一个不亮的按钮发呆。 */
+    const textAll = coachState.text + ((!r && coachState.where) ? ('  → 去「' + coachState.where + '」完成这一步。') : '');
+    const lines = CV.wrap(textAll, CV.W - 60 * CV.SCALE, CV.FS.lg, 6);
     const th = 44 * CV.SCALE + lines.length * CV.FS.lg * 1.7;
     const tw = CV.W - 40 * CV.SCALE;
     const tx = 20 * CV.SCALE;

@@ -89,6 +89,15 @@
      ============================================================================ */
 
   /* 主线每一步 = 引导的一步（父亲大人：合并成一套） */
+  /* 页面 → 中文名：引导卡里写"去「XX」完成这一步"用（父亲大人：不能只给一张没指向的卡） */
+  const PAGE_NAME = {
+    home: '灯阁首页', world: '残域·世界页', dungeon: '残域', bag: '背包（切到装备）',
+    party: '队伍', corridor: '深井', protag: '主角详情', buildings: '基地建设',
+    recruit: '招募伙伴', tasks: '任务', shop: '兑换大厅', genelock: '铭刻',
+    beast: '伴生体', reincarn: '转生天赋', keji: '秘术阁', fabao: '法宝',
+    mount: '坐骑', garden: '药园', arena: '斗法台', sign: '求签', refine: '炼化台',
+    bounty: '限时悬赏', idlelines: '挂机分工',
+  };
   const TUT = {
     q01:  { page: 'home',    run: coachHero },                       // 熟悉身体（逐项讲主角卡）
     q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
@@ -120,6 +129,7 @@
       key: key,
       mustTap: true,
       waitFor: quest ? function () { return !!quest.check(Core.S); } : null,
+      where: PAGE_NAME[rule.page] || rule.page,
     });
     return true;
   }
