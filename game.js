@@ -12,7 +12,10 @@ require('./js/cv.js');           // canvas 界面框架（配色/字号/圆角�
 require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫格/按钮…每块对应网页版一个 CSS 类）
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
 require('./js/sc-home.js');      // 灯阁（首页）
-require('./js/sc-roster.js');    // 执灯者：伙伴总览 + 伙伴详情
+require('./js/sc-roster.js');   // 执灯者：伙伴总览 + 伙伴详情
+require('./js/sc-protag.js');  // 主角详情（角色页）
+require('./js/sc-battle.js');   // 战斗页（副本 / 深井 / 斗法台共用）
+require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → 关卡 → 扫荡
 
 const CV = globalThis.CV, Core = globalThis.Core;
 const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();

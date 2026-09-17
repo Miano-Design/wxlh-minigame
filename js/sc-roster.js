@@ -155,19 +155,19 @@
     U.card(function () {
       const h = 76 * CV.SCALE, top = U.y;
       const asz = 56 * CV.SCALE;
-      const cx = U.pad() + asz / 2;
+      const cx = U.ix() + asz / 2;
       CV.ctx.beginPath(); CV.ctx.arc(cx, top + asz / 2, asz / 2, 0, Math.PI * 2);
       CV.ctx.fillStyle = '#232c42'; CV.ctx.fill(); CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = rarColor(ch.rarity); CV.ctx.stroke();
       CV.text(nm(id).slice(0, 1), cx, top + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: rarColor(ch.rarity) });
-      const tx = U.pad() + asz + 12 * CV.SCALE;
+      const tx = U.ix() + asz + 12 * CV.SCALE;
       CV.text(ch.rarity, tx, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true, color: rarColor(ch.rarity) });
       const rw = CV.measure(ch.rarity, CV.FS.f1, true);
-      CV.text(CV.fit(nm(id), U.cw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
+      CV.text(CV.fit(nm(id), U.iw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
       CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold });
       CV.text(ch.role + ' · ' + ch.faction + ' · ' + ch.bloodline + '血统', tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text('Lv.' + c.lv + ' · 碎片 ' + c.shards + ' · 血统 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-      CV.text(fmt(Core.power(id)), U.pad() + U.cw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
-      CV.text('战力', U.pad() + U.cw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+      CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
+      CV.text('战力', U.ix() + U.iw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + h;
     });
 
@@ -208,7 +208,7 @@
       [ch.skills.s1, ch.skills.s2, ch.skills.ult].forEach(function (sk, i) {
         if (!sk) return;
         const lv = (c.skillLv || [0, 0, 0])[i];   // V9.5.82：技能从 0 级起
-        CV.text(['技能', '技能', '必杀'][i] + '·' + sk.name + '（Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i] + '）', U.pad(), U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(['技能', '技能', '必杀'][i] + '·' + sk.name + '（Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i] + '）', U.iw(), CV.FS.lg, true), U.ix(), U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true });
         U.y += 20 * CV.SCALE;
         U.hint(sk.desc || '', 0);
         U.space(CV.SP[1]);
@@ -223,11 +223,11 @@
       const eq = S.equipped[id] || {};
       U.h3('🗡 装备', slots.filter((s) => eq[s]).length + '/' + slots.length + ' 件');
       const cols = 3, gap = 10 * CV.SCALE;
-      const tw = (U.cw() - gap * (cols - 1)) / cols, th = 62 * CV.SCALE;
+      const tw = (U.iw() - gap * (cols - 1)) / cols, th = 62 * CV.SCALE;
       const y0 = U.y;
       slots.forEach(function (slot, i) {
         const e = eq[slot] && S.equips[eq[slot]];
-        const x = U.pad() + (i % cols) * (tw + gap), y = y0 + Math.floor(i / cols) * (th + gap);
+        const x = U.ix() + (i % cols) * (tw + gap), y = y0 + Math.floor(i / cols) * (th + gap);
         CV.round(x, y, tw, th, 6 * CV.SCALE, CV.C.panel, e ? CV.C.line2 : CV.C.line);
         CV.text(D.EQUIP_SLOTS[slot], x + 8 * CV.SCALE, y + 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         if (e) {

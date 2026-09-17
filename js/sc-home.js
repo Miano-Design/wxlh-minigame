@@ -25,16 +25,16 @@
       const top = U.y;
       rows.forEach(function (r, i) {
         const cy = top + rowH * i + rowH / 2;
-        CV.text(r[0], U.pad(), cy, { size: CV.FS.md, color: CV.C.dim });
+        CV.text(r[0], U.ix(), cy, { size: CV.FS.md, color: CV.C.dim });
         const vw = CV.measure(r[1], CV.FS.lg, true);
         const sw = r[2] ? CV.measure(r[2], CV.FS.sm) + 8 * CV.SCALE : 0;
-        CV.text(CV.fit(r[1], U.cw() - 28 * CV.SCALE - sw, CV.FS.lg, true), U.pad() + U.cw() - 14 * CV.SCALE - vw - sw, cy,
+        CV.text(CV.fit(r[1], U.iw() - 28 * CV.SCALE - sw, CV.FS.lg, true), U.ix() + U.iw() - vw - sw, cy,
           { size: CV.FS.lg, bold: true, color: (i === 0 && st.hasBloodline) || i === 2 ? CV.C.gold : CV.C.text });
-        if (r[2]) CV.text(r[2], U.pad() + U.cw() - 14 * CV.SCALE, cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+        if (r[2]) CV.text(r[2], U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
         if (i < rows.length - 1) {
           CV.ctx.save();
           CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
-          CV.ctx.beginPath(); CV.ctx.moveTo(U.pad(), top + rowH * (i + 1) - .5); CV.ctx.lineTo(U.pad() + U.cw(), top + rowH * (i + 1) - .5); CV.ctx.stroke();
+          CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + rowH * (i + 1) - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + rowH * (i + 1) - .5); CV.ctx.stroke();
           CV.ctx.restore();
         }
       });
@@ -49,18 +49,18 @@
     U.card(function () {
       const h = 72 * CV.SCALE, top = U.y;
       if (q) {
-        const bw = 74 * CV.SCALE, bx = U.pad() + U.cw() - bw;
-        CV.text(CV.fit('主线 · ' + q.q.name, U.cw() - bw - 16 * CV.SCALE, CV.FS.f1, true), U.pad(), top + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        const bw = 74 * CV.SCALE, bx = U.ix() + U.iw() - bw;
+        CV.text(CV.fit('主线 · ' + q.q.name, U.iw() - bw - 16 * CV.SCALE, CV.FS.f1, true), U.ix(), top + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
         const tw = CV.measure('主线 · ' + q.q.name, CV.FS.f1, true);
         const tag = '第 ' + (qi + 1) + '/' + mq.length + ' 步';
         const tagW = CV.measure(tag, CV.FS.sm) + 14 * CV.SCALE;
-        CV.round(U.pad() + tw + 8 * CV.SCALE, top + 14 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
-        CV.text(tag, U.pad() + tw + 8 * CV.SCALE + tagW / 2, top + 23 * CV.SCALE, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
-        CV.text('完成奖励：' + Core.rewardTextOf(q.q.reward), U.pad(), top + 48 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.round(U.ix() + tw + 8 * CV.SCALE, top + 14 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
+        CV.text(tag, U.ix() + tw + 8 * CV.SCALE + tagW / 2, top + 23 * CV.SCALE, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
+        CV.text('完成奖励：' + Core.rewardTextOf(q.q.reward), U.ix(), top + 48 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         U.btn(bx, top + 16 * CV.SCALE, bw, 40 * CV.SCALE, q.done ? '领取奖励' : '去完成 ›', q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
       } else {
-        CV.text('主线 · 已走完', U.pad(), top + 32 * CV.SCALE, { size: CV.FS.f1, bold: true });
-        CV.text('挑战更高难度与深井', U.pad(), top + 52 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text('主线 · 已走完', U.ix(), top + 32 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        CV.text('挑战更高难度与深井', U.ix(), top + 52 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       }
       U.y = top + h;
     });
@@ -93,7 +93,7 @@
     /* 日常（网页版 .grid-title「日常」+ 六格） */
     U.space(CV.SP[2]);
     U.y += 16 * CV.SCALE;
-    CV.text('日常', U.pad() + 2, U.y - 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+    CV.text('日常', U.pad() + 2, U.y - 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });   // .grid-title：左右各留 2
     U.tiles([
       ['open_bounty', '限时悬赏', '按时重置'],
       ['open_tasks', '每日任务', '主线 / 日常 / 周常', 'tasks'],
@@ -113,12 +113,12 @@
     const prog = Core.travelProgress(), pend = Core.pendingTravel();
     U.card(function () {
       const h = 44 * CV.SCALE, top = U.y, cy = top + h / 2;
-      CV.text('【游历奇遇】', U.pad(), cy, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim });
+      CV.text('【游历奇遇】', U.ix(), cy, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim });
       if (pend) {
-        CV.text(pend.name, U.pad() + U.cw(), cy, { size: CV.FS.md, color: CV.C.gold, align: 'right' });
+        CV.text(CV.fit(pend.name, U.iw() - 90 * CV.SCALE, CV.FS.md), U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.gold, align: 'right' });
         CV.hit('claim_travel', U.pad(), top, U.cw(), h);
       } else {
-        CV.text('距下一次 ' + Math.round(Math.max(0, prog.every - prog.sec)) + ' 秒', U.pad() + U.cw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
+        CV.text('距下一次 ' + Math.round(Math.max(0, prog.every - prog.sec)) + ' 秒', U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
         CV.hit('open_travel', U.pad(), top, U.cw(), h);
       }
       U.y = top + h;
@@ -128,40 +128,50 @@
     U.sectionTitle('挂机');
     const r0 = Core.idleRates(), bank = Core.idleBankGains(), lines = Core.idleLines();
     U.card(function () {
-      const lh = 26 * CV.SCALE, top = U.y;
+      const lh = 28 * CV.SCALE, top = U.y;
       const dim = CV.C.dim, txt = CV.C.dim;             // V9.5.28：这一块全部灰字
-      // 行 1：挂机速率
-      CV.text('【挂机】', U.pad(), top + lh / 2, { size: CV.FS.md, color: dim });
-      CV.text('◈ ' + r0.pointsPerMin.toFixed(1) + '/分', U.pad() + 62 * CV.SCALE, top + lh / 2, { size: CV.FS.md, color: txt });
-      CV.text('EXP ' + r0.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h',
-        U.pad() + 140 * CV.SCALE, top + lh / 2, { size: CV.FS.sm, color: dim });
-      // 行 2：已挂 / 待领
+      const GAP = CV.SP[2];                             // .idle-line gap: var(--sp2)
+      /* 行 1：【挂机】 + ◈x.x/分 + （EXP…/离线…/上限…）—— 依次排开，不再写死坐标 */
+      let x = U.ix();
+      CV.text('【挂机】', x, top + lh / 2, { size: CV.FS.md, color: dim });
+      x += CV.measure('【挂机】', CV.FS.md) + GAP;
+      const v1 = '◈ ' + r0.pointsPerMin.toFixed(1) + '/分';
+      CV.text(v1, x, top + lh / 2, { size: CV.FS.md, color: txt });
+      x += CV.measure(v1, CV.FS.md) + GAP;
+      const s1 = 'EXP ' + r0.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h';
+      CV.text(CV.fit(s1, U.ix() + U.iw() - x, CV.FS.sm), x, top + lh / 2, { size: CV.FS.sm, color: dim });
+      /* 行 2：【已挂】+ 时长 …… 右端「【待领】+ 收益」（网页版：待领标签带 margin-left:auto） */
       const y2 = top + lh;
       const dur = G.formatDuration ? G.formatDuration(bank.seconds) : (bank.seconds + '秒');
-      CV.text('【已挂】', U.pad(), y2 + lh / 2, { size: CV.FS.md, color: dim });
-      // V9.5.82：挂满上限时补一个「已满」（和网页版一致），免得玩家以为收益卡住了
-      CV.text(dur + (Core.idleFull && Core.idleFull() ? '（已满）' : ''), U.pad() + 62 * CV.SCALE, y2 + lh / 2, { size: CV.FS.md, color: txt });
+      const durTxt = dur + (Core.idleFull && Core.idleFull() ? '（已满）' : '');
+      let x2 = U.ix();
+      CV.text('【已挂】', x2, y2 + lh / 2, { size: CV.FS.md, color: dim });
+      x2 += CV.measure('【已挂】', CV.FS.md) + GAP;
+      CV.text(durTxt, x2, y2 + lh / 2, { size: CV.FS.md, color: txt });
       const gainTxt = '◈ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
         + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '') + (bank.story ? ' · ❖ ' + bank.story : '');
-      CV.text('【待领】', U.pad() + U.cw() - CV.measure(gainTxt, CV.FS.md) - 70 * CV.SCALE, y2 + lh / 2, { size: CV.FS.md, color: dim });
-      CV.text(gainTxt, U.pad() + U.cw(), y2 + lh / 2, { size: CV.FS.md, color: txt, align: 'right' });
-      // 行 3：分工
+      const gW = Math.min(CV.measure(gainTxt, CV.FS.md), U.iw() * 0.62);
+      CV.text(CV.fit(gainTxt, gW, CV.FS.md), U.ix() + U.iw(), y2 + lh / 2, { size: CV.FS.md, color: txt, align: 'right' });
+      const k2w = CV.measure('【待领】', CV.FS.md);
+      CV.text('【待领】', U.ix() + U.iw() - gW - GAP - k2w, y2 + lh / 2, { size: CV.FS.md, color: dim });
+      /* 行 3：【分工】+ 名单（长度按剩下的宽度截） */
       const y3 = top + lh * 2;
-      CV.text('【分工】', U.pad(), y3 + lh / 2, { size: CV.FS.md, color: dim });
-      CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? G.cname(l.leaderId) : '空')).join(' · '), U.cw() - 60 * CV.SCALE, CV.FS.sm),
-        U.pad() + 62 * CV.SCALE, y3 + lh / 2, { size: CV.FS.sm, color: dim });
+      CV.text('【分工】', U.ix(), y3 + lh / 2, { size: CV.FS.md, color: dim });
+      const x3 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
+      CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空')).join(' · '), U.ix() + U.iw() - x3, CV.FS.sm),
+        x3, y3 + lh / 2, { size: CV.FS.sm, color: dim });
       /* 行间虚线（网页版 .idle-line 的 border-bottom: 1px dashed） */
       CV.ctx.save();
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
       [1, 2].forEach((i) => {
-        CV.ctx.beginPath(); CV.ctx.moveTo(U.pad(), top + lh * i - .5); CV.ctx.lineTo(U.pad() + U.cw(), top + lh * i - .5); CV.ctx.stroke();
+        CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + lh * i - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + lh * i - .5); CV.ctx.stroke();
       });
       CV.ctx.restore();
-      // 两个按钮
+      // 两个按钮（网页版 .btn-row：左小右大，间距 10）
       const by = top + lh * 3 + 8 * CV.SCALE, bh = 42 * CV.SCALE, gap = 10 * CV.SCALE;
-      const bw = (U.cw() - gap) * 0.42;
-      U.btn(U.pad(), by, bw, bh, '派人分工', 'ghost', 'open_idlelines');
-      U.btn(U.pad() + bw + gap, by, U.cw() - bw - gap, bh, '收取奖励', 'primary', 'claim_all');
+      const bw = (U.iw() - gap) * 0.42;
+      U.btn(U.ix(), by, bw, bh, '派人分工', 'ghost', 'open_idlelines');
+      U.btn(U.ix() + bw + gap, by, U.iw() - bw - gap, bh, '收取奖励', 'primary', 'claim_all');
       U.y = by + bh;
     });
 
@@ -188,7 +198,7 @@
     CV.render();
   });
   /* 还没复刻的页面：给个明确提示，别点了没反应 */
-  ['open_protag', 'open_party', 'open_grow', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
+  ['open_party', 'open_grow', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
     'open_sect', 'open_keji', 'open_fabao', 'open_garden', 'open_arena', 'open_mount', 'open_refine',
     'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
     'open_bounty', 'open_tasks', 'open_ach', 'open_sign', 'open_recruit', 'open_shop'].forEach(function (id) {

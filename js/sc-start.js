@@ -11,20 +11,25 @@
   /* ================= ① 欢迎（网页版 showTutorial 的文案） ================= */
   CV.register('welcome', function () {
     U.begin();
+    /* 网页版是居中弹窗（sticky、没有关闭入口），小游戏这边是整页，所以先留一段上边距把它压到画面中部 */
+    U.space(Math.max(40 * CV.SCALE, CV.H * 0.18));
     U.card(function () {
       U.h3('欢迎来到灯阁');
-      U.note('你被神秘存在选中，成为了「执灯者」。');
-      U.space(CV.SP[1]);
-      U.note('在这里，你将：', 4 * CV.SCALE);
-      ['· 进入残域执行探索任务', '· 招募伙伴，组建五人小队（主角必上阵）',
-        '· 解锁血统与铭刻，突破极限', '· 挑战深井，寻找离开的方法'].forEach((t) => U.hint(t, 2 * CV.SCALE));
+      U.eventDesc([
+        { t: '你被神秘存在选中，成为了', tail: { t: '执灯者', color: CV.C.accent, bold: true } },
+        { t: '' },
+        { t: '在这里，你将：' },
+        { t: '🌀 进入残域执行探索任务' },
+        { t: '👥 招募伙伴，组建五人小队（主角必上阵）' },
+        { t: '🧬 解锁血统与铭刻，突破极限' },
+        { t: '♾ 挑战深井，寻找离开的方法' },
+        { t: '' },
+        { t: '如果下一场探索真的会死，你会带谁进去？', bold: true },
+      ], 2 * CV.SCALE);
       U.space(CV.SP[2]);
-      U.hint('如果下一场探索真的会死，你会带谁进去？', 6 * CV.SCALE);
+      U.btnRow([{ label: '签订灯阁契约', style: 'primary', id: 'welcome_ok' }]);
     });
-    U.space(CV.SP[3]);
-    U.btnRow([{ label: '签订灯阁契约', style: 'primary', id: 'welcome_ok' }]);
   });
-  CV.on('welcome_ok', () => CV.reset('create'));
 
   /* ================= ② 起名（网页版 showCharCreate） ================= */
   const NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊'];
@@ -33,22 +38,21 @@
     U.begin();
     U.card(function () {
       U.h3('创建你的执灯者');
-      U.note('灯阁需要一个名字来记录你的行程。这个名字将伴随你进入每一个世界。');
+      U.eventDesc(['灯阁需要一个名字来记录你的行程。这个名字将伴随你进入每一个世界。'], 2 * CV.SCALE);
       U.space(CV.SP[2]);
       /* 名字框：网页版是一个 input，canvas 里点一下弹微信键盘；右边一个 🎲 换一个 */
       const h = 44 * CV.SCALE, gap = 8 * CV.SCALE;
       const bw = 52 * CV.SCALE;
       const top = U.y;
-      CV.round(U.pad(), top, U.cw() - bw - gap, h, CV.RADIUS_SM, CV.C.panel2, CV.C.line2);
-      CV.text(NAMES[nameIdx], U.pad() + (U.cw() - bw - gap) / 2, top + h / 2, { size: CV.FS.f2, bold: true, align: 'center', color: CV.C.gold });
-      CV.hit('name_type', U.pad(), top, U.cw() - bw - gap, h);
-      U.btn(U.pad() + U.cw() - bw, top, bw, h, '🎲', 'ghost', 'name_roll');
+      CV.round(U.ix(), top, U.iw() - bw - gap, h, CV.RADIUS_SM, CV.C.panel, CV.C.line);
+      CV.text(CV.fit(NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, 15 * CV.SCALE), U.ix() + 12 * CV.SCALE, top + h / 2, { size: 15 * CV.SCALE });
+      CV.hit('name_type', U.ix(), top, U.iw() - bw - gap, h);
+      U.btn(U.ix() + U.iw() - bw, top, bw, h, '🎲', 'ghost', 'name_roll');
       U.y = top + h;
     });
     U.space(CV.SP[3]);
     U.btnRow([{ label: '以这个名字进入残域', style: 'primary', id: 'name_ok' }]);
-    U.y += CV.SP[1];
-    U.hint('名字定完紧接着选血统：境界线跟着血统走，所以开局就得定下来（选完不可更改）');
+
   });
   CV.on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });
   CV.on('name_type', function () {

@@ -15,23 +15,52 @@
   const U = {};
   G.U = U;
 
+  /* ---------- 全局工具（逐字对齐网页版 js/ui.js 的同名函数） ---------- */
+  /* fmt：网页版把 20000 显示成「2.0万」、1.2 亿显示成「1.20亿」——
+     小游戏原来没有这个函数，各页各自 `G.fmt || String` 兜底，于是首页显示成「55000」，
+     和网页版完全不是一个观感（V9.5.93 修：补上同一个 fmt，并挂到全局给所有页用）。 */
+  G.fmt = function (n) {
+    n = Math.floor(n || 0);
+    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
+    if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    return String(n);
+  };
+  U.fmt = G.fmt;
+  /* formatDuration：网页版同一段逻辑（小时/分/秒三档） */
+  G.formatDuration = function (sec) {
+    sec = Math.floor(sec || 0);
+    const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    if (h) return h + '小时' + m + '分';
+    if (m) return m + '分' + s + '秒';
+    return s + '秒';
+  };
+
   U.y = 0;                 // 纵向游标（从内容区顶部算起）
   U.dry = false;           // true = 只量高度不画（U.card 用它先量后画底）
   U.begin = function () { U.y = 0; };
-  U.pad = () => 12 * CV.SCALE;                        // 网页版 #view padding: 0.75rem
-  U.cw = () => CV.W - U.pad() * 2;                    // 内容宽
+  U.pad = () => 12 * CV.SCALE;                        // 网页版 #view padding: 0.75rem（屏幕边距）
+  U.cw = () => CV.W - U.pad() * 2;                    // 卡片/区块外宽
+  /* V9.5.93（父亲大人："文字贴边"）：网页版 .card 有一圈 14px 内边距（padding: var(--sp3)），
+     小游戏这边原来只画了卡片框、内容却按卡片边缘排 —— 所有卡片里的文字/按钮都贴着边框。
+     现在卡片内统一走 U.ix()/U.iw()（内容左边界 / 内容宽），不在卡片里时等于屏幕内容区。 */
+  U.inCard = false;
+  U.inPad = () => (U.inCard ? CV.SP[2] : 0);
+  U.ix = () => U.pad() + U.inPad();
+  U.iw = () => U.cw() - U.inPad() * 2;
   U.space = function (px) { U.y += px; };
   const draw = (fn) => { if (!U.dry) fn(); };
 
   /* ---------- 卡片 .card（bg --panel / 边 --line / 圆角 10 / 内边距 14 / 下边距 14）
      传一个画内容的函数：它按"内容游标"往下画，卡片底由这里先量后画。 ---------- */
   U.card = function (content) {
-    const pad = CV.SP[2], top = U.y;
+    const pad = CV.SP[2], top = U.y, outer = U.inCard;
+    U.inCard = true;
     U.dry = true; U.y = top + pad; content(); const inner = U.y - top - pad;
     U.dry = false;
     const h = inner + pad * 2;
     if (h > 4) CV.card(U.pad(), top, U.cw(), h);
     U.y = top + pad; content();
+    U.inCard = outer;
     U.y = top + h + CV.SP[2];
     return h;
   };
@@ -40,15 +69,22 @@
      · 左边 3×13 金色竖条 + 标题 15px 粗体；右侧小字 11px 灰、贴右。 ---------- */
   U.h3 = function (title, sub, opt) {
     opt = opt || {};
+    /* opt.btn = { label, id }：标题行右侧的小按钮（网页版 .card h3 .hbtn，和标题/小字同一中线） */
+    if (opt.btn) {
+      const bw = CV.measure(opt.btn.label, CV.FS.sm) + 20 * CV.SCALE;
+      const bh = 26 * CV.SCALE;
+      U.btn(U.ix() + U.iw() - bw, U.y - 6 * CV.SCALE, bw, bh, opt.btn.label, 'ghost', opt.btn.id);
+    }
     const bar = 3, gap = 7, lh = CV.FS.f1 * 1.3;
     const top = U.y;
     draw(() => {
       const cy = top + lh / 2;
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
-      CV.round(U.pad(), cy - 6.5, bar, 13, 2, g);
-      CV.text(CV.fit(title, U.cw() - 120, CV.FS.f1, true), U.pad() + bar + gap, cy, { size: CV.FS.f1, bold: true });
-      if (sub) CV.text(CV.fit(sub, U.cw() - 90, CV.FS.sm), U.pad() + U.cw(), cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
+      CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
+      CV.text(CV.fit(title, U.iw() - 120, CV.FS.f1, true), U.ix() + bar + gap, cy, { size: CV.FS.f1, bold: true });
+      const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
+      if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
     });
     U.y = top + lh + 10 * CV.SCALE;                   // 标题下边距 10（.card h3 margin-bottom）
     return lh + 10 * CV.SCALE;
@@ -60,11 +96,11 @@
     const top = U.y;
     draw(() => {
       const cy = top + h / 2;
-      CV.text(CV.fit(k, U.cw() * 0.55, CV.FS.lg), U.pad(), cy, { size: CV.FS.lg, color: CV.C.dim });
-      CV.text(CV.fit(v, U.cw() * 0.45, CV.FS.lg), U.pad() + U.cw(), cy, { size: CV.FS.lg, color: color || CV.C.text, align: 'right' });
+      CV.text(CV.fit(k, U.iw() * 0.55, CV.FS.lg), U.ix(), cy, { size: CV.FS.lg, color: CV.C.dim });
+      CV.text(CV.fit(v, U.iw() * 0.45, CV.FS.lg), U.ix() + U.iw(), cy, { size: CV.FS.lg, color: color || CV.C.text, align: 'right' });
       CV.ctx.save();
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
-      CV.ctx.beginPath(); CV.ctx.moveTo(U.pad(), top + h - .5); CV.ctx.lineTo(U.pad() + U.cw(), top + h - .5); CV.ctx.stroke();
+      CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();
       CV.ctx.restore();
     });
     U.y = top + h;
@@ -74,24 +110,66 @@
   /* ---------- 提示小字 .hint（11px 灰，行高 1.7）/ 说明 .note（12px 灰，行高 1.75） ---------- */
   function wrapBlock(text, size, lh, color, gapTop) {
     const lhPx = size * lh;
-    const lines = CV.wrap(text, U.cw(), size, 6);
+    const lines = CV.wrap(text, U.iw(), size, 6);
     const top = U.y + (gapTop || 0);
-    draw(() => lines.forEach((ln, i) => CV.text(ln, U.pad(), top + lhPx * (i + 0.5), { size, color })));
+    draw(() => lines.forEach((ln, i) => CV.text(ln, U.ix(), top + lhPx * (i + 0.5), { size, color })));
     U.y = top + lines.length * lhPx;
     return lines.length * lhPx;
   }
   U.hint = function (text, gapTop) { return wrapBlock(text, CV.FS.sm, 1.7, CV.C.dim, gapTop); };
   U.note = function (text, gapTop) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop); };
 
+  /* ---------- 说明框 .event-desc（网页版：bg --panel / 圆角 10 / 内边距 12 / 13px 灰字 1.7 行高）
+     开局契约、起名提示这类"成段说明"都用它，别再直接铺在卡片上。 ---------- */
+  U.eventDesc = function (lines, gapIn) {
+    const pad = 12 * CV.SCALE, size = CV.FS.lg, lh = size * 1.7;
+    const src = [].concat(lines || []);
+    // 先按宽度把所有行折出来（每行可以是纯文本，也可以是 { t, color, bold }）
+    const out = [];
+    src.forEach((raw) => {
+      const obj = (typeof raw === 'string') ? { t: raw } : raw;
+      if (!obj || !obj.t) { out.push({ t: '', blank: true }); return; }
+      /* 行尾可以接一段不同颜色的字（网页版是 <b style="color:var(--accent)">执灯者</b> 这种内联强调） */
+      const full = obj.tail ? (obj.t + obj.tail.t) : obj.t;
+      const ws = CV.wrap(full, U.iw() - pad * 2, size, 8);
+      ws.forEach((ln, i) => {
+        const last = i === ws.length - 1;
+        // 末尾那段如果整段都在这一行里，就拆成"前半 + 强调后半"两截画
+        let head = ln, tail = null;
+        if (last && obj.tail && ln.length > obj.tail.t.length && ln.slice(-obj.tail.t.length) === obj.tail.t) {
+          head = ln.slice(0, ln.length - obj.tail.t.length);
+          tail = obj.tail;
+        }
+        out.push({ t: head, color: obj.color, bold: obj.bold && last, tail });
+      });
+    });
+    const h = pad * 2 + out.length * lh;
+    const top = U.y + (gapIn || 0);
+    draw(() => {
+      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS, CV.C.panel);
+      out.forEach((o, i) => {
+        if (!o.t) return;
+        const x0 = U.ix() + pad, cy = top + pad + lh * (i + 0.5);
+        CV.text(o.t, x0, cy, { size, color: o.color || CV.C.dim, bold: o.bold });
+        if (o.tail) {
+          const w1 = CV.measure(o.t, size, o.bold);
+          CV.text(o.tail.t, x0 + w1, cy, { size, color: o.tail.color || CV.C.dim, bold: o.tail.bold });
+        }
+      });
+    });
+    U.y = top + h;
+    return h;
+  };
+
   /* ---------- 区块小标题 .section-title（12px 字距 1px，右边一条线） ---------- */
   U.sectionTitle = function (text) {
     const top = U.y + CV.SP[3], lh = CV.FS.md * 1.3;
     draw(() => {
       const cy = top + lh / 2;
-      CV.text(text, U.pad() + 4, cy, { size: CV.FS.md, color: CV.C.text2, bold: true });
+      CV.text(text, U.ix() + 4, cy, { size: CV.FS.md, color: CV.C.text2, bold: true });
       const w = CV.measure(text, CV.FS.md, true);
       CV.ctx.strokeStyle = CV.C.line; CV.ctx.lineWidth = 1;
-      CV.ctx.beginPath(); CV.ctx.moveTo(U.pad() + 4 + w + 10, cy); CV.ctx.lineTo(U.pad() + U.cw() - 4, cy); CV.ctx.stroke();
+      CV.ctx.beginPath(); CV.ctx.moveTo(U.ix() + 4 + w + 10, cy); CV.ctx.lineTo(U.ix() + U.iw() - 4, cy); CV.ctx.stroke();
     });
     U.y = top + lh + CV.SP[1];                          // 下边距 10
     return lh + CV.SP[3] + CV.SP[1];
@@ -100,12 +178,12 @@
   /* ---------- 三列文字宫格 .text-menu + .tile（名字 13 粗体 / 状态 11 灰，居中） ---------- */
   U.tiles = function (list, cols) {
     cols = cols || 3;
-    const gap = CV.SP[1], cellW = (U.cw() - gap * (cols - 1)) / cols;
+    const gap = CV.SP[2], cellW = (U.iw() - gap * (cols - 1)) / cols;
     const th = 54 * CV.SCALE;
     const startY = U.y;
     list.forEach((t, i) => {
       const r = Math.floor(i / cols), c = i % cols;
-      const x = U.pad() + c * (cellW + gap), y = startY + r * (th + gap);
+      const x = U.ix() + c * (cellW + gap), y = startY + r * (th + gap);
       draw(() => {
         CV.round(x, y, cellW, th, 6 * CV.SCALE, CV.C.panel, CV.C.line2);
         const inner = cellW - 12 * CV.SCALE;
@@ -128,10 +206,10 @@
     const top = U.y;
     draw(() => {
       const y0 = top + pad;
-      CV.text(CV.fit(o.t1, U.cw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.f1, true), U.pad() + 4, y0 + t1 / 2, { size: CV.FS.f1, bold: true });
-      if (o.t2) CV.text(CV.fit(o.t2, U.cw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.sm), U.pad() + 4, y0 + t1 + 4 * CV.SCALE + t2 / 2, { size: CV.FS.sm, color: CV.C.dim });
+      CV.text(CV.fit(o.t1, U.iw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.f1, true), U.ix() + 4, y0 + t1 / 2, { size: CV.FS.f1, bold: true });
+      if (o.t2) CV.text(CV.fit(o.t2, U.iw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.sm), U.ix() + 4, y0 + t1 + 4 * CV.SCALE + t2 / 2, { size: CV.FS.sm, color: CV.C.dim });
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.lineWidth = 1;
-      CV.ctx.beginPath(); CV.ctx.moveTo(U.pad(), top + h - .5); CV.ctx.lineTo(U.pad() + U.cw(), top + h - .5); CV.ctx.stroke();
+      CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();
     });
     U.y = top + h;
     return h;
@@ -156,9 +234,9 @@
   /* 一行按钮（等分；网页版 .btn-row） */
   U.btnRow = function (list, gapIn) {
     const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = 44 * CV.SCALE;
-    const w = (U.cw() - gap * (list.length - 1)) / list.length;
+    const w = (U.iw() - gap * (list.length - 1)) / list.length;
     const top = U.y;
-    list.forEach((b, i) => U.btn(U.pad() + i * (w + gap), top, w, h, b.label, b.style, b.id));
+    list.forEach((b, i) => U.btn(U.ix() + i * (w + gap), top, w, h, b.label, b.style, b.id));
     U.y = top + h;
     return h;
   };
@@ -167,9 +245,9 @@
   U.bar = function (pct, color) {
     const h = 8 * CV.SCALE, top = U.y;
     draw(() => {
-      CV.round(U.pad(), top, U.cw(), h, 6 * CV.SCALE, '#0d1120');
-      const w2 = Math.max(0, Math.min(1, pct)) * U.cw();
-      if (w2 > 1) CV.round(U.pad(), top, w2, h, 6 * CV.SCALE, color || CV.C.gold);
+      CV.round(U.ix(), top, U.iw(), h, 6 * CV.SCALE, '#0d1120');
+      const w2 = Math.max(0, Math.min(1, pct)) * U.iw();
+      if (w2 > 1) CV.round(U.ix(), top, w2, h, 6 * CV.SCALE, color || CV.C.gold);
     });
     U.y = top + h;
     return h;
@@ -208,7 +286,10 @@
     o.lines.forEach((ln, i) => CV.text(ln, o.x + 14 * CV.SCALE, o.y + 52 * CV.SCALE + CV.FS.lg * 1.7 * (i + 0.5), { size: CV.FS.lg, color: CV.C.dim }));
     const by = o.y + o.h - 44 * CV.SCALE - 10 * CV.SCALE;
     const bw = (o.w - 28 * CV.SCALE - 10 * CV.SCALE) / 2;
+    /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记 */
+    CV.hitMode = 'screen';
     U.btn(o.x + 14 * CV.SCALE, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
     U.btn(o.x + 14 * CV.SCALE + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, '确定', 'primary', '_cf_yes');
+    CV.hitMode = 'content';
   };
 })();

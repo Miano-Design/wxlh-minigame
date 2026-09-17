@@ -135,8 +135,16 @@
     return lines;
   };
 
-  /* ---------- 触摸命中区 ---------- */
-  CV.hit = function (id, x, y, w, h) { CV.hits.push({ id, x, y, w, h }); };
+  /* ---------- 触摸命中区 ----------
+     V9.5.93（父亲大人："小游戏功能点了没反应"）：命中区**分两套坐标系**，
+     以前混在一起比，导致内容区的按钮判定整体偏移了一整条顶栏（点 A 触发 A 下面那个）。
+       · 内容区（U.card / U.btn / 宫格…）：画在"内容游标"里，坐标从内容顶部算 → 'content'
+       · 顶栏 / 底栏 / 确认弹窗：直接按屏幕坐标画 → 'screen'
+     登记时带上坐标系，派发时各自换算，两边都不再错位。 */
+  CV.hitMode = 'content';
+  CV.hit = function (id, x, y, w, h) { CV.hits.push({ id, x, y, w, h, screen: CV.hitMode === 'screen' }); };
+  /* 屏幕坐标 → 内容坐标（含滚动） */
+  CV.localY = function (py) { return py - (CV.TOP + 8) + (CV.scroll || 0); };
   CV.dispatch = function (id) {
     const fn = CV.onAct[id];
     if (fn) fn();
@@ -144,11 +152,12 @@
   CV.onAct = {};
   CV.on = function (id, fn) { CV.onAct[id] = fn; };
 
-  /* ---------- 页面栈 ---------- */
+  /* ---------- 页面栈（每次换页把滚动位置归零，和网页版换页一个手感） ---------- */
+  CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
-  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.render(); };
-  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.render(); };
-  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.render(); };
+  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.render(); };
+  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.render(); };
+  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.render(); };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
 
   /* ---------- 渲染一帧 ---------- */
@@ -159,65 +168,94 @@
     CV.y = 0;
     /* 开局三步（欢迎 / 起名 / 选血统）时**不画顶栏和底栏**——
        网页版这时整块界面是隐藏的（没签契约看不到游戏界面，V9.5.23 定的），这里照做。 */
-    const chromeless = ['welcome', 'create', 'bloodline'].indexOf(CV.top().name) >= 0;
+    /* 战斗页也是整屏接管：网页版战斗遮罩盖住了顶栏和底栏，这里同样不画标准顶栏/底栏，
+       由战斗页自己画"标题 / 速度 / 撤离"那一条（V9.5.93）。 */
+    const chromeless = ['welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
     if (chromeless) { CV.TOP = CV.safeTop; CV.NAV_H = 0; }
     c.save();
     c.fillStyle = CV.C.bg;
     c.fillRect(0, 0, CV.W, CV.H);
     c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
     c.beginPath(); c.rect(0, 0, CV.W, CV.H); c.clip();
-    if (!chromeless) CV.topbar();
+    if (CV.top().name === 'battle') CV.battleHead((CV.top().opts && CV.top().opts.title) || '战斗');
+    else if (!chromeless) CV.topbar();
     c.save();
     c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
     c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
     CV.y = 0;
     const fn = CV.panels[CV.top().name];
     if (fn) fn(CV.top().opts);
-    CV.contentH = CV.y + 20;
+    /* 内容总高：游标在通用件里（U.y），以前这里读的是 CV.y —— 那个变量在渲染时被归零后
+       再没人写过，于是 contentH 恒等于 20、maxScroll 恒为 0，**滚动等于没有**（V9.5.93 修）。 */
+    CV.contentH = ((G.U && G.U.y) || CV.y || 0) + 20;
     c.restore();
+    /* 内容画完才知道总高：把滚动量夹回合法范围（换页 / 状态变化后内容变短也要收回来） */
+    CV.maxScroll = Math.max(0, CV.contentH + CV.SP[1] - (CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8));
+    if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
     CV.drawToasts();
     c.restore();
   };
 
-  /* ---------- 顶栏（照网页版 #topbar：玩家行 + 货币行） ---------- */
+  /* ---------- 顶栏（照网页版 #topbar：玩家行 + 货币行） ----------
+     网页版数值（css/style.css）：
+       .player-row  padding: sp2(10) 12 sp1(4)，gap sp2(10)；.pname 15 粗体；.plv 11 金色 + 描边；
+                    .genelock 11 红字（铭刻名）
+       #curbar      padding: 2px 12px sp2(10)，gap 0.375rem(6)
+       .cur-chip    min-height 2.5rem(**40px**)、padding 5px 11px、radius 7、字号 12、gap 5
+     小游戏原来把胶囊画成 30px 高、左边距 14 —— 比网页版矮一截、还往外偏 2px（V9.5.93 修）。 */
   CV.topbar = function () {
-    const c = CV.ctx, S = (G.Core && G.Core.S) || null;
+    const c = CV.ctx, S = (G.Core && G.Core.S) || null, D = G.DATA;
     const top = CV.safeTop;
-    const h = top + 78;
+    const ROW_H = 34, CHIP_H = 40, BAR_TOP = 2, BAR_BOTTOM = 10;
+    const h = top + ROW_H + BAR_TOP + CHIP_H + BAR_BOTTOM;
     CV.TOP = h;
-    c.fillStyle = 'rgba(7,9,14,.98)';
+    c.fillStyle = 'rgba(7,9,14,.94)';
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
+    const PAD = 12 * CV.SCALE;                       // 网页版顶栏左右 0.75rem
     const name = (S && S.player.name) || '执灯者';
-    const lv = (S && S.player.level) || 1;
-    CV.text(name, 14, top + 20, { size: CV.FS.f1, bold: true });
+    const lv = (S && S.player.level) || 0;
+    const ny = top + 10 * CV.SCALE + 10 * CV.SCALE;   // 行内中线
+    CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
     const nw = CV.measure(name, CV.FS.f1, true);
-    /* Lv. 胶囊：网页版 .plv（金色描边 + 圆角 7） */
+    /* Lv. 胶囊：网页版 .plv（金色描边 + 圆角 7 + 左右 6px） */
     const lvTxt = 'Lv.' + lv;
-    const lw = CV.measure(lvTxt, CV.FS.sm) + 12;
-    CV.round(14 + nw + 10, top + 20 - 8, lw, 16, CV.RADIUS_SM, null, '#e6b64c66');
-    CV.text(lvTxt, 14 + nw + 10 + lw / 2, top + 20, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
-    /* 货币行：网页版 #curbar 的三个主力货币 + 全部货币 */
-    const D = G.DATA;
+    const lw = CV.measure(lvTxt, CV.FS.sm) + 12 * CV.SCALE;
+    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, '#e6b64c66');
+    CV.text(lvTxt, PAD + nw + 10 * CV.SCALE + lw / 2, ny, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
+    /* 铭刻名（网页版 .genelock：11px 红字，只在解锁后出现） */
+    if (S && S.player.geneLock > 0 && D && D.GENE_LOCKS && D.GENE_LOCKS[S.player.geneLock - 1]) {
+      const gt = '铭刻·' + D.GENE_LOCKS[S.player.geneLock - 1].name;
+      CV.text(CV.fit(gt, CV.W - PAD * 2 - nw - lw - 30, CV.FS.sm), PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE, ny,
+        { size: CV.FS.sm, color: CV.C.accent });
+    }
+    /* 货币行：三个主力货币 + 全部货币（图标 + 数值，胶囊 40 高） */
     const cur = (S && S.cur) || {};
-    const main = (D ? D.CURRENCIES : []).filter((x) => ['points', 'holy', 'otherworld'].indexOf(x.id) >= 0);
-    let x = 14;
     const fmt = G.fmt || ((n) => String(n));
-    main.forEach((cc) => {
-      const label = cc.icon + ' ' + fmt(cur[cc.id] || 0);
-      const w = CV.measure(label, CV.FS.md) + 22;
-      CV.round(x, top + 40, w, 30, CV.RADIUS_SM, CV.C.panel, CV.C.line);
-      CV.text(cc.icon, x + 11, top + 55, { size: CV.FS.md, color: cc.color });
-      CV.text(fmt(cur[cc.id] || 0), x + 11 + CV.measure(cc.icon, CV.FS.md) + 5, top + 55, { size: CV.FS.md });
-      x += w + 6;
-    });
-    const more = '▤ 全部货币';
-    const mw = CV.measure(more, CV.FS.md) + 22;
-    CV.round(x, top + 40, mw, 30, CV.RADIUS_SM, CV.C.panel, CV.C.line);
-    CV.text(more, x + 11, top + 55, { size: CV.FS.md, color: CV.C.dim });
+    const main = (D ? D.CURRENCIES : []).filter((x) => ['points', 'holy', 'otherworld'].indexOf(x.id) >= 0);
+    let x = PAD;
+    const cy = top + ROW_H + BAR_TOP;
+    const chip = function (label, icon, color, dim, dashed) {
+      const w = 11 * CV.SCALE + CV.measure(icon, CV.FS.md) + 5 * CV.SCALE + CV.measure(label, CV.FS.md) + 11 * CV.SCALE;
+      const ww = Math.max(40 * CV.SCALE, w);
+      CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.C.panel, dashed ? CV.C.line2 : CV.C.line);
+      if (dashed) {                                   // .cur-chip.more：虚线边框
+        CV.ctx.save();
+        CV.ctx.strokeStyle = CV.C.line2; CV.ctx.setLineDash([4, 3]); CV.ctx.lineWidth = 1;
+        CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, null, CV.C.line2);
+        CV.ctx.restore();
+      }
+      let tx = x + 11 * CV.SCALE;
+      if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: color || CV.C.text }); tx += CV.measure(icon, CV.FS.md) + 5 * CV.SCALE; }
+      CV.text(label, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: dim ? CV.C.dim : CV.C.text, bold: true });
+      x += ww + 6 * CV.SCALE;
+      return ww;
+    };
+    main.forEach((cc) => { chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false); });
+    if (x + 40 * CV.SCALE < CV.W - PAD) chip('全部货币', '▤', null, true, true);
   };
 
   /* ---------- 底栏（照网页版 #navbar：四格，选中金色） ---------- */
@@ -235,9 +273,11 @@
       CV.text(t.name, cx, y + 42, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       if (active) {
         c.fillStyle = CV.C.gold;
-        c.fillRect(cx - 14, y, 28, 2);
+        c.fillRect(cx - 13, y, 26, 2);          // 网页版 .nav-item.active::before：1.625rem × 2px
       }
+      CV.hitMode = 'screen';
       CV.hit('tab:' + t.id, tabW * i, y, tabW, h);
+      CV.hitMode = 'content';
     });
   };
 
@@ -261,15 +301,54 @@
       const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
       return { x: (t.clientX || t.pageX || 0) - Math.round((CV.pxW - CV.W) / 2), y: t.clientY || t.pageY || 0 };
     };
-    let downY = 0, moved = false;
-    wx.onTouchStart((e) => { const p = toW(e); downY = p.y; moved = false; });
-    wx.onTouchMove((e) => { const p = toW(e); if (Math.abs(p.y - downY) > 8) moved = true; });
+    const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
+    let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
+    const stopMomentum = () => { if (raf) { try { cancelAnimationFrame(raf); } catch (e) {} raf = null; } };
+    /* 滚动：以前框架里**只有读没有写**（CV.scroll 永远是 0），页面一长（首页、残域）下面的内容
+       就永远看不到。这里补上拖拽滚动 + 松手惯性，和手机原生滚动手感一致。 */
+    wx.onTouchStart((e) => {
+      const p = toW(e);
+      downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
+      startScroll = CV.scroll || 0;
+      stopMomentum();
+    });
+    wx.onTouchMove((e) => {
+      const p = toW(e);
+      const dy = p.y - downY;
+      if (Math.abs(dy) > 8) moved = true;
+      if (!moved) return;
+      const now = Date.now(), dt = Math.max(1, now - lastT);
+      vel = (p.y - lastY) / dt;                    // px/ms，向下拖为正
+      lastY = p.y; lastT = now;
+      const next = Math.max(0, Math.min(CV.maxScroll || 0, startScroll - dy));
+      if (next !== CV.scroll) { CV.scroll = next; CV.render(); }
+    });
     wx.onTouchEnd((e) => {
       const p = toW(e);
-      if (moved) return;
+      if (moved) {                                 // 松手 → 惯性
+        let sp = -vel * 14;
+        if (Math.abs(sp) < 1) return;
+        const step = () => {
+          sp *= 0.92;
+          const next = Math.max(0, Math.min(CV.maxScroll || 0, CV.scroll + sp));
+          const edge = next === CV.scroll;
+          CV.scroll = next; CV.render();
+          if (Math.abs(sp) > 0.6 && !edge) raf = RAF(step); else raf = null;
+        };
+        raf = RAF(step);
+        return;
+      }
+      /* 点击：内容区登记的是"内容坐标"，这里换算（− 顶栏 − 8 + 滚动）后再比 ——
+         以前两边坐标系不同直接比，内容区所有按钮的判定都偏了一整条顶栏。 */
+      const ly = CV.localY(p.y);
+      const overlayOnly = !!(G.U && G.U.overlay);   // 确认弹窗打开时，底下的内容不吃点击
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
-        if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) { CV.dispatch(h.id); return; }
+        if (overlayOnly && !h.screen) continue;
+        const wy = h.screen ? p.y : ly;
+        if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) {
+          CV.dispatch(h.id); return;
+        }
       }
     });
   };
