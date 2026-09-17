@@ -235,10 +235,14 @@
   /* ---------- 列表行 .list-row（左标题+说明、右按钮） ---------- */
   U.listRow = function (o) {
     const t1 = CV.FS.f1 * 1.35, t2 = CV.FS.sm * 1.55, pad = 10 * CV.SCALE;
+    /* o.ico：行首一个大字符（网页版 .list-row 里那个 <span style="font-size:1.1875rem">）。
+       o.rightText：行尾一段灰色小字（网页版 游历 / 秘术阁 那些行的右侧奖励）。 */
+    const icoW = o.ico ? (CV.measure(o.ico, 19 * CV.SCALE) + 10 * CV.SCALE) : 0;
+    const rightW = o.rightText ? (CV.measure(o.rightText, CV.FS.sm) + 10 * CV.SCALE) : 0;
     /* V9.6.7：网页版 .t1/.t2 是**换行**的（没有 line-clamp），原来这里用 CV.fit 单行截断，
        "开启后进入战斗立即结算，不再逐帧播放，适合挂机刷本"会被砍成"…适…"。
        现在按可用宽度折行，行高照 CSS 的 line-height（t1 1.35 / t2 1.55）。 */
-    const availW = U.iw() - (o.rightW || 0) - 12 * CV.SCALE;
+    const availW = U.iw() - (o.rightW || 0) - rightW - icoW - 12 * CV.SCALE;
     /* o.tag：标题行右侧跟着一枚小标（网页版 .list-row .t1 > .tag，金色描边胶囊） */
     const tagW = o.tag ? (CV.measure(o.tag, CV.FS.xs) + 14 * CV.SCALE) : 0;
     const l1 = CV.wrap(o.t1, availW - tagW, CV.FS.f1);
@@ -248,14 +252,16 @@
     draw(() => {
       if (o.dim) CV.ctx.save(), CV.ctx.globalAlpha = 0.45;   /* 网页版已领取行 opacity:.45/.5 */
       const y0 = top + pad;
-      l1.forEach((ln, i) => CV.text(ln, U.ix() + 4, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true }));
+      if (o.ico) CV.text(o.ico, U.ix() + 4, y0 + (l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0)) / 2, { size: 19 * CV.SCALE });
+      if (o.rightText) CV.text(o.rightText, U.ix() + U.iw(), y0 + (l1.length * t1) / 2, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+      l1.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true }));
       if (o.tag) {
         const tw = CV.measure(l1[l1.length - 1], CV.FS.f1, true), th = CV.FS.xs * 1.5;
-        const tx = U.ix() + 4 + Math.min(tw, availW - tagW) + 6 * CV.SCALE, ty = y0 + t1 * (l1.length - 0.5) - th / 2;
+        const tx = U.ix() + 4 + icoW + Math.min(tw, availW - tagW) + 6 * CV.SCALE, ty = y0 + t1 * (l1.length - 0.5) - th / 2;
         CV.round(tx, ty, tagW, th, 999, null, CV.C.gold);
         CV.text(o.tag, tx + tagW / 2, ty + th / 2, { size: CV.FS.xs, align: 'center', color: CV.C.gold });
       }
-      l2.forEach((ln, i) => CV.text(ln, U.ix() + 4, y0 + l1.length * t1 + 4 * CV.SCALE + t2 * (i + 0.5),
+      l2.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + l1.length * t1 + 4 * CV.SCALE + t2 * (i + 0.5),
         { size: CV.FS.sm, color: CV.C.dim }));
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.lineWidth = 1;
       CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();

@@ -11,6 +11,7 @@ require('./js/dungeon.js');
 require('./js/cv.js');           // canvas 界面框架（配色/字号/圆角全部取网页版 :root，并按 clamp 缩放）
 require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫格/按钮…每块对应网页版一个 CSS 类）
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
+require('./js/sc-guide.js');     // 玩法指南 / 货币图鉴 / 游历奇遇
 require('./js/sc-home.js');      // 灯阁（首页）
 require('./js/sc-roster.js');   // 执灯者：伙伴总览 + 伙伴详情
 require('./js/sc-recruit.js'); // 招募（三池 + 结果页 + 概率公示）

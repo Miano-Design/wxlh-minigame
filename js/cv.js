@@ -273,7 +273,14 @@
       return ww;
     };
     main.forEach((cc) => { chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false); });
-    if (x + 40 * CV.SCALE < CV.W - PAD) chip('全部货币', '▤', null, true, true);
+    /* V9.6.7（父亲大人："看着像按钮、点了没反应"）：这颗胶囊以前**完全没登记热区**，
+       点了什么都不发生。网页版它是开「货币图鉴」的入口，这里补上。 */
+    if (x + 40 * CV.SCALE < CV.W - PAD) {
+      const w = chip('全部货币', '▤', null, true, true);
+      CV.hitMode = 'screen';
+      CV.hit('open_currency', x - w - 6 * CV.SCALE, cy, w, CHIP_H);
+      CV.hitMode = 'content';
+    }
   };
 
   /* ---------- 底栏（照网页版 #navbar：四格，选中金色） ---------- */
