@@ -436,6 +436,8 @@
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
         if (overlayOnly && !h.screen) continue;
+        /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
+        if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
         if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) return h;
       }

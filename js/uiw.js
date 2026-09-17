@@ -404,6 +404,21 @@
     CV.render();
   };
   U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
+  /* V9.6.45（父亲大人："小游戏指引一半还是能点到别的窗口"）：
+     引导画在最上层只是**视觉**上盖住了，底下那些按钮的热区仍然在 CV.hits 里、照样能派发 ——
+     看着被挡住，其实还能点到别的。这里给派发加一道闸：引导在的时候，
+     只放行「引导自己的那颗（跳过这一步）」和「高亮的目标」，其余一律吃掉。 */
+  U.coachAllows = function (h) {
+    if (!coachState) return true;
+    if (h.id === '_coach_ok') return true;
+    const want = [].concat(coachState.targetId);
+    for (let i = 0; i < want.length; i++) {
+      const w = want[i];
+      if (w.slice(-1) === '*') { if (h.id.indexOf(w.slice(0, -1)) === 0) return true; }
+      else if (h.id === w) return true;
+    }
+    return false;
+  };
   /* 点中"高亮的那颗"才算过。swallow=true 时这一下**只推进引导、不执行原动作**
      （逐项介绍用：点一下"【境界】"只是听下一项，不该顺手把页面跳走）。 */
   const _dispatch = CV.dispatch;
