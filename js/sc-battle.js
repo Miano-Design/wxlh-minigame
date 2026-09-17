@@ -102,7 +102,9 @@
     if (!f || f.type === 'end') { finish(); return; }
     applyFrame(f);
     const delay = f.type === 'round' ? 260 : (f.type === 'skill' || f.type === 'phase' || f.type === 'revive' || f.type === 'summon') ? 520 : 300;
-    B.timer = setTimeout(step, Math.max(40, delay / B.speed));
+    /* V9.6.68（资料 §8「hitstop」）：暴击多停 ~90ms —— 打击感主要来自这一下"顿"。 */
+    const stop = (f.type === 'damage' && f.crit) ? 90 : 0;
+    B.timer = setTimeout(step, Math.max(40, (delay + stop) / B.speed));
     CV.render();
   }
 
@@ -143,6 +145,10 @@
       case 'damage': {
         const u = B.units[f.target];
         hitFx(f.target); atkFx(f.source || f.actor);      // 受击闪红 + 出手前冲
+        /* V9.6.68（资料 §8/§9）：轻击一点点震、暴击明显一点 + 一下 hitstop（见 step）；
+           平时不震，免得整场都在抖（原文："如果普通攻击都在震屏，玩家很快就烦"。） */
+        B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
+        B.shakePx = f.crit ? 3 * CV.SCALE : 1.5 * CV.SCALE;
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
         floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : '#ff8080');
         B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
@@ -302,6 +308,15 @@
       { list: front, y: allyTop, ally: true },
       { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },
     ];
+    /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
+       （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
+       画完立刻还原，热区不受影响。轻击 1.5px、暴击 3px，见 hitFx 里设的 B.shakePx。 */
+    const shaking = (B.shakeUntil || 0) > Date.now();
+    const shakePx = B.shakePx || 0;
+    const sx = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
+    const sy = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
+    CV.ctx.save();
+    CV.ctx.translate(sx, sy);
     rows.forEach((row) => {
       const list = row.list;
       if (!list.length) return;
@@ -345,6 +360,7 @@
       else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
       CV.ctx.restore();
     });
+    CV.ctx.restore();                       // 震屏结束：还原坐标系
 
     /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);

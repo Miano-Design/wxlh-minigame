@@ -564,9 +564,39 @@
       });
       U.y = y0 + Math.ceil(keys.length / cols) * (h + gap);
     });
+    /* V9.6.68（资料 §5「引导每一步都要能测」）：本地引导漏斗 ——
+       和网页版同一套数据（S.coachStats），按"被跳过率"排序，越高越该改。 */
+    U.card(function () {
+      const st = S.coachStats || {};
+      const keys = Object.keys(st);
+      U.h3('引导漏斗', '本地统计 · ' + keys.length + ' 步');
+      if (!keys.length) {
+        U.hint('还没有数据 —— 跑一遍新手引导就会出现（每步记：看过 / 点过 / 跳过 / 停留）。', 3 * CV.SCALE);
+        return;
+      }
+      const rows = keys.map(function (k) {
+        const s = st[k];
+        const total = (s.tap || 0) + (s.skip || 0);
+        return { k: k, s: s, total: total, rate: total ? Math.round((s.skip || 0) / total * 100) : 0,
+          avg: s.msN ? Math.round(s.ms / s.msN / 100) / 10 : 0 };
+      }).sort(function (a, b) { return b.rate - a.rate || b.total - a.total; });
+      U.hint('按被跳过率排序 —— 越高＝这一步越没人看，优先改它。', 3 * CV.SCALE);
+      rows.slice(0, 14).forEach(function (r) {
+        U.listRow({
+          t1: r.k,
+          t2: '看过 ' + (r.s.view || 0) + ' · 点过 ' + (r.s.tap || 0) + ' · 跳过 ' + (r.s.skip || 0)
+            + (r.s.miss ? (' · 没指到 ' + r.s.miss) : '') + ' · 平均 ' + r.avg + 's',
+          rightText: r.rate + '%',
+        });
+      });
+      if (rows.length > 14) U.hint('（只列前 14 条）', 3 * CV.SCALE);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '清空漏斗统计', style: 'ghost', id: 'gm_funnel_reset' }], undefined, U.BTN_SM);
+    });
     U.hint('当前：' + CV.top().name + ' · 存档 v' + (S.v || '?') + ' · 点页面名直接跳过去', 4 * CV.SCALE);
   });
   CV.on('gm_go:*', function (k) { CV.reset(k); });
+  CV.on('gm_funnel_reset', function () { Core.S.coachStats = {}; Core.save(); CV.toast('引导漏斗统计已清空'); CV.render(); });
   CV.on('gm_points', function () { Core.addCur('points', 100000); CV.toast('◈ +10万'); CV.render(); });
   CV.on('gm_holy', function () { Core.addCur('holy', 10000); CV.toast('✦ +1万'); CV.render(); });
   CV.on('gm_other', function () { Core.addCur('otherworld', 10000); CV.toast('◆ +1万'); CV.render(); });

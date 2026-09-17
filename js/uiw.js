@@ -371,6 +371,18 @@
      （网页版同一个毛病，父亲大人："又没说要干嘛"）。用一个短窗口的开关把"主动要的"和
      "路过顺手讲的"分开。 */
   let coachForceUntil = 0;
+  /* V9.6.68（资料 §5「引导每一步都要能测」）：本地引导漏斗 —— 形状与网页版一致，
+     记 看过/点过/跳过/没指到 + 累计毫秒；GM 面板里能看（sc-last 的调试页）。 */
+  function coachFunnel(key, what, ms) {
+    if (!key || !(G.Core && G.Core.S)) return;
+    const S = G.Core.S;
+    S.coachStats = S.coachStats || {};
+    const st = S.coachStats[key] = S.coachStats[key] || { view: 0, tap: 0, skip: 0, miss: 0, ms: 0, msN: 0 };
+    st[what] = (st[what] || 0) + 1;
+    if (what === 'tap' || what === 'skip') { st.ms = (st.ms || 0) + Math.max(0, ms || 0); st.msN = (st.msN || 0) + 1; }
+    G.Core.save();
+  }
+  U.coachFunnel = coachFunnel;
   U.coachForce = function (ms) { coachForceUntil = Date.now() + (ms || 2500); };
   U.coachForced = function () { return Date.now() < coachForceUntil; };
   /* V9.6.67（查漏补缺）：**战斗页整屏接管，引导在那一页既不画也不挡**。
@@ -471,7 +483,10 @@
       return (w.slice(-1) === '*') ? (id.indexOf(w.slice(0, -1)) === 0) : (id === w);
     });
     if (!hit) return true;                       // 点别处：吃掉，什么都不做
-    if (st.swallow !== false) { U.coachMark(st); U.coachNext(); return true; }   // 只推进、不执行原动作
+    if (st.swallow !== false) {
+      coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
+      U.coachMark(st); U.coachNext(); return true;
+    }   // 只推进、不执行原动作
     /* V9.6.67（查漏补缺）：`enter` 那几步的顺序是 ——
        ① 先标记"这一步讲过了"（否则动作换页之后，这一页的 render 会把它当幽灵清掉，
           实测表现就是"点了角色卡，后面什么都没有了"）；
@@ -479,6 +494,7 @@
        ③ **动作做完**才接着走链（提前走会按旧页面挑下一步 —— 在首页挑出"养成区"，
           紧接着页面跳到角色卡，那一步就被丢掉了）。 */
     if (st.waitFor) return _dispatch(id);
+    coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
     U.coachMark(st);
     coachState = null;
     const r = _dispatch(id);
@@ -493,7 +509,10 @@
     if (coachSuspended()) return;                   // 战斗页不画引导（战斗自己的界面优先）
     /* 换页了就别再画（见 bornPage 的说明）：直接放下，**不标已读、也不跑 onDone**
        （跑 onDone 会误触发"退回上一层"，把玩家拽到更乱的地方）。 */
-    if (coachState.bornPage && coachState.bornPage !== ((CV.top() || {}).name)) { coachState = null; return; }
+    if (coachState.bornPage && coachState.bornPage !== ((CV.top() || {}).name)) {
+      coachFunnel(coachState.key, 'miss');     // 换页了：这一步这次没讲成
+      coachState = null; return;
+    }
     /* V9.6.61（父亲大人拍板第 2 条：**做完才放行**）：
        带 waitFor 的引导，先问"这件事真做完了吗" —— 做完了就直接过、连提示都不留；
        没做完才继续挡着（并且每帧都在问，所以玩家一做完立刻放行，不用再点一次）。 */
@@ -576,11 +595,17 @@
     CV.hitMode = 'screen';
     /* 热区给足 44 高（手指点得准），但**画出来的只是一行小字** */
     CV.hit('_coach_ok', hx - 8 * CV.SCALE, hy - 11 * CV.SCALE, hw + 16 * CV.SCALE, 44 * CV.SCALE);
+    /* V9.6.68（资料 §5）：卡片真的画出来了 → 记一次「看过」并开始计时；
+       没找到锚点（指不到那颗）另记一笔「没指到」，这是最该修的一种。 */
+    coachState._t0 = Date.now();
+    coachFunnel(coachState.key, 'view');
+    if (!r) coachFunnel(coachState.key, 'miss');
     CV.hitMode = 'content';
   };
   /* 「跳过这一步」：标记已看并播下一条（**没有"整条跳过"** —— 父亲大人要的是完全强制） */
   CV.on('_coach_ok', function () {
     if (!coachState) return;
+    coachFunnel(coachState.key, 'skip', coachState._t0 ? (Date.now() - coachState._t0) : 0);
     U.coachMark(coachState);
     U.coachNext();
   });
