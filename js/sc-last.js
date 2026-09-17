@@ -538,18 +538,13 @@
     U.card(function () {
       U.h3('一键发资源');
       U.btnRow([
-        { label: '◈ 点数 +10万', style: 'ghost', id: 'gm_points' },
-        { label: '✦ 圣洁 +1万', style: 'ghost', id: 'gm_holy' },
+        { label: '全部货币 +9 亿', style: 'primary', id: 'gm_all' },
+        { label: '🎫 券各 ×100', style: 'ghost', id: 'gm_tk' },
       ]);
       U.space(CV.SP[1]);
       U.btnRow([
-        { label: '◆ 结晶 +1万', style: 'ghost', id: 'gm_other' },
-        { label: '❖ 故事 +1万', style: 'ghost', id: 'gm_story' },
-      ]);
-      U.space(CV.SP[1]);
-      U.btnRow([
-        { label: '🎫 普通券 ×100', style: 'ghost', id: 'gm_tk' },
-        { label: '🔓 全解锁', style: 'primary', id: 'gm_unlock' },
+        { label: '🔓 全解锁', style: 'ghost', id: 'gm_unlock' },
+        { label: '🌍 全世界解锁', style: 'ghost', id: 'gm_worlds' },
       ]);
     });
     U.card(function () {
@@ -599,10 +594,33 @@
   });
   CV.on('gm_go:*', function (k) { CV.reset(k); });
   CV.on('gm_funnel_reset', function () { Core.S.coachStats = {}; Core.save(); CV.toast('引导漏斗统计已清空'); CV.render(); });
-  CV.on('gm_points', function () { Core.addCur('points', 100000); CV.toast('◈ +10万'); CV.render(); });
-  CV.on('gm_holy', function () { Core.addCur('holy', 10000); CV.toast('✦ +1万'); CV.render(); });
-  CV.on('gm_other', function () { Core.addCur('otherworld', 10000); CV.toast('◆ +1万'); CV.render(); });
-  CV.on('gm_story', function () { Core.addCur('story', 10000); CV.toast('❖ +1万'); CV.render(); });
+  /* V9.6.77（父亲大人："GM 后门的货币都改成给我 9 亿，现在给的太少了"）：
+     与网页版同一口径 —— 读 D.CURRENCIES，一次把每种货币（含转生点 ♾、深井徽记 ♜）拉满 9 亿。
+     以前是四个按钮各发一种、还都没给转生点，测转生天赋得来回点。 */
+  CV.on('gm_all', function () {
+    (D.CURRENCIES || []).forEach(function (c) { Core.addCur(c.id, 900000000); });
+    CV.toast('全部货币 +9 亿');
+    CV.render();
+  });
+  /* 旧按钮名保留成别名：有人习惯点它们，删了会变成死键 */
+  ['gm_points', 'gm_holy', 'gm_other', 'gm_story'].forEach(function (k) {
+    CV.on(k, function () {
+      (D.CURRENCIES || []).forEach(function (c) { Core.addCur(c.id, 900000000); });
+      CV.toast('全部货币 +9 亿');
+      CV.render();
+    });
+  });
+  CV.on('gm_worlds', function () {
+    /* 和网页版同一处自审：GM 的"全世界解锁"必须**绕过转生门**，
+       否则 36 张图只开出 12 张，按键等于没反应。 */
+    const S = Core.S;
+    (D.WORLDS || []).forEach(function (w) {
+      if (!S.worlds[w.id]) S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+      S.worlds[w.id].unlocked = true;
+    });
+    Core.refreshUnlocks && Core.refreshUnlocks();
+    Core.save(); CV.toast('已解锁全部 ' + (D.WORLDS || []).length + ' 个世界'); CV.render();
+  });
   CV.on('gm_tk', function () {
     Core.addItem('ticket_normal', 100); Core.addItem('ticket_adv', 100);
     CV.toast('招募券 +100'); CV.render();
