@@ -197,7 +197,9 @@
   };
 
   /* ---------- 三列文字宫格 .text-menu + .tile（名字 13 粗体 / 状态 11 灰，居中） ---------- */
-  U.tiles = function (list, cols) {
+  /* groupId：给**整片宫格**登记一个锚点（引导要整片高亮，不能只框第一个格子）。
+     它登记在最后 → 派发时先命中它（引导只放行它，格子本身的热区被挡住）。 */
+  U.tiles = function (list, cols, groupId) {
     cols = cols || 3;
     /* V9.6.7：网页版 .text-menu 的 gap 是 var(--sp2)=10px（不是 sp3=14）。
        第 0 版这里写成 CV.SP[2] 了 —— 格子因此窄 3px、缝宽 4px，整块宫格跟网页版对不上。 */
@@ -229,6 +231,7 @@
       if (t[0]) CV.hit(t[0], x, y, cellW, th);
     });
     const rows = Math.ceil(list.length / cols);
+    if (groupId) CV.hit(groupId, U.ix(), startY, U.iw(), rows * th + (rows - 1) * gap);
     U.y = startY + rows * th + (rows - 1) * gap;
     U.lastBottom = 0;
     return rows * th + (rows - 1) * gap;

@@ -24,9 +24,9 @@
     const L = [
       ['hero:0', '① **角色卡**：你的身份和状态都在这 —— 境界（修为阶段）、等级、待分配的属性/技能点、转生次数。',
         '点开这张卡，六维、技能、装备、血统、境界全在里面。', 'tut_blk1'],
-      ['open_party', '② **养成区**：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台…',
+      ['grid:grow', '② **养成区**：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台…',
         '前期不用全点，缺什么补什么；每条点进去都会有它自己的说明。', 'tut_blk2'],
-      ['open_bounty', '③ **日常区**：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。',
+      ['grid:daily', '③ **日常区**：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。',
         '有红点的就是"有东西可领"，别让它亮着。', 'tut_blk3'],
       ['claim_quest', '**详细怎么玩，跟着主线走就行** —— 每点一次「去完成」，我都会带你做那一步。',
         '下面这条就是主线：做完一步回来领奖励，接着下一步。', 'tut_blk4'],
@@ -175,6 +175,7 @@
   }
 
   G.coachFor = function (page) {
+    if (G.U && G.U.overlay) return;      // 别的弹窗（比如登录奖励）开着就先不弹引导
     if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
     if (page === 'home') {
@@ -321,7 +322,7 @@
       ['open_codex', '灯录', null, 'recruit'],
     ];
     U.sectionTitle('养成');
-    U.tiles(growAll.filter((x) => !x[3] || Core.isUnlocked(x[3])));
+    U.tiles(growAll.filter((x) => !x[3] || Core.isUnlocked(x[3])), 3, 'grid:grow');
     const locked = growAll.filter((x) => x[3] && !Core.isUnlocked(x[3])).map((x) => x[1]);
     if (locked.length) { U.space(CV.SP[1]); U.hint('还没解锁：' + locked.join(' / ')); }
     /* 日常（网页版 .grid-title「日常」+ 六格；红点与"真的能领"同源） */
@@ -338,7 +339,7 @@
       ['open_sign', '求签', null, null, signReady],
       ['open_recruit', '招募伙伴', null, 'recruit', freeDot],
       ['open_shop', '兑换大厅', null, 'shop'],
-    ].filter((x) => !x[3] || Core.isUnlocked(x[3])));
+    ].filter((x) => !x[3] || Core.isUnlocked(x[3])), 3, 'grid:daily');
     /* V9.6.7：这一行「全部养成线的总览在「执灯者 → 成长」。」网页版**没有** ——
        父亲大人的规矩是"主页只留功能名，非必要的注释都不要"，删掉。 */
     U.space(CV.SP[2]);
