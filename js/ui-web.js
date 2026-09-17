@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.8';
+  const GAME_VER = '9.6.9';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -766,7 +766,7 @@ window.UI = (function () {
       </div>
       <div class="idle-line idle-mini">
         <span class="il-k">【分工】</span>
-        <!-- V9.6.8（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
+        <!-- V9.6.9（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
              颜色本身就是状态：没派领队（没激活）灰、派了（激活）金。 -->
         <span class="il-s">${lines.map(l => `<span style="color:${l.leaderId ? 'var(--gold)' : 'var(--dim)'}">${l.line.name}</span>`).join('<span style="color:var(--line2)"> · </span>')}</span>
       </div>
@@ -1538,7 +1538,7 @@ window.UI = (function () {
   }
 
   /* ================= 角色 ================= */
-  /* V9.6.8（父亲大人）：执灯者的**分类和排序两行都删掉了** ——
+  /* V9.6.9（父亲大人）：执灯者的**分类和排序两行都删掉了** ——
      "默认的排序顺序就已经能很好的区分这些了，没必要了"。
      所以这里只保留一条默认顺序（上阵优先 → 等级 → 稀有度 → 星级），
      charFilter / charSort / CHAR_SORTS 连同它们的入口一起删，不留"没有 UI 的状态"。 */
@@ -1588,10 +1588,10 @@ window.UI = (function () {
     const S = C().S;
     const cs = C().codexState();
     return `
-      <!-- V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
+      <!-- V9.6.9（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
            默认顺序已经够用。图鉴留着，还是在这一行的右上角。 -->
       <div class="filter-bar">
-        <button class="btn small ghost push" data-act="open-codex" style="margin-left:auto">📕 图鉴</button>
+        <button class="btn small ghost push" data-act="open-codex" style="margin-left:auto">图鉴</button>
       </div>
       <div style="font-size:0.6875rem;color:var(--dim);margin:0 2px 0.5rem">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
       <div class="char-grid" id="char-list">${charGridHtml()}</div>`;
@@ -1865,7 +1865,7 @@ window.UI = (function () {
     return shown;
   }
   function equipFilterBar() {
-    /* V9.6.8（父亲大人）：装备页的分类**保留**，但去掉「普通」和「SSR+」两枚 ——
+    /* V9.6.9（父亲大人）：装备页的分类**保留**，但去掉「普通」和「SSR+」两枚 ——
        "普通"跟"全部"几乎重合、看不出区别；"SSR+"原来挂在部位那一行末尾，
        七个部位 + 它正好挤到第三行、孤零零一个，看着像掉出来的。 */
     const filters = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
@@ -1878,7 +1878,7 @@ window.UI = (function () {
         <span>未穿戴 ${u.eqUsed} / ${u.eqCap} 格</span>
         ${batchMode
           ? '<span class="note push">批量分解中 · 点格子挑选</span>'
-          : '<button class="btn small ghost push" data-batchon>🧹 批量分解</button>'}
+          : '<button class="btn small ghost push" data-batchon>批量分解</button>'}
       </div>`;
   }
   function equipBatchBar() {
@@ -2790,7 +2790,7 @@ window.UI = (function () {
       </div>
       ${rows.map(r => {
       const leader = r.leaderId;
-      /* V9.6.8（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
+      /* V9.6.9（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
          派了领队才算激活，标题 / 产出 / 边框一律金色高亮。一眼就能看出哪条线在干活。
          灰色只压文字与边框，操作按钮（＋ 派一名领队）保持正常，别看着像点不动。 */
       return `<div class="card" style="${leader
@@ -2798,7 +2798,7 @@ window.UI = (function () {
         : 'border-style:dashed;border-color:var(--line)'}">
         <h3 style="color:${leader ? 'var(--gold)' : 'var(--dim)'}">${r.line.ico} ${r.line.name}
           <span class="sub" style="${leader ? 'color:var(--gold)' : ''}">${r.per}</span></h3>
-        <!-- V9.6.8（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
+        <!-- V9.6.9（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
              外面只留"这条线在不在干活"（颜色）+ 一个入口。 -->
         <div class="hint mb2"${leader ? '' : ' style="color:var(--dim);opacity:.85"'}>${r.line.desc}</div>
         <button class="btn small block" data-idlepick="${r.line.id}" ${leader || bench.length ? '' : 'disabled'}>${
@@ -2822,7 +2822,7 @@ window.UI = (function () {
     const line = D.IDLE_LINES.find(l => l.id === lineId);
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const cur = S.idle.lines[lineId];
-    /* V9.6.8（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
+    /* V9.6.9（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
        所以这一层要先把自己当前的领队摆出来（含撤下），下面才是备选名单。 */
     const curBlock = cur ? `
       <div class="card" style="border-color:#e6b64c66">
@@ -4659,7 +4659,7 @@ switch (act) {
     });
     root.querySelectorAll('[data-char]').forEach(el => el.onclick = () => charDetail(el.dataset.char));
     root.querySelectorAll('[data-eqd]').forEach(el => el.onclick = () => equipDetail(el.dataset.eqd));
-    /* [data-filter] / [data-charsort] 随执灯者的分类+排序一起删掉了（V9.6.8） */
+    /* [data-filter] / [data-charsort] 随执灯者的分类+排序一起删掉了（V9.6.9） */
     root.querySelectorAll('[data-efilter]').forEach(el => el.onclick = () => { equipFilter = el.dataset.efilter; render(); });
     root.querySelectorAll('[data-ecat]').forEach(el => el.onclick = () => { equipCatFilter = el.dataset.ecat; render(); });
     // 批量分解

@@ -49,11 +49,13 @@
     U.begin();
     /* V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
        "默认的排序顺序就已经能很好的区分这些了"。只留默认顺序 + 右端「📕 图鉴」。 */
-    const pillH = 44 * CV.SCALE;
-    const codexW = CV.measure('📕 图鉴', CV.FS.md) + 26 * CV.SCALE;   // .btn.small：左右 13px
+    /* V9.6.9（父亲大人）：图鉴去掉 📕 图标、做成小按钮 —— 分類和排序删掉之后，
+       这一行只剩它一个，没必要占 44 高；缩到 36，整块内容跟着往上提。 */
+    const pillH = 36 * CV.SCALE;
+    const codexW = CV.measure('图鉴', CV.FS.sm) + 24 * CV.SCALE;
     const gy = U.y;
-    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '📕 图鉴', 'ghost', 'open_codex');
-    U.y = gy + pillH + 6 * CV.SCALE;                       // .pill-tabs padding-bottom 0.375rem
+    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '图鉴', 'ghost', 'open_codex');
+    U.y = gy + pillH + 4 * CV.SCALE;
     /* 已收集提示（网页版那行小灰字） */
     const cs = Core.codexState();
     U.hint('已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length + ' · 当前显示 ' + listSorted().length);

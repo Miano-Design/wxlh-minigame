@@ -50,16 +50,17 @@
     });
     const used = Object.keys(S.equips).filter(function (u) { return !worn.has(u); }).length;
     const cap = S.bag.eqCap;
-    const h = U.BTN_SM * CV.SCALE, top = U.y;
+    /* V9.6.9（父亲大人）：批量分解去掉 🧹 图标、做成小按钮（原来是 40 高、字还带图标，占地方） */
+    const h = 34 * CV.SCALE, top = U.y;
     CV.text('未穿戴 ' + used + ' / ' + cap + ' 格', U.pad(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim });
     if (batchMode) {
       CV.text('批量分解中 · 点格子挑选', U.pad() + U.cw(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'right' });
     } else {
-      const lbl = '🧹 批量分解';
-      const bw = CV.measure(lbl, CV.FS.sm) + 22 * CV.SCALE;
+      const lbl = '批量分解';
+      const bw = CV.measure(lbl, CV.FS.sm) + 20 * CV.SCALE;
       U.btn(U.pad() + U.cw() - bw, top, bw, h, lbl, 'ghost', 'bag_batch');
     }
-    U.y = top + h + CV.SP[2];
+    U.y = top + h + 8 * CV.SCALE;
   }
   /* 一行「左文字 + 右按钮」（和 sc-last 的 coreRow 同一套写法；各文件各留一份，不跨文件依赖） */
   function listBtn(o) {
@@ -116,11 +117,24 @@
   let curItem = null;          // 道具详情页当前看的道具
 
   /* ---------- 分类卡（网页版 .tab-cards / .tab-card） ---------- */
+  /* V9.6.9（父亲大人两件事一起）：
+     ① "固定在面板上不跟着下滑这个你没做好" —— 网页版 .tab-cards 是 position:sticky、
+        钉在货币条下面；小游戏原来是普通内容、跟着滚走了。现在标签**只在吸顶那一趟**
+        按屏幕坐标画（cv.js 的 CV.sticky 钩子），内容区只负责让出它的高度。
+        所以这里不再画，只推进游标 —— 位置由 CV.sticky 统一决定，不会出现两层错位。
+     ② "离上面间隔太大" —— 吸顶条贴着顶栏下方 4px，内容从它下面接着排。 */
+  const TAB_TOP_GAP = 4 * CV.SCALE;      // 标签离顶栏的距离（屏幕坐标）
+  const TAB_BOTTOM_GAP = 6 * CV.SCALE;   // 标签与下面内容的间距
   function tabCards() {
-    const top = U.y, gap = CV.SP[2], h = U.BTN_H * CV.SCALE;
-    U.space(CV.SP[2]);
-    const y = U.y;
+    /* 只占位（标签本身由 CV.sticky 画）：让内容从标签下面开始。
+       吸顶条贴在顶栏下方 4px，内容原点在顶栏下方 8px，所以这里按满高让位即可。 */
+    U.y += U.BTN_H * CV.SCALE + TAB_BOTTOM_GAP;
+  }
+  /* 在给定 y（屏幕坐标）画三张标签卡 */
+  function drawTabCards(y) {
+    const gap = CV.SP[2], h = U.BTN_H * CV.SCALE;
     const w = (U.cw() - gap * (TABS.length - 1)) / TABS.length;
+    const mode = CV.hitMode;
     TABS.forEach(function (t, i) {
       const x = U.pad() + i * (w + gap);
       const on = view === t[0];
@@ -128,8 +142,7 @@
       CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit('bagview:' + t[0], x, y, w, h);
     });
-    U.y = y + h + CV.SP[2];
-    return U.y - top;
+    CV.hitMode = mode;
   }
 
   /* ---------- 待领箱（网页版 stashBar） ---------- */
@@ -197,7 +210,17 @@
   CV.register('bag', function () {
     const S = Core.S;
     U.begin();
+    /* 三大标签吸顶：内容先让出它的高度，标签本身在 CV.sticky 那一趟按屏幕坐标画 */
     tabCards();
+    CV.sticky = function () {
+      CV.hitMode = 'screen';
+      /* 吸顶条自带一层不透明底：内容从它下面滚过去时不会透出来 */
+      const h = U.BTN_H * CV.SCALE;
+      CV.ctx.fillStyle = '#0b0e15f5';
+      CV.ctx.fillRect(0, CV.TOP, CV.W, TAB_TOP_GAP + h + 2 * CV.SCALE);
+      drawTabCards(CV.TOP + TAB_TOP_GAP);
+      CV.hitMode = 'content';
+    };
     stashBar();
     const pool = POOLS[view];
     const cap = S.bag[pool.capKey];

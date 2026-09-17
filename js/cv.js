@@ -164,9 +164,9 @@
   CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
   /* 换页时把"页面级覆盖层"清掉 —— 否则结算层会跟着下一页一起被画出来（V9.6.1 修） */
-  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
-  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
-  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
+  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
+  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
+  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
 
   /* ---------- 渲染一帧 ---------- */
@@ -206,6 +206,10 @@
     const bottom = CV.contentH - 20;        // contentH 里那 20 是给"滚到底"留的尾白，量的时候要减掉
     CV.maxScroll = bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]);
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
+    /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
+       页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
+       位置在顶栏之下、底栏之上，画在内容之后 → 内容从它下面滚过去。 */
+    if (CV.sticky) CV.sticky();
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
     /* 页面级覆盖层（战斗结算这类"整屏一幕"）：**必须在内容裁剪之外**画 ——
