@@ -108,8 +108,11 @@
     if (locked.length) { U.space(CV.SP[1]); U.hint('还没解锁：' + locked.join(' / ')); }
     /* 日常（网页版 .grid-title「日常」+ 六格；红点与"真的能领"同源） */
     U.space(CV.SP[2]);
-    U.y += 16 * CV.SCALE;
-    CV.text('日常', U.pad() + 2, U.y - 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+    /* 网页版 .grid-title 的 margin 是 `var(--sp3) 2px var(--sp2)`：上 14 / 下 **10**。
+       以前只推进了行高、没有下边距，标题跟下面那排卡片贴在一起了（父亲大人截图点出来的）。 */
+    const gridTitleH = CV.FS.sm * 1.2;
+    CV.text('日常', U.pad() + 2, U.y + gridTitleH / 2, { size: CV.FS.sm, color: CV.C.dim });
+    U.y += gridTitleH + CV.SP[1];
     U.tiles([
       ['open_bounty', '限时悬赏', null, null, bountyDot],
       ['open_tasks', '每日任务', null, 'tasks', taskDot],
@@ -177,8 +180,25 @@
       const y4 = top + lh * 3;
       CV.text('【分工】', U.ix(), y4 + lh / 2, { size: CV.FS.md, color: dim });
       const x4 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
-      CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空')).join(' · '), U.ix() + U.iw() - x4, CV.FS.sm),
-        x4, y4 + lh / 2, { size: CV.FS.sm, color: dim });
+      /* V9.6.7（父亲大人："没激活就灰色，激活就高亮"）：
+         每条产线单独上色 —— 派了领队的那条整段金色，空着的灰色；
+         超宽时折到第二行（卡片自己会长高），不再用省略号砍掉后半截。 */
+      const lhS = CV.FS.sm * 1.45;
+      let px = x4, py = y4 + (lh - lhS) / 2, rows = 1;
+      lines.forEach(function (l, i) {
+        if (i) {
+          const sw = CV.measure(' · ', CV.FS.sm);
+          if (px + sw > U.ix() + U.iw() && px > x4) { px = x4; py += lhS; rows++; }
+          CV.text(' · ', px, py + lhS / 2, { size: CV.FS.sm, color: CV.C.dim });
+          px += sw;
+        }
+        const t = l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空');
+        const w = CV.measure(t, CV.FS.sm);
+        if (px + w > U.ix() + U.iw() && px > x4) { px = x4; py += lhS; rows++; }
+        CV.text(t, px, py + lhS / 2, { size: CV.FS.sm, color: l.leaderId ? CV.C.gold : dim });
+        px += w;
+      });
+      const extra = (rows - 1) * lhS;
       /* 行间虚线（网页版 .idle-line 的 border-bottom: 1px dashed） */
       CV.ctx.save();
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
@@ -187,7 +207,7 @@
       });
       CV.ctx.restore();
       // 两个按钮（网页版 .btn-row：左小右大，间距 10）
-      const by = top + lh * 4 + 8 * CV.SCALE, bh = U.BTN_H * CV.SCALE, gap = 10 * CV.SCALE;
+      const by = top + lh * 4 + extra + 8 * CV.SCALE, bh = U.BTN_H * CV.SCALE, gap = 10 * CV.SCALE;
       const bw = (U.iw() - gap) * 0.42;
       U.btn(U.ix(), by, bw, bh, '派人分工', 'ghost', 'open_idlelines');
       U.btn(U.ix() + bw + gap, by, U.iw() - bw - gap, bh, '收取奖励', 'primary', 'claim_all');

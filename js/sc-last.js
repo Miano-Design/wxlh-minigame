@@ -444,25 +444,58 @@
   let leaderLine = null;
   CV.register('idlelines', function () {
     const lines = Core.idleLines();
+    const bench = Object.keys(Core.S.chars).filter((id) => Core.S.party.indexOf(id) < 0);
     U.begin(); head('挂机分工');
     U.hint('4 条产线各派 1 名领队：领队战力越高，这条线产出越高（最高 +150%）。上阵主力不能派去挂机，「板凳上的伙伴」在这里发挥作用；没派领队的产线不产出。', 0);
-    U.space(CV.SP[1]);
-    U.card(function () {
-      lines.forEach(function (l) {
-        const top = U.y, h = 76 * CV.SCALE;
-        CV.text(l.line.ico + ' ' + l.line.name, U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text(l.leaderId ? Core.charName(l.leaderId) : '未派领队，不产出', U.ix() + U.iw(), top + 16 * CV.SCALE,
-          { size: CV.FS.sm, align: 'right', color: l.leaderId ? CV.C.gold : CV.C.dim });
-        CV.text(CV.fit(l.line.desc || '', U.iw(), CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        CV.text(l.per || '', U.ix(), top + 56 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        const bw = 76 * CV.SCALE;
-        U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          l.leaderId ? '换人' : '派领队', 'ghost', 'pickleader:' + l.line.id);
-        U.y = top + h;
-      });
+    /* V9.6.7（父亲大人："里面的界面现在也是乱的"）：原来四条产线挤在一张卡里、
+       右侧小字跟按钮叠着。网页版 idleLinesModal 是**一条产线一张卡**：
+         标题「图标 名字」+ 右侧产出小字 → 说明行 → 有人：头像 + 名字/属性行 + 「撤下」按钮
+                                                   → 没人：整行「＋ 派一名领队」按钮（虚线边框）
+       照这个结构重排。 */
+    lines.forEach(function (l) {
+      const led = l.leaderId;
+      U.space(CV.SP[2]);
+      const top = U.y;
+      /* 用 dry 两趟量高度：卡片先用虚线框在 dry 趟里不画，这里直接手写结构 */
+      const pad = CV.SP[2];
+      U.inCard = true; U.dry = true; U.y = top + pad;
+      U.h3(l.line.ico + ' ' + l.line.name, l.per);
+      U.hint((l.line.desc || '') + (led ? (' · 领队【' + l.line.attrName + '】' + l.attrValue + ' → 加成 +' + Math.round((l.bonus || 0) * 100) + '%') : ''), 0);
+      U.space(CV.SP[1]);
+      if (led) U.space(34 * CV.SCALE); else U.space(U.BTN_SM * CV.SCALE);
+      const innerH = U.y - top - pad;
+      U.dry = false;
+      const h = innerH + pad * 2;
+      if (h > 4) CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, CV.C.line);
+      U.y = top + pad;
+      U.h3(l.line.ico + ' ' + l.line.name, l.per);
+      U.hint((l.line.desc || '') + (led ? (' · 领队【' + l.line.attrName + '】' + l.attrValue + ' → 加成 +' + Math.round((l.bonus || 0) * 100) + '%') : ''), 0);
+      U.space(CV.SP[1]);
+      if (led) {
+        const ah = 34 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bw = 62 * CV.SCALE;
+        const rowTop = U.y;
+        /* 头像：网页版 charAvatar(leader, 34) */
+        CV.round(U.ix(), rowTop, ah, ah, 999, CV.C.panel2, CV.C.line);
+        CV.text(CV.fit(Core.charName(led), ah - 6, CV.FS.sm), U.ix() + ah / 2, rowTop + ah / 2, { size: CV.FS.sm, align: 'center', bold: true });
+        const tx = U.ix() + ah + 8 * CV.SCALE;
+        CV.text(CV.fit(Core.charName(led), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.f1, true), tx, rowTop + ah / 2 - 8 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        CV.text(CV.fit(l.line.attrName + ' ' + l.attrValue + ' · 战力 ' + fmt(Core.power(led)), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.sm),
+          tx, rowTop + ah / 2 + 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        U.btn(U.ix() + U.iw() - bw, rowTop + (ah - bh) / 2, bw, bh, '撤下', 'ghost', 'idleclear:' + l.line.id);
+        U.y = rowTop + ah;
+      } else {
+        const no = !bench.length;
+        U.btnRow([{ label: no ? '没有可派的伙伴（先去招募）' : '＋ 派一名领队', style: 'ghost', id: no ? '' : 'pickleader:' + l.line.id, dis: no }]);
+      }
+      U.inCard = false;
+      U.y = top + h + CV.SP[2];
     });
-    const own = Object.keys(Core.S.chars).filter((id) => Core.S.party.indexOf(id) < 0);
-    U.hint('可派伙伴：' + own.length + ' 名（未上阵的伙伴）。产出的收益和挂机收益一起，在首页「收取奖励」里结算。', 4 * CV.SCALE);
+    U.hint('可派伙伴：' + bench.length + ' 名（未上阵的伙伴）。产出的收益和挂机收益一起，在首页「收取奖励」里结算。', 4 * CV.SCALE);
+  });
+  CV.on('idleclear:*', function (id) {
+    const r = Core.setIdleLeader(id, null);
+    CV.toast(r.msg || '已撤下领队');
+    CV.render();
   });
   CV.register('pickleader', function () {
     const S = Core.S;

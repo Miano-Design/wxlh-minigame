@@ -198,8 +198,13 @@
        再没人写过，于是 contentH 恒等于 20、maxScroll 恒为 0，**滚动等于没有**（V9.5.93 修）。 */
     CV.contentH = ((G.U && G.U.y) || CV.y || 0) + 20;
     c.restore();
-    /* 内容画完才知道总高：把滚动量夹回合法范围（换页 / 状态变化后内容变短也要收回来） */
-    CV.maxScroll = Math.max(0, CV.contentH + CV.SP[1] - (CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8));
+    /* 内容画完才知道总高：把滚动量夹回合法范围（换页 / 状态变化后内容变短也要收回来）。
+       V9.6.7（父亲大人："能一屏显示就一屏显示，不要还能上下拉一点的，很别扭"）：
+       以前不管内容多高都额外加一段 CV.SP[1] 的下留白，于是**刚好铺满一屏**的页面
+       （深井就是）也还能被拉动十来像素。现在只有内容真的超出一屏才给那点留白。 */
+    const viewH = CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8;
+    const bottom = CV.contentH - 20;        // contentH 里那 20 是给"滚到底"留的尾白，量的时候要减掉
+    CV.maxScroll = bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]);
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
