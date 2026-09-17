@@ -367,7 +367,7 @@ setParty(['C021']);
   Core.S.bag.eqCap = 99999; Core.S.bag.itemCap = 99999; // 避免背包满干扰判定
   let plain = 0, world = 0, cls = 0;
   for (let i = 0; i < 300; i++) {
-    const e = Core.grantEquip('W01', 'SR');
+    const e = Core.grantEquip('W20', 'SR');
     if (e.equip) {
       if (e.equip.charId) continue;
       if (e.equip.bloodSet) cls++;
@@ -377,15 +377,15 @@ setParty(['C021']);
   }
   t('SR装备含世界套装与血统套装', world > 100 && cls > 30);
   for (let i = 0; i < 100; i++) {
-    const e = Core.grantEquip('W01', 'N');
+    const e = Core.grantEquip('W20', 'N');
     if (e.equip && (e.equip.set || e.equip.bloodSet)) plain = -999;
   }
   t('N装备全为普通装', plain !== -999);
   const sig = Core.grantSignatureEquip(0);
-  t('专属装备生成', !!sig.equip && sig.equip.charId === 'C039' && sig.equip.rarity === 'UR');
+  t('专属装备生成', !!sig.equip && sig.equip.charId === D.SIGNATURE_EQUIPS[0].charId && sig.equip.rarity === 'UR');
   t('专属装备他人不可装备', !Core.equipItem('@player', sig.equip.uid));
-  Core.addChar('C039');
-  t('专属装备本人可装备', Core.equipItem('C039', sig.equip.uid));
+  Core.addChar(sig.equip.charId);
+  t('专属装备本人可装备', Core.equipItem(sig.equip.charId, sig.equip.uid));
 }
 
 /* 25. 血统套装（V9.6.81 起：原来按"职业/定位"分，现在按**血统**分）
@@ -396,7 +396,7 @@ setParty(['C021']);
   const vamp = all.find(id => D.charById[id].bloodline === '血族');
   const other = all.find(id => D.charById[id].bloodline === '魔法');
   Core.addChar(vamp); Core.addChar(other);
-  const mk = uid => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族' }; };
+  const mk = uid => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族', bloodWorld: 'W20' }; };
   mk('eqc1'); mk('eqc2'); mk('eqc3'); mk('eqc4');
   Core.S.equips['eqc2'].slot = 'accessory';
   Core.S.equipped[vamp] = { weapon: 'eqc1', armor: null, accessory: 'eqc2' };
@@ -2631,6 +2631,92 @@ setParty(['C021']);
   }
   t('神装箱保底是传说（开不出传说以下的）', ur + my === 600, 'UR ' + ur + ' · MYTH ' + my + ' · 其它 ' + other);
   t('神装箱小概率出神话（≈15%，实测 8%~22%）', my / 600 >= 0.08 && my / 600 <= 0.22, (my / 600 * 100).toFixed(1) + '%');
+}
+
+/* ---- 血统套装：第 10 张图起 · 每张图 × 每支血统各一套 · 按世界计件 · 2/4/6 激活 ----
+   （V9.6.82 父亲大人："血统套装太少了，就第 10 个世界后每个世界都有对应的血统套装，
+     数值比世界套装高一些，套装激活都按 2/4/6 算。"） */
+{
+  t('血统套装是"每张图 × 每支血统"各一套（' + (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) + ' 张 × 6 支）',
+    Object.keys(D.BLOODLINE_SETS).length === (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) * 6,
+    Object.keys(D.BLOODLINE_SETS).length + ' 套');
+  t('第 10 张图之前没有血统套装（W09 取不到，W10 取得到）',
+    !D.bloodlineSetKey('W09', '血族') && !!D.bloodlineSetKey('W10', '血族'));
+
+  /* 掉落实测：W09 一件血统件都不出；W10 起才出，而且带上世界出处 */
+  Core.newGame(); Core.setPlayerName('血统套装'); Core.choosePlayerBloodline('血族');
+  Core.S.bag.eqCap = 99999;
+  let w9 = 0, w10 = 0, tagged = 0;
+  for (let i = 0; i < 1200; i++) {
+    const a = Core.grantEquip('W09', 'SSR').equip;
+    if (a && a.bloodSet) w9++;
+    const b = Core.grantEquip('W10', 'SSR').equip;
+    if (b && b.bloodSet) { w10++; if (b.bloodWorld === 'W10') tagged++; }
+  }
+  t('第 9 张图掉不出血统套装', w9 === 0, w9 + ' 件');
+  t('第 10 张图起掉血统套装，且标着世界出处', w10 > 100 && tagged === w10, w10 + ' 件 / 带出处 ' + tagged);
+
+  /* 数值：同世界的血统套装三档总量要**高于**世界套装 */
+  const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+  let higher = true;
+  for (let n = D.BLOODLINE_MIN_WORLD; n <= D.WORLDS.length; n++) {
+    const wid = D.WORLDS[n - 1].id;
+    const ws = D.SETS[wid];
+    const bs = D.BLOODLINE_SETS[D.bloodlineSetKey(wid, '血族')];
+    if (sum(bs.b2) + sum(bs.b4) + sum(bs.b6) <= sum(ws.b2) + sum(ws.b4) + sum(ws.b6)) higher = false;
+  }
+  t('每个世界的血统套装数值都高于同世界的世界套装', higher);
+
+  /* 计件规则：**同一张图 + 同一支血统**才算一套 —— 两张图的件不能拼成一套 */
+  const mkB = (uid, wid) => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族', bloodWorld: wid }; };
+  Core.newGame(); Core.setPlayerName('计件'); Core.choosePlayerBloodline('血族');
+  const vamp2 = D.characters.find(c => c.bloodline === '血族').id;
+  Core.addChar(vamp2);
+  mkB('b1', 'W20'); mkB('b2', 'W20'); mkB('b3', 'W21'); mkB('b4', 'W21');
+  Core.S.equips.b3.slot = 'accessory'; Core.S.equips.b4.slot = 'head';
+  Core.S.equipped[vamp2] = { weapon: 'b1', armor: 'b2', accessory: 'b3', head: 'b4' };
+  Core.S.equips.b2.slot = 'armor';
+  const st2 = Core.effectiveStats(vamp2);
+  /* 两张图各 2 件 → 各自够 2 件档（两个 b2 都吃到），但**没有**4 件档 ——
+     effectiveStats 会把命中过的套装 key 列出来，直接看它最准 */
+  const keys = Object.keys(st2.sets || {}).filter(k => k.indexOf('blood:') === 0);
+  t('血统套装按"同一张图"计件：两张图各 2 件 → 两个 2 件档（不是一套 4 件）',
+    keys.length === 2 && st2.sets['blood:W20|血族'] === 2 && st2.sets['blood:W21|血族'] === 2,
+    keys.join(' / ') || '(没命中任何血统套装)');
+}
+
+/* ---- 伙伴专属装备：六支血统各一件、不重复、基础值跟进度（V9.6.83） ---- */
+{
+  const byBlood = {};
+  D.SIGNATURE_EQUIPS.forEach(s => {
+    const c = D.charById[s.charId] || {};
+    byBlood[c.bloodline] = (byBlood[c.bloodline] || 0) + 1;
+  });
+  t('伙伴专属正好 6 件', D.SIGNATURE_EQUIPS.length === 6, D.SIGNATURE_EQUIPS.length + ' 件');
+  t('六支血统各一件、没有重复（念动力也有）',
+    Object.keys(byBlood).length === 6 && Object.values(byBlood).every(n => n === 1),
+    JSON.stringify(byBlood));
+  /* 每一位都必须是**本血统最强**的那一位（六维和最大） */
+  const tot = c => Object.values(c.attrs).reduce((a, b) => a + b, 0);
+  const ORD = { UR: 0, SSR: 1, SR: 2, R: 3, N: 4 };
+  let best = true, worst = '';
+  D.SIGNATURE_EQUIPS.forEach(s => {
+    const me = D.charById[s.charId];
+    const sameBl = D.characters.filter(c => c.bloodline === me.bloodline);
+    const top = sameBl.slice().sort((a, b) => (ORD[a.rarity] ?? 9) - (ORD[b.rarity] ?? 9) || tot(b) - tot(a))[0];
+    if (top.id !== me.id) { best = false; worst = me.name + ' 不是' + me.bloodline + '最强（应给 ' + top.name + '）'; }
+  });
+  t('专属都绑在本血统最强的伙伴身上', best, worst);
+
+  Core.newGame(); Core.setPlayerName('专属'); Core.choosePlayerBloodline('修真');
+  Core.S.bag.eqCap = 999;
+  const early = Core.grantSignatureEquip(0).equip;
+  D.WORLDS.slice(0, 20).forEach(w => { Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } }; });
+  const late = Core.grantSignatureEquip(0).equip;
+  t('专属基础值跟进度走（不再是写死的 320）', early.base.atk < late.base.atk && early.base.atk > 0,
+    '新号 ' + early.base.atk + ' → 20 张图 ' + late.base.atk);
+  const normalUr = D.makeEquip('W20', 'weapon', 'UR', 'cmp', {}).base.atk;
+  t('专属比同档普通 UR 武器更好', late.base.atk > normalUr, late.base.atk + ' vs ' + normalUr);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

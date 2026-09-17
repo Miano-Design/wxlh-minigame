@@ -231,6 +231,12 @@ window.Core = (function () {
         e.name = bl + e.name.slice(oldName.length);
       }
     });
+    /* V9.6.82：血统套装改成"按世界"之后，老的血统件（只有 bloodSet、没有 bloodWorld）
+       在套装卡里会显示成 0/6 却不知道为什么。给它们补上出处（第 10 张图，血统套装的最早一张），
+       让它们仍然是有效的一套、能被计数。 */
+    Object.values(S.equips || {}).forEach(e => {
+      if (e && e.bloodSet && !e.bloodWorld) e.bloodWorld = D.WORLDS[Math.max(0, (D.BLOODLINE_MIN_WORLD || 10) - 1)].id;
+    });
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});
@@ -442,10 +448,11 @@ window.Core = (function () {
   function applySetBonuses(pct, sets) {
     Object.entries(sets).forEach(([setId, n]) => {
       if (setId.startsWith('blood:')) {
-        const cs = D.BLOODLINE_SETS[setId.slice(6)];
+        const cs = D.BLOODLINE_SETS[setId.slice(6)];      // key = `${世界id}|${血统}`
         if (!cs) return;
         if (n >= 2 && cs.b2) Object.entries(cs.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
-        if (n >= 3 && cs.b3) Object.entries(cs.b3).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 4 && cs.b4) Object.entries(cs.b4).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 6 && cs.b6) Object.entries(cs.b6).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
         return;
       }
       if (setId.startsWith('god:')) {              // 血统神装：2 / 4 / 6 件
@@ -913,7 +920,11 @@ window.Core = (function () {
       pct.critPct += st.flat.critPct || 0;
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) sets[e.set] = (sets[e.set] || 0) + 1;
-      if (e.bloodSet && e.bloodSet === base.bloodline) sets['blood:' + e.bloodSet] = (sets['blood:' + e.bloodSet] || 0) + 1;
+      /* 血统套装：**同一张图 + 同一支血统**才算一套（V9.6.82 按世界拆开），且只有同血统的人穿得上 */
+      if (e.bloodSet && e.bloodWorld && e.bloodSet === base.bloodline) {
+        const bk = 'blood:' + e.bloodWorld + '|' + e.bloodSet;
+        sets[bk] = (sets[bk] || 0) + 1;
+      }
       /* 血统神装：只有**同血统**的人穿上的那几件才算数（V9.6.76） */
       if (e.godSet && e.godSet === base.bloodline) sets['god:' + e.godSet] = (sets['god:' + e.godSet] || 0) + 1;
     });
@@ -1001,7 +1012,10 @@ window.Core = (function () {
       pct.critPct += st.flat.critPct || 0;
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) psets[e.set] = (psets[e.set] || 0) + 1;
-      if (e.bloodSet && e.bloodSet === S.player.bloodline) psets['blood:' + e.bloodSet] = (psets['blood:' + e.bloodSet] || 0) + 1;
+      if (e.bloodSet && e.bloodWorld && e.bloodSet === S.player.bloodline) {
+        const bk = 'blood:' + e.bloodWorld + '|' + e.bloodSet;
+        psets[bk] = (psets[bk] || 0) + 1;
+      }
       if (e.godSet && e.godSet === S.player.bloodline) psets['god:' + e.godSet] = (psets['god:' + e.godSet] || 0) + 1;
     });
     applySetBonuses(pct, psets);
@@ -1111,10 +1125,18 @@ window.Core = (function () {
        血统怎么挑（V9.6.76）：**七成偏向上阵那 5 个人的血统**，剩下三成六支里随机。
        全随机的话，想给主力凑一套要刷到天荒地老；全按队伍给又变成"没有选择"。
        偏差给到七三，既照顾主力，又留着"别的血统也能刷出来"的空间。 */
+    const wi = D.WORLDS.findIndex(x => x.id === worldId) + 1;
+    const hasBlood = wi >= D.BLOODLINE_MIN_WORLD;
     if (rarity === 'MYTH') opts = { setType: 'god', godSet: randomGodSet() };
     else if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
-    else if (rarity === 'SR') opts = roll < (opts0.preferWorldSet ? 0.85 : 0.7) ? { setType: 'world' } : { setType: 'blood', bloodSet: randomBloodlineSet() };
-    else if (rarity === 'SSR' || rarity === 'UR') opts = roll < (opts0.preferWorldSet ? 0.8 : 0.6) ? { setType: 'world' } : { setType: 'blood', bloodSet: randomBloodlineSet() };
+    else if (rarity === 'SR' || rarity === 'SSR' || rarity === 'UR') {
+      /* 血统套装**第 10 张图起**才有（父亲大人："就第 10 个世界后每个世界都有对应的血统套装"）——
+         第 10 张之前那 30% 落点只给普通装，不会掉出一件"属于不存在套装"的装备
+         （makeEquip 里还有一道兜底：这张图没这套就退化成世界套装）。 */
+      const pWorld = rarity === 'SR' ? (opts0.preferWorldSet ? 0.85 : 0.7) : (opts0.preferWorldSet ? 0.8 : 0.6);
+      if (roll < pWorld) opts = { setType: 'world' };
+      else opts = hasBlood ? { setType: 'blood', bloodSet: randomBloodlineSet() } : { setType: 'plain' };
+    }
     const eq = D.makeEquip(worldId, s, rarity, uid, opts);
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
@@ -1137,20 +1159,23 @@ window.Core = (function () {
   /* 套装该给哪支血统：**七成偏向上阵那 5 个人**，三成六支里随机。
      全随机的话想给主力凑一套要刷到天荒地老；全按队伍给又变成"没有选择"。
      （V9.6.81：血统套装与血统神装共用这一条随机线 —— 都是血统的东西。） */
-  function randomBloodSet(pool) {
-    const sets = Object.keys(pool);
+  function randomBloodSet(pool) {          // pool = 一组"血统名"，返回其中一个
     const party = (S.party || []).filter(Boolean)
       .map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] || {}).bloodline))
-      .filter(b => b && pool[b]);
+      .filter(b => b && pool.indexOf(b) >= 0);
     if (party.length && Math.random() < 0.7) return party[Math.floor(Math.random() * party.length)];
-    return sets[Math.floor(Math.random() * sets.length)];
+    return pool[Math.floor(Math.random() * pool.length)];
   }
-  function randomGodSet() { return randomBloodSet(D.GOD_SETS); }
-  function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_SETS); }
+  function randomGodSet() { return randomBloodSet(Object.keys(D.GOD_SETS)); }
+  /* ⚠ 这里要的是**血统名**，不是套装 key（V9.6.82 踩过：传错的池子会让 makeEquip 找不到套装、
+     静默降级成世界套装 —— 表面不报错，实际血统套装一件都掉不出来）。 */
+  function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_KEYS || Object.keys(D.BLOODLINE_SETS)); }
   // SSR 专属装备（UR，绑定角色）
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
-    const eq = D.makeSignatureEquip(sigId, uid);
+    /* 专属装备的基础值按**玩家当前进度**那张图的档位生成（V9.6.83）——
+       以前是写死的 320，第 20 张图之后随便一件普通 UR 武器都比它强，专属成了纪念品。 */
+    const eq = D.makeSignatureEquip(sigId, uid, boxSourceWorld());
     if (!eq) return { sold: false };
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
@@ -2677,7 +2702,7 @@ window.Core = (function () {
     const item = D.ITEMS[itemId];
     if (!item || item.type !== 'box') return { ok: false, msg: '不是宝箱' };
     if (!removeItem(itemId)) return { ok: false, msg: '没有该宝箱' };
-    // UR 箱：10% 开出 SSR 伙伴专属装备
+    // UR 箱：10% 开出伙伴专属装备（UR，六支血统各一件，见 data.js 的 SIGNATURE_EQUIPS）
     if (item.rarity === 'UR' && Math.random() < 0.10) {
       const sigId = Math.floor(Math.random() * D.SIGNATURE_EQUIPS.length);
       const sigRes = grantSignatureEquip(sigId);

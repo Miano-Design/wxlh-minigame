@@ -147,7 +147,10 @@ console.log('\n=== ⑥ 四条装备线：各几套 · 从哪来 ===');
     console.log('     来源二：血统神装箱 ' + pctR(0.15) + ' 升格（其余保底传说）· 通关 W20 后在异界商店上架');
     console.log('     ⚠ 杂兵、精英、任何第 20 张图之前的世界：**一处都没有**');
   }
-  console.log('  ④ 伙伴专属 ' + D.SIGNATURE_EQUIPS.length + ' 件（各绑定一名 SSR，UR 品质）');
+  const sigRar = [...new Set(D.SIGNATURE_EQUIPS.map(x => (D.charById[x.charId] || {}).rarity))].join('/');
+  const sigBl = [...new Set(D.SIGNATURE_EQUIPS.map(x => (D.charById[x.charId] || {}).bloodline))];
+  console.log('  ④ 伙伴专属 ' + D.SIGNATURE_EQUIPS.length + ' 件（六支血统各一件 · 绑定的都是本血统最强的那位：' + sigRar
+    + ' · 覆盖 ' + sigBl.length + ' 支血统 · 名字里那 6 件全是武器，UR 品质）');
   D.SIGNATURE_EQUIPS.forEach(s => {
     const c = (D.charById || {})[s.charId] || {};
     console.log('     ' + s.name.padEnd(6) + ' · ' + (c.name || s.charId) + '（' + (c.rarity || '') + '·' + (c.bloodline || '') + '血统）');

@@ -495,14 +495,55 @@ window.DATA = (function () {
        · 两件 / 三件各一档 —— 它是"打到就能凑"的常规线，神装才是神话档的加强版
      ⚠ 老存档怎么迁移见 core.js 的 migrate()：旧 classSet（定位名）按固定映射换成血统，
        名字前缀也跟着换，玩家的套装**不会凭空掉档**。 */
+  /* ---- 血统套装：**第 10 张图起，每一张世界 × 每一支血统各一套** ----
+     V9.6.82（父亲大人："血统套装太少了，就第 10 个世界后每个世界都有对应的血统套装，
+     血统套装的数值比世界套装高一些，然后套装的激活都是按 2/4/6 算"）。
+
+     原来只有 6 套"全游戏通用"的血统套装，跟 36 套世界套装比确实太单薄。
+     现在每一张图（第 10 张起）都有六支血统各自的套装 —— 27 张 × 6 支 = 162 套，
+     名字直接带上世界：'灯阁回廊·血族套装'。凑套只认**同一张图 + 同一支血统**的件数，
+     所以它天然是"在这一张图里顺手凑"的一条线（2/4 件就已经给力，不必强求 6 件）。
+
+     数值：按血统性格给（血族=吸血暴击 / 狼人=血肉 / 修真=全能 / 魔法=术法 / 科技=速度命中 /
+     念动力=精神控制），**总量明确高于同世界的世界套装**（世界套装三档合计约 0.63，
+     血统套装 0.57~0.98 —— 见下面的模板；这是"高一些"，不是碾压）。
+     ⚠ 刻意**不随世界变强**（跟世界套装一样是平表）：真正随世界涨的是装备基础值（tier）。
+       如果按世界加系数，第 36 张图的血统套装会追平神话套装，那条终局线就废了。 */
   const KIND_NAMES = { warrior: '战士', tank: '坦克', mage: '法师', ranger: '射手', assassin: '刺客', support: '辅助', healer: '治疗', controller: '控制', vampire: '血族' };
-  const BLOODLINE_SETS = {
-    '血族':   { name: '血族套装', b2: { atkPct: 0.08 }, b3: { lifesteal: 0.06, critDmg: 0.25 }, text: '2件:攻击+8%　3件:吸血+6%·暴击伤害+25%' },
-    '狼人':   { name: '狼人套装', b2: { hpPct: 0.08 }, b3: { defPct: 0.15, hpPct: 0.08 }, text: '2件:生命+8%　3件:防御+15%·生命+8%' },
-    '修真':   { name: '修真套装', b2: { atkPct: 0.06, hpPct: 0.06 }, b3: { defPct: 0.08, spdPct: 0.08, skillPct: 0.08 }, text: '2件:攻击+6%·生命+6%　3件:防御+8%·速度+8%·技能伤害+8%' },
-    '魔法':   { name: '魔法套装', b2: { skillPct: 0.08 }, b3: { spiritPct: 0.15, skillPct: 0.15 }, text: '2件:技能伤害+8%　3件:精神+15%·技能伤害+15%' },
-    '科技':   { name: '科技套装', b2: { spdPct: 0.08 }, b3: { critPct: 0.06, evaPct: 0.05 }, text: '2件:速度+8%　3件:暴击+6%·闪避+5%' },
-    '念动力': { name: '念动套装', b2: { spiritPct: 0.10 }, b3: { skillPct: 0.12, resPct: 0.12 }, text: '2件:精神+10%　3件:技能伤害+12%·异常抗性+12%' },
+  const BLOODLINE_MIN_WORLD = 10;              // 第 10 张图起才有血统套装
+  const BLOODLINE_KEYS = ['血族', '狼人', '修真', '魔法', '科技', '念动力'];   // 六支血统（套装模板的键）
+  const BLOOD_SET_TEMPLATE = {
+    '血族':   { b2: { atkPct: 0.10 }, b4: { atkPct: 0.10, lifesteal: 0.06 }, b6: { atkPct: 0.24, critDmg: 0.30, lifesteal: 0.08 } },
+    '狼人':   { b2: { hpPct: 0.10 }, b4: { hpPct: 0.10, defPct: 0.08 }, b6: { hpPct: 0.26, defPct: 0.22, atkPct: 0.12 } },
+    '修真':   { b2: { atkPct: 0.07, hpPct: 0.07 }, b4: { defPct: 0.10, spdPct: 0.08 }, b6: { atkPct: 0.20, hpPct: 0.20, defPct: 0.16, spdPct: 0.10 } },
+    '魔法':   { b2: { skillPct: 0.10 }, b4: { skillPct: 0.10, spiritPct: 0.10 }, b6: { skillPct: 0.28, spiritPct: 0.18, critDmg: 0.20 } },
+    '科技':   { b2: { spdPct: 0.10 }, b4: { spdPct: 0.10, critPct: 0.08 }, b6: { spdPct: 0.20, critPct: 0.14, evaPct: 0.06 } },
+    '念动力': { b2: { spiritPct: 0.10 }, b4: { spiritPct: 0.10, skillPct: 0.09 }, b6: { spiritPct: 0.20, skillPct: 0.24, resPct: 0.12 } },
+  };
+  /* 百分比效果 → 人话（套装文案由数值生成，不再手抄一遍，杜绝"写着有、实际没有"） */
+  const PCT_LABEL = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '异常抗性', lifesteal: '吸血', spiritPct: '精神' };
+  const pctText = (o) => Object.entries(o).map(([k, v]) => (PCT_LABEL[k] || k) + '+' + Math.round(v * 100) + '%').join('·');
+  const BLOODLINE_SETS = {};                   // key = `${worldId}|${血统}` → 套装定义
+  const BLOODLINE_SETS_BY_WORLD = {};          // worldId → { 血统: key }
+  WORLDS.forEach((w, i) => {
+    if (i + 1 < BLOODLINE_MIN_WORLD) return;
+    const byWorld = {};
+    Object.keys(BLOOD_SET_TEMPLATE).forEach(bl => {
+      const t = BLOOD_SET_TEMPLATE[bl];
+      const key = w.id + '|' + bl;
+      BLOODLINE_SETS[key] = {
+        name: w.name + '·' + bl + '套装', world: w.id, bloodline: bl,
+        b2: t.b2, b4: t.b4, b6: t.b6,
+        text: '2件:' + pctText(t.b2) + '　4件:' + pctText(t.b4) + '　6件:' + pctText(t.b6),
+      };
+      byWorld[bl] = key;
+    });
+    BLOODLINE_SETS_BY_WORLD[w.id] = byWorld;
+  });
+  /* 取某张图某支血统的套装 key；这张图还没有血统套装（第 10 张之前）就返回 null */
+  const bloodlineSetKey = (worldId, bloodline) => {
+    const m = BLOODLINE_SETS_BY_WORLD[worldId];
+    return (m && m[bloodline]) || null;
   };
   /* 老档迁移表：旧"定位套装"→ 新"血统套装"。
      这只是给老存档找一条确定的落点（定位和血统本来不是一一对应），一次迁移、之后不再用。 */
@@ -511,14 +552,22 @@ window.DATA = (function () {
     ranger: '科技', mage: '魔法', controller: '念动力', support: '修真', healer: '修真',
   };
 
-  /* ================= SSR 伙伴专属装备（UR，绑定角色） ================= */
+  /* ================= 伙伴专属装备（UR，绑定角色 · 六支血统各一件） =================
+     V9.6.83（父亲大人："伙伴专属现在有两个血族，念动力血统的没有，应该是选出各个血统的最强伙伴，
+     不要有重复血统的，这显得很看不起念动力偏爱血族似的"）。
+     旧清单是六名 SSR，其中血族两个人（沈夜 + 白夜）、念动力空缺，而且有几支还不是本血统最强的。
+     现在改成**六支血统各挑最强的那一位**，一人一件、不重复；因为最强的基本都在 UR 档，
+     所以这六件是 UR 专属（UR 有 100 抽保底、且优先给没拥有过的伙伴，长期一定拿得到）。
+     ⚠ 基础值不再写死 320 —— 那是"死数"，第 20 张图之后随便一件 UR 武器都碾压它，
+       等于把"专属"做成了纪念品。现在跟装备箱同口径：按你**当前进度**那张图的档位生成，
+       再乘 1.15（专属就该比同档普通 UR 好一点）。 */
   const SIGNATURE_EQUIPS = [
-    { charId: 'C039', name: '猩红獠牙', slot: 'weapon', base: { atk: 320 }, affixes: [{ k: 'atkPct', v: 0.18 }, { k: 'lifesteal', v: 0.08 }], text: '沈夜专属：暗杀者的血之利刃' },
-    { charId: 'C040', name: '青萍古剑', slot: 'weapon', base: { atk: 320 }, affixes: [{ k: 'atkPct', v: 0.18 }, { k: 'skillPct', v: 0.12 }], text: '洛川专属：剑修本命飞剑' },
-    { charId: 'C041', name: '霜寒法杖', slot: 'weapon', base: { atk: 320 }, affixes: [{ k: 'skillPct', v: 0.22 }, { k: 'critPct', v: 0.05 }], text: '顾寒专属：极寒魔力凝聚' },
-    { charId: 'C042', name: '毁灭者重炮', slot: 'weapon', base: { atk: 340 }, affixes: [{ k: 'atkPct', v: 0.22 }, { k: 'critDmg', v: 0.20 }], text: '林渊专属：重火力压制' },
-    { charId: 'C046', name: '嗜血战斧', slot: 'weapon', base: { atk: 330 }, affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'hpPct', v: 0.12 }], text: '韩烬专属：狂战不熄' },
-    { charId: 'C047', name: '虚空刺匕', slot: 'weapon', base: { atk: 330 }, affixes: [{ k: 'critPct', v: 0.08 }, { k: 'critDmg', v: 0.28 }], text: '白夜专属：一击致命' },
+    { charId: 'C115', name: '血河刃',   slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'critDmg', v: 0.30 }], text: '白河愁专属：血族的极致一击' },
+    { charId: 'C119', name: '终末之怒', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'hpPct', v: 0.15 }],  text: '终焉专属：狂战不熄' },
+    { charId: 'C120', name: '代行之刃', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.18 }, { k: 'skillPct', v: 0.15 }], text: '灯阁代行者专属：剑修本命飞剑' },
+    { charId: 'C116', name: '元素咏叹', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.24 }, { k: 'critPct', v: 0.06 }], text: '天草洋吾专属：极寒魔力凝聚' },
+    { charId: 'C117', name: '零式重炮', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.22 }, { k: 'critDmg', v: 0.22 }], text: '零式专属：重火力压制' },
+    { charId: 'C114', name: '心识之环', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.20 }, { k: 'spiritPct', v: 0.18 }], text: '山吹时雨专属：念动力的极致控制' },
   ];
   const EQUIP_NAMES = {
     weapon:   { bio: ['聚合物军刀', '脉冲步枪', '血脉切割者'], ghost: ['镇魂铃', '驱邪短刃', '缚灵符剑'], mystic: ['秘银法杖', '圣光权杖', '咒纹长剑'], tech: ['磁轨枪', '粒子刀', '湮灭炮'], god: ['灯阁之刃', '终焉权杖', '试炼圣枪'] },
@@ -569,7 +618,7 @@ window.DATA = (function () {
   };
 
   // 装备实例生成：worldTier 1-36，rarity 指定，slot 指定
-  // opts: { setType: 'plain'|'world'|'blood'|'god', bloodSet, godSet }
+  // opts: { setType: 'plain'|'world'|'blood'|'god', bloodSet（血统名）, godSet（血统名） }
   function makeEquip(worldId, slot, rarity, uid, opts) {
     opts = opts || {};
     const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
@@ -579,9 +628,13 @@ window.DATA = (function () {
     let name;
     const names = EQUIP_NAMES[slot][w.theme];
     const godSet = opts.godSet || Object.keys(GOD_SETS)[0];      // 血统名（'血族' / '修真' …）
-    const bloodSet = opts.bloodSet || Object.keys(BLOODLINE_SETS)[0];
+    const bloodSet = opts.bloodSet || Object.keys(BLOOD_SET_TEMPLATE)[0];
+    /* 血统套装是"按世界"的：这张图没有对应套装（第 10 张之前）就退化成世界套装，
+       绝不会生成一件"属于不存在套装"的装备（那会让详情页画出一张空卡）。 */
+    const bloodKey = setType === 'blood' ? bloodlineSetKey(w.id, bloodSet) : null;
+    const effSetType = setType === 'blood' ? (bloodKey ? 'blood' : 'world') : setType;
     if (setType === 'god') name = (GOD_SETS[godSet] || GOD_SETS[Object.keys(GOD_SETS)[0]]).name + '·' + names[Math.floor(Math.random() * names.length)];
-    else if (setType === 'blood') name = bloodSet + '·' + names[Math.floor(Math.random() * names.length)];
+    else if (effSetType === 'blood') name = bloodSet + '·' + names[Math.floor(Math.random() * names.length)];
     else name = names[Math.floor(Math.random() * names.length)];
     const base = {};
     if (slot === 'weapon') base.atk = Math.round((22 + tier * 20) * mult);
@@ -602,17 +655,23 @@ window.DATA = (function () {
     }
     return {
       uid, name, slot, rarity, enhance: 0, base, affixes,
-      set: setType === 'world' ? worldId : null,
-      bloodSet: setType === 'blood' ? bloodSet : null,
+      set: effSetType === 'world' ? worldId : null,
+      bloodSet: effSetType === 'blood' ? bloodSet : null,
+      bloodWorld: effSetType === 'blood' ? w.id : null,
       godSet: setType === 'god' ? godSet : null,
     };
   }
 
   // SSR 专属装备实例
-  function makeSignatureEquip(sigId, uid) {
+  /* worldId：这件专属按哪张图的档位生成（调用方传"玩家当前进度"，见 core.grantSignatureEquip） */
+  function makeSignatureEquip(sigId, uid, worldId) {
     const sig = SIGNATURE_EQUIPS[sigId];
     if (!sig) return null;
-    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base: Object.assign({}, sig.base), affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, bloodSet: null, charId: sig.charId, sigText: sig.text };
+    const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
+    const tier = WORLDS.indexOf(w) + 1;
+    /* 同档普通 UR 武器 = (22 + tier*20) × 2.00；专属再 ×1.15 —— "专属就该好一点" */
+    const base = { atk: Math.round((22 + tier * 20) * EQUIP_RARITY_MULT.UR * 1.15) };
+    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base, affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, bloodSet: null, bloodWorld: null, godSet: null, charId: sig.charId, sigText: sig.text };
   }
 
   /* ================= 道具 ================= */
@@ -1993,7 +2052,8 @@ window.DATA = (function () {
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
     SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
-    BLOODLINE_SKILLS, KIND_NAMES, BLOODLINE_SETS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip,
+    BLOODLINE_SKILLS, KIND_NAMES, BLOODLINE_SETS, BLOODLINE_SETS_BY_WORLD, BLOODLINE_MIN_WORLD,
+    bloodlineSetKey, pctText, BLOODLINE_KEYS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,

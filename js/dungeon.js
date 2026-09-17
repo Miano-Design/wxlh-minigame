@@ -158,7 +158,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       if (res.equip) got.push({ k: 'equip', v: res.equip });
       else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true });
     }
-    // 地狱 Boss：5% 掉落 SSR 伙伴专属装备
+    // 地狱 Boss：5% 掉落伙伴专属装备（UR）
     if (kind === 'boss' && diff === 'hell' && Math.random() < 0.05) {
       const sig = D.SIGNATURE_EQUIPS[Math.floor(Math.random() * D.SIGNATURE_EQUIPS.length)];
       const sigRes = Core.grantSignatureEquip(D.SIGNATURE_EQUIPS.indexOf(sig));
