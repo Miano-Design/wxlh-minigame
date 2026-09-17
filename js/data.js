@@ -1233,6 +1233,11 @@ window.DATA = (function () {
   // 带截止时间的目标：过期作废，完成后给高价值奖励（对标"次日中午前晋升领 5000 桃子"的紧迫感）
   // 悬赏按"你现在的进度"动态生成：目标永远是下一步本来就要做的事，不再是四条写死的。
   // 生成结果存进存档（S.bounty.list），所以刷新页面不会换目标；开新一期时重新生成。
+  /* V9.6.17（父亲大人："限时悬赏的时间还是没改"）：悬赏期是**生成一次就写进存档**的
+     （'本期固定不再变'），所以只改上面的 hours 只对**新开的期**生效，老档里那几条
+     还挂着 72/96/120/168 小时的旧截止时间。这个 rev 就是给迁移用的：
+     存档里的 rev 对不上 → 丢掉那一期，按新表重新生成。改动数值时把它 +1。 */
+  const BOUNTY_REV = 2;
   const makeBounties = function (S) {
     const out = [];
     const push = (kind, param, name, desc, hours, reward) => {
@@ -1761,7 +1766,7 @@ window.DATA = (function () {
     FORMATIONS, pityText,
     AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV,
     IDLE_LINES, IDLE_LINE_ATTR_DIV, IDLE_MAT_PER_MIN,
-    makeBounties, REALMS, REALM_PCT, REALM_TIERS, REALM_MAJORS, REALM_STAGE_COUNT, realmName, realmChain,
+    makeBounties, BOUNTY_REV, REALMS, REALM_PCT, REALM_TIERS, REALM_MAJORS, REALM_STAGE_COUNT, realmName, realmChain,
     ELEMENTS, ELEMENT_ICON, ELEMENT_COUNTER, ELEMENT_BONUS, ELEMENT_PENALTY, worldElement,
     BEASTS, beastById, beastDesc, beastPctAt, BEAST_PCT_NAME, BEAST_RARITY_RATE,
     BEAST_EGG_ITEM, BEAST_EGG_COST, BEAST_MAX_LV, BEAST_SOUL_PER_LV, BEAST_LV_PCT,

@@ -62,7 +62,7 @@ window.Core = (function () {
       tasks: { date: '', daily: {}, claimed: {}, allClaimed: false, weekKey: '', weekly: {}, weeklyClaimed: {}, weeklyAllClaimed: false },
       login: { day: 0, round: 1, lastClaim: '' },
       idle: { bankSec: 0, lastTs: Date.now(), lines: { cultivate: null, gather: null, explore: null, guard: null } },
-      bounty: { start: Date.now(), claimed: {}, list: null },   // 限时悬赏：list 按当前进度生成，本期固定
+      bounty: { start: Date.now(), claimed: {}, list: null, rev: 0 },   // 限时悬赏：list 按当前进度生成，本期固定（rev 见 migrate）
       beast: { owned: {}, active: null },                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
       stats: { battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0 },
       settings: { speed: 1, autoSellN: false, autoSellR: false, sfx: true, autoBattle: false, autoNext: true },
@@ -159,6 +159,12 @@ window.Core = (function () {
     S.idle.lines = Object.assign({ cultivate: null, gather: null, explore: null, guard: null }, S.idle.lines || {});
     S.bounty = Object.assign({ start: Date.now(), claimed: {}, list: null }, S.bounty || {});
     S.bounty.claimed = S.bounty.claimed || {};
+    /* V9.6.17（父亲大人："限时悬赏的时间还是没改"）：悬赏期**生成一次就写进存档**，
+       只改数据表里的 hours 对老档无效（它那一期的截止时间是老的）。rev 对不上就丢掉这一期、
+       按新表重新生成 —— 一次性迁移，之后 rev 就一致了。 */
+    if (S.bounty.rev !== D.BOUNTY_REV) {
+      S.bounty = { start: Date.now(), claimed: {}, list: null, rev: D.BOUNTY_REV };
+    }
     // 悬赏改成"按进度动态生成"，老档没有 list 就在这里补一份（不改变已领记录）
     if (!Array.isArray(S.bounty.list) || !S.bounty.list.length) S.bounty.list = D.makeBounties(S);
     S.beast = Object.assign({ owned: {}, active: null }, S.beast || {});
