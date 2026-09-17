@@ -147,7 +147,15 @@
   CV.localY = function (py) { return py - (CV.TOP + 8) + (CV.scroll || 0); };
   CV.dispatch = function (id) {
     const fn = CV.onAct[id];
-    if (fn) fn();
+    if (fn) { fn(); return true; }
+    /* 动态 id（装备 uid、道具 id 这类）：允许登记前缀处理器 'eqd:*'，
+       命中时把冒号后面那段当参数传进去 —— 否则每画一件装备就得注册一个闭包。 */
+    const i = String(id).indexOf(':');
+    if (i > 0) {
+      const pre = String(id).slice(0, i + 1) + '*';
+      if (CV.onAct[pre]) { CV.onAct[pre](String(id).slice(i + 1)); return true; }
+    }
+    return false;
   };
   CV.onAct = {};
   CV.on = function (id, fn) { CV.onAct[id] = fn; };

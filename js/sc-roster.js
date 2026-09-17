@@ -271,5 +271,4 @@
   CV.on('starup', () => { const r = Core.starUp(cur); CV.toast(r.msg); CV.render(); });
   CV.on('blup', () => { const r = Core.bloodlineUpgrade(cur); CV.toast(r.msg); CV.render(); });
   [0, 1, 2].forEach((i) => CV.on('sk' + i, () => { const r = Core.skillUp(cur, i); CV.toast(r.msg); CV.render(); }));
-  CV.on('eqd:0', () => CV.toast('装备详情（弹窗）在下一批复刻'));
 })();
