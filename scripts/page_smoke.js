@@ -60,6 +60,10 @@ if (loadErrors.length) {
 }
 const CV = global.CV, Core = global.Core;
 if (!CV || !Core) { console.log('  CV / Core 没挂上，无法继续 ✗\n'); process.exit(1); }
+/* V9.6.70（父亲大人："你这叫瞻前不顾后"）：**这里原来漏了 CV.setup()** ——
+   而 CV.render() 开头就是 `if (!CV.ctx) return;`，于是"每一页渲染成功"其实是**一句空话**
+   （什么都没画，CV.hits 恒为 0）。真实入口 game.js 是调了 setup 的，这里必须一样。 */
+CV.setup(wx.getWindowInfo());
 Core.newGame(); Core.setPlayerName('体检'); Core.chooseBloodline ? 0 : 0;
 try { Core.choosePlayerBloodline('修真'); } catch (e) {}
 

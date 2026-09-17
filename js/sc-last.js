@@ -163,7 +163,9 @@
     if (key === 'item1') { CV.cur = 'bag'; CV.reset('bag'); return; }
     CV.cur = 'dungeon'; CV.reset('dungeon');
   }
-  const DAILY_MAIN_GO = (D.DAILY_MAIN_GO) || { battle5: '残域打一场', idle1: '灯阁领挂机', enhance1: '装备页强化', recruit1: '招募 1 次', dungeon1: '残域通关一关', item1: '背包用道具' };
+  /* V9.6.70（静态审计查出来的）：这里原来写 `D.DAILY_MAIN_GO || {...}` —— data.js 里**没有**这个导出，
+     一直靠右边那份兜底在跑。引用一个不存在的东西早晚出事，直接把兜底那份留成唯一真相。 */
+  const DAILY_MAIN_GO = { battle5: '残域打一场', idle1: '灯阁领挂机', enhance1: '装备页强化', recruit1: '招募 1 次', dungeon1: '残域通关一关', item1: '背包用道具' };
   /* 任务列表的一行：左 .t1/.t2（自动折行）+ 右侧 .btn.small（按行中线对齐） */
   function coreRow(o) {
     const bw = 84 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;

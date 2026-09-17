@@ -132,6 +132,9 @@
       const gap = 8 * CV.SCALE, cols = 4;
       const cw = (U.cw() - gap * (cols - 1)) / cols;
       const top = U.y;
+      /* V9.6.70：整片关卡格登记一颗**组锚点** —— 引导要指"这一关"但那一关还没解锁时，
+         退而指整片格子（总比弹一张"不知道指哪"的卡强）。 */
+      CV.hit('stage_grid', U.pad(), top - 4 * CV.SCALE, U.cw(), cw * 3 + gap * 2 + 8 * CV.SCALE);
       for (let i = 0; i < 12; i++) {
         const r = Math.floor(i / cols), c = i % cols;
         const x = U.pad() + c * (cw + gap), y = top + r * (cw + gap);
@@ -166,7 +169,10 @@
   let sweepSel = 11;
   CV.register('sweep', function () {
     const S = Core.S;
-    const w = D.WORLDS.find((x) => x.id === view.worldId);
+    /* V9.6.70：这一页是从世界页推上来的（view.worldId 一定有值），但**代码不能假设**——
+       page_smoke 单独渲染这一页时 view.worldId 是空的，原来直接读 w.id 就崩。
+       真机上如果哪天从别处进来，同样会崩；这里给个兜底。 */
+    const w = D.WORLDS.find((x) => x.id === view.worldId) || D.WORLDS[0];
     const diff = view.diff;
     const arr = (S.worlds[w.id] && S.worlds[w.id].stages[diff]) || [];
     const cleared = arr.map((s, i) => ({ s, i })).filter((x) => x.s > 0);

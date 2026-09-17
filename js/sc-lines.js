@@ -183,8 +183,8 @@
           : (ready ? '已成熟，可以收了' : ('生长中 · 还需 ' + (G.formatDuration ? G.formatDuration(Math.ceil(p.leftMs / 1000)) : '')));
         CV.text(CV.fit(state, textW, CV.FS.sm), U.ix(), top + 32 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
         const desc = !p.plot
-          ? ('可种「' + (D.GARDENS[i] || {}).name + '」：' + ((D.GARDENS[i] || {}).desc || ''))
-          : ('收 ' + ((D.GARDENS[i] || {}).desc || ''));
+          ? ('可种「' + (D.GARDEN[i] || {}).name + '」：' + ((D.GARDEN[i] || {}).desc || ''))
+          : ('收 ' + ((D.GARDEN[i] || {}).desc || ''));
         CV.text(CV.fit(desc, textW, CV.FS.xs), U.ix(), top + 50 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         if (!p.plot) U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE, '播种', 'ghost', 'garden_plant:' + i);
         else U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
@@ -197,7 +197,7 @@
   });
   [0, 1, 2, 3].forEach(function (i) {
     CV.on('garden_plant:' + i, function () {
-      const r = Core.plantGarden(i, (D.GARDENS[i] || {}).id);
+      const r = Core.plantGarden(i, (D.GARDEN[i] || {}).id);
       CV.toast(r.msg || '已播种');
       CV.render();
     });
