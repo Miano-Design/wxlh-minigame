@@ -27,7 +27,37 @@
       { key: 'tut_hero_open', mustTap: true, swallow: false, queue: true });
   }
 
+  /* V9.6.36：**主线每一步 = 引导的一步**（父亲大人：合并成一套）。
+     一张表按"当前主线是哪一步 + 现在在哪一页"决定播哪组；每组只播一次（key 记存档），
+     所以老号第一次进这个模块时也会补上。旁白式、逐项、必须点中。 */
+  const TUT = {
+    q01:  { page: 'home',    run: coachHero },                       // 熟悉身体（逐项讲主角卡，已做）
+    q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
+    q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
+    q03:  { page: 'recruit', s: ['pull1:normal', 'pull1:normal:free'], t: '招募在这里：每天有免费次数，先用掉 —— 免费抽也计入主线。' },
+    q04:  { page: 'party',   s: ['pslot:0', 'pslot:1', 'pslot:2'], t: '点空格子把伙伴放上阵（共 5 格，主角占 1 格）。长按任意一格可以拖着换位置。' },
+    q05:  { page: 'world',   s: ['stage:1'], t: '第 2 关开始出现多波敌人 —— 血量会继承，不会自动回满。' },
+    q06:  { page: 'world',   s: ['stage:2'], t: '第 3 关打完就解锁「装备强化」这条线，回头记得把装备拉一拉。' },
+    q07:  { page: 'bag',     s: ['bagview:equip'], t: '强化在这里：切到「装备」，点一件装备进去花材料强化。' },
+    q08:  { page: 'world',   s: ['stage:3'], t: '第 4 关是精英关：敌人更硬、掉落更好，打不动就先回首页收挂机收益。' },
+    q10:  { page: 'world',   s: ['stage:11'], t: '第 12 关是这一世界的守关 Boss —— 打完解锁下一个世界。' },
+    q11:  { page: 'corridor',s: ['corridor_fight'], t: '深井：一直往上打、没有重置。每 10 层给一枚深井印记，井内全属性加成。' },
+    q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
+  };
+  function coachByQuest(page) {
+    const cu = Core.currentQuest && Core.currentQuest();
+    const qid = cu && cu.q && cu.q.id;
+    const rule = qid && TUT[qid];
+    if (!rule || rule.page !== page) return false;
+    const key = 'tut_' + qid;
+    if (U.coachSeen(key)) return false;
+    if (rule.run) { rule.run(); return true; }
+    U.coach(rule.s, rule.t, { key: key, mustTap: true });
+    return true;
+  }
+
   G.coachFor = function (page) {
+    if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
     if (page === 'home' && !U.coachSeen('tut_hero_open')) coachHero();
     const C = [
       ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],

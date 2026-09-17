@@ -398,6 +398,14 @@
       U.btnRow([{ label: '➕ 新建主角', style: 'ghost', id: 'new_protag' }], undefined, U.BTN_SM);
     });
     U.card(function () {
+      /* V9.6.36：重跑新手引导 —— 清掉"这一课看过"的记录，下次进对应页面会重新逐项讲一遍。
+         父亲大人 8 问里第 8 条：只在设置里放这一个入口。 */
+      U.h3('新手引导');
+      U.hint('已经把引导跳过的部分，可以在这里重新跑一遍 —— 进入对应页面时会重新逐项讲解。', 2 * CV.SCALE);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '重跑新手引导', style: 'ghost', id: 'reset_coach' }]);
+    });
+    U.card(function () {
       U.h3('危险区');
       U.btnRow([{ label: '删除当前进度，重新开始', style: 'ghost', id: 'wipe_save' }], undefined, U.BTN_SM);
     });
@@ -489,6 +497,12 @@
       });
       G.wx.showKeyboard({ defaultValue: '', maxLength: 12, multiple: false, confirmType: 'done', fail: function () { CV.toast('键盘没打开，再点一次'); } });
     } catch (e) { CV.toast('键盘没打开，再点一次'); }
+  });
+  CV.on('reset_coach', function () {
+    Core.S.coachSeen = {};
+    Core.save();
+    CV.toast('新手引导已重置 —— 回首页就会重新开始讲');
+    CV.render();
   });
   CV.on('wipe_save', function () {
     U.confirm('删除当前进度', '会清掉这台设备上的全部进度，重新从开局契约开始。确定吗？', function () {
