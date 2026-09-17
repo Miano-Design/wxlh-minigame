@@ -124,6 +124,7 @@
   let taskTab = 'main';
   /* 「前往 ›」的落点（逐条照网页版 gotoQuest / gotoDaily 的映射） */
   function goQuest(qid) {
+    U.coachForce(2500);          // 主动求引导：这一步的说明这次一定再讲一遍（与网页版同步）
     const worldOf = { q12: 'W02', q14: 'W02', q15: 'W03' }[qid] || 'W01';
     if (qid === 'q01' || qid === 'q13') { CV.cur = 'home'; CV.reset('home'); CV.push('protag'); return; }
     if (qid === 'q03') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
@@ -148,6 +149,7 @@
   G.goQuest = goQuest;
 
   function goDaily(key) {
+    U.coachForce(2500);
     if (key === 'recruit1') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
     if (key === 'idle1') { CV.cur = 'home'; CV.reset('home'); return; }
     if (key === 'enhance1') {
@@ -501,8 +503,11 @@
   CV.on('reset_coach', function () {
     Core.S.coachSeen = {};
     Core.save();
-    CV.toast('新手引导已重置 —— 回首页就会重新开始讲');
-    CV.render();
+    /* V9.6.66（与网页版同步）：点完直接**把人带回首页并把开场引导接上**，
+       不用再让玩家自己摸回首页才看见效果（网页版也是这个行为）。 */
+    CV.cur = 'home';
+    CV.reset('home');
+    CV.toast('新手引导已重置 —— 从首页重新开始讲');
   });
   CV.on('wipe_save', function () {
     U.confirm('删除当前进度', '会清掉这台设备上的全部进度，重新从开局契约开始。确定吗？', function () {

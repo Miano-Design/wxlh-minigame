@@ -117,6 +117,11 @@
   CV.glyphWidth = function (ch, size) { return CV.GLYPHS[ch] ? size : 0; };
 
   /* ---------- 绘制原语（数值都对齐网页版） ---------- */
+  /* V9.6.66（父亲大人："字都画出来了"级别的小毛病）：引导文案里用 **粗体** 标重点，
+     但画布不认 markdown —— 结果是**星号原样画在屏幕上**（截图里就是"① **角色卡**：…"）。
+     统一在三个入口（画 / 量 / 折行）把这两顆星号去掉，宽度和绘制口径就永远一致。 */
+  function _md(str) { return String(str == null ? '' : str).replace(/\*\*/g, ''); }
+  CV.plain = _md;
   CV.text = function (str, x, y, opt) {
     opt = opt || {};
     const c = CV.ctx;
@@ -128,7 +133,7 @@
     if (lsOk && opt.ls) { try { c.letterSpacing = opt.ls + 'px'; } catch (e) {} }
     c.textAlign = opt.align || 'left';
     c.textBaseline = opt.baseline || 'middle';
-    const raw = String(str);
+    const raw = _md(str);
     if (CV.hasGlyph(raw)) {
       /* 分段：普通文字照旧 fillText，缺字形的字符交给 CV.GLYPHS 画 */
       const size = opt.size || CV.FS.lg;
@@ -151,7 +156,7 @@
   CV.measure = function (str, size, bold) {
     const c = CV.ctx;
     c.font = `${bold ? '600 ' : ''}${size}px ${CV.FONT}`;
-    const raw = String(str);
+    const raw = _md(str);
     if (CV.hasGlyph(raw)) {
       let w = 0;
       Array.from(raw).forEach(function (t) {
@@ -200,7 +205,7 @@
   };
   /* 折行：按可用宽度断行（返回行数组，最多 maxLines 行，超出末行加省略号） */
   CV.wrap = function (str, maxW, size, maxLines) {
-    const chars = String(str == null ? '' : str).split('');
+    const chars = _md(str).split('');
     const lines = [];
     let line = '';
     chars.forEach((ch) => {
@@ -426,6 +431,10 @@
     };
     const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
     let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
+    /* V9.6.66（父亲大人："引导时……不能滑动界面"）：引导期间**整屏锁死** ——
+       手指滑动不再滚页，也不会触发惯性；点也只有"高亮的那颗 / 跳过这一步"能被 hitAt 认出来。 */
+    let coachLock = false;
+    const coachOn = () => !!(G.U && G.U.coachActive && G.U.coachActive());
     const stopMomentum = () => { if (raf) { try { cancelAnimationFrame(raf); } catch (e) {} raf = null; } };
     /* 滚动：以前框架里**只有读没有写**（CV.scroll 永远是 0），页面一长（首页、残域）下面的内容
        就永远看不到。这里补上拖拽滚动 + 松手惯性，和手机原生滚动手感一致。 */
@@ -448,6 +457,7 @@
       downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
       startScroll = CV.scroll || 0;
       stopMomentum();
+      coachLock = coachOn();
       /* V9.6.40（父亲大人：两侧一致 / 手感）：网页版按钮有 :active 缩放，画布原来点下去毫无反馈。
          按下先记住"按的是哪颗"，U.btn 会把它画成按下态；抬手或开始滚动就清掉。 */
       const h = hitAt(p);
@@ -457,6 +467,7 @@
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
+      if (coachLock || coachOn()) { CV.pressed = null; return; }     // 引导在：不滚、不给按下态
       if (!moved) return;
       if (CV.pressed) { CV.pressed = null; CV.render(); }   // 一变成滚动就不算"按着按钮"了
       const now = Date.now(), dt = Math.max(1, now - lastT);
@@ -467,6 +478,8 @@
     });
     wx.onTouchEnd((e) => {
       const p = toW(e);
+      if (coachLock && moved) { coachLock = false; return; }          // 引导期间的滑动：整下丢掉
+      coachLock = false;
       if (moved) {                                 // 松手 → 惯性
         let sp = -vel * 14;
         if (Math.abs(sp) < 1) return;
@@ -488,6 +501,9 @@
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
         if (overlayOnly && !h.screen) continue;
+        /* 引导在的时候，只认它自己那颗（V9.6.66）—— 与 hitAt 同一条规矩，
+           否则"按下没反应、抬手却真的跳页了"。 */
+        if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
         if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) {
           CV.dispatch(h.id); return;

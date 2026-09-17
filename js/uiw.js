@@ -366,6 +366,13 @@
      只弹一次：看过记进 S.coachSeen。 */
   let coachState = null;
   const coachQueue = [];
+  /* V9.6.66（与网页版 V9.6.65 同步）：**玩家自己点「去完成」= 主动求引导**，这种必须每次都给。
+     原来小游戏的引导是"看过就永不再弹"，于是第二次点前往只会把人送到页面、什么都不说
+     （网页版同一个毛病，父亲大人："又没说要干嘛"）。用一个短窗口的开关把"主动要的"和
+     "路过顺手讲的"分开。 */
+  let coachForceUntil = 0;
+  U.coachForce = function (ms) { coachForceUntil = Date.now() + (ms || 2500); };
+  U.coachForced = function () { return Date.now() < coachForceUntil; };
   /* V9.6.35（父亲大人定的需求）：引导是**强制、逐项、必须真点到那颗按钮**才放行。
      用法：U.coach(targetId, text, opts)
        opts.key      —— 记进存档的键（默认用 targetId 拼）；老号第一次进某模块时补一次靠它
@@ -378,8 +385,11 @@
     if (!S) return;
     S.coachSeen = S.coachSeen || {};
     const key = opts.key || [].concat(targetId).join('|');
-    if (S.coachSeen[key]) return;                      // 看过就不再弹
-    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false, onDone: opts.onDone,
+    if (S.coachSeen[key] && !U.coachForced()) return;  // 看过就不再弹（除非玩家主动又要了一次）
+    /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
+       mustTap 改成**默认开** —— 所有引导都只有两条出路：点高亮的那颗，或者点右下角「跳过这一步」。
+       以前非强制的那些给了一颗全屏热区（点哪都算过），玩家一边看引导一边还能操作别的东西。 */
+    const item = { targetId: targetId, key: key, text: text, mustTap: opts.mustTap !== false, swallow: opts.swallow !== false, onDone: opts.onDone,
       waitFor: opts.waitFor,   // waitFor：**这件事真的做完了**才算过（父亲大人拍板的第 2 条）
       where: opts.where };     // where：这一步要在哪一页做（目标不在本页时告诉玩家去哪）
     /* V9.6.43 自审：同一个 key 不能重复入队 —— 链式引导每帧都会问一次，
@@ -409,6 +419,7 @@
     CV.render();
   };
   U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
+  U.coachActive = function () { return !!coachState; };   // 触摸层用它挡滚动（引导期间不许滑屏）
   /* V9.6.45（父亲大人："小游戏指引一半还是能点到别的窗口"）：
      引导画在最上层只是**视觉**上盖住了，底下那些按钮的热区仍然在 CV.hits 里、照样能派发 ——
      看着被挡住，其实还能点到别的。这里给派发加一道闸：引导在的时候，
@@ -429,16 +440,25 @@
   const _dispatch = CV.dispatch;
   CV.dispatch = function (id) {
     const st = coachState;
-    if (st && st.mustTap) {
-      const want = [].concat(st.targetId);
-      if (want.indexOf(id) >= 0) {
-        if (st.swallow !== false) { U.coachMark(st); U.coachNext(); return true; }   // 吃掉这一下
-        const r = _dispatch(id);
-        if (coachState === st) { U.coachMark(st); U.coachNext(); }
-        return r;
-      }
-    }
-    return _dispatch(id);
+    if (!st) return _dispatch(id);
+    /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
+       这里原来是**漏的** —— 只有按下判定（hitAt）过滤了，真正执行动作的这条派发路
+       直接 `return _dispatch(id)`，所以高亮期间点别处照样跳页（实测点到了"查看境界·渡劫"）。
+       现在引导在 = 真模态：只有「高亮的那颗」和「跳过这一步」能派发，其余一律吃掉。 */
+    if (id === '_coach_ok') return _dispatch(id);
+    const want = [].concat(st.targetId);
+    /* 锚点支持**前缀**（'eqd:*' / 'bup:*'）：动态 id 不可能写死，
+       原来只认全等 → 这类锚点怎么点都不过，只能靠"跳过这一步"。 */
+    const hit = want.some(function (w) {
+      return (w.slice(-1) === '*') ? (id.indexOf(w.slice(0, -1)) === 0) : (id === w);
+    });
+    if (!hit) return true;                       // 点别处：吃掉，什么都不做
+    if (st.swallow !== false) { U.coachMark(st); U.coachNext(); return true; }   // 只推进、不执行原动作
+    const r = _dispatch(id);
+    /* 带 waitFor（做完才放行）的那几步：点一下不算过，交给每帧的 waitFor 判定，
+       否则玩家点一下高亮就把提示消掉、事却没做成 —— 那正是网页版刚修掉的坑。 */
+    if (coachState === st && !st.waitFor) { U.coachMark(st); U.coachNext(); }
+    return r;
   };
   U.drawCoach = function () {
     if (!coachState) return;
@@ -513,20 +533,17 @@
        要么把小字换成'跳过这一步'"）：左边那颗大按钮去掉，
        右下角那一行**本身就是**操作提示：强制的那条写「跳过这一步 ›」，
        看到就过的那条写「点一下继续 ›」。 */
-    const forced = coachState.mustTap && !!r;
-    const hint = forced ? '跳过这一步 ›' : '点一下继续 ›';
+    /* V9.6.66（父亲大人："引导时只能点高亮区域"）：只有"点高亮那颗"和"点这行小字跳过"两种操作，
+       屏幕上其它地方**一律不吃** —— 不再有"点哪都算过"的全屏热区。 */
+    const hint = '跳过这一步 ›';
     const hw = CV.measure(hint, CV.FS.sm) + 10 * CV.SCALE;
     const hx = tx + tw - 14 * CV.SCALE - hw, hy = ty + th - 22 * CV.SCALE;
     CV.text(hint, tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
       { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
     c.restore();
     CV.hitMode = 'screen';
-    if (forced) {
-      /* 热区给足 44 高（手指点得准），但**画出来的只是一行小字** */
-      CV.hit('_coach_ok', hx - 8 * CV.SCALE, hy - 11 * CV.SCALE, hw + 16 * CV.SCALE, 44 * CV.SCALE);
-    } else {
-      CV.hit('_coach_ok', 0, 0, CV.W, CV.H);     // 看到就过：点哪都算
-    }
+    /* 热区给足 44 高（手指点得准），但**画出来的只是一行小字** */
+    CV.hit('_coach_ok', hx - 8 * CV.SCALE, hy - 11 * CV.SCALE, hw + 16 * CV.SCALE, 44 * CV.SCALE);
     CV.hitMode = 'content';
   };
   /* 「跳过这一步」：标记已看并播下一条（**没有"整条跳过"** —— 父亲大人要的是完全强制） */

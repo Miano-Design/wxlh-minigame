@@ -99,7 +99,11 @@
     bounty: '限时悬赏', idlelines: '挂机分工',
   };
   const TUT = {
-    q01:  { page: 'home',    run: coachHero },                       // 熟悉身体（逐项讲主角卡）
+    /* V9.6.66（与网页版对齐）：主线一「熟悉身体」的落点是**角色页**，就讲角色页里的东西。
+       原来这里写的是 run: coachHero（重播首页三区块）—— 玩家点「去完成」进到角色页，
+       屏幕上却飘着"① 角色卡：你的身份和状态都在这"那张讲首页的卡，指的还是被盖住的首页。
+       （开场三区块由 TOUR 负责，跟主线一不是同一件事。） */
+    q01:  { page: 'protag',  s: ['attr:*'], t: '这是你的属性面板：升级得属性点和技能点，点 +1 分配，六维、技能、装备、血统都在这一页。' },
     q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
     q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
     /* q03（招募）/ q04（上阵）的引导只在开场三区块里讲一次，不在主线里重复（审计结论）。 */
@@ -118,17 +122,25 @@
     const rule = qid && TUT[qid];
     if (!rule || rule.page !== page) return false;
     const key = 'tut_' + qid;
-    if (U.coachSeen(key)) return false;
+    /* V9.6.66（与网页版同步）：玩家自己点「前往 ›」＝主动求引导，这次必须再讲一遍 */
+    if (U.coachSeen(key) && !U.coachForced()) return false;
     if (rule.run) { rule.run(); return true; }
     /* V9.6.61（父亲大人拍板第 2 条：做完才放行）：
        主线这一课的"过关条件"就是**那一步主线本身有没有完成** ——
        直接绑它的 check()，所以"点一下按钮"不算过，得真做完。
        （每一步仍然保留「跳过这一步」，所以不会把人卡死。） */
     const quest = (D.MAIN_QUESTS || []).filter(function (q) { return q.id === qid; })[0];
+    /* V9.6.66（与网页版对齐）：这一步**已经做完了**的（比如"熟悉身体"就是打开角色页本身）
+       就不能再挂 waitFor —— 否则引导刚登记就被判定"做完"、当场自己消失，玩家什么都看不见。
+       没做过的才用"做完才放行"。 */
+    const alreadyDone = quest ? !!quest.check(Core.S) : false;
     U.coach(rule.s, rule.t, {
       key: key,
       mustTap: true,
-      waitFor: quest ? function () { return !!quest.check(Core.S); } : null,
+      /* swallow:false = 点高亮的那一下**真的生效**（点关卡就开打、点装备就进强化）。
+         配 waitFor 用：点完不消提示，等这一步真做完才放行。 */
+      swallow: false,
+      waitFor: (quest && !alreadyDone) ? function () { return !!quest.check(Core.S); } : null,
       where: PAGE_NAME[rule.page] || rule.page,
     });
     return true;
