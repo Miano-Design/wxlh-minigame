@@ -458,7 +458,10 @@ body {
 #battle-overlay .b-title { font-size: 0.875rem; font-weight: 700; flex: 1; }
 /* V9.6.0（父亲大人）：敌方与我方分列上下两端；我方前后排收成一组（间距 0.875rem），
    不再用 space-evenly 把三行摊满整屏（那样前后排离得太远、不像一支队伍）。 */
-.b-field { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 0.5rem 0.875rem 0.75rem; }
+/* V9.6.1（父亲大人给的批注）：敌方在上、我方在下、日志贴底，**三方紧凑占满一屏**，
+   中间不留一大块空白。做法：把战场区的余量四等分（上 / 敌我之间 / 下），
+   于是"敌我之间的空档"= 上下留白的 2 倍，视觉上是一块紧凑的战场。 */
+.b-field { flex: 1; display: flex; flex-direction: column; justify-content: space-around; padding: 0.5rem 0.875rem 0.5rem; }
 .b-side { display: flex; flex-direction: column; gap: 0.875rem; }
 .b-row { display: flex; justify-content: center; gap: 0.625rem; flex-wrap: wrap; }
 /* 站位可见化：我方分两行（前排在上、后排在下），敌人优先打前排。

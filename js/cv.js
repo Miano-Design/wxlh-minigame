@@ -163,9 +163,10 @@
   /* ---------- 页面栈（每次换页把滚动位置归零，和网页版换页一个手感） ---------- */
   CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
-  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.render(); };
-  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.render(); };
-  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.render(); };
+  /* 换页时把"页面级覆盖层"清掉 —— 否则结算层会跟着下一页一起被画出来（V9.6.1 修） */
+  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
+  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
+  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.render(); };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
 
   /* ---------- 渲染一帧 ---------- */
@@ -202,6 +203,10 @@
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
+    /* 页面级覆盖层（战斗结算这类"整屏一幕"）：**必须在内容裁剪之外**画 ——
+       V9.6.1（父亲大人："结算内容也得在画面中间"）：以前结算画在内容层里，被顶栏下移、还跟着滚动，
+       既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */
+    if (CV.pageOverlay) CV.pageOverlay();
     CV.drawToasts();
     c.restore();
   };

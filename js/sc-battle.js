@@ -246,12 +246,16 @@
        我方两排之间只隔 14px（就是"一支部队"该有的距离），屏幕越高上下留白越多。 */
     const FIELD_TOP = U.y;
     const CARD_H = 92 * CV.SCALE;                 // 一张单位卡的高度（头像 + 名字 + 血条 + 百分比）
-    const LOG_H = 126 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距）
+    const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 我方前排与后排的间距（和网页版 .b-side gap 一致）
     const FIELD_BOTTOM = CV.H - CV.NAV_H - CV.safeBottom - LOG_H;
-    const allyBlockH = CARD_H * 2 + SIDE_GAP;
-    const allyTop = Math.max(FIELD_TOP + CARD_H + 16 * CV.SCALE, FIELD_BOTTOM - allyBlockH);
-    const enemyY = FIELD_TOP + Math.max(0, (allyTop - FIELD_TOP - CARD_H)) * 0.42;
+    /* V9.6.1（父亲大人给的批注）：中间那块不能是空的 —— 敌方 / 我方 / 日志要**紧凑占满一屏**。
+       把余量**四等分**（上留白 / 敌我之间×2 / 下留白），也就是敌我空档 = 上下留白的 2 倍，
+       和网页版 .b-field 的 `justify-content: space-around` 是同一套几何。 */
+    const stackH = CARD_H * 3 + SIDE_GAP;
+    const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM - FIELD_TOP) - stackH) / 4);
+    const enemyY = FIELD_TOP + space;
+    const allyTop = enemyY + CARD_H + space * 2;
     const rows = [
       { list: enemies, y: enemyY, ally: false },
       { list: front, y: allyTop, ally: true },
@@ -276,8 +280,8 @@
       if (!lines.length) U.hint('（战斗开始）', 4 * CV.SCALE);
       lines.forEach((ln) => U.hint(ln, 2 * CV.SCALE));
     });
-    /* 结算：**整屏结算层**（网页版 .b-result：大标题 + 回合/星级 + 奖励胶囊 + 动作 + 收起返回） */
-    if (B.panel) drawSettle(res, B.panel);
+    /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
+    CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
     if (B.tip) {
       const w = Math.min(CV.W - 60 * CV.SCALE, CV.measure(B.tip, CV.FS.lg) + 36 * CV.SCALE);
       const x = (CV.W - w) / 2, y = CV.H / 2 - 20 * CV.SCALE;
@@ -316,7 +320,8 @@
     const c = CV.ctx;
     c.fillStyle = 'rgba(5,6,10,.9)';
     c.fillRect(0, 0, CV.W, CV.H);
-    CV.hitMode = 'screen';
+    CV.hitMode = 'screen';                 // 这一层画在屏幕坐标里，命中区也要按屏幕坐标登记
+    const prevOverlay = CV.pageOverlay;
     const cx = CV.W / 2;
     const rewards = (p.rewards || []).slice(0, 8);
     const acts = p.acts || [];
@@ -356,6 +361,7 @@
     U.btn(cx - 100 * CV.SCALE, y, 200 * CV.SCALE, 44 * CV.SCALE,
       res.win ? (acts.length ? '收下奖励并返回' : '收下奖励') : '返回', acts.length ? 'ghost' : 'primary', 'battle_close');
     CV.hitMode = 'content';
+    CV.pageOverlay = prevOverlay;
   }
 
   CV.register('battle', drawBattle);

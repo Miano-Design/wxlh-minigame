@@ -39,12 +39,18 @@
     /* ① 小队 */
     U.card(function () {
       U.h3('⚔️ 灯阁小队', '总战力 ' + fmt(Core.teamPower()) + '（主角必上阵）');
-      const gap = CV.SP[2], th = 92 * CV.SCALE;
+      /* V9.6.1（父亲大人："间距都太急了"）：这一整块按网页版实测重排 ——
+         · 前排/后排标签：margin 8px 2px 6px（上 8、下 6），字号 12
+         · 伙伴格：**高 115**（原来 92，太扁）、内边距 10、圆角 10
+         · 格内：头像 40 上下各留 8 → 名字 13/行高 17.5 且下间距 4 → 小字 11/行高 15.4
+         这一套行距是网页版 .pslot/.pname/.pmeta 的实测值，别再自己压。 */
+      const gap = CV.SP[2], th = 115 * CV.SCALE;
+      const PAD = 10 * CV.SCALE;
+      const NAME_LH = 17.5 * CV.SCALE, META_LH = 15.4 * CV.SCALE;
       const drawRow = function (label, slots) {
-        const top = U.y;
-        CV.text(label, U.ix(), top + 9 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        U.y = top + 20 * CV.SCALE;
-        const y = U.y;
+        const labelTop = U.y + 8 * CV.SCALE;
+        CV.text(label, U.ix() + 2 * CV.SCALE, labelTop + 8 * CV.SCALE, { size: CV.FS.md, color: CV.C.dim });
+        const y = labelTop + 16.5 * CV.SCALE + 6 * CV.SCALE;
         const cw = label === '后排' ? (U.iw() - gap * 2) / 3 : (U.iw() - gap) / 2;
         slots.forEach(function (i, k) {
           const x = U.ix() + k * (cw + gap);
@@ -61,12 +67,16 @@
             CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, null, '#e6b64c66');
             CV.text('主角', x + 4 * CV.SCALE + tw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
           }
-          avatar(id, 40 * CV.SCALE, x + cw / 2, y + 26 * CV.SCALE);
-          CV.text(CV.fit(Core.charName(id), cw - 8 * CV.SCALE, CV.FS.lg, true), x + cw / 2, y + 56 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
+          /* 头像 40（上留 8）、名字 13/行高 17.5、小字 11/行高 15.4 —— 全按网页版实测 */
+          const avTop = y + PAD + 8 * CV.SCALE;
+          avatar(id, 40 * CV.SCALE, x + cw / 2, avTop + 20 * CV.SCALE);
+          const nameY = avTop + 40 * CV.SCALE + 8 * CV.SCALE + NAME_LH / 2;
+          CV.text(CV.fit(Core.charName(id), cw - PAD * 2, CV.FS.lg, true), x + cw / 2, nameY, { size: CV.FS.lg, bold: true, align: 'center' });
           const meta = id === '@player'
             ? ('Lv.' + S.player.level + ' · 战力 ' + fmt(Core.playerPower()))
             : ('Lv.' + S.chars[id].lv + ' · ' + (D.charById[id] || {}).role + ' · ' + (D.charById[id] || {}).faction);
-          CV.text(CV.fit(meta, cw - 8 * CV.SCALE, CV.FS.xs), x + cw / 2, y + 74 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+          CV.text(CV.fit(meta, cw - PAD * 2, CV.FS.xs), x + cw / 2, nameY + NAME_LH / 2 + 4 * CV.SCALE + META_LH / 2,
+            { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
           CV.hit('poke:' + i, x, y, cw, th);
         });
         U.y = y + th + CV.SP[2];

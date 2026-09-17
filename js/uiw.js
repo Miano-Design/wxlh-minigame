@@ -65,6 +65,7 @@
     U.y = top + pad; content();
     U.inCard = outer;
     U.y = top + h + CV.SP[2];
+    U.lastBottom = CV.SP[2];
     return h;
   };
 
@@ -166,7 +167,11 @@
 
   /* ---------- 区块小标题 .section-title（12px 字距 1px，右边一条线） ---------- */
   U.sectionTitle = function (text) {
-    const top = U.y + CV.SP[3], lh = CV.FS.md * 1.3;
+    /* V9.6.1（父亲大人："上面的间距太大了，要和下面一样"）：小节标题上下间距必须相等 ——
+       上面那块卡片自己已经留了 14px 下边距，这里只补差额，两边都是 14px。 */
+    const WANT = CV.SP[2];
+    const extraTop = Math.max(0, WANT - (U.lastBottom || 0));
+    const top = U.y + extraTop, lh = CV.FS.md * 1.3;
     draw(() => {
       const cy = top + lh / 2;
       CV.text(text, U.ix() + 4, cy, { size: CV.FS.md, color: CV.C.text2, bold: true });
@@ -174,8 +179,9 @@
       CV.ctx.strokeStyle = CV.C.line; CV.ctx.lineWidth = 1;
       CV.ctx.beginPath(); CV.ctx.moveTo(U.ix() + 4 + w + 10, cy); CV.ctx.lineTo(U.ix() + U.iw() - 4, cy); CV.ctx.stroke();
     });
-    U.y = top + lh + CV.SP[1];                          // 下边距 10
-    return lh + CV.SP[3] + CV.SP[1];
+    U.y = top + lh + WANT;
+    U.lastBottom = WANT;
+    return lh + extraTop + WANT;
   };
 
   /* ---------- 三列文字宫格 .text-menu + .tile（名字 13 粗体 / 状态 11 灰，居中） ---------- */
@@ -210,6 +216,7 @@
     });
     const rows = Math.ceil(list.length / cols);
     U.y = startY + rows * th + (rows - 1) * gap;
+    U.lastBottom = 0;
     return rows * th + (rows - 1) * gap;
   };
 
