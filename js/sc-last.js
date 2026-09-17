@@ -5,7 +5,7 @@
    · 任务 tasksModal     ：四个标签（主线 / 日常 / 周常 / 成就）+ 各自列表
    · 设置 settingsModal  ：战斗速度 / 自动战斗 / 音效 / 自动进下一关 / 自动分解 / 存档与备份 / 主角列表
    · 挂机分工 idleLinesModal：说明 + 4 条产线（派领队）
-   · 深井 corridorScreen ：当前层 / 历史最高 / 深井印记与加成 / 本层守卫 / 通关奖励 / 挑战本层 / 深井商店
+   · 深井 corridorScreen ：当前层 / 深井印记与加成 / 本层守卫 / 通关奖励 / 挑战本层 / 深井商店
    数值全部读 Core/DATA。
 */
 (function () {
@@ -662,7 +662,6 @@
       const top = U.y;
       CV.text('深井', CV.W / 2, top + 14 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
       CV.text(String(floor), CV.W / 2, top + 52 * CV.SCALE, { size: 40 * CV.SCALE, bold: true, align: 'center', color: CV.C.gold });
-      CV.text('历史最高 ' + S.corridor.best + ' 层', CV.W / 2, top + 84 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
       U.y = top + 100 * CV.SCALE;
     });
     U.card(function () {

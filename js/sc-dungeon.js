@@ -64,8 +64,9 @@
     const corridorLocked = !Core.isUnlocked('corridor');
     if (!corridorLocked) {
       U.sectionTitle('深井挑战');
-      worldCard('♾', '深井', '当前第 ' + S.corridor.floor + ' 层 · 历史最高 ' + S.corridor.best + ' 层',
-        '终局挑战', 'open_corridor', false);
+      /* V9.6.24（父亲大人）：去掉终局挑战标签与历史最高 —— 深井是一直往上打的、没有重置，
+         所以历史最高这个概念本身就不成立。 */
+      worldCard('♾', '深井', '当前第 ' + S.corridor.floor + ' 层', null, 'open_corridor', false);
     }
     /* 残域：**只列已解锁的世界**（V9.6.2 父亲大人："还没解锁的地图就别显示，等解锁了再显示"）——
        以前把 20 个全列出来、未解锁的压暗加锁，一屏全是"🔒 通关上一世界解锁"，既没用又碍眼。 */
