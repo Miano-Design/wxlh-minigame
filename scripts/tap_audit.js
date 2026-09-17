@@ -1,0 +1,115 @@
+/* 全界面"点一遍"审计：node scripts/tap_audit.js
+
+   起因（父亲大人："很多功能点击无效" / "点进去是空白"）：画布界面里每一颗热区都是
+   CV.hit(id) + CV.on(id)。两者对不上就是**死键**（看着能点、点了没反应），
+   而这种错只有"真点一遍"才查得出来。
+
+   做法：假 canvas 起 51 页 → 每页渲染后把它登记过的热区**一个个派发一遍** →
+     ① 抛异常的 → 报错（页面/交互会崩）
+     ② 没有对应处理器、又不在"故意无动作"名单里的 → 死键告警
+   只读脚本：跑在假环境里，不碰真存档。
+*/
+const fs = require('fs');
+const path = require('path');
+const JS = path.resolve(__dirname, '../js');
+
+const store = {};
+global.GameGlobal = global;
+global.window = global;
+global.localStorage = {
+  getItem: (k) => (k in store ? store[k] : null),
+  setItem: (k, v) => { store[k] = String(v); },
+  removeItem: (k) => { delete store[k]; },
+};
+const ctxStub = new Proxy({}, {
+  get(t, k) {
+    if (k === 'measureText') return () => ({ width: 10 });
+    if (k === 'createLinearGradient') return () => ({ addColorStop() {} });
+    const props = ['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'globalAlpha', 'textAlign',
+      'textBaseline', 'shadowColor', 'shadowBlur', 'shadowOffsetY', 'letterSpacing'];
+    if (props.indexOf(k) >= 0) return t[k];
+    return () => {};
+  },
+  set(t, k, v) { t[k] = v; return true; },
+});
+const canvas = { width: 390, height: 844, getContext: () => ctxStub, toDataURL: () => '' };
+global.wx = {
+  createCanvas: () => canvas,
+  getWindowInfo: () => ({ windowWidth: 390, windowHeight: 844, pixelRatio: 3, safeArea: { top: 44, bottom: 810 } }),
+  onTouchStart() {}, onTouchMove() {}, onTouchEnd() {},
+  getStorageSync() { return null; }, setStorageSync() {}, removeStorageSync() {},
+  setClipboardData() {}, getClipboardData() {}, showKeyboard() {}, onKeyboardConfirm() {}, offKeyboardConfirm() {},
+};
+
+['wx-adapter.js', 'data.js', 'core.js', 'battle.js', 'dungeon.js', 'cv.js', 'uiw.js']
+  .concat(fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)))
+  .forEach((f) => { const p = path.join(JS, f); if (fs.existsSync(p)) require(p); });
+
+const CV = global.CV, Core = global.Core, D = global.DATA;
+CV.setup(global.wx.getWindowInfo());
+/* 底栏四个页签的处理器是在**真实入口 game.js** 里注册的，这里补上（否则会把 tab:* 误判成死键） */
+(CV.NAV_TABS || []).forEach((t) => { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
+
+/* 故意没有动作的热区（纯粹给引导当锚点用 / 玩家点了本来就该什么都不发生） */
+/* 故意没有动作的热区：①纯给引导当锚点（attr_card / party_board / stage_grid / hero:N / grid:*）
+   ②调试暗门（gm_tap 由连点计数处理） */
+const INERT = ['attr_card', 'party_board', 'stage_grid', 'gm_tap', 'hero:', 'grid:'];
+const inertOk = (id) => INERT.indexOf(id) >= 0 || /^poke:/.test(id) === false && false;
+
+let bad = 0, warn = 0, taps = 0;
+
+/* 用"全解锁 + 有伙伴 + 有点资源"的状态点，才能把后面的页面点出来 */
+function openState() {
+  Core.newGame();
+  Core.setPlayerName('点检');
+  try { Core.choosePlayerBloodline('修真'); } catch (e) {}
+  (D.UNLOCKS || []).forEach((u) => { Core.S.unlocks[u.id] = true; });
+  if (D.characters && D.characters.length) {
+    const cid = D.characters[0].id;
+    Core.S.chars[cid] = { lv: 20, star: 3, exp: 0, attrs: {}, skillLv: [1, 1, 1], bloodlineLv: 1, equips: {} };
+    Core.S.party[1] = cid;
+  }
+  Core.S.player.level = 40;
+  Core.S.player.attrPoints = 5;
+  Core.S.player.skillPoints = 5;
+  ['points', 'holy', 'otherworld', 'story', 'bloodCrystal', 'skillChip', 'corridor'].forEach((k) => Core.addCur(k, 99999));
+  ['ticket_normal', 'ticket_adv'].forEach((k) => Core.addItem(k, 20));
+  if (D.GARDEN) D.GARDEN.forEach((g) => Core.addItem(g.seedItem || g.id, 5));
+  Object.keys(Core.S.worlds || {}).forEach((wid) => {
+    const w = Core.S.worlds[wid];
+    if (w && w.stages) Object.keys(w.stages).forEach((df) => { w.stages[df] = w.stages[df].map(() => 3); });
+  });
+}
+
+console.log('\n=== 全界面点一遍（死键 / 交互崩溃） ===');
+Object.keys(CV.panels || {}).forEach((page) => {
+  openState();
+  let ids = [];
+  try { CV.reset(page); ids = (CV.hits || []).map((h) => h.id); }
+  catch (e) { bad++; console.log('✗ ' + page + ' 渲染就抛异常：' + e.message); return; }
+  const seen = new Set();
+  ids.forEach((id) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    taps++;
+    const hasExact = !!(CV.onAct || {})[id];
+    const i = String(id).indexOf(':');
+    const pref = i > 0 ? String(id).slice(0, i + 1) + '*' : null;
+    const hasPrefix = pref ? !!(CV.onAct || {})[pref] : false;
+    if (!hasExact && !hasPrefix) {
+      if (inertOk(id) || INERT.some((x) => id.indexOf(x) === 0)) return;
+      warn++;
+      console.log('⚠ 死键：' + page + ' 页的 ' + id + ' 没有处理器（看着能点、点了没反应）');
+      return;
+    }
+    try { CV.dispatch(id); }
+    catch (e) {
+      bad++;
+      console.log('✗ ' + page + ' 页点 ' + id + ' 崩了：' + e.message);
+    }
+  });
+});
+
+console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.panels || {}).length + ' 个');
+console.log('结论：' + (bad ? '✗ 有 ' + bad + ' 处崩溃' : '没有交互崩溃 ✓') + (warn ? '；' + warn + ' 个死键待核' : '；没有死键 ✓') + '\n');
+process.exitCode = bad ? 1 : 0;

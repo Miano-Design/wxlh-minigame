@@ -63,6 +63,15 @@
      不主动换页 —— 该进角色卡是玩家按①点进去的，进不去就一直等他。 */
   G.openingNext = function () {
     const S = Core.S; S.coachSeen = S.coachSeen || {};
+    /* V9.6.71（与网页版同一条判断）：只要玩家**已经领过任何一个主线奖励**，
+       说明他已经在按主线玩了 —— 开场链剩下的步骤直接作废，不再中途冒出来打断他。 */
+    try {
+      const list = Core.mainQuestState();
+      if (list.some(function (x) { return x.claimed; })) {
+        OPENING.forEach(function (st) { S.coachSeen[st.key] = true; });
+        Core.save();
+      }
+    } catch (e) {}
     if (openingLeft() === 0) { tourRunning = false; return false; }
     tourRunning = true;
     if (U.coachActive && U.coachActive()) {
@@ -182,6 +191,7 @@
     const alreadyDone = quest ? !!quest.check(Core.S) : false;
     U.coach(rule.s, rule.t, {
       key: key,
+      queue: true,          // V9.6.71：玩家主动点「去完成」的那一步，不能被别的引导挤掉
       mustTap: true,
       /* swallow:false = 点高亮的那一下**真的生效**（点关卡就开打、点装备就进强化）。
          配 waitFor 用：点完不消提示，等这一步真做完才放行。 */
