@@ -241,7 +241,11 @@
   /* ---------- 转生天赋 ---------- */
   CV.register('reincarn', function () {
     const S = Core.S;
-    const can = Core.canReincarnate();
+    /* V9.6.74（审计抓到的真 bug）：Core.canReincarnate() 返回的是**布尔**，
+       这里却按对象用（can.ok / can.msg）—— 于是"条件"永远显灰、**「开始转生」按钮永远没有 id**
+       （看着在、点不动，玩家根本转生不了）。 */
+    const can = { ok: Core.canReincarnate() };
+    can.msg = can.ok ? '' : ('条件未满足：玩家 Lv.' + S.player.level + '/100 · 铭刻 ' + S.player.geneLock + '/5 · 灯芯 Lv.' + (S.buildings.core || 0) + '/30');
     U.begin(); head('转生天赋');
     U.card(function () {
       U.h3('转生', '已转生 ' + (S.player.reincarnations || 0) + ' 次');

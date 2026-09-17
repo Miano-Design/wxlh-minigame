@@ -1561,30 +1561,51 @@ window.DATA = (function () {
 
   /* ================= 主线任务 ================= */
   // check: (S, helpers) => bool；reward 自动结算，点击领取
+  /* ================= 主线任务 ================= */
+  /* V9.6.74（父亲大人："23479 是不是太相似了，就相差一关，有存在的价值吗？你整体重新规划一下"）：
+     **重排原则：一条主线只教一件不同的事。**
+       · 原来"通关第 1/2/3/4 关"拆成四条，其实干的是同一件事 → 合并成一条「一路推进·第 4 关」
+         （顺带一次解锁 兑换/强化/基地/任务，解锁本来就按"通关第 N 关"判定，不受影响）；
+       · 中间补上游戏里**真正的主要系统**各一课：任务领赏 / 秘术阁 / 法宝 / 药园 / 求签 / 斗法台 / 坐骑
+         —— 这些系统以前整条主线一次都没提过（"跟不上版本"就是指这个）；
+       · 里程碑保留：第 1 关 / 世界守关 Boss / 深井 / 每个世界的守关 / 转生；
+       · desc 就是判定条件，两边必须同源（scripts/guide_audit.js 规则⑥ 自动核对）。
+     每一步都要能在"走到这一步时"完成：功能要么开局就有，要么在这一步之前已经解锁。 */
   const MAIN_QUESTS = [
-    /* V9.5.67（文案体检）：这条写的是"打开个人房间"——那个界面早就没有了
-       （现在主角的六维/技能全在主页最上面那张主角卡里）。任务的**判定**一直是
-       打开主角详情（S.stats.profileViews），只有文案没跟着改，于是新人照着做会找不到地方。 */
-    { id: 'q01', name: '熟悉身体', desc: '点主页最上面的主角卡，看六维与技能', reward: { points: 500 },
+    /* ---- 入门：把最基础的几件事按顺序做一遍 ---- */
+    { id: 'q01', name: '熟悉身体', desc: '打开主页最上面的主角卡，看六维与技能', reward: { points: 500 },
       check: S => (S.stats.profileViews || 0) >= 1 },
-    { id: 'q01b', name: '熟悉战斗', desc: '完成 1 场战斗', reward: { points: 1000 },
+    { id: 'q01b', name: '熟悉战斗', desc: '打完第 1 场战斗', reward: { points: 1000 },
       check: S => S.stats.battles >= 1 },
     { id: 'q02', name: '初临蜂巢', desc: '通关 菌毯巢穴·第1关', reward: { holy: 100 }, unlock: 'recruit',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[0] > 0 },
-    { id: 'q03', name: '第一位同伴', desc: '进行 1 次招募', reward: { points: 2000 },
+    { id: 'q03', name: '第一位同伴', desc: '招募 1 次伙伴', reward: { points: 2000 },
       check: S => S.stats.recruits >= 1 },
-    { id: 'q04', name: '并肩作战', desc: '在队伍中上阵 1 名伙伴', reward: { story: 50 },
+    { id: 'q04', name: '并肩作战', desc: '让 1 名伙伴上阵', reward: { story: 50 },
       check: S => S.party.filter(id => id && id !== '@player').length >= 1 },
-    { id: 'q05', name: '深入蜂巢', desc: '通关 菌毯巢穴·第2关', reward: { points: 2000 }, unlock: 'shop',
-      check: S => S.worlds.W01 && S.worlds.W01.stages.normal[1] > 0 },
-    { id: 'q06', name: '工欲善其事', desc: '通关 菌毯巢穴·第3关', reward: { otherworld: 50 }, unlock: 'enhance',
-      check: S => S.worlds.W01 && S.worlds.W01.stages.normal[2] > 0 },
+    /* 一条顶原来的三条：打通第 4 关，顺便把 兑换/强化/基地/任务 全解锁 */
+    { id: 'q05', name: '一路推进', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000 }, unlock: 'shop,enhance,buildings,tasks',
+      check: S => S.worlds.W01 && S.worlds.W01.stages.normal[3] > 0 },
     { id: 'q07', name: '第一次强化', desc: '强化 1 次装备', reward: { points: 3000 },
       check: S => S.stats.enhances >= 1 },
-    { id: 'q08', name: '安身立命', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000 }, unlock: 'buildings,tasks',
-      check: S => S.worlds.W01 && S.worlds.W01.stages.normal[3] > 0 },
     { id: 'q09', name: '大兴土木', desc: '升级 1 次建筑', reward: { points: 2000 },
-      check: S => Object.values(S.buildings).some(lv => lv >= 1) },   // V9.6.72：建筑从 0 级起，「升级 1 次」就是 ≥1（原来写 ≥2，得多升一级才认）
+      check: S => Object.values(S.buildings).some(lv => lv >= 1) },
+    { id: 'q_tasks', name: '领赏', desc: '在任务面板领 1 次奖励', reward: { points: 1500 },
+      check: S => (S.stats.taskClaims || 0) >= 1 },
+    /* ---- 系统课：游戏里真正的主要系统，各讲一课、各做一次 ---- */
+    { id: 'q_keji', name: '秘术阁', desc: '在秘术阁升 1 级秘术', reward: { points: 2000 },
+      check: S => Object.values(S.keji || {}).some(v => v >= 1) },
+    { id: 'q_fabao', name: '法宝', desc: '获得 1 件法宝', reward: { points: 2000 },
+      check: S => (S.fabao && S.fabao.own || []).length >= 1 },
+    { id: 'q_garden', name: '药园', desc: '在药园种 1 次地', reward: { points: 1500 },
+      check: S => (S.garden || []).some(p => p) },
+    { id: 'q_sign', name: '求签', desc: '求 1 次签', reward: { story: 50 },
+      check: S => (S.stats.signDraws || 0) >= 1 },
+    { id: 'q_arena', name: '斗法台', desc: '打赢 1 场斗法台', reward: { otherworld: 50 },
+      check: S => S.arena && S.arena.best >= 2 },       // best 从 1 起，≥2 就是赢过一场
+    { id: 'q_mount', name: '坐骑', desc: '驯服 1 只坐骑', reward: { points: 2000 },
+      check: S => (S.mount && S.mount.own || []).length >= 1 },
+    /* ---- 里程碑：世界守关 / 深井 / 血统 / 境界 / 转生 ---- */
     { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, bloodCrystal: 100 }, unlock: 'geneLock,corridor',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
     { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { story: 100 },
@@ -1593,11 +1614,14 @@ window.DATA = (function () {
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[0] > 0 },
     { id: 'q13', name: '血脉觉醒', desc: '升级 1 次血统（主角或伙伴）', reward: { points: 5000 },
       check: S => S.player.bloodlineLv >= 1 || Object.values(S.chars).some(c => c.bloodlineLv >= 1) },
+    { id: 'q_realm', name: '境界渡劫', desc: '突破 1 小阶境界', reward: { points: 3000 },
+      check: S => (S.player.realm || 0) >= 1 },
     { id: 'q14', name: '潜影之后', desc: '通关 潜影窟·第12关', reward: { holy: 300, otherworld: 200 },
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[11] > 0 },
-    // V9.5.72：reward 里原来挂了个 `rp: 0`（转生点 0），纯占位——奖励表里不留零值
     { id: 'q15', name: '执灯者之路', desc: '通关 怨声旧宅·第12关', reward: { holy: 500 }, unlock: 'reincarn',
       check: S => S.worlds.W03 && S.worlds.W03.stages.normal[11] > 0 },
+    { id: 'q_reincarn', name: '转生', desc: '完成 1 次转生（Lv.100 + 铭刻 5 阶 + 灯芯 Lv.30）', reward: { holy: 1000 },
+      check: S => (S.player.reincarnations || 0) >= 1 },
   ];
 
   // 新手掉落保护：按关卡限制掉落品质上限

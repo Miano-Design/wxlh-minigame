@@ -87,7 +87,12 @@ function renderAll() {
 const freshHits = renderAll();
 try {
   (D.UNLOCKS || []).forEach((u) => { Core.S.unlocks[u.id] = true; });
-  Core.S.player.level = 60;
+  Core.S.player.level = 120;
+  /* V9.6.74：很多按钮是"钱够 / 条件到"才画出来的（秘术阁升级、法宝买、转生…）——
+     不全解锁一遍的话，这些**合法缺席**会被当成"锚点不存在"。 */
+  ['points', 'holy', 'otherworld', 'story', 'bloodCrystal', 'corridor', 'skillChip'].forEach((k) => { try { Core.addCur(k, 999999); } catch (e) {} });
+  Core.S.player.geneLock = 5;
+  Core.S.buildings.core = 30;
   Object.keys(Core.S.worlds || {}).forEach((wid) => {
     const w = Core.S.worlds[wid];
     /* 全部关卡标成"已通关"（不是 0）—— 0 只解锁第 1 关，后面的 stage:N 锚点还是画不出来 */
@@ -143,7 +148,7 @@ openingSrc.replace(/\{ key: '([a-z0-9_]+)',\s*page: '([a-z]+)',\s*target: (?:'([
 
 const tutSrc = home.slice(home.indexOf('const TUT = {'), home.indexOf('\n  };', home.indexOf('const TUT = {')));
 const tut = {};
-tutSrc.replace(/(q[0-9a-z]+):\s*\{([^}]*)\}/g, (m, qid, body) => {
+tutSrc.replace(/(q[0-9a-z_]+):\s*\{([^}]*)\}/g, (m, qid, body) => {
   const page = (body.match(/page: '([a-z]+)'/) || [])[1];
   const anchors = [];
   const arr = body.match(/\bs:\s*\[([^\]]*)\]/);
@@ -193,7 +198,7 @@ else console.log('✓ 规则② key 没有意外重复');
 const EXEMPT = { q03: '招募在开场三区块里讲过，不重复' };
 const questBlock = data.slice(data.indexOf('const MAIN_QUESTS = ['), data.indexOf('\n  ];', data.indexOf('const MAIN_QUESTS = [')));
 const quests = [];
-questBlock.replace(/\{ id: '([a-z0-9]+)', name: '([^']+)'/g, (m, id, name) => { quests.push({ id: id, name: name }); return m; });
+questBlock.replace(/\{ id: '([a-z0-9_]+)', name: '([^']+)'/g, (m, id, name) => { quests.push({ id: id, name: name }); return m; });
 const questTopic = (home.match(/const QUEST_TOPIC = \{([^}]*)\}/) || ['', ''])[1];
 const missing = quests.filter((q) => !tut[q.id] && !EXEMPT[q.id] && questTopic.indexOf(q.id) < 0);
 if (missing.length) fail('这些主线步点了「去完成」什么都不讲：' + missing.map((q) => q.id + '(' + q.name + ')').join('、'));

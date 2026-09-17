@@ -64,7 +64,8 @@ window.Core = (function () {
       idle: { bankSec: 0, lastTs: Date.now(), lines: { cultivate: null, gather: null, explore: null, guard: null } },
       bounty: { start: Date.now(), claimed: {}, list: null, rev: 0 },   // 限时悬赏：list 按当前进度生成，本期固定（rev 见 migrate）
       beast: { owned: {}, active: null },                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
-      stats: { battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0 },
+      stats: { battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0,
+        taskClaims: 0, signDraws: 0 },   // V9.6.74：主线新步骤要用的两个计数（老档没有 → 一律 || 0 兜底）
       settings: { speed: 1, autoSellN: false, autoSellR: false, sfx: true, autoBattle: false, autoNext: true },
       codex: { chars: [], equipsSeen: 0, claimed: [] },
       achievements: {},       // achId → true（已领取）
@@ -2463,6 +2464,7 @@ window.Core = (function () {
     if (!st.canDraw) return { ok: false, msg: '今天已经求过签了，明天再来' };
     const s = D.rollSign();
     S.sign = { date: dailyDate(), tier: s.tier, idlePct: s.idlePct, drawn: (S.sign.drawn || 0) + 1 };
+    S.stats.signDraws = (S.stats.signDraws || 0) + 1;   // 主线「求签」用（drawn 只记今天）
     applyRewardObj(s.gain);
     S.stats.signs = (S.stats.signs || 0) + 1;
     task('sign1', 1);           // 每日任务：求签 1 次
@@ -2757,6 +2759,7 @@ window.Core = (function () {
     if (!t || S.tasks.claimed[id]) return { ok: false };
     if ((S.tasks.daily[id] || 0) < t.target) return { ok: false, msg: '未完成' };
     S.tasks.claimed[id] = true;
+    S.stats.taskClaims = (S.stats.taskClaims || 0) + 1;   // 主线「领赏」用
     applyRewardObj(t.reward);
     save();
     return { ok: true };
@@ -2767,6 +2770,7 @@ window.Core = (function () {
     const allDone = D.DAILY_TASKS.every(t => (S.tasks.daily[t.id] || 0) >= t.target);
     if (!allDone) return { ok: false, msg: '尚未完成全部任务' };
     S.tasks.allClaimed = true;
+    S.stats.taskClaims = (S.stats.taskClaims || 0) + 1;   // 一键全领也算领过
     applyRewardObj(D.DAILY_ALL_REWARD);
     save();
     return { ok: true };
