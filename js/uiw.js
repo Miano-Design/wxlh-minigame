@@ -52,6 +52,9 @@
   U.iw = () => U.cw() - U.inPad() * 2;
   U.space = function (px) { U.y += px; };
   const draw = (fn) => { if (!U.dry) fn(); };
+  /* 页面要自己排"两栏卡"（左文字 + 右按钮列）时用 U.draw —— 它认得 U.card 的先量后画，
+     不会在量高度那一趟把东西画两遍。 */
+  U.draw = (fn) => draw(fn);
 
   /* ---------- 卡片 .card（bg --panel / 边 --line / 圆角 10 / 内边距 14 / 下边距 14）
      传一个画内容的函数：它按"内容游标"往下画，卡片底由这里先量后画。 ---------- */
@@ -116,16 +119,19 @@
   };
 
   /* ---------- 提示小字 .hint（11px 灰，行高 1.7）/ 说明 .note（12px 灰，行高 1.75） ---------- */
-  function wrapBlock(text, size, lh, color, gapTop) {
+  /* widthIn：给"左文字 + 右按钮列"这种两栏卡用（网页版左列 flex:1，右列按内容宽）。
+     不传就是整块内容宽。 */
+  function wrapBlock(text, size, lh, color, gapTop, widthIn) {
     const lhPx = size * lh;
-    const lines = CV.wrap(text, U.iw(), size, 6);
+    const W = widthIn || U.iw();
+    const lines = CV.wrap(text, W, size, 6);
     const top = U.y + (gapTop || 0);
     draw(() => lines.forEach((ln, i) => CV.text(ln, U.ix(), top + lhPx * (i + 0.5), { size, color })));
     U.y = top + lines.length * lhPx;
     return lines.length * lhPx;
   }
-  U.hint = function (text, gapTop) { return wrapBlock(text, CV.FS.sm, 1.7, CV.C.dim, gapTop); };
-  U.note = function (text, gapTop) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop); };
+  U.hint = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.sm, 1.7, CV.C.dim, gapTop, widthIn); };
+  U.note = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop, widthIn); };
 
   /* ---------- 说明框 .event-desc（网页版：bg --panel / 圆角 10 / 内边距 12 / 13px 灰字 1.7 行高）
      开局契约、起名提示这类"成段说明"都用它，别再直接铺在卡片上。 ---------- */
@@ -191,7 +197,9 @@
   /* ---------- 三列文字宫格 .text-menu + .tile（名字 13 粗体 / 状态 11 灰，居中） ---------- */
   U.tiles = function (list, cols) {
     cols = cols || 3;
-    const gap = CV.SP[2], cellW = (U.iw() - gap * (cols - 1)) / cols;
+    /* V9.6.7：网页版 .text-menu 的 gap 是 var(--sp2)=10px（不是 sp3=14）。
+       第 0 版这里写成 CV.SP[2] 了 —— 格子因此窄 3px、缝宽 4px，整块宫格跟网页版对不上。 */
+    const gap = CV.SP[1], cellW = (U.iw() - gap * (cols - 1)) / cols;
     const th = 54 * CV.SCALE;
     const startY = U.y;
     list.forEach((t, i) => {
@@ -227,21 +235,39 @@
   /* ---------- 列表行 .list-row（左标题+说明、右按钮） ---------- */
   U.listRow = function (o) {
     const t1 = CV.FS.f1 * 1.35, t2 = CV.FS.sm * 1.55, pad = 10 * CV.SCALE;
-    const h = Math.max(pad * 2 + t1 + 4 * CV.SCALE + t2, 44 * CV.SCALE);
+    /* V9.6.7：网页版 .t1/.t2 是**换行**的（没有 line-clamp），原来这里用 CV.fit 单行截断，
+       "开启后进入战斗立即结算，不再逐帧播放，适合挂机刷本"会被砍成"…适…"。
+       现在按可用宽度折行，行高照 CSS 的 line-height（t1 1.35 / t2 1.55）。 */
+    const availW = U.iw() - (o.rightW || 0) - 12 * CV.SCALE;
+    /* o.tag：标题行右侧跟着一枚小标（网页版 .list-row .t1 > .tag，金色描边胶囊） */
+    const tagW = o.tag ? (CV.measure(o.tag, CV.FS.xs) + 14 * CV.SCALE) : 0;
+    const l1 = CV.wrap(o.t1, availW - tagW, CV.FS.f1);
+    const l2 = o.t2 ? CV.wrap(o.t2, availW, CV.FS.sm) : [];
+    const h = Math.max(pad * 2 + l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0), 44 * CV.SCALE);
     const top = U.y;
     draw(() => {
+      if (o.dim) CV.ctx.save(), CV.ctx.globalAlpha = 0.45;   /* 网页版已领取行 opacity:.45/.5 */
       const y0 = top + pad;
-      CV.text(CV.fit(o.t1, U.iw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.f1, true), U.ix() + 4, y0 + t1 / 2, { size: CV.FS.f1, bold: true });
-      if (o.t2) CV.text(CV.fit(o.t2, U.iw() - (o.rightW || 0) - 12 * CV.SCALE, CV.FS.sm), U.ix() + 4, y0 + t1 + 4 * CV.SCALE + t2 / 2, { size: CV.FS.sm, color: CV.C.dim });
+      l1.forEach((ln, i) => CV.text(ln, U.ix() + 4, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true }));
+      if (o.tag) {
+        const tw = CV.measure(l1[l1.length - 1], CV.FS.f1, true), th = CV.FS.xs * 1.5;
+        const tx = U.ix() + 4 + Math.min(tw, availW - tagW) + 6 * CV.SCALE, ty = y0 + t1 * (l1.length - 0.5) - th / 2;
+        CV.round(tx, ty, tagW, th, 999, null, CV.C.gold);
+        CV.text(o.tag, tx + tagW / 2, ty + th / 2, { size: CV.FS.xs, align: 'center', color: CV.C.gold });
+      }
+      l2.forEach((ln, i) => CV.text(ln, U.ix() + 4, y0 + l1.length * t1 + 4 * CV.SCALE + t2 * (i + 0.5),
+        { size: CV.FS.sm, color: CV.C.dim }));
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.lineWidth = 1;
       CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();
+      if (o.dim) CV.ctx.restore();
     });
     U.y = top + h;
     return h;
   };
 
   /* ---------- 按钮 .btn（primary 红渐变 / gold / ghost；高度 44） ---------- */
-  U.btn = function (x, y, w, h, label, style, id) {
+  /* dis=true：网页版 `.btn[disabled] { opacity:.34; pointer-events:none }` —— 变灰、且不登记热区 */
+  U.btn = function (x, y, w, h, label, style, id, dis) {
     h = h || U.BTN_H * CV.SCALE;
     const g = style === 'primary' ? CV.ctx.createLinearGradient(0, y, 0, y + h)
       : style === 'gold' ? CV.ctx.createLinearGradient(0, y, 0, y + h) : null;
@@ -250,6 +276,7 @@
     const fill = g || (style === 'ghost' ? null : CV.C.panel2);
     const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? '#e05a6d40' : style === 'gold' ? '#e6b64c44' : CV.C.line2);
     draw(() => {
+      if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
       CV.round(x, y, w, h, CV.RADIUS_SM, fill, line);
       /* 长标签换行，不截断 —— 网页版 .btn-row .btn { white-space: normal; line-height: 1.25 } */
       const size = h <= U.BTN_SM * CV.SCALE ? CV.FS.md : CV.FS.lg;
@@ -259,13 +286,14 @@
         CV.text(ln, x + w / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh,
           { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'gold' ? '#fdf3dc' : CV.C.text });
       });
+      if (dis) CV.ctx.restore();
     });
-    if (id) CV.hit(id, x, y, w, h);
+    if (id && !dis) CV.hit(id, x, y, w, h);
     return h;
   };
   /* 一行按钮（等分；网页版 .btn-row） */
-  U.btnRow = function (list, gapIn) {
-    const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = U.BTN_H * CV.SCALE;
+  U.btnRow = function (list, gapIn, hIn) {
+    const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = (hIn || U.BTN_H) * CV.SCALE;
     const top = U.y;
     /* 宽度按"文字自然宽"比例分（网页版 .btn-row .btn 是 flex: 1 1 auto + min-width 5.375rem）：
        字多的按钮拿更多宽度，所以"免费抽 1 次（今日还剩 3 次）"这类长标签在网页版是一行，
@@ -275,7 +303,7 @@
     const sum = nat.reduce((a, b) => a + b, 0) || 1;
     const widths = nat.map((w) => Math.max(U.BTN_MINW * CV.SCALE, w * avail / sum));
     let x = U.ix();
-    list.forEach((b, i) => { U.btn(x, top, widths[i], h, b.label, b.style, b.id); x += widths[i] + gap; });
+    list.forEach((b, i) => { U.btn(x, top, widths[i], h, b.label, b.style, b.id, b.dis); x += widths[i] + gap; });
     U.y = top + h;
     return h;
   };

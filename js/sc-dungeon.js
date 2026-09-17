@@ -371,7 +371,5 @@
     if (t) { view.worldId = t.worldId; view.diff = t.diff; startStage(t.worldId, t.diff, t.stageIdx); }
     else CV.reset('world');
   });
-  CV.on('open_corridor', function () {
-    CV.toast('深井正在做，下一个就来');
-  });
+  CV.on('open_corridor', function () { CV.push('corridor'); });   // 深井页（sc-last.js）
 })();

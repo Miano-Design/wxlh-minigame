@@ -1,0 +1,571 @@
+/* 最后一批页面（照网页版 js/ui.js 逐个复刻）
+   ------------------------------------------------------------------------------
+   · 炼化台 refineModal  ：说明 + 每种血清（名称/专属标/说明/配方/已有/制作按钮）
+   · 限时悬赏 bountyModal：说明 + 每条（标题/状态/目标/剩余时间/奖励/领取或去完成）
+   · 任务 tasksModal     ：四个标签（主线 / 日常 / 周常 / 成就）+ 各自列表
+   · 设置 settingsModal  ：战斗速度 / 自动战斗 / 音效 / 自动进下一关 / 自动分解 / 存档与备份 / 主角列表
+   · 挂机分工 idleLinesModal：说明 + 4 条产线（派领队）
+   · 深井 corridorScreen ：当前层 / 历史最高 / 深井印记与加成 / 本层守卫 / 通关奖励 / 挑战本层 / 深井商店
+   数值全部读 Core/DATA。
+*/
+(function () {
+  const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
+  const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
+  const fmt = G.fmt || ((n) => String(n));
+  const dur = (sec) => (G.formatDuration ? G.formatDuration(sec) : (sec + '秒'));
+  function head(title) {
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
+    CV.text(title, U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+  }
+  CV.on('page_back', () => CV.pop());
+
+  /* ---------- 炼化台（血清） ---------- */
+  CV.register('refine', function () {
+    const S = Core.S;
+    U.begin(); head('⚗️ 炼化台');
+    U.hint('血清是永久强化剂：喂给某名伙伴后永久加属性，每人每种有上限。血统血清只有对应血统能用——先觉醒血统，再决定喂给谁。', 0);
+    U.space(CV.SP[1]);
+    D.SERUMS.forEach(function (s) {
+      const itemId = D.SERUM_ITEM(s.id);
+      const own = S.items[itemId] || 0;
+      const matName = (D.ITEMS[s.mat] || {}).name || s.mat;
+      const haveMat = S.items[s.mat] || 0;
+      const can = Math.min(Math.floor(haveMat / s.matN), Math.floor((S.cur.points || 0) / s.points));
+      U.card(function () {
+        /* 网页版结构：一行 flex —— 左列 flex:1（名称 / 说明 / 配方 / 已有），
+           右列 flex 竖排两个 .btn.small：炼 ×1、炼 ×10。 */
+        const bw = Math.max(58 * CV.SCALE, CV.measure('炼 ×10', CV.FS.md) + 26 * CV.SCALE);
+        const colGap = 8 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bGap = 6 * CV.SCALE;
+        const lw = U.iw() - bw - colGap;
+        const top = U.y;
+        const nameSize = CV.FS.lg, nameLh = nameSize * 1.35;
+        U.draw(function () {
+          const cy = top + nameLh / 2;
+          CV.text('💊 ' + s.name, U.ix(), cy, { size: nameSize });
+          if (s.bloodline) {
+            const w0 = CV.measure('💊 ' + s.name, nameSize);
+            CV.text(s.bloodline + '专属', U.ix() + w0 + 4 * CV.SCALE, cy,
+              { size: CV.FS.xs, color: CV.C.gold });
+          }
+        });
+        U.y = top + nameLh + 4 * CV.SCALE;
+        U.hint(String(((D.ITEMS[itemId] || {}).desc) || '').replace(/^【[^】]*】/, ''), 0, lw);
+        U.hint('配方：' + matName + ' ×' + s.matN + ' + ◈ ' + fmt(s.points)
+          + '　（现有 ' + matName + ' ' + haveMat + ' · ◈ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, lw);
+        const ownTop = U.y + 4 * CV.SCALE;
+        U.draw(function () {
+          CV.text('已有血清 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8,
+            { size: CV.FS.xs, color: own ? CV.C.green : CV.C.dim });
+        });
+        U.y = ownTop + CV.FS.xs * 1.6;
+        /* 右列按钮（和左列同一顶部对齐） */
+        const bx = U.ix() + U.iw() - bw;
+        U.btn(bx, top, bw, bh, '炼 ×1', 'ghost', 'craft:' + s.id, can < 1);
+        U.btn(bx, top + bh + bGap, bw, bh, '炼 ×10', 'ghost', 'craft10:' + s.id, can < 10);
+        const rightH = bh * 2 + bGap;
+        if (rightH > U.y - top) U.y = top + rightH;
+      });
+    });
+  });
+  D.SERUMS.forEach(function (s) {
+    [1, 10].forEach(function (n) {
+      CV.on('craft' + (n === 10 ? '10' : '') + ':' + s.id, function () {
+        const r = Core.craftSerum(s.id, n);
+        CV.toast(r.msg || (r.ok ? '已炼制' : '材料不够'));
+        CV.render();
+      });
+    });
+  });
+
+  /* ---------- 限时悬赏 ---------- */
+  CV.register('bounty', function () {
+    const st = Core.bountyState();
+    U.begin(); head('限时悬赏');
+    U.hint('限时悬赏：到点作废，达成才有奖励。每条按自己的截止时间算，全部结束后可以开新一期。', 0);
+    U.space(CV.SP[1]);
+    U.card(function () {
+      st.list.forEach(function (x) {
+        const b = x.b;
+        const state = x.claimed ? '已领取' : (x.expired ? '已过期' : (x.done ? '可领取' : '进行中'));
+        const top = U.y, h = 74 * CV.SCALE;
+        CV.text(CV.fit(b.name, U.iw() * 0.62, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(state, U.ix() + U.iw(), top + 16 * CV.SCALE,
+          { size: CV.FS.sm, align: 'right', color: x.done && !x.claimed && !x.expired ? CV.C.gold : CV.C.dim });
+        CV.text(CV.fit(b.desc || '', U.iw(), CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
+          + '　奖励 ' + Core.rewardTextOf(b.reward), U.ix(), top + 56 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        const bw = 84 * CV.SCALE;
+        const claimable = x.done && !x.claimed && !x.expired;
+        U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+          claimable ? '领取奖励' : (x.claimed ? '已领取' : '去完成'), claimable ? 'primary' : 'ghost',
+          claimable ? 'bounty_claim:' + b.id : '');
+        U.y = top + h;
+      });
+    });
+    if (st.allOver) {
+      U.btnRow([{ label: '开新一期悬赏', style: 'primary', id: 'bounty_renew' }]);
+    }
+  });
+  CV.on('bounty_claim:*', function (id) {
+    const r = Core.claimBounty(id);
+    CV.toast(r.msg || '已领取');
+    CV.render();
+  });
+  CV.on('bounty_renew', function () {
+    const r = Core.renewBounties();
+    CV.toast(r.msg || '已开新一期');
+    CV.render();
+  });
+
+  /* ---------- 任务 / 成就（四个标签） ---------- */
+  let taskTab = 'main';
+  /* 「前往 ›」的落点（逐条照网页版 gotoQuest / gotoDaily 的映射） */
+  function goQuest(qid) {
+    const worldOf = { q12: 'W02', q14: 'W02', q15: 'W03' }[qid] || 'W01';
+    if (qid === 'q01' || qid === 'q13') { CV.cur = 'home'; CV.reset('home'); CV.push('protag'); return; }
+    if (qid === 'q03') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
+    if (qid === 'q09') { CV.cur = 'home'; CV.reset('home'); CV.push('buildings'); return; }
+    if (qid === 'q04') { CV.cur = 'home'; CV.reset('home'); CV.push('party'); return; }
+    if (qid === 'q07') { CV.cur = 'bag'; CV.reset('bag'); return; }
+    if (qid === 'q11') { CV.cur = 'home'; CV.reset('home'); CV.push('corridor'); return; }
+    CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
+  }
+  function goDaily(key) {
+    if (key === 'recruit1') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
+    if (key === 'idle1') { CV.cur = 'home'; CV.reset('home'); return; }
+    if (key === 'enhance1' || key === 'item1') { CV.cur = 'bag'; CV.reset('bag'); return; }
+    CV.cur = 'dungeon'; CV.reset('dungeon');
+  }
+  const DAILY_MAIN_GO = (D.DAILY_MAIN_GO) || { battle5: '残域打一场', idle1: '灯阁领挂机', enhance1: '装备页强化', recruit1: '招募 1 次', dungeon1: '残域通关一关', item1: '背包用道具' };
+  /* 任务列表的一行：左 .t1/.t2（自动折行）+ 右侧 .btn.small（按行中线对齐） */
+  function coreRow(o) {
+    const bw = 84 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+    const rowTop = U.y;
+    const h = U.listRow({ t1: o.t1, t2: o.t2, rightW: bw + 10 * CV.SCALE, dim: o.dim, tag: o.tag });
+    const b = o.btn;
+    if (b) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, b[0], b[1], b[2], b[3]);
+  }
+  /* 顶部四枚 .pill 标签（网页版 .pill-tabs > .pill） */
+  function tabPills(tabs) {
+    const gap = 6 * CV.SCALE, h = U.BTN_H * CV.SCALE, top = U.y;
+    let x = U.ix();
+    tabs.forEach(function (t) {
+      const on = taskTab === t[0];
+      const w = Math.max(72 * CV.SCALE, CV.measure(t[1], CV.FS.md) + 28 * CV.SCALE);
+      CV.round(x, top, w, h, 999, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
+      CV.hit('tasktab:' + t[0], x, top, w, h);
+      x += w + gap;
+    });
+    U.y = top + h + CV.SP[2];
+  }
+  CV.register('tasks', function () {
+    U.begin(); head('任务');
+    const tabs = [['main', '📜 主线'], ['daily', '📋 日常'], ['weekly', '🗓 周常'], ['ach', '🏅 成就']];
+    tabPills(tabs);
+    if (taskTab === 'main') {
+      const list = Core.mainQuestState();
+      const curIdx = list.findIndex(function (x) { return !x.claimed; });
+      U.card(function () {
+        U.h3('主线进度', list.filter((x) => x.claimed).length + ' / ' + list.length + ' 步');
+        list.forEach(function (x, i) {
+          const isCur = i === curIdx && !x.claimed;
+          coreRow({
+            /* 网页版当前这一步带一枚金色「当前」小标 —— canvas 里用金色实心块 + 白字复刻 */
+            t1: '第 ' + (i + 1) + '/' + list.length + ' 步 · ' + x.q.name,
+            t2: x.q.desc + ' · 奖励 ' + Core.rewardTextOf(x.q.reward),
+            dim: x.claimed,
+            tag: isCur ? '当前' : null,
+            btn: x.claimed ? ['已完成', 'ghost', '', true] : (x.done ? ['领取', 'primary', 'quest_claim:' + x.q.id] : ['前往 ›', 'ghost', 'quest_go:' + x.q.id]),
+          });
+        });
+      });
+    } else if (taskTab === 'daily') {
+      const allDone = D.DAILY_TASKS.every((t) => ((Core.S.tasks.daily || {})[t.id] || 0) >= t.target);
+      U.card(function () {
+        U.h3('每日任务', '每天 0 点重置');
+        D.DAILY_TASKS.forEach(function (t) {
+          const cur = Math.min((Core.S.tasks.daily || {})[t.id] || 0, t.target);
+          const done = cur >= t.target;
+          const claimed = !!(Core.S.tasks.claimed || {})[t.id];
+          coreRow({
+            t1: t.name,
+            t2: cur + '/' + t.target + ' · 奖励 ' + Core.rewardTextOf(t.reward)
+              + ((done || claimed) ? '' : (' · ' + (DAILY_MAIN_GO[t.id] || ''))),
+            dim: claimed,
+            btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'task_claim:' + t.id] : ['前往 ›', 'ghost', 'godaily:' + t.id]),
+          });
+        });
+      });
+      U.card(function () {
+        U.h3('全部完成奖励');
+        U.note(Core.rewardTextOf(D.DAILY_ALL_REWARD), 2 * CV.SCALE);
+        U.space(CV.SP[1]);
+        const got = !!Core.S.tasks.allClaimed;
+        U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allDone) ? 'all_daily' : '', dis: got || !allDone }]);
+      });
+    } else if (taskTab === 'weekly') {
+      /* Core.weeklyState() 返回的是**数组**（[{t, prog, done, claimed}]），不是 {list}。 */
+      const ws = Core.weeklyState() || [];
+      const allDone = ws.every((x) => x.done);
+      U.card(function () {
+        U.h3('周常任务', '周一 0 点重置');
+        U.hint('本周 ' + Core.weekKey() + ' 起算 · 进度与每日任务通用，周一自动重置。', 2 * CV.SCALE);
+        ws.forEach(function (x) {
+          const t = x.t || {}, done = !!x.done, claimed = !!x.claimed;
+          coreRow({
+            t1: t.name || '', t2: Math.min(x.prog || 0, t.target || 0) + '/' + (t.target || 0) + ' · 奖励 ' + Core.rewardTextOf(t.reward),
+            dim: claimed,
+            btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'week_claim:' + t.id] : ['进行中', 'ghost', '', true]),
+          });
+        });
+      });
+      U.card(function () {
+        U.h3('本周全清奖励');
+        U.note(Core.rewardTextOf(D.WEEKLY_ALL_REWARD), 2 * CV.SCALE);
+        U.space(CV.SP[1]);
+        const got = !!Core.S.tasks.weeklyAllClaimed;
+        U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allDone) ? 'all_weekly' : '', dis: got || !allDone }]);
+      });
+    } else {
+      const sum = Core.achievementSummary();
+      U.card(function () {
+        U.kv('成就进度', '已达成 ' + sum.claimed + '/' + sum.total + ' · 可领取 ' + sum.list.filter((x) => x.done && !x.claimed).length);
+      });
+      ['战斗', '养成', '收集', '挑战'].forEach(function (cat) {
+        const list = sum.list.filter(function (x) { return x.a.cat === cat; });
+        if (!list.length) return;
+        U.sectionTitle(cat);
+        U.card(function () {
+          list.forEach(function (x) {
+            coreRow({
+              t1: (x.claimed ? '🏅 ' : x.done ? '✨ ' : '') + x.a.name,
+              t2: x.a.desc + ' · 奖励 ' + Core.rewardTextOf(x.a.reward),
+              t1Color: x.done ? null : CV.C.dim, dim: x.claimed,
+              btn: x.claimed ? ['已领', 'ghost', '', true] : (x.done ? ['领取', 'primary', 'ach_claim:' + x.a.id] : ['未达成', 'ghost', '', true]),
+            });
+          });
+        });
+      });
+    }
+  });
+  ['main', 'daily', 'weekly', 'ach'].forEach(function (k) {
+    CV.on('tasktab:' + k, function () { taskTab = k; CV.render(); });
+  });
+  /* 首页「成就」那颗格子直接落到成就标签 */
+  CV.on('open_ach', function () { taskTab = 'ach'; CV.push('tasks'); });
+  CV.on('quest_claim:*', function (id) {
+    const r = Core.claimQuest(id);
+    CV.toast(r.msg || '已领取');
+    CV.render();
+  });
+  /* quest_go:* / godaily:* 的真处理在下面（goQuest / goDaily）——这里不再登记占位 toast，
+     否则"前往 ›"点了只弹一句话，玩家还是得自己找路。 */
+  CV.on('task_claim:*', function (id) {
+    const r = Core.claimTask(id);
+    CV.toast(r.msg || '已领取');
+    CV.render();
+  });
+  CV.on('week_claim:*', function (id) {
+    const r = Core.claimWeekly(id);
+    CV.toast(r.msg || '已领取');
+    CV.render();
+  });
+  CV.on('ach_claim:*', function (id) {
+    const r = Core.claimAchievement(id);
+    CV.toast(r.msg || '已领取');
+    CV.render();
+  });
+  CV.on('godaily:*', function (key) { goDaily(key); });
+  CV.on('quest_go:*', function (id) { goQuest(id); });
+  CV.on('all_daily', function () {
+    const r = Core.claimAllTasks();
+    CV.toast(r.msg || '已领取全部完成奖励');
+    CV.render();
+  });
+  CV.on('all_weekly', function () {
+    const r = Core.claimAllWeekly();
+    CV.toast(r.msg || '已领取本周全清奖励');
+    CV.render();
+  });
+
+  /* ---------- 设置与存档（逐块照网页版 settingsModal） ---------- */
+  /* .list-row + 右侧 .btn.small 是网页版最常见的一行：这里把两者放一起，
+     右边按钮按"行的竖直中线"对齐（以前是各自拍一个 y，两个永远差几个像素）。 */
+  function setRow(t1, t2, btnLabel, btnStyle, actId, dis) {
+    const bw = 78 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+    const rowTop = U.y;
+    const h = U.listRow({ t1: t1, t2: t2, rightW: bw + 10 * CV.SCALE });
+    U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, btnLabel, btnStyle, actId, dis);
+  }
+  function settingsPage() {
+    const S = Core.S, set = S.settings;
+    U.begin(); head('设置与存档');
+    U.card(function () {
+      U.h3('玩法说明');
+      U.btnRow([{ label: '❓ 玩法指南', style: 'ghost', id: 'open_guide' }], undefined, U.BTN_SM);
+    });
+    U.card(function () {
+      U.h3('战斗速度');
+      U.btnRow([1, 2, 3].map(function (v) {
+        return { label: v + '×', style: (set.speed || 1) === v ? 'primary' : 'ghost', id: 'speed_set:' + v };
+      }), undefined, U.BTN_SM);
+    });
+    U.card(function () {
+      U.h3('战斗与音效');
+      [['autoBattle', '自动战斗（直接出结果）', '开启后进入战斗立即结算，不再逐帧播放，适合挂机刷本'],
+        ['sfx', '音效', '点击 / 强化 / 开箱 / 战斗胜负的提示音，可随时关闭'],
+        ['autoNext', '通关结算自动进下一关', '胜利结算 8 秒内没做选择，就自动接着打下一关；关掉之后结算页会一直等你点'],
+      ].forEach(function (r) {
+        const on = set[r[0]] !== false;
+        setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
+      });
+    });
+    U.card(function () {
+      U.h3('自动分解');
+      [['autoSellN', '自动分解 N 装备', '掉到 N 品质直接换成 ◆ 异界结晶'],
+        ['autoSellR', '自动分解 R 装备', '掉到 R 品质直接换成 ◆ 异界结晶']].forEach(function (r) {
+        const on = !!set[r[0]];
+        setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
+      });
+    });
+    U.card(function () {
+      U.h3('存档与备份');
+      U.hint('进度只存在这台设备里', 0);
+      U.space(CV.SP[1]);
+      U.btnRow([
+        { label: '📤 导出存档', style: 'ghost', id: 'save_export' },
+        { label: '📥 导入存档', style: 'ghost', id: 'save_import' },
+      ], undefined, U.BTN_SM);
+      U.hint('手动存档槽（三格）：', CV.SP[3]);
+      U.space(CV.SP[1]);
+      const info = Core.slotInfo();
+      info.forEach(function (s) {
+        /* slotInfo() 的字段是 { slot, exists, meta:{ level, floor, time } } —— 等级在 meta 里，
+           原来读 s.level 恒为 undefined，三个槽全显示"Lv.0"。 */
+        const m = s.meta || {};
+        const bw = 62 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, gap = 8 * CV.SCALE;
+        const rowTop = U.y;
+        const h = U.listRow({
+          t1: '存档槽 ' + s.slot,
+          t2: (s.exists && s.meta) ? ('Lv.' + (m.level || 0) + ' · 深井 ' + (m.floor || 0) + ' 层') : '空',
+          rightW: bw * 2 + gap + 10 * CV.SCALE,
+        });
+        const by = rowTop + (h - bh) / 2;
+        U.btn(U.ix() + U.iw() - bw * 2 - gap, by, bw, bh, '存入', 'ghost', 'slot_save:' + s.slot);
+        U.btn(U.ix() + U.iw() - bw, by, bw, bh, '读取', 'ghost', s.exists ? 'slot_load:' + s.slot : '', !s.exists);
+      });
+    });
+    U.card(function () {
+      U.h3('主角列表');
+      Core.protagonistList().forEach(function (p, i) {
+        const bw = 62 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+        const rowTop = U.y;
+        const h = U.listRow({
+          t1: p.name + (p.current ? '（当前）' : ''),
+          t2: 'Lv.' + p.level + ' · ' + (p.bloodline ? (p.bloodline + '血统 Lv.' + p.bloodlineLv) : '未觉醒血统'),
+          rightW: p.current ? 0 : (bw + 10 * CV.SCALE),
+        });
+        if (!p.current) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, '切换', 'ghost', 'switch_alt:' + p.altIndex);
+      });
+      U.hint('新建主角从 Lv.0 开始，可体验不同血统路线；世界进度、货币、队伍不受影响', CV.SP[1]);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '➕ 新建主角', style: 'ghost', id: 'new_protag' }], undefined, U.BTN_SM);
+    });
+    U.card(function () {
+      U.h3('危险区');
+      U.btnRow([{ label: '删除当前进度，重新开始', style: 'ghost', id: 'wipe_save' }], undefined, U.BTN_SM);
+    });
+    U.space(CV.SP[2]);
+    U.draw(function () {
+      CV.text('残域 V' + (G.GAME_VER || ''), CV.W / 2, U.y + 8 * CV.SCALE,
+        { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+    });
+    U.space(18 * CV.SCALE);
+  }
+  CV.register('settings', settingsPage);
+  CV.on('toggle:*', function (k) {
+    const set = Core.S.settings;
+    set[k] = !(set[k] !== false);
+    Core.save();
+    CV.toast(({ autoBattle: '自动战斗', sfx: '音效', autoNext: '结算自动进下一关', autoSellN: '自动分解 N', autoSellR: '自动分解 R' }[k] || k) + '：' + (set[k] === false || set[k] === true && k.indexOf('auto') === 0 && k !== 'autoNext' ? (set[k] ? '已开启' : '已关闭') : (set[k] ? '已开启' : '已关闭')));
+    CV.render();
+  });
+  CV.on('speed_set:*', function (v) {
+    Core.S.settings.speed = +v; Core.save();
+    CV.toast('战斗速度 ' + v + '×');
+    CV.render();
+  });
+  CV.on('save_export', function () { CV.toast('导出存档：小游戏里请用「设置与存档 → 存档槽」备份', 2600); });
+  CV.on('save_import', function () { CV.toast('导入存档：小游戏里请用「设置与存档 → 存档槽」读取', 2600); });
+  [1, 2, 3].forEach(function (n) {
+    CV.on('slot_save:' + n, function () {
+      Core.saveSlot(n);
+      CV.toast('已存入存档槽 ' + n);
+      CV.render();
+    });
+    CV.on('slot_load:' + n, function () {
+      U.confirm('读取存档', '读取存档槽 ' + n + ' 会覆盖当前进度，确定吗？', function () {
+        const ok = Core.loadSlot(n);
+        CV.toast(ok ? '已读取存档槽 ' + n : '这个槽是空的');
+        if (ok) CV.reset('home'); else CV.render();
+      });
+    });
+  });
+  /* 主角列表三个动作（照网页版 settingsModal 的 data-switchprotag / data-newprotag / data-reset） */
+  CV.on('switch_alt:*', function (i) {
+    const r = Core.switchProtagonist(+i);
+    CV.toast(r.msg || '已切换主角');
+    CV.render();
+  });
+  CV.on('new_protag', function () {
+    if (!(G.wx && G.wx.showKeyboard)) { CV.toast('这台设备不支持键盘输入'); return; }
+    try {
+      if (G.wx.offKeyboardConfirm) G.wx.offKeyboardConfirm();
+      G.wx.onKeyboardConfirm(function (res) {
+        const nm = String((res && res.value) || '').trim();
+        if (!nm) { CV.toast('名字不能为空'); return; }
+        const r = Core.createProtagonist(nm);
+        CV.toast(r.msg || (r.ok ? '已创建' : '创建失败'));
+        CV.render();
+      });
+      G.wx.showKeyboard({ defaultValue: '', maxLength: 12, multiple: false, confirmType: 'done', fail: function () { CV.toast('键盘没打开，再点一次'); } });
+    } catch (e) { CV.toast('键盘没打开，再点一次'); }
+  });
+  CV.on('wipe_save', function () {
+    U.confirm('删除当前进度', '会清掉这台设备上的全部进度，重新从开局契约开始。确定吗？', function () {
+      Core.wipeSave();
+      CV.reset('welcome');
+    });
+  });
+
+  /* ---------- 挂机分工 ---------- */
+  let leaderLine = null;
+  CV.register('idlelines', function () {
+    const lines = Core.idleLines();
+    U.begin(); head('挂机分工');
+    U.hint('4 条产线各派 1 名领队：领队战力越高，这条线产出越高（最高 +150%）。上阵主力不能派去挂机，「板凳上的伙伴」在这里发挥作用；没派领队的产线不产出。', 0);
+    U.space(CV.SP[1]);
+    U.card(function () {
+      lines.forEach(function (l) {
+        const top = U.y, h = 76 * CV.SCALE;
+        CV.text(l.line.ico + ' ' + l.line.name, U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(l.leaderId ? Core.charName(l.leaderId) : '未派领队，不产出', U.ix() + U.iw(), top + 16 * CV.SCALE,
+          { size: CV.FS.sm, align: 'right', color: l.leaderId ? CV.C.gold : CV.C.dim });
+        CV.text(CV.fit(l.line.desc || '', U.iw(), CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text(l.per || '', U.ix(), top + 56 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        const bw = 76 * CV.SCALE;
+        U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+          l.leaderId ? '换人' : '派领队', 'ghost', 'pickleader:' + l.line.id);
+        U.y = top + h;
+      });
+    });
+    const own = Object.keys(Core.S.chars).filter((id) => Core.S.party.indexOf(id) < 0);
+    U.hint('可派伙伴：' + own.length + ' 名（未上阵的伙伴）。产出的收益和挂机收益一起，在首页「收取奖励」里结算。', 4 * CV.SCALE);
+  });
+  CV.register('pickleader', function () {
+    const S = Core.S;
+    U.begin(); head('派领队');
+    const line = (D.IDLE_LINES || []).find((l) => l.id === leaderLine);
+    U.hint('选一名**没上阵**的伙伴当「' + ((line || {}).name || '') + '」的领队', 0);
+    U.space(CV.SP[1]);
+    const own = Object.keys(S.chars).filter((id) => S.party.indexOf(id) < 0);
+    U.card(function () {
+      if (!own.length) { U.hint('没有可派的伙伴（先去招募）', 4 * CV.SCALE); return; }
+      own.forEach(function (id) {
+        const ch = D.charById[id] || {}, c = S.chars[id];
+        const top = U.y, h = 52 * CV.SCALE;
+        CV.text(Core.charName(id), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text('Lv.' + c.lv + ' · ' + ch.role + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
+          U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.hit('setleader:' + id, U.ix(), top, U.iw(), h);
+        U.y = top + h;
+      });
+    });
+  });
+  CV.on('pickleader:*', function (lineId) { leaderLine = lineId; CV.push('pickleader'); });
+  CV.on('setleader:*', function (id) {
+    const r = Core.setIdleLeader(leaderLine, id);
+    CV.toast(r.msg || '已派领队');
+    CV.pop();
+    CV.render();
+  });
+
+  /* ---------- 深井 ---------- */
+  CV.register('corridor', function () {
+    const S = Core.S;
+    const floor = S.corridor.floor;
+    const e = D.corridorEnemy(floor);
+    const rw = D.corridorReward(floor);
+    U.begin();
+    U.btn(U.pad(), U.y, CV.measure('‹ 返回', CV.FS.md) + 26 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹ 返回', 'ghost', 'page_back');
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[1];
+    /* 头部：深井 + 大层数 + 历史最高（网页版 .corridor-hero） */
+    U.card(function () {
+      const top = U.y;
+      CV.text('深井', CV.W / 2, top + 14 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+      CV.text(String(floor), CV.W / 2, top + 52 * CV.SCALE, { size: 40 * CV.SCALE, bold: true, align: 'center', color: CV.C.gold });
+      CV.text('历史最高 ' + S.corridor.best + ' 层', CV.W / 2, top + 84 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+      U.y = top + 100 * CV.SCALE;
+    });
+    U.card(function () {
+      U.h3('◇ 深井印记', Core.corridorMarks() + '/' + D.CORRIDOR_MARK_CAP + ' 枚');
+      U.note('当前深井内加成：+' + (Core.corridorMarkBonus() * 100).toFixed(1) + '%', 2 * CV.SCALE);
+    });
+    U.card(function () {
+      U.h3('本层守卫');
+      U.kv(e.name, e.isBoss ? '👹 Boss' : e.isElite ? '精英' : '普通');
+      U.kv('HP', fmt(e.hp));
+      U.kv('攻击', fmt(e.atk));
+      U.kv('防御', fmt(e.def));
+      U.space(CV.SP[1]);
+      U.kv('通关奖励', '◈ ' + fmt(rw.points) + ' · ❖ ' + rw.story + ' · ◇ ' + rw.corridor + (rw.bloodCrystal ? (' · ❥ ' + rw.bloodCrystal) : ''), CV.C.gold);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '⚔️ 挑战本层', style: 'primary', id: 'corridor_fight' }]);
+    });
+    U.btnRow([{ label: '🏪 深井商店（◇ ' + fmt(S.cur.corridor || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
+  });
+  CV.on('corridor_fight', function () {
+    const S = Core.S;
+    const floor = S.corridor.floor;
+    const spec = D.corridorEnemy(floor);
+    const allies = G.BattleUI.buildAllies(null, null, { mult: 1 + Core.corridorMarkBonus() });
+    if (!allies.length) { CV.toast('没有可出战的成员'); return; }
+    const enemies = [spec];
+    if (spec.isBoss) enemies.push({ name: '深井之影', hp: Math.round(spec.hp * 0.3), atk: Math.round(spec.atk * 0.5), def: Math.round(spec.def * 0.5), spd: 70, faction: null, eva: 0.05 });
+    G.BattleUI.run({
+      title: '深井 · 第 ' + floor + ' 层',
+      allies: allies, enemies: enemies, worldId: null,
+      maxRounds: spec.isBoss ? 50 : 30,
+      onQuit: function () { CV.reset('corridor'); },
+      onEnd: function (win, res) {
+        if (!win) {
+          return {
+            title: '止步于第 ' + floor + ' 层', sub: '',
+            rewards: [], acts: [{ label: '↻ 再挑第 ' + floor + ' 层', style: 'primary', id: 'corridor_fight' }, { label: '返回深井', style: 'ghost', id: 'corridor_back' }],
+          };
+        }
+        const rw = D.corridorReward(floor);
+        Core.addCur('points', rw.points); Core.addCur('story', rw.story); Core.addCur('corridor', rw.corridor);
+        if (rw.bloodCrystal) Core.addCur('bloodCrystal', rw.bloodCrystal);
+        const gotMark = floor % D.CORRIDOR_MARK_STEP === 0;
+        S.corridor.best = Math.max(S.corridor.best, floor);
+        S.corridor.floor = floor + 1;
+        Core.save();
+        const rewards = ['◈+' + fmt(rw.points), '❖+' + rw.story, '◇+' + rw.corridor]
+          .concat(rw.bloodCrystal ? ['❥+' + rw.bloodCrystal] : [])
+          .concat(gotMark ? ['◇ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
+        return {
+          title: '第 ' + floor + ' 层通过', sub: '', rewards: rewards,
+          acts: [{ label: '› 继续第 ' + S.corridor.floor + ' 层', style: 'primary', id: 'corridor_fight' }, { label: '返回深井', style: 'ghost', id: 'corridor_back' }],
+        };
+      },
+    });
+  });
+  CV.on('corridor_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('corridor'); });
+  CV.on('corridor_shop', function () {
+    if (G.setShopTab) G.setShopTab('corridor');
+    CV.push('shop');
+  });
+})();

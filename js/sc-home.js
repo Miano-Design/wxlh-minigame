@@ -118,9 +118,9 @@
       ['open_recruit', '招募伙伴', null, 'recruit', freeDot],
       ['open_shop', '兑换大厅', null, 'shop'],
     ].filter((x) => !x[3] || Core.isUnlocked(x[3])));
+    /* V9.6.7：这一行「全部养成线的总览在「执灯者 → 成长」。」网页版**没有** ——
+       父亲大人的规矩是"主页只留功能名，非必要的注释都不要"，删掉。 */
     U.space(CV.SP[2]);
-    U.hint('全部养成线的总览在「执灯者 → 成长」。');
-    /* 游历奇遇出来时右侧带上这次奇遇的奖励（网页版 .rs） */
 
     /* ④ 游历（网页版 travelBlock：只有一个「游历奇遇」条） */
     U.sectionTitle('游历');
@@ -231,6 +231,12 @@
   CV.on('open_beast', function () { CV.push('beast'); });
   CV.on('open_reincarn', function () { CV.push('reincarn'); });
   CV.on('open_codex', function () { CV.push('codex'); });
+  /* 最后一批：炼化台 / 悬赏 / 任务成就 / 设置 / 挂机分工 */
+  CV.on('open_refine', function () { CV.push('refine'); });
+  CV.on('open_bounty', function () { CV.push('bounty'); });
+  CV.on('open_tasks', function () { CV.push('tasks'); });
+  CV.on('open_settings', function () { CV.push('settings'); });
+  CV.on('open_idlelines', function () { CV.push('idlelines'); });
   CV.on('open_shop', function () { CV.push('shop'); });
 
   CV.on('open_recruit', function () {
@@ -242,8 +248,7 @@
      ⚠ V9.5.99：这里**不能覆盖已经存在的真实处理器** —— CV.on 是同 id 后注册的赢，
      之前"成长"已经接上真实页面了，又在这里被占位提示盖掉，点了就只弹一句"还在复刻"。
      现在先查一下有没有处理器，有就跳过，以后每补一页都不用手动从这份清单里删。 */
-  [ 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
-    'open_refine', 'open_bounty', 'open_tasks', 'open_ach'].forEach(function (id) {
+  [ 'open_travel', 'open_guide' ].forEach(function (id) {
     if (CV.onAct[id]) return;                     // 已经有真实页面了，别盖掉
     CV.on(id, () => CV.toast('这一页还在复刻队列里（下一步）'));
   });

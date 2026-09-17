@@ -14,6 +14,7 @@ require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血�
 require('./js/sc-home.js');      // 灯阁（首页）
 require('./js/sc-roster.js');   // 执灯者：伙伴总览 + 伙伴详情
 require('./js/sc-recruit.js'); // 招募（三池 + 结果页 + 概率公示）
+require('./js/sc-last.js');  // 炼化台 / 悬赏 / 任务成就 / 设置 / 挂机分工 / 深井
 require('./js/sc-core-pages.js'); // 评级 / 权限 / 建设 / 境界 / 铭刻 / 伴生体 / 转生 / 灯录
 require('./js/sc-lines.js');   // 秘术阁 / 法宝 / 坐骑 / 药园 / 斗法台 / 求签
 require('./js/sc-grow.js');    // 成长（十三条养成线）+ 兑换大厅（四家店）
@@ -24,6 +25,8 @@ require('./js/sc-battle.js');   // 战斗页（副本 / 深井 / 斗法台共用
 require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → 关卡 → 扫荡
 
 const CV = globalThis.CV, Core = globalThis.Core;
+/* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
+globalThis.GAME_VER = '9.6.4';
 const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
 /* 底栏四个页签 → 对应页面（网页版 #navbar） */
 CV.NAV_TABS.forEach(function (t) {

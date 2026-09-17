@@ -220,9 +220,9 @@
     head('斗法台');
     U.card(function () {
       U.h3('斗法台', '第 ' + st.floor + ' 台 · 历史最高 ' + st.best + ' 台');
-      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶 + ♜ 深井徽记，输了退一台（次数照常消耗，不会卡死在第 1 台）。', 2 * CV.SCALE);
+      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶 + ◇ 深井徽记，输了退一台（次数照常消耗，不会卡死在第 1 台）。', 2 * CV.SCALE);
       U.kv('今日剩余', st.left + ' / ' + st.cap);
-      U.kv('本台奖励', '◆ ' + fmt(st.reward.otherworld) + ' · ♜ ' + st.reward.corridor, CV.C.gold);
+      U.kv('本台奖励', '◆ ' + fmt(st.reward.otherworld) + ' · ◇ ' + st.reward.corridor, CV.C.gold);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '挑战第 ' + st.floor + ' 台', style: 'primary', id: st.left > 0 ? 'arena_fight' : '' }]);
     });

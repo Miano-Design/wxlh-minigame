@@ -134,6 +134,8 @@
     });
   });
   CV.on('shop_back', function () { CV.pop(); });
+  /* 供别的页面打开指定店铺（深井商店） */
+  G.setShopTab = function (k) { if (D.SHOPS[k]) shopTab = k; };
   Object.keys(D.SHOPS || {}).forEach(function (k) {
     CV.on('shoptab:' + k, function () { shopTab = k; CV.render(); });
   });
