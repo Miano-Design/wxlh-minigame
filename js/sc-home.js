@@ -11,7 +11,24 @@
   /* ---------- 首次操作引导（网页版 coachmark 的画布版）----------
      V9.6.30：集中一处按页面查表，挂在 cv.js 渲染完之后（那时 CV.hits 已经齐了）。
      每条只弹一次（S.coachSeen），一页命中多条时按顺序：这次弹第一条，下次进来弹第二条。 */
+  /* V9.6.35（父亲大人定的需求：完全强制 / 逐项 / 必须点中 / 旁白式 / 与主线合并）：
+     开局第一组 —— 逐项介绍**主角卡**（主线一「熟悉身体」就是这一步）。
+     四行各讲一句，点一下听下一项（swallow：只推进、不跳页），
+     最后一步要求**真的点开主角卡**——那才是主线一真正要的动作。 */
+  function coachHero() {
+    const L = [
+      ['hero:0', '【境界】是你的修为阶段：每突破一阶全属性永久上涨，36 阶走满 +50.4%。突破在「成长 → 境界渡劫」。'],
+      ['hero:1', '【等级】升级会给你属性点和技能点 —— 这两样要自己去「主角卡」里分，不会自动加。'],
+      ['hero:2', '【主角】这一行就是提醒你还有多少点没分。数值是金色的，说明有事可做。'],
+      ['hero:3', '【转生】是把等级和世界进度重置、换永久天赋点 —— 中后期最主要的成长线。'],
+    ];
+    L.forEach(function (x) { U.coach(x[0], x[1], { key: 'tut_hero_' + x[0], mustTap: true }); });
+    U.coach('open_protag', '最后：点开这张主角卡 —— 六维、技能、装备、血统、境界全在里面。',
+      { key: 'tut_hero_open', mustTap: true, swallow: false, queue: true });
+  }
+
   G.coachFor = function (page) {
+    if (page === 'home' && !U.coachSeen('tut_hero_open')) coachHero();
     const C = [
       ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],
       ['home', ['claim_all'], '离线期间也在攒，回来点一下就能收。'],
@@ -48,6 +65,9 @@
         CV.text(CV.fit(r[1], U.iw() - 28 * CV.SCALE - sw, CV.FS.lg, true), U.ix() + U.iw() - vw - sw, cy,
           { size: CV.FS.lg, bold: true, color: (i === 0 && st.hasBloodline) || i === 2 ? CV.C.gold : CV.C.text });
         if (r[2]) CV.text(r[2], U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+        /* V9.6.35：四行各登记一颗热区 —— 开局引导要**逐项**讲（父亲大人：逐项介绍），
+           只有整卡一颗热区的话，"讲【等级】"就没法只高亮那一行。 */
+        CV.hit('hero:' + i, U.ix(), cy - rowH / 2, U.iw(), rowH);
         if (i < rows.length - 1) {
           CV.ctx.save();
           CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;

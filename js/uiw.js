@@ -357,17 +357,55 @@
      （所以页面怎么写都不用管引导），外面套一圈金色高亮框 + 一张提示卡；点任意位置关掉。
      只弹一次：看过记进 S.coachSeen。 */
   let coachState = null;
-  U.coach = function (targetId, text) {
+  const coachQueue = [];
+  /* V9.6.35（父亲大人定的需求）：引导是**强制、逐项、必须真点到那颗按钮**才放行。
+     用法：U.coach(targetId, text, opts)
+       opts.key      —— 记进存档的键（默认用 targetId 拼）；老号第一次进某模块时补一次靠它
+       opts.mustTap  —— true：必须**点中目标本身**才推进（点别处不生效）
+       opts.queue    —— true：当前有引导时不丢弃，排队等这条播完（逐项介绍就是排一串）
+     U.coachSkipAll() 给"跳过整条"，U.coachSeen(key) 查这条看过没有。 */
+  U.coach = function (targetId, text, opts) {
+    opts = opts || {};
     const S = G.Core && G.Core.S;
     if (!S) return;
     S.coachSeen = S.coachSeen || {};
-    /* targetId 可以是数组：同一个位置在不同状态下 id 不一样
-       （比如主线那颗按钮，能做时是 claim_quest、不能做时是 goto_quest）。
-       这里只记"这一课看没看过"，锚点等渲染时再挑真正存在的那个。 */
-    if (coachState) return;                            // 一次只播一条，其它的留到下次进来
-    const key = [].concat(targetId).join('|');
+    const key = opts.key || [].concat(targetId).join('|');
     if (S.coachSeen[key]) return;                      // 看过就不再弹
-    coachState = { targetId: targetId, key: key, text: text };
+    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false };
+    if (coachState) { if (opts.queue) coachQueue.push(item); return; }
+    coachState = item;
+  };
+  U.coachSeen = function (key) { return !!(G.Core && G.Core.S && (G.Core.S.coachSeen || {})[key]); };
+  U.coachMark = function (item) {
+    const S = G.Core.S; S.coachSeen = S.coachSeen || {};
+    if (item && item.key) S.coachSeen[item.key] = true;
+    G.Core.save();
+  };
+  U.coachNext = function () {
+    coachState = null;
+    while (coachQueue.length) {
+      const it = coachQueue.shift();
+      const S = G.Core.S;
+      if (!(S.coachSeen || {})[it.key]) { coachState = it; break; }
+    }
+    CV.render();
+  };
+  U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
+  /* 点中"高亮的那颗"才算过。swallow=true 时这一下**只推进引导、不执行原动作**
+     （逐项介绍用：点一下"【境界】"只是听下一项，不该顺手把页面跳走）。 */
+  const _dispatch = CV.dispatch;
+  CV.dispatch = function (id) {
+    const st = coachState;
+    if (st && st.mustTap) {
+      const want = [].concat(st.targetId);
+      if (want.indexOf(id) >= 0) {
+        if (st.swallow !== false) { U.coachMark(st); U.coachNext(); return true; }   // 吃掉这一下
+        const r = _dispatch(id);
+        if (coachState === st) { U.coachMark(st); U.coachNext(); }
+        return r;
+      }
+    }
+    return _dispatch(id);
   };
   U.drawCoach = function () {
     if (!coachState) return;
@@ -412,22 +450,27 @@
     lines.forEach(function (ln, i) {
       CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
     });
-    CV.text('点一下继续 ›', tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
+    CV.text(coachState.mustTap ? '点高亮的地方 ›' : '点一下继续 ›',
+      tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
       { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
     c.restore();
     CV.hitMode = 'screen';
-    CV.hit('_coach_ok', 0, 0, CV.W, CV.H);     // 全屏可点：点哪都关
+    /* mustTap 的那条**不铺全屏"随便点"**，只有一颗小小的"跳过这一步"
+       （父亲大人：完全强制 —— 但每一步仍然允许跳过，不然卡住就没救了）；
+       其它条维持"点一下继续"。 */
+    if (coachState.mustTap) {
+      const sw = 76 * CV.SCALE, sh = 30 * CV.SCALE;
+      U.btn(tx, ty + th - sh - 6 * CV.SCALE, sw, sh, '跳过这一步', 'ghost', '_coach_ok');
+    } else {
+      CV.hit('_coach_ok', 0, 0, CV.W, CV.H);
+    }
     CV.hitMode = 'content';
-    coachState.ready = true;
   };
+  /* 「跳过这一步」：标记已看并播下一条（**没有"整条跳过"** —— 父亲大人要的是完全强制） */
   CV.on('_coach_ok', function () {
     if (!coachState) return;
-    const S = G.Core.S;
-    S.coachSeen = S.coachSeen || {};
-    S.coachSeen[coachState.key] = true;
-    coachState = null;
-    G.Core.save();
-    CV.render();
+    U.coachMark(coachState);
+    U.coachNext();
   });
 
   U.drawOverlay = function () {
