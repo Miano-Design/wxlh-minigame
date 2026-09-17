@@ -24,7 +24,7 @@
     ];
     L.forEach(function (x) { U.coach(x[0], x[1], { key: 'tut_hero_' + x[0], mustTap: true }); });
     U.coach('open_protag', '最后：点开这张主角卡 —— 六维、技能、装备、血统、境界全在里面。',
-      { key: 'tut_hero_open', mustTap: true, swallow: false, queue: true });
+      { key: 'tut_hero_open', mustTap: true, swallow: false, queue: true, onDone: tourNext });
   }
 
   /* V9.6.36：**主线每一步 = 引导的一步**（父亲大人：合并成一套）。
@@ -88,10 +88,49 @@
     return false;
   }
 
+  /* V9.6.43（父亲大人："开局签订完契约选完系统后，就只能跟着指引先操作一遍，带着玩家整体操作一遍"）：
+     把"一页一组"接成**一条链** —— 上一组走完自动进下一组，该换页就换页。
+     每一步仍然可以「跳过这一步」（保命阀），但不会停在原地等人自己乱点。
+     顺序：逐项讲主角卡 → 点开主角卡 → 回首页领主线奖励 → 去残域打第 1 关。 */
+  const TOUR = [
+    { key: 'tour_hero',  page: 'home',    run: coachHero },
+    { key: 'tour_claim', page: 'home',    s: ['claim_quest', 'goto_quest'],
+      t: '这里是主线：每做完一步就能在这儿领奖励。以后跟着它走就不会迷路。' },
+    { key: 'tour_dun',   page: 'dungeon', s: ['w:W01'],
+      t: '主线让你打副本：进「残域」，点这个世界，再点第 1 关就开打。' },
+    { key: 'tour_world', page: 'world',   s: ['stage:0'],
+      t: '点第 1 关就开始 —— 一关要一口气打完所有波次，血量继承、不会自动回满。' },
+  ];
+  G.tourNext = function () {
+    const S = Core.S;
+    S.coachSeen = S.coachSeen || {};
+    for (let i = 0; i < TOUR.length; i++) {
+      const st = TOUR[i];
+      if (S.coachSeen[st.key]) continue;
+      if (CV.top().name !== st.page) { CV.cur = st.page; CV.reset(st.page); }
+      if (st.run) {
+        /* 用 run() 的那一步（逐项讲主角卡）本身没有固定 key，
+           这里立刻把 tour 的那把钥匙记上 —— 否则 G.tourNext 每次都会重新跑它、链子走不下去。 */
+        S.coachSeen[st.key] = true; Core.save();
+        st.run();
+      }
+      else {
+        U.coach(st.s, st.t, { key: st.key, mustTap: true, queue: true,
+          onDone: (i + 1 < TOUR.length) ? G.tourNext : null });
+      }
+      return;
+    }
+  };
+
   G.coachFor = function (page) {
     if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
-    if (page === 'home' && !U.coachSeen('tut_hero_open')) coachHero();
+    if (page === 'home') {
+      const S = Core.S;
+      for (let i = 0; i < TOUR.length; i++) {
+        if (!(S.coachSeen || {})[TOUR[i].key]) { G.tourNext(); return; }
+      }
+    }
     const C = [
       ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],
       ['home', ['claim_all'], '离线期间也在攒，回来点一下就能收。'],

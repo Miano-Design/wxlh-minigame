@@ -376,7 +376,11 @@
     S.coachSeen = S.coachSeen || {};
     const key = opts.key || [].concat(targetId).join('|');
     if (S.coachSeen[key]) return;                      // 看过就不再弹
-    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false };
+    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false, onDone: opts.onDone };
+    /* V9.6.43 自审：同一个 key 不能重复入队 —— 链式引导每帧都会问一次，
+       不拦的话队列会**无限堆积**（每渲染一帧塞一条）。 */
+    if (coachState && coachState.key === key) return;
+    for (let i = 0; i < coachQueue.length; i++) if (coachQueue[i].key === key) return;
     if (coachState) { if (opts.queue) coachQueue.push(item); return; }
     coachState = item;
   };
@@ -387,12 +391,16 @@
     G.Core.save();
   };
   U.coachNext = function () {
+    const done = coachState && coachState.onDone;
     coachState = null;
     while (coachQueue.length) {
       const it = coachQueue.shift();
       const S = G.Core.S;
       if (!(S.coachSeen || {})[it.key]) { coachState = it; break; }
     }
+    /* V9.6.43：这一组播完了 → 交给链式引导的下一步（"带着走"靠它；
+       注意**先渲染再回调**，否则回调里换页会在没有引导的状态下多画一帧）。 */
+    if (!coachState && done) { CV.render(); setTimeout(done, 0); return; }
     CV.render();
   };
   U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
