@@ -93,6 +93,21 @@ try {
   ['points', 'holy', 'otherworld', 'story', 'bloodCrystal', 'corridor', 'skillChip'].forEach((k) => { try { Core.addCur(k, 999999); } catch (e) {} });
   Core.S.player.geneLock = 5;
   Core.S.buildings.core = 30;
+  /* 这几条按钮同样是"条件到了才画"：分工要有伙伴、伴生体要有兽魂石、灯录要有已达成的里程碑 */
+  if (typeof Core.addItem === 'function') { try { Core.addItem('beast_egg', 10); } catch (e) {} }
+  try { Core.S.codex.chars = (D.characters || []).map((c) => c.id); } catch (e) {}
+  try { Core.S.idle = Core.S.idle || { lines: {} }; } catch (e) {}
+  /* 分工要"有可选伙伴"才画按钮 */
+  try {
+    if (D.characters && D.characters.length) {
+      const c0 = D.characters[0].id;
+      Core.S.chars[c0] = { lv: 20, star: 3, exp: 0, attrs: {}, skillLv: [1, 1, 1], bloodlineLv: 1, equips: {} };
+      Core.S.party[1] = c0;                                  // 上阵的（其它页要用）
+      const c1 = (D.characters[1] || D.characters[0]).id;
+      /* 挂机分工派的是"板凳伙伴"（没上阵的）—— 只在 party 里放人，分工按钮就不会出现 */
+      Core.S.chars[c1] = Core.S.chars[c1] || { lv: 15, star: 2, exp: 0, attrs: {}, skillLv: [1, 1, 1], bloodlineLv: 0, equips: {} };
+    }
+  } catch (e) {}
   Object.keys(Core.S.worlds || {}).forEach((wid) => {
     const w = Core.S.worlds[wid];
     /* 全部关卡标成"已通关"（不是 0）—— 0 只解锁第 1 关，后面的 stage:N 锚点还是画不出来 */

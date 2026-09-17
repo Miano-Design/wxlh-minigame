@@ -1605,6 +1605,12 @@ window.DATA = (function () {
       check: S => S.arena && S.arena.best >= 2 },       // best 从 1 起，≥2 就是赢过一场
     { id: 'q_mount', name: '坐骑', desc: '驯服 1 只坐骑', reward: { points: 2000 },
       check: S => (S.mount && S.mount.own || []).length >= 1 },
+    /* V9.6.75（父亲大人："你安排"）：再补两条**玩家每天都会碰**的系统 —— 挂机分工与限时悬赏。
+       权限 / 评级是自动涨的被动线、炼化台是素材循环的子功能，这三条不加（会变啰嗦）。 */
+    { id: 'q_idle', name: '派人干活', desc: '给挂机分工派 1 名领队', reward: { points: 2000 },
+      check: S => Object.keys((S.idle && S.idle.lines) || {}).some(k => S.idle.lines[k]) },
+    { id: 'q_bounty', name: '限时悬赏', desc: '领 1 次悬赏奖励', reward: { points: 2000 },
+      check: S => Object.keys((S.bounty && S.bounty.claimed) || {}).length >= 1 },
     /* ---- 里程碑：世界守关 / 深井 / 血统 / 境界 / 转生 ---- */
     { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, bloodCrystal: 100 }, unlock: 'geneLock,corridor',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
@@ -1616,6 +1622,11 @@ window.DATA = (function () {
       check: S => S.player.bloodlineLv >= 1 || Object.values(S.chars).some(c => c.bloodlineLv >= 1) },
     { id: 'q_realm', name: '境界渡劫', desc: '突破 1 小阶境界', reward: { points: 3000 },
       check: S => (S.player.realm || 0) >= 1 },
+    /* 伴生体在潜影窟第 3 关解锁 —— 放在这个位置时它一定已经开了 */
+    { id: 'q_beast', name: '伴生体', desc: '孵化 1 只伴生体', reward: { points: 3000 },
+      check: S => Object.keys((S.beast && S.beast.owned) || {}).length >= 1 },
+    { id: 'q_codex', name: '灯录', desc: '领 1 次灯录里程碑奖励', reward: { points: 3000 },
+      check: S => ((S.codex && S.codex.claimed) || []).length >= 1 },
     { id: 'q14', name: '潜影之后', desc: '通关 潜影窟·第12关', reward: { holy: 300, otherworld: 200 },
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[11] > 0 },
     { id: 'q15', name: '执灯者之路', desc: '通关 怨声旧宅·第12关', reward: { holy: 500 }, unlock: 'reincarn',
