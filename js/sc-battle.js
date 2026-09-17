@@ -81,7 +81,7 @@
 
   function start(cfg) {
     clearTimer();
-    B.on = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {};
+    B.on = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     B.speed = (Core.S.settings && Core.S.settings.speed) || 1;
     CV.battleSpeed = B.speed;
     B.title = cfg.title || '战斗';
@@ -106,11 +106,31 @@
     CV.render();
   }
 
+  /* V9.6.28（父亲大人："战斗没有攻击、掉血的动效"）自审发现：飘字一直在往 B.floaters 里塞，
+     **却没有任何地方把它画出来** —— 所以打了半天没有伤害数字、也没有受击反馈。
+     这里是配套的动画帧：只要还有"活着的"动效（飘字 / 受击 / 出手），就按 ~18fps 重画，
+     放完自动停（不在空闲时白烧电）。 */
+  let fxT = null;
+  function ensureFx() {
+    if (fxT) return;
+    fxT = setInterval(function () {
+      const now = Date.now();
+      const alive = (B.floaters || []).some(function (f) { return now - f.t < 900; })
+        || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
+        || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; });
+      if (!alive) { clearInterval(fxT); fxT = null; }
+      CV.render();
+    }, 55);
+  }
   function floater(uid, text, color) {
     const u = B.units[uid];
     if (!u) return;
     B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now() });
+    ensureFx();
   }
+  /* 受击 / 出手：记一个时间戳，unitCard 按它算抖动与红闪 */
+  function hitFx(uid) { if (uid) { B.hitAt[uid] = Date.now(); ensureFx(); } }
+  function atkFx(uid) { if (uid) { B.atkAt[uid] = Date.now(); ensureFx(); } }
 
   function applyFrame(f) {
     switch (f.type) {
@@ -122,6 +142,7 @@
         break;
       case 'damage': {
         const u = B.units[f.target];
+        hitFx(f.target); atkFx(f.source || f.actor);      // 受击闪红 + 出手前冲
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
         floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : '#ff8080');
         B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
@@ -131,6 +152,7 @@
       }
       case 'dot': {
         const u = B.units[f.target];
+        hitFx(f.target);
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
         floater(f.target, '-' + f.dmg, '#ff8080');
         if (f.killed) pushLog('💀 ' + nameOf(f.target) + ' 倒下');
@@ -140,6 +162,7 @@
         const u = B.units[f.target];
         if (u) u.hp = Math.min(u.maxHp, u.hp + f.amount);
         floater(f.target, '+' + f.amount, CV.C.green);
+        ensureFx();
         break;
       }
       case 'shield': floater(f.target, '🛡+' + f.amount, CV.C.green); break;
@@ -161,6 +184,8 @@
   function finish() {
     if (B.done) return;
     B.done = true;
+    B.hitAt = {}; B.atkAt = {};                 // 结算页不需要残留的受击/出手状态
+    if (fxT) { clearInterval(fxT); fxT = null; }
     const cfg = B.cfg, res = B.res;
     // 补算剩余帧，保证血量/日志正确
     for (; B.idx < res.frames.length; B.idx++) {
@@ -204,6 +229,13 @@
   function unitCard(x, y, w, u, small) {
     const dead = u.hp <= 0;
     const av = small ? 42 : 50;
+    /* V9.6.28：受击抖一下 + 闪红；出手时朝对面冲一小步（我方右冲、敌方左冲） */
+    const now = Date.now();
+    const hitP = B.hitAt[u.uid] ? Math.max(0, 1 - (now - B.hitAt[u.uid]) / 300) : 0;
+    const atkP = B.atkAt[u.uid] ? Math.max(0, 1 - (now - B.atkAt[u.uid]) / 220) : 0;
+    const shake = hitP ? Math.sin(now / 28) * 3 * hitP : 0;
+    const lunge = atkP ? (u.side === 'ally' ? 1 : -1) * 7 * Math.sin(atkP * Math.PI) : 0;
+    x += shake + lunge;
     const cx = x + w / 2;
     if (dead) CV.ctx.globalAlpha = 0.25;
     CV.ctx.beginPath();
@@ -214,6 +246,7 @@
       CV.ctx.fill();
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
     } else CV.ctx.fillStyle = '#232c42';
+    u._cx = cx; u._top = y; u._av = av;   // 飘字要用：记住这一张卡画在哪
     CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: small ? 16 : 18, bold: true, align: 'center' });
     if (dead) CV.ctx.globalAlpha = 1;
     // 名字
@@ -279,6 +312,40 @@
       const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
       list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
     });
+    /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
+       位置取自各卡刚才记下的 _cx/_top —— 所以先画完所有单位再画它。 */
+    (B.floaters || []).forEach(function (f) {
+      const u = B.units[f.uid];
+      if (!u || u._cx == null) return;
+      const p = Math.min(1, (Date.now() - f.t) / 900);
+      if (p >= 1) return;
+      const fy = u._top - 4 * CV.SCALE - 26 * CV.SCALE * p;
+      const alpha = 1 - p * p;
+      CV.ctx.save();
+      CV.ctx.globalAlpha = alpha;
+      const size = 14 * CV.SCALE;
+      CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
+      CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
+      CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
+      CV.ctx.strokeText(f.text, u._cx, fy);
+      CV.ctx.fillStyle = f.color || CV.C.gold;
+      CV.ctx.fillText(f.text, u._cx, fy);
+      CV.ctx.restore();
+    });
+    /* 受击红闪：在头像外再描一圈（画在飘字之前，所以不会被盖） */
+    Object.keys(B.hitAt || {}).forEach(function (uid) {
+      const u = B.units[uid];
+      if (!u || u._cx == null) return;
+      const p = Math.max(0, 1 - (Date.now() - B.hitAt[uid]) / 300);
+      if (p <= 0) return;
+      CV.ctx.save();
+      CV.ctx.globalAlpha = 0.75 * p;
+      CV.ctx.strokeStyle = '#ff5a5a'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
+      if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
+      else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
+      CV.ctx.restore();
+    });
+
     /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
