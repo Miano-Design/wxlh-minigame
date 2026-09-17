@@ -139,7 +139,19 @@
     beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
     reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
   };
+  /* V9.6.62（父亲大人拍板第 3 条：解锁弹窗"时机要准，不能影响体验"）—— 三道闸：
+       ① 不在战斗中（战斗是整屏接管，弹层会打断节奏）；
+       ② 不叠在别的确认框/弹窗上（U.overlay 开着就先不弹）；
+       ③ 不在切页那一瞬间（等 ~0.4 秒，页面稳了再说）。 */
+  let lastPage = null, lastPageAt = 0;
+  function coachPageSettled(page) {
+    if (page !== lastPage) { lastPage = page; lastPageAt = Date.now(); return false; }
+    return (Date.now() - lastPageAt) > 400;
+  }
   function coachByUnlock(page) {
+    if (page === 'battle') return false;                          // ①
+    if (G.U && G.U.overlay) return false;                         // ②
+    if (!coachPageSettled(page)) return false;                    // ③
     const ids = Object.keys(UNLOCK_GUIDE);
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i], g = UNLOCK_GUIDE[id];
