@@ -208,3 +208,51 @@ if (stuck.length) {
   });
   console.log(`  → ${realWall ? '有 ' + realWall + ' 个世界连满配都过不去，这才需要动数值' : '没有一个世界连满配都过不去：不用动数值'}`);
 }
+
+/* === 前期门槛（V9.5.91 父亲大人："前期的副本还是有点难了"）===
+   上一轮量出来：压力全在守关 BOSS——前 11 关 Lv.3 就能过，第 12 关却要 W02 Lv.11 / W03 Lv.16 /
+   W04 Lv.27 / W05 Lv.50，而且失败是**被打死**（不是打不动）。dungeon.js 因此给前六个世界
+   加了一个平滑系数。这一段就是那把尺子：**前期几个世界，"几个人、几级"必须能推完**。
+   门槛是父亲大人定的体感线，不是数学推导：单人也要能推完前三个世界，第四到第六个世界
+   允许要求 3 个人。 */
+{
+  const nakedTeam = (lv, n) => {
+    Core.newGame();
+    Core.setPlayerName('前期');
+    Core.choosePlayerBloodline('修真');
+    const p = Core.S.player;
+    p.level = lv;
+    p.attrPoints = lv * 3;
+    D.ATTR_META.forEach(a => Core.allocateAttr(a.id, Math.floor(p.attrPoints / (D.ATTR_META.length * 10)) * 10));
+    const ids = ['C021', 'C022', 'C023'].slice(0, n - 1);
+    ids.forEach(id => { try { Core.addChar(id); Core.S.chars[id].lv = Math.max(0, lv - 4); } catch (e) {} });
+    Core.S.party = ['@player'].concat(ids);
+    while (Core.S.party.length < 5) Core.S.party.push(null);
+  };
+  const clearsWhole = (wid, lv, n) => {
+    let win = 0;
+    for (let k = 0; k < 3; k++) {
+      seed = 100 + k * 37;
+      nakedTeam(lv, n);
+      let ok = true;
+      for (let stage = 1; stage <= 12 && ok; stage++) {
+        const allies = UI._panels.buildAllies({}, {});
+        if (!allies.length) { ok = false; break; }
+        if (!Battle.run({ allies, enemies: Dun.makeEnemies(wid, 'normal', stage, Dun.finalKind(stage)), worldId: wid, maxRounds: 60 }).win) ok = false;
+      }
+      if (ok) win++;
+    }
+    return win >= 2;
+  };
+  const GATES = [['W01', 1, 5], ['W02', 1, 10], ['W03', 1, 20], ['W04', 3, 25], ['W05', 3, 45], ['W06', 3, 70]];
+  console.log('\n=== 前期门槛（裸装，人数 × 等级必须推得动整个世界的 12 关）===');
+  let bad = 0;
+  GATES.forEach(([wid, n, cap]) => {
+    let need = null;
+    for (let lv = 3; lv <= 100; lv++) { if (clearsWhole(wid, lv, n)) { need = lv; break; } }
+    const ok = need !== null && need <= cap;
+    if (!ok) bad++;
+    console.log(`  ${wid}：${n} 人裸装需要 Lv.${need === null ? '>100' : need}（门槛 ≤${cap}）${ok ? '✓' : ' ⚠ 前期偏难'}`);
+  });
+  console.log(bad ? `  → 有 ${bad} 个前期世界超过门槛，要再降` : '  → 前六个世界全部达标（前期不再卡人）');
+}

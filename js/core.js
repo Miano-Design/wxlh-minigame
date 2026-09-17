@@ -1289,56 +1289,54 @@ window.Core = (function () {
     });
     return s;
   }
-  function autoEquipBest() {
-    const members = ['@player', ...S.party.filter(Boolean)];
-    // 换装前的快照：用来算"到底改了几处"（否则先全脱再全穿，数字会虚高）
-    const before = {};
-    Object.keys(S.equipped).forEach(cid => { before[cid] = Object.assign({}, S.equipped[cid]); });
-    // 1) 先把所有**没锁定**的装备从每个人（含没上阵的）身上摘下来，回到待分配池。
-    //    旧版没做这一步，池子里含"别人身上那件"时，会把它同时留给原主和新主 → 一件装备两个人穿。
-    //    锁定的装备不动，继续留在原位（并且占位，不再参与分配）。
-    const used = new Set();
+  /* 一键最优装备（V9.5.91 父亲大人重做）
+     旧版规则是"把全队**未锁定**的装备全脱下来回池子、再重新分配"——两个毛病：
+       ① 会把别人身上的装备抢走（玩家只想让这个人穿好的，结果全队都被洗了一遍）；
+       ② 从没上阵的伙伴身上也扒（装备凭空跑到主力身上，玩家找不到）。
+     现在只有三条规则：
+       ① 候选池 = **没穿在任何人身上**的装备（锁定的不自动动：锁 = 别自动动它）；
+       ② 只动 targets 这些人自己的格子：某格有更好的候选就换上，没有就保持原样；
+       ③ 绝不碰其他任何人的装备（这条是硬规则，测试守着）。
+     charId 传 '@player' 或伙伴 id = 只给这一个人配；不传 = 全体上阵成员各配一次。 */
+  function autoEquipBest(charId) {
+    const targets = charId ? [charId] : ['@player'].concat(S.party.filter(Boolean));
+    // 谁身上穿着什么：这一份一开始就锁死，只有"被换下来的那件"会解禁
+    const worn = new Set();
     Object.keys(S.equipped).forEach(cid => {
-      const cur = S.equipped[cid];
-      if (!cur) return;
-      Object.keys(cur).forEach(slot => {
-        const uid = cur[slot];
-        if (!uid) return;
-        const e = S.equips[uid];
-        if (e && e.lock) { used.add(uid); return; }
-        cur[slot] = null;
-      });
+      const cur = S.equipped[cid] || {};
+      Object.keys(cur).forEach(slot => { if (cur[slot]) worn.add(cur[slot]); });
     });
-    // 2) 候选池：所有没被锁定的装备（同一件只会分给一个人）
-    const pool = Object.values(S.equips).filter(e => !e.lock);
     let changed = 0;
-    members.forEach(cid => {
+    const detail = [];
+    targets.forEach(cid => {
+      if (cid !== '@player' && !S.chars[cid]) return;
       const cur = S.equipped[cid] || (S.equipped[cid] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null });
       const slots = cid === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS;
       slots.forEach(slot => {
-        // 锁定的装备不动：如果它正穿在身上，就当作已占用直接跳过
-        if (cur[slot] && S.equips[cur[slot]] && S.equips[cur[slot]].lock) { used.add(cur[slot]); return; }
-        let best = null, bestScore = -1;
-        pool.forEach(e => {
-          if (used.has(e.uid)) return;
+        const oldUid = cur[slot];
+        const oldEq = oldUid ? S.equips[oldUid] : null;
+        if (oldEq && oldEq.lock) return;                       // 锁着的一律不动
+        let best = oldEq, bestScore = oldEq ? equipScore(oldEq) : -1;
+        Object.values(S.equips).forEach(e => {
+          if (e.uid === oldUid) return;
+          if (worn.has(e.uid)) return;                         // 别人身上穿着 —— 绝不抢
+          if (e.lock) return;                                  // 锁着的不自动动
           if (e.slot !== slot) return;
           if (!canEquip(cid, e)) return;
-          const s = equipScore(e);
-          if (s > bestScore) { bestScore = s; best = e; }
+          const sc = equipScore(e);
+          if (sc > bestScore) { bestScore = sc; best = e; }
         });
-        if (best) {
-          used.add(best.uid);
-          if (cur[slot] !== best.uid) cur[slot] = best.uid;
+        if (best && best.uid !== oldUid) {
+          cur[slot] = best.uid;
+          if (oldUid) worn.delete(oldUid);                      // 换下来的回池子（可能给队里其他人用）
+          worn.add(best.uid);
+          changed++;
+          detail.push(`${charName(cid)} ${D.EQUIP_SLOTS[slot]} → ${best.name}`);
         }
       });
     });
-    // 3) 和快照对比，数出真实变化
-    Object.keys(S.equipped).forEach(cid => {
-      const now = S.equipped[cid] || {}, was = before[cid] || {};
-      Object.keys(Object.assign({}, now, was)).forEach(slot => { if ((now[slot] || null) !== (was[slot] || null)) changed++; });
-    });
     save();
-    return { ok: true, changed, members: members.length };
+    return { ok: true, changed, members: targets.length, detail };
   }
   // 穿戴规则：专属限本人；职业套装限对应定位（主角=战士）；槽位受角色类型限制（头/手/腿仅主角）
   function canEquip(charId, eq) {

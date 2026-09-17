@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.90';
+  const GAME_VER = '9.5.91';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -97,6 +97,9 @@ window.UI = (function () {
     return `<div class="card">
       <h3>🗡 装备 <span class="sub">${filled}/${slots.length} 件</span></h3>
       <div class="eq-grid">${tiles}</div>
+      <!-- V9.5.91（父亲大人）：一键最优装备从"队伍页"搬到**角色/伙伴详情的装备栏**这里，
+           而且只从"没穿在任何人身上"的装备里挑，不抢别人身上的。 -->
+      <button class="btn small ghost block mt2" data-autoequip="${ownerId}">⚡ 一键最优装备</button>
     </div>`;
   }
 
@@ -1290,7 +1293,6 @@ window.UI = (function () {
           <div class="pos-row-label" data-row="back">后排</div>
           <div class="party-slots">${slotTile(2)}${slotTile(3)}${slotTile(4)}</div>
         </div>
-        <button class="btn small block mt3" data-act="auto-equip">⚡ 一键最优装备</button>
       </div>
       <!-- V9.5.46（父亲大人）：编队预设独立成一张卡，不再跟小队挤在一起 -->
       <div class="card">
@@ -1457,6 +1459,14 @@ window.UI = (function () {
       C().unequipItem('@player', b.dataset.punequip);
       reopenSelf();
     });
+    /* V9.5.91（父亲大人）：一键最优装备搬到详情页的装备栏 —— 只从"没穿在别人身上"的装备里挑 */
+    const autoEqBtn = w.querySelector('[data-autoequip]');
+    if (autoEqBtn) autoEqBtn.onclick = () => {
+      const r = C().autoEquipBest(autoEqBtn.dataset.autoequip);
+      toast(r.changed ? `已换上 ${r.changed} 件（只从背包里没穿的装备挑，不抢别人身上的）` : '背包里没有更好的了', 2600);
+      sfx('coin');
+      reopenSelf(); renderTopbar();
+    };
     w.querySelector('[data-rename]').onclick = () => {
       closeModal(w);
       const rw = modal('修改名字', `
@@ -1734,6 +1744,14 @@ window.UI = (function () {
       C().unequipItem(id, b.dataset.unequip);
       reopenSelf();
     });
+    /* V9.5.91（父亲大人）：一键最优装备搬到详情页的装备栏 —— 只从"没穿在别人身上"的装备里挑 */
+    const autoEqBtn = w.querySelector('[data-autoequip]');
+    if (autoEqBtn) autoEqBtn.onclick = () => {
+      const r = C().autoEquipBest(autoEqBtn.dataset.autoequip);
+      toast(r.changed ? `已换上 ${r.changed} 件（只从背包里没穿的装备挑，不抢别人身上的）` : '背包里没有更好的了', 2600);
+      sfx('coin');
+      reopenSelf(); renderTopbar();
+    };
     /* 队伍操作：换将 / 下阵。用 fromSlot 而不是"S.party.indexOf(id)"——
        万一换将过程中队伍变了，索引用当时点进来的那个格子号才不会错位。 */
     const swapBtn = w.querySelector('[data-swap]');
@@ -3018,7 +3036,9 @@ window.UI = (function () {
       setTab('home');
       setTimeout(() => {
         protagonistDetail();
-        coachmark('.text-rows', '这是你的属性面板：升级得属性点和技能点，点 +1 分配；选定血统后技能栏会换成那条血统的技能。看完关掉面板，回首页领取奖励。');
+        /* V9.5.91（父亲大人）：原来后半句在解释"觉醒血统之后技能组会被替换"——
+           那是老版本的机制说明，技能面板的标题自己就会跟着血统变，玩家不需要这段解释。 */
+        coachmark('.text-rows', '这是你的属性面板：升级得属性点和技能点，点 +1 分配。看完关掉面板，回首页领取奖励。');
       }, 250);
       return;
     }
@@ -4537,13 +4557,6 @@ switch (act) {
           case 'open-guide': guideModal(); break;
           case 'open-codex': codexModal(); break;
           case 'open-ach': tasksModal('ach'); break;
-          case 'auto-equip': {
-            const r = C().autoEquipBest();
-            toast(r.changed ? `已为 ${r.members} 名成员重新分配 ${r.changed} 处装备（含从没上阵的伙伴身上取下的）` : '当前已是最优配置', 2600);
-            sfx('coin');
-            repaintParty(); renderTopbar();
-            break;
-          }
           case 'open-corridor':
             if (!C().isUnlocked('corridor')) { toast('🔒 ' + C().unlockTip('corridor')); break; }
             dungeonView = { page: 'corridor' }; render(); break;

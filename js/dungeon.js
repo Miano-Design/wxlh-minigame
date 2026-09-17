@@ -12,8 +12,17 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
   // 生成一场战斗的敌人
   function makeEnemies(worldId, diff, stage, kind) {
     const w = D.WORLDS.find(x => x.id === worldId);
-    const m = diffMult(diff) * stageMult(stage);                       // HP 用满倍率（V5 §51）
-    const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1);          // 攻击放缓（V9.5.64 再放缓一档）
+    const wi = D.WORLDS.indexOf(w);
+    /* V9.5.91（父亲大人："前期的副本还是有点难了，可以再降一点"）——
+       实测（3 人裸装、普通难度）看清了病灶：**压力全压在守关 BOSS 上**。
+       前 11 关 Lv.3 就能过，第 12 关却要 W02 Lv.11 / W03 Lv.16 / W04 Lv.27 / W05 Lv.50，
+       而且失败是 12~15 回合被**打死**（不是打不动）。
+       所以给前六个世界一个 0.60→0.95 的平滑系数（第 7 个世界起完全不动）：
+       敌人 HP 与攻击都乘它，守关 BOSS 自己那份也一样乘 —— 目标是把"守关"从
+       前面关卡的 2.6~3.0 倍压到 1.3~1.6 倍，前期不再在最后一关突然变成墙。 */
+    const ease = wi >= 7 ? 1 : 0.40 + wi * 0.0857;
+    const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
+    const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
     const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);           // 防御放缓，避免伤害坍缩
     const faction = THEME_FACTION[w.theme];
     const mk = (name, hp, atk, def, opts) => Object.assign({
@@ -38,11 +47,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     if (kind === 'boss') {
       const bossHp = w.bossHp[D.DIFFICULTY.findIndex(d => d.id === diff)] || w.bossHp[0];
       // Boss 血量按世界序号缩放（早期世界玩家战力低，避免数值碾压）
-      const wi = D.WORLDS.indexOf(w);
       /* V9.5.64（父亲大人：前期副本卡关）——首关 Boss 血量系数 0.28 → 0.10，
          之后每个世界再 +0.05：第一个 Boss 是"能打赢的关"，不是劝退墙。 */
-      const bossHpMult = 0.05 + wi * 0.05;
-      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04), w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true })];
+      const bossHpMult = (0.05 + wi * 0.05) * ease;
+      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true })];
       list.push(mk(w.enemies[0], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
       if (diff !== 'normal') list.push(mk(w.enemies[1], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
       return label(list);

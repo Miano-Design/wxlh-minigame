@@ -2425,5 +2425,36 @@ setParty(['C021']);
   t('扫荡：跨天后能一口气扫满上限（显示与实扣一致）', r.ok && r.count === cap, `扫了 ${r.count} 次 / 上限 ${cap}`);
 }
 
+/* ---- V9.5.91（父亲大人）：一键最优装备只从"没穿在任何人身上"的装备里挑 ----
+   旧版是把全队未锁定的装备全脱下来重分——会把别人身上的扒走、连没上阵的伙伴也扒。 */
+{
+  Core.newGame(); Core.setPlayerName('配装'); Core.choosePlayerBloodline('修真');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.S.bag.eqCap = 400;
+  Core.addChar('C021'); Core.addChar('C022');
+  Core.S.party = ['@player', 'C021', 'C022', null, null];
+  /* C021 身上先穿一件好武器（等于"别人身上的东西"） */
+  const good = Core.grantEquip('W05', 'SSR', 'weapon').equip;
+  Core.equipItem('C021', good.uid);
+  /* 背包里再塞 6 件没穿的武器 */
+  for (let i = 0; i < 6; i++) Core.grantEquip('W05', 'SSR', 'weapon');
+  const c21 = Core.S.equipped.C021.weapon, c22 = Core.S.equipped.C022.weapon;
+  const wornBefore = new Set();
+  Object.keys(Core.S.equipped).forEach(cid => Object.values(Core.S.equipped[cid]).forEach(u => { if (u) wornBefore.add(u); }));
+  const r = Core.autoEquipBest('@player');
+  t('一键最优装备：给本人配上了背包里更好的那件', r.ok && r.changed >= 1 && !!Core.S.equipped['@player'].weapon);
+  t('一键最优装备：不抢别人身上的装备（C021 的武器没被扒走）', Core.S.equipped.C021.weapon === c21);
+  t('一键最优装备：只动指定的那个人（C022 一格没动）', Core.S.equipped.C022.weapon === c22);
+  t('一键最优装备：换上来的那件原本是"没人穿"的', !!Core.S.equipped['@player'].weapon && !wornBefore.has(Core.S.equipped['@player'].weapon));
+  /* 锁定的不自动动 */
+  {
+    const locked = Core.grantEquip('W05', 'SSR', 'weapon').equip;
+    Core.toggleEquipLock(locked.uid);
+    Core.unequipItem('@player', 'weapon');       // 主角空着武器，背包里有件锁定的大武器
+    Core.autoEquipBest('@player');
+    t('一键最优装备：锁定的装备不自动装/不自动动', Core.S.equipped['@player'].weapon !== locked.uid);
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

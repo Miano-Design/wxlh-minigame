@@ -1632,5 +1632,25 @@ t('装备详情：强化按钮写的是实价，并且列出材料/代用', () =
   if (html.indexOf('◈ ' + shown) < 0) throw new Error('按钮上的点数不是实价（应为 ' + shown + '）');
 });
 
+/* ---- V9.5.91（父亲大人）：一键最优装备从队伍页搬到角色/伙伴详情的装备栏 ---- */
++t('队伍页不再有"一键最优装备"，改到角色/伙伴详情的装备栏里', () => {
+  Core.newGame(); Core.setPlayerName('搬运'); Core.choosePlayerBloodline('修真');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.addChar('C021'); Core.S.party = ['@player', 'C021', null, null, null];
+  const party = UI._panels._screens.partyScreen();
+  if (party.indexOf('一键最优装备') >= 0) throw new Error('队伍页还挂着一键最优装备');
+  /* 主角详情 */
+  const pw = UI._panels.protagonistDetail();
+  if (!pw || (pw.innerHTML || '').indexOf('data-autoequip="@player"') < 0) throw new Error('主角详情的装备栏里没有一键最优装备');
+  /* 伙伴详情 */
+  const cw = UI._panels.charDetail('C021');
+  if (!cw || (cw.innerHTML || '').indexOf('data-autoequip="C021"') < 0) throw new Error('伙伴详情的装备栏里没有一键最优装备');
+});
++t('主线一的引导不再提"技能栏会换成血统技能"（父亲大人）', () => {
+  const src = fs.readFileSync('js/ui.js', 'utf8');
+  if (src.indexOf('技能栏会换成') >= 0) throw new Error('那句多余的解释还在');
+  if (src.indexOf('这是你的属性面板') < 0) throw new Error('属性面板的引导被整段删掉了（只该删后半句）');
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
