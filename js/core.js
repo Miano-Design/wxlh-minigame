@@ -217,6 +217,20 @@ window.Core = (function () {
       S.equipped[id] = Object.assign({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null }, S.equipped[id] || {});
     });
     Object.values(S.equips || {}).forEach(e => { if (e.lock === undefined) e.lock = false; });
+    /* V9.6.81（父亲大人："现在的职业套装改成血统套装"）：老存档里的装备带着旧的 `classSet`（定位名，
+       如 warrior）。按 LEGACY_KIND_SET 换成血统，名字前缀也跟着换（'战士·磁轨枪' → '狼人·磁轨枪'），
+       玩家的套装不会凭空掉档。跑过一次存档里就没有 classSet 了，天然只迁移一次。 */
+    Object.values(S.equips || {}).forEach(e => {
+      if (!e || !e.classSet) return;
+      const oldKind = e.classSet;
+      const bl = (D.LEGACY_KIND_SET || {})[oldKind] || null;
+      e.bloodSet = bl;
+      delete e.classSet;
+      const oldName = (D.KIND_NAMES || {})[oldKind];
+      if (bl && oldName && typeof e.name === 'string' && e.name.indexOf(oldName + '·') === 0) {
+        e.name = bl + e.name.slice(oldName.length);
+      }
+    });
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});
@@ -424,11 +438,11 @@ window.Core = (function () {
   }
 
   /* ================= 道具 ================= */
-  // 套装加成：世界套装 2/4/6 件；职业套装 2/3 件（已按定位匹配计入 sets）
+  // 套装加成：世界套装 2/4/6 件；血统套装 2/3 件；血统神装 2/4/6 件（后两者已按血统匹配计入 sets）
   function applySetBonuses(pct, sets) {
     Object.entries(sets).forEach(([setId, n]) => {
-      if (setId.startsWith('class:')) {
-        const cs = D.CLASS_SETS[setId.slice(6)];
+      if (setId.startsWith('blood:')) {
+        const cs = D.BLOODLINE_SETS[setId.slice(6)];
         if (!cs) return;
         if (n >= 2 && cs.b2) Object.entries(cs.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
         if (n >= 3 && cs.b3) Object.entries(cs.b3).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
@@ -590,7 +604,7 @@ window.Core = (function () {
   function partnerExp() { return S.charExp || 0; }
   /* 无损换将（V9.5.47）：把 slotIdx 上的伙伴换成 newId ——
        ① 新伙伴继承被换下那位的等级（取较高者，绝不掉级）；
-       ② 被换下那位身上"新伙伴也穿得了"的装备跟着转过去；穿不了（职业专属 / 定位不符）留在原位。
+       ② 被换下那位身上"新伙伴也穿得了"的装备跟着转过去；穿不了（别人专属 / 血统对不上）留在原位。
      返回 { ok, outId, inheritLv, moved }。 */
   function swapPartyMember(slotIdx, newId) {
     if (!S.chars[newId]) return { ok: false, msg: '未拥有该伙伴' };
@@ -899,7 +913,7 @@ window.Core = (function () {
       pct.critPct += st.flat.critPct || 0;
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) sets[e.set] = (sets[e.set] || 0) + 1;
-      if (e.classSet && e.classSet === base.kind) sets['class:' + e.classSet] = (sets['class:' + e.classSet] || 0) + 1;
+      if (e.bloodSet && e.bloodSet === base.bloodline) sets['blood:' + e.bloodSet] = (sets['blood:' + e.bloodSet] || 0) + 1;
       /* 血统神装：只有**同血统**的人穿上的那几件才算数（V9.6.76） */
       if (e.godSet && e.godSet === base.bloodline) sets['god:' + e.godSet] = (sets['god:' + e.godSet] || 0) + 1;
     });
@@ -987,7 +1001,7 @@ window.Core = (function () {
       pct.critPct += st.flat.critPct || 0;
       Object.entries(st.affix).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
       if (e.set) psets[e.set] = (psets[e.set] || 0) + 1;
-      if (e.classSet && e.classSet === 'warrior') psets['class:warrior'] = (psets['class:warrior'] || 0) + 1;
+      if (e.bloodSet && e.bloodSet === S.player.bloodline) psets['blood:' + e.bloodSet] = (psets['blood:' + e.bloodSet] || 0) + 1;
       if (e.godSet && e.godSet === S.player.bloodline) psets['god:' + e.godSet] = (psets['god:' + e.godSet] || 0) + 1;
     });
     applySetBonuses(pct, psets);
@@ -1090,7 +1104,7 @@ window.Core = (function () {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     const slots = slot ? [slot] : D.DROP_SLOTS;
     const s = slots[Math.floor(Math.random() * slots.length)];
-    // 装备类别：普通 / 世界套装 / 职业套装 / 血统神装（神话专属）
+    // 装备类别：普通 / 世界套装 / 血统套装 / 血统神装（神话专属）
     let opts = { setType: 'plain' };
     const roll = Math.random();
     /* 神话只会是血统神装，没有"普通神话"这一说。
@@ -1099,8 +1113,8 @@ window.Core = (function () {
        偏差给到七三，既照顾主力，又留着"别的血统也能刷出来"的空间。 */
     if (rarity === 'MYTH') opts = { setType: 'god', godSet: randomGodSet() };
     else if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
-    else if (rarity === 'SR') opts = roll < (opts0.preferWorldSet ? 0.85 : 0.7) ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
-    else if (rarity === 'SSR' || rarity === 'UR') opts = roll < (opts0.preferWorldSet ? 0.8 : 0.6) ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
+    else if (rarity === 'SR') opts = roll < (opts0.preferWorldSet ? 0.85 : 0.7) ? { setType: 'world' } : { setType: 'blood', bloodSet: randomBloodlineSet() };
+    else if (rarity === 'SSR' || rarity === 'UR') opts = roll < (opts0.preferWorldSet ? 0.8 : 0.6) ? { setType: 'world' } : { setType: 'blood', bloodSet: randomBloodlineSet() };
     const eq = D.makeEquip(worldId, s, rarity, uid, opts);
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
@@ -1120,17 +1134,19 @@ window.Core = (function () {
     }
     return { equip: eq };
   }
-  function randomKind() {
-    const kinds = Object.keys(D.CLASS_SETS);
-    return kinds[Math.floor(Math.random() * kinds.length)];
-  }
-  /* 神装该给哪支血统（见 grantEquip 里的说明：七成偏队伍，三成随机） */
-  function randomGodSet() {
-    const sets = Object.keys(D.GOD_SETS);
-    const party = (S.party || []).filter(Boolean).map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] || {}).bloodline)).filter(b => b && D.GOD_SETS[b]);
+  /* 套装该给哪支血统：**七成偏向上阵那 5 个人**，三成六支里随机。
+     全随机的话想给主力凑一套要刷到天荒地老；全按队伍给又变成"没有选择"。
+     （V9.6.81：血统套装与血统神装共用这一条随机线 —— 都是血统的东西。） */
+  function randomBloodSet(pool) {
+    const sets = Object.keys(pool);
+    const party = (S.party || []).filter(Boolean)
+      .map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] || {}).bloodline))
+      .filter(b => b && pool[b]);
     if (party.length && Math.random() < 0.7) return party[Math.floor(Math.random() * party.length)];
     return sets[Math.floor(Math.random() * sets.length)];
   }
+  function randomGodSet() { return randomBloodSet(D.GOD_SETS); }
+  function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_SETS); }
   // SSR 专属装备（UR，绑定角色）
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
@@ -1366,18 +1382,22 @@ window.Core = (function () {
     save();
     return { ok: true, changed, members: targets.length, detail };
   }
-  // 穿戴规则：专属限本人；职业套装限对应定位（主角=战士）；血统神装限对应血统；槽位受角色类型限制
+  // 穿戴规则：专属限本人；血统套装与血统神装都要求**同血统**；槽位受角色类型限制
   function canEquip(charId, eq) {
     if (!eq) return false;
     if (eq.charId && eq.charId !== charId) return false;
     if (charId !== '@player' && !S.chars[charId]) return false;
-    const kind = charId === '@player' ? D.PROTAGONIST.kind : (D.charById[charId] || {}).kind;
-    if (eq.classSet && eq.classSet !== kind) return false;
-    /* 血统神装：只有同血统的人穿得上（V9.6.76）。
+    /* 血统套装 / 血统神装：只有**同血统**的人穿得上（V9.6.81 起两条线同一条规矩）。
        这是"凑齐一套"的代价 —— 六件都得是这支血统，别人代穿不算。 */
-    if (eq.godSet) {
-      const bl = charId === '@player' ? S.player.bloodline : (D.charById[charId] || {}).bloodline;
-      if (eq.godSet !== bl) return false;
+    const bl = charId === '@player' ? S.player.bloodline : (D.charById[charId] || {}).bloodline;
+    if (eq.bloodSet && eq.bloodSet !== bl) return false;
+    if (eq.godSet && eq.godSet !== bl) return false;
+    /* ⚠ 老存档兜底：V9.6.81 之前的装备带的是 `classSet`（定位名，如 warrior）。
+       migrate() 会把它换成血统，但**万一有漏网的**（手动改档 / 更老的版本），
+       这里按 LEGACY_KIND_SET 现算一次，别让玩家看到"穿不上又不知道为什么"。 */
+    if (eq.classSet) {
+      const mapped = (D.LEGACY_KIND_SET || {})[eq.classSet];
+      if (!mapped || mapped !== bl) return false;
     }
     return (charId === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS).includes(eq.slot);
   }
@@ -2674,7 +2694,7 @@ window.Core = (function () {
     if (item.mythBox) rarity = Math.random() < 0.15 ? 'MYTH' : 'UR';   // 保底传说、小概率神话
     /* V9.6.80（父亲大人："箱子开出来的世界套装以开箱时的当前进度为准，比如你 20 就开 20 的套装"）：
        ① 档位 = 当前进度那张图（见 boxSourceWorld）；
-       ② 而且**主要出那张图的世界套装**（原来跟野外掉落同一套随机：60% 世界套装 / 40% 职业套装，
+       ② 而且**主要出那张图的世界套装**（原来跟野外掉落同一套随机：60% 世界套装 / 40% 血统套装，
           开箱的人往往就是冲着"这一段的套装"去的，所以箱子给到 80%）。 */
     const res = grantEquip(worldId, rarity, undefined, { preferWorldSet: true });
     save();

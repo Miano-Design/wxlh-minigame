@@ -485,18 +485,30 @@ window.DATA = (function () {
     };
   });
 
-  /* ================= 职业套装（2/3 件，需定位匹配） ================= */
+  /* ================= 血统套装（2/3 件，穿对人） =================
+     V9.6.81（父亲大人："现在的职业套装改成血统套装，你整体审核一下，我们这个游戏都没啥职业的概念，
+     主要还是血统"）。
+     原来那九套是**按定位**分的（战士/法师/刺客…），可这个游戏的定位只是个"站前排还是后排"的
+     战斗参数，玩家真正认同的身份是**血统**（六支，各有自己的成长与技能）。所以整套换成血统版：
+       · 六支血统一支一套，效果按这支血统的性格给（见 BLOODLINES 的说明）
+       · 和血统神装同一条规矩：**只有同血统的人穿得上**，别人代穿不算
+       · 两件 / 三件各一档 —— 它是"打到就能凑"的常规线，神装才是神话档的加强版
+     ⚠ 老存档怎么迁移见 core.js 的 migrate()：旧 classSet（定位名）按固定映射换成血统，
+       名字前缀也跟着换，玩家的套装**不会凭空掉档**。 */
   const KIND_NAMES = { warrior: '战士', tank: '坦克', mage: '法师', ranger: '射手', assassin: '刺客', support: '辅助', healer: '治疗', controller: '控制', vampire: '血族' };
-  const CLASS_SETS = {
-    warrior:    { name: '狂战套装', b2: { atkPct: 0.08 }, b3: { atkPct: 0.12, critPct: 0.05 }, text: '2件:攻击+8%　3件:攻击+12%·暴击+5%' },
-    tank:       { name: '守护套装', b2: { hpPct: 0.08 }, b3: { defPct: 0.15 }, text: '2件:生命+8%　3件:防御+15%' },
-    mage:       { name: '元素套装', b2: { skillPct: 0.08 }, b3: { skillPct: 0.15 }, text: '2件:技能伤害+8%　3件:技能伤害+15%' },
-    ranger:     { name: '疾风套装', b2: { spdPct: 0.08 }, b3: { critPct: 0.08 }, text: '2件:速度+8%　3件:暴击+8%' },
-    assassin:   { name: '影袭套装', b2: { critPct: 0.06 }, b3: { critDmg: 0.25 }, text: '2件:暴击+6%　3件:暴击伤害+25%' },
-    support:    { name: '鼓舞套装', b2: { hpPct: 0.06 }, b3: { skillPct: 0.10 }, text: '2件:生命+6%　3件:技能伤害+10%' },
-    healer:     { name: '圣愈套装', b2: { hpPct: 0.06 }, b3: { spiritPct: 0.15 }, text: '2件:生命+6%　3件:精神+15%' },
-    controller: { name: '咒缚套装', b2: { spdPct: 0.06 }, b3: { skillPct: 0.12 }, text: '2件:速度+6%　3件:技能伤害+12%' },
-    vampire:    { name: '猩红套装', b2: { lifesteal: 0.05 }, b3: { atkPct: 0.10 }, text: '2件:吸血+5%　3件:攻击+10%' },
+  const BLOODLINE_SETS = {
+    '血族':   { name: '血族套装', b2: { atkPct: 0.08 }, b3: { lifesteal: 0.06, critDmg: 0.25 }, text: '2件:攻击+8%　3件:吸血+6%·暴击伤害+25%' },
+    '狼人':   { name: '狼人套装', b2: { hpPct: 0.08 }, b3: { defPct: 0.15, hpPct: 0.08 }, text: '2件:生命+8%　3件:防御+15%·生命+8%' },
+    '修真':   { name: '修真套装', b2: { atkPct: 0.06, hpPct: 0.06 }, b3: { defPct: 0.08, spdPct: 0.08, skillPct: 0.08 }, text: '2件:攻击+6%·生命+6%　3件:防御+8%·速度+8%·技能伤害+8%' },
+    '魔法':   { name: '魔法套装', b2: { skillPct: 0.08 }, b3: { spiritPct: 0.15, skillPct: 0.15 }, text: '2件:技能伤害+8%　3件:精神+15%·技能伤害+15%' },
+    '科技':   { name: '科技套装', b2: { spdPct: 0.08 }, b3: { critPct: 0.06, evaPct: 0.05 }, text: '2件:速度+8%　3件:暴击+6%·闪避+5%' },
+    '念动力': { name: '念动套装', b2: { spiritPct: 0.10 }, b3: { skillPct: 0.12, resPct: 0.12 }, text: '2件:精神+10%　3件:技能伤害+12%·异常抗性+12%' },
+  };
+  /* 老档迁移表：旧"定位套装"→ 新"血统套装"。
+     这只是给老存档找一条确定的落点（定位和血统本来不是一一对应），一次迁移、之后不再用。 */
+  const LEGACY_KIND_SET = {
+    warrior: '狼人', tank: '狼人', vampire: '血族', assassin: '血族',
+    ranger: '科技', mage: '魔法', controller: '念动力', support: '修真', healer: '修真',
   };
 
   /* ================= SSR 伙伴专属装备（UR，绑定角色） ================= */
@@ -535,7 +547,7 @@ window.DATA = (function () {
        · 神话品质：基础值 2.80×（传说 2.00×）、5 条词条（传说 4 条）、词条能越过区间上限
        · **六套血统神装**，一支血统一套，效果按那支血统的性格给：
          血族=吸血暴击 / 狼人=血肉 / 修真=全能 / 魔法=术法 / 科技=速度命中 / 念动力=精神控制
-       · **穿对人**：神装只有**同血统**的人穿得上（和职业套装"限对应定位"同一条规矩）——
+       · **穿对人**：神装只有**同血统**的人穿得上（和血统套装同一条规矩）——
          主角穿自己那支，伙伴穿各自那支。所以"凑齐 6 件"= 给一个人配满，不是随便找件衣服套上
        · 只在残域第 21 张图之后掉落（前面给了也没用，面板还不到那儿）
        · 六件全穿才有 6 件效果 —— 一件顶六件那种写法会让"凑套装"这件事失去意义
@@ -557,7 +569,7 @@ window.DATA = (function () {
   };
 
   // 装备实例生成：worldTier 1-36，rarity 指定，slot 指定
-  // opts: { setType: 'plain'|'world'|'class'|'god', classKind, godSet }
+  // opts: { setType: 'plain'|'world'|'blood'|'god', bloodSet, godSet }
   function makeEquip(worldId, slot, rarity, uid, opts) {
     opts = opts || {};
     const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
@@ -567,8 +579,9 @@ window.DATA = (function () {
     let name;
     const names = EQUIP_NAMES[slot][w.theme];
     const godSet = opts.godSet || Object.keys(GOD_SETS)[0];      // 血统名（'血族' / '修真' …）
+    const bloodSet = opts.bloodSet || Object.keys(BLOODLINE_SETS)[0];
     if (setType === 'god') name = (GOD_SETS[godSet] || GOD_SETS[Object.keys(GOD_SETS)[0]]).name + '·' + names[Math.floor(Math.random() * names.length)];
-    else if (setType === 'class') name = KIND_NAMES[opts.classKind] + '·' + names[Math.floor(Math.random() * names.length)];
+    else if (setType === 'blood') name = bloodSet + '·' + names[Math.floor(Math.random() * names.length)];
     else name = names[Math.floor(Math.random() * names.length)];
     const base = {};
     if (slot === 'weapon') base.atk = Math.round((22 + tier * 20) * mult);
@@ -590,7 +603,7 @@ window.DATA = (function () {
     return {
       uid, name, slot, rarity, enhance: 0, base, affixes,
       set: setType === 'world' ? worldId : null,
-      classSet: setType === 'class' ? opts.classKind : null,
+      bloodSet: setType === 'blood' ? bloodSet : null,
       godSet: setType === 'god' ? godSet : null,
     };
   }
@@ -599,7 +612,7 @@ window.DATA = (function () {
   function makeSignatureEquip(sigId, uid) {
     const sig = SIGNATURE_EQUIPS[sigId];
     if (!sig) return null;
-    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base: Object.assign({}, sig.base), affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, classSet: null, charId: sig.charId, sigText: sig.text };
+    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base: Object.assign({}, sig.base), affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, bloodSet: null, charId: sig.charId, sigText: sig.text };
   }
 
   /* ================= 道具 ================= */
@@ -739,7 +752,8 @@ window.DATA = (function () {
       '强化最高 +20，消耗对应等级的强化材料（不够时用点数代用）+ 异界结晶；强化失败不会降级。',
       '材料按强化等级分 5 档：+0~4 基础金属、+5~9 强化合金、+10~14 异界合金、+15~19 虚空晶体、+20 灯阁残片。',
       'T4/T5 材料从 W04 / W05 之后的精英和 Boss 掉；通关 W04 / W06 后商店也会上架，不用死刷。',
-      '同世界套装 2 / 4 / 6 件激活额外效果（6 件效果需要全身同世界套装）；职业套装限对应定位穿戴（主角算战士）。',
+      '世界套装 2 / 4 / 6 件激活额外效果（6 件效果要全身同一世界的套装）；血统套装 2 / 3 件一档，' +
+      '**只有同血统的人穿得上**；血统神装（神话）2 / 4 / 6 件，规矩一样但只有神话档才有。',
       '装备都在**背包 → 装备**那一栏（道具和装备分开占格子）：重复装备可以「批量分解」换成异界结晶；不想被分解的点详情里的 🔒 锁上。',
       /* V9.5.91（父亲大人）：按钮从队伍页搬到了角色/伙伴详情的装备栏，这句说明跟着改，
          并把新规则一次说清楚——只从没穿的里挑、不抢别人身上的。 */
@@ -1979,7 +1993,7 @@ window.DATA = (function () {
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
     SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
-    BLOODLINE_SKILLS, KIND_NAMES, CLASS_SETS, SIGNATURE_EQUIPS, makeSignatureEquip,
+    BLOODLINE_SKILLS, KIND_NAMES, BLOODLINE_SETS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,

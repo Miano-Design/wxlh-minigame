@@ -79,7 +79,7 @@ t('战力>0', Core.power('C021') > 0);
 // 4. 装备
 const eq = Core.grantEquip('W01', 'SR', 'weapon');
 t('装备生成', !!eq.equip);
-eq.equip.set = null; eq.equip.classSet = null; // 固定为普通装备，排除套装随机性
+eq.equip.set = null; eq.equip.bloodSet = null; // 固定为普通装备，排除套装随机性
 Core.equipItem('C021', eq.equip.uid);
 const st2 = Core.effectiveStats('C021');
 t('装备提升攻击', st2.atk > st.atk);
@@ -237,7 +237,7 @@ setParty(['C021']);
   t('主角血统升级', Core.upgradePlayerBloodline().ok && Core.S.player.bloodlineLv === 1);
   t('血统不可更改', !Core.choosePlayerBloodline('魔法').ok);
   const eq6 = Core.grantEquip('W01', 'SR', 'head');
-  eq6.equip.set = null; eq6.equip.classSet = null; // 固定为普通装备，排除套装随机性
+  eq6.equip.set = null; eq6.equip.bloodSet = null; // 固定为普通装备，排除套装随机性
   t('头部装备主角可穿', Core.equipItem('@player', eq6.equip.uid));
   Core.unequipItem('@player', 'head');
   t('头部装备招募角色也可穿（6 槽修正）', Core.equipItem('C021', eq6.equip.uid));
@@ -370,15 +370,15 @@ setParty(['C021']);
     const e = Core.grantEquip('W01', 'SR');
     if (e.equip) {
       if (e.equip.charId) continue;
-      if (e.equip.classSet) cls++;
+      if (e.equip.bloodSet) cls++;
       else if (e.equip.set) world++;
       else plain++;
     }
   }
-  t('SR装备含世界套装与职业套装', world > 100 && cls > 30);
+  t('SR装备含世界套装与血统套装', world > 100 && cls > 30);
   for (let i = 0; i < 100; i++) {
     const e = Core.grantEquip('W01', 'N');
-    if (e.equip && (e.equip.set || e.equip.classSet)) plain = -999;
+    if (e.equip && (e.equip.set || e.equip.bloodSet)) plain = -999;
   }
   t('N装备全为普通装', plain !== -999);
   const sig = Core.grantSignatureEquip(0);
@@ -388,48 +388,50 @@ setParty(['C021']);
   t('专属装备本人可装备', Core.equipItem('C039', sig.equip.uid));
 }
 
-// 25. 职业套装需定位匹配
+/* 25. 血统套装（V9.6.81 起：原来按"职业/定位"分，现在按**血统**分）
+   规矩和血统神装完全一致：只有同血统的人穿上的那几件才算数。 */
 {
-  // 找一名战士与一名非战士
+  // 找一名血族与一名非血族
   const all = D.characters.map(c => c.id);
-  const war = all.find(id => D.charById[id].kind === 'warrior');
-  const nonWar = all.find(id => D.charById[id].kind === 'mage');
-  Core.addChar(war); Core.addChar(nonWar);
-  const mk = uid => { Core.S.equips[uid] = { uid, name: '狂战·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, classSet: 'warrior' }; };
+  const vamp = all.find(id => D.charById[id].bloodline === '血族');
+  const other = all.find(id => D.charById[id].bloodline === '魔法');
+  Core.addChar(vamp); Core.addChar(other);
+  const mk = uid => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族' }; };
   mk('eqc1'); mk('eqc2'); mk('eqc3'); mk('eqc4');
-  // 战士穿 2 件（武器+饰品槽不足，改为同位两件不可，故用 weapon+accessory）
   Core.S.equips['eqc2'].slot = 'accessory';
-  Core.S.equipped[war] = { weapon: 'eqc1', armor: null, accessory: 'eqc2' };
-  const warWith = Core.effectiveStats(war).atk;
-  Core.S.equips['eqc1'].classSet = null; Core.S.equips['eqc2'].classSet = null;
-  const warWithout = Core.effectiveStats(war).atk;
-  Core.S.equips['eqc1'].classSet = 'warrior'; Core.S.equips['eqc2'].classSet = 'warrior';
-  // 非战士穿同样 2 件
-  Core.S.equipped[nonWar] = { weapon: 'eqc3', armor: null, accessory: 'eqc4' };
-  const mageWith = Core.effectiveStats(nonWar).atk;
-  Core.S.equips['eqc3'].classSet = null; Core.S.equips['eqc4'].classSet = null;
-  const mageWithout = Core.effectiveStats(nonWar).atk;
-  t('职业套装按定位激活', warWith > warWithout && mageWith === mageWithout);
+  Core.S.equipped[vamp] = { weapon: 'eqc1', armor: null, accessory: 'eqc2' };
+  const vampWith = Core.effectiveStats(vamp).atk;
+  Core.S.equips['eqc1'].bloodSet = null; Core.S.equips['eqc2'].bloodSet = null;
+  const vampWithout = Core.effectiveStats(vamp).atk;
+  Core.S.equips['eqc1'].bloodSet = '血族'; Core.S.equips['eqc2'].bloodSet = '血族';
+  // 别的血统穿同样 2 件（血统对不上 → 不激活）
+  Core.S.equipped[other] = { weapon: 'eqc3', armor: null, accessory: 'eqc4' };
+  const otherWith = Core.effectiveStats(other).atk;
+  Core.S.equips['eqc3'].bloodSet = null; Core.S.equips['eqc4'].bloodSet = null;
+  const otherWithout = Core.effectiveStats(other).atk;
+  t('血统套装按"穿对人"激活', vampWith > vampWithout && otherWith === otherWithout);
   delete Core.S.equips['eqc1']; delete Core.S.equips['eqc2']; delete Core.S.equips['eqc3']; delete Core.S.equips['eqc4'];
-  Core.S.equipped[war] = { weapon: null, armor: null, accessory: null };
-  Core.S.equipped[nonWar] = { weapon: null, armor: null, accessory: null };
+  Core.S.equipped[vamp] = { weapon: null, armor: null, accessory: null };
+  Core.S.equipped[other] = { weapon: null, armor: null, accessory: null };
 }
 
-// 26. 穿戴规则（canEquip）：职业套装限定位、专属限本人、槽位限角色类型
+// 26. 穿戴规则（canEquip）：血统套装/神装限同血统、专属限本人、槽位限角色类型
 {
-  const war = D.characters.find(c => c.kind === 'warrior').id;
-  const mage = D.characters.find(c => c.kind === 'mage').id;
-  if (!Core.S.chars[war]) Core.addChar(war);
+  const vamp = D.characters.find(c => c.bloodline === '血族').id;
+  const mage = D.characters.find(c => c.bloodline === '魔法').id;
+  if (!Core.S.chars[vamp]) Core.addChar(vamp);
   if (!Core.S.chars[mage]) Core.addChar(mage);
-  const classEq = { uid: 'x1', slot: 'weapon', classSet: 'mage' };
-  t('法师套装法师可穿', Core.canEquip(mage, classEq) === true);
-  t('法师套装战士不可穿', Core.canEquip(war, classEq) === false);
-  t('法师套装主角(战士)不可穿', Core.canEquip('@player', classEq) === false);
-  t('战士套装主角可穿', Core.canEquip('@player', { uid: 'x2', slot: 'weapon', classSet: 'warrior' }) === true);
-  t('专属装备限本人', Core.canEquip(war, { uid: 'x3', slot: 'weapon', charId: mage }) === false && Core.canEquip(mage, { uid: 'x3', slot: 'weapon', charId: mage }) === true);
-  t('招募角色也有头部槽（世界套装4/6件可达）', Core.canEquip(war, { uid: 'x4', slot: 'head' }) === true);
+  const bloodEq = { uid: 'x1', slot: 'weapon', bloodSet: '魔法' };
+  t('魔法套装魔法血统可穿', Core.canEquip(mage, bloodEq) === true);
+  t('魔法套装血族穿不上', Core.canEquip(vamp, bloodEq) === false);
+  if (!Core.S.player.bloodline) Core.choosePlayerBloodline('修真');   // 前面的用例可能换过档
+  const myBl = Core.S.player.bloodline;
+  t('主角穿不上别的血统的套装', Core.canEquip('@player', { uid: 'x1b', slot: 'weapon', bloodSet: myBl === '魔法' ? '血族' : '魔法' }) === false);
+  t('主角穿自己血统的套装可以', !!myBl && Core.canEquip('@player', { uid: 'x2', slot: 'weapon', bloodSet: myBl }) === true, myBl || '(主角没选血统)');
+  t('专属装备限本人', Core.canEquip(vamp, { uid: 'x3', slot: 'weapon', charId: mage }) === false && Core.canEquip(mage, { uid: 'x3', slot: 'weapon', charId: mage }) === true);
+  t('招募角色也有头部槽（世界套装4/6件可达）', Core.canEquip(vamp, { uid: 'x4', slot: 'head' }) === true);
   t('主角六槽全开', Core.canEquip('@player', { uid: 'x5', slot: 'head' }) === true);
-  t('equipItem 拒绝非本职业套装', Core.equipItem(war, (Core.S.equips['x1'] = Object.assign({ name: 't', rarity: 'SR', enhance: 0, base: {}, affixes: [], set: null }, classEq), 'x1')) === false);
+  t('equipItem 拒绝血统对不上的套装', Core.equipItem(vamp, (Core.S.equips['x1'] = Object.assign({ name: 't', rarity: 'SR', enhance: 0, base: {}, affixes: [], set: null }, bloodEq), 'x1')) === false);
   delete Core.S.equips['x1'];
 }
 
@@ -514,7 +516,7 @@ setParty(['C021']);
   Core.S.unlocks.enhance = true;   // 装备强化是通关 菌毯巢穴·第3关 之后才开的线
   Core.addItem('mat_t1', 5);
   const eq = Core.grantEquip('W01', 'SR', 'weapon').equip;
-  eq.enhance = 0; eq.set = null; eq.classSet = null;
+  eq.enhance = 0; eq.set = null; eq.bloodSet = null;
   Core.S.cur.points = 0; Core.S.cur.otherworld = 0;
   const r = Core.enhance(eq.uid);
   t('点数不足强化失败', r.ok === false && !r.fail);
@@ -966,14 +968,14 @@ setParty(['C021']);
   const slots = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
   slots.slice(0, 4).forEach(s => {
     const r = Core.grantEquip('W01', 'SR', s);
-    r.equip.set = 'W01'; r.equip.classSet = null; r.equip.affixes = [];
+    r.equip.set = 'W01'; r.equip.bloodSet = null; r.equip.affixes = [];
     Core.equipItem('C021', r.equip.uid);
   });
   const four = Core.effectiveStats('C021');
   t('招募角色能激活 4 件套（旧版永远不可达）', four.sets['W01'] === 4 && four.resPct > naked.resPct);
   slots.slice(4).forEach(s => {
     const r = Core.grantEquip('W01', 'SR', s);
-    r.equip.set = 'W01'; r.equip.classSet = null; r.equip.affixes = [];
+    r.equip.set = 'W01'; r.equip.bloodSet = null; r.equip.affixes = [];
     Core.equipItem('C021', r.equip.uid);
   });
   const six = Core.effectiveStats('C021');
@@ -1005,7 +1007,7 @@ setParty(['C021']);
   t('一键最优装备不会把同一件分给两个人', new Set(used).size === used.length);
   // 先确保 C021 有一件武器，再锁定它；然后塞一堆更好的武器，看一键最优会不会把它换走
   const w1 = Core.grantEquip('W03', 'SSR', 'weapon');
-  w1.equip.set = null; w1.equip.classSet = null; w1.equip.affixes = [];
+  w1.equip.set = null; w1.equip.bloodSet = null; w1.equip.affixes = [];
   Core.equipItem('C021', w1.equip.uid);
   Core.toggleEquipLock(w1.equip.uid);
   for (let i = 0; i < 6; i++) Core.grantEquip('W06', 'UR', 'weapon');
