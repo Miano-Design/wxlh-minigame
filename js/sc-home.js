@@ -15,103 +15,39 @@
      开局第一组 —— 逐项介绍**主角卡**（主线一「熟悉身体」就是这一步）。
      四行各讲一句，点一下听下一项（swallow：只推进、不跳页），
      最后一步要求**真的点开主角卡**——那才是主线一真正要的动作。 */
+  /* V9.6.56（父亲大人拍板：开场"大范围大概地引导一下"—— 只介绍角色卡 / 养成区 / 日常区，
+     详细怎么玩交给主线任务）：
+       · 只讲**首页这三块**，不再横跨到副本/招募/队伍（那是"跳来跳去、不知道干嘛"的根源）；
+       · 每步**必须点继续**才过（要＝强制），但**不要求点中目标** —— 只高亮 + 讲解，所以不会卡屏；
+       · 最后一句把人**交给主线**：后面每点一次「去完成」，就开那一步的详细指引。 */
   function coachHero() {
     const L = [
-      ['hero:0', '【境界】是你的修为阶段：每突破一阶全属性永久上涨，36 阶走满 +50.4%。突破在「成长 → 境界渡劫」。'],
-      ['hero:1', '【等级】升级会给你属性点和技能点 —— 这两样要自己去「主角卡」里分，不会自动加。'],
-      ['hero:2', '【主角】这一行就是提醒你还有多少点没分。数值是金色的，说明有事可做。'],
-      ['hero:3', '【转生】是把等级和世界进度重置、换永久天赋点 —— 中后期最主要的成长线。'],
+      ['hero:0', '① **角色卡**：你的身份和状态都在这 —— 境界（修为阶段）、等级、待分配的属性/技能点、转生次数。',
+        '点开这张卡，六维、技能、装备、血统、境界全在里面。', 'tut_blk1'],
+      ['open_party', '② **养成区**：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台…',
+        '前期不用全点，缺什么补什么；每条点进去都会有它自己的说明。', 'tut_blk2'],
+      ['open_bounty', '③ **日常区**：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。',
+        '有红点的就是"有东西可领"，别让它亮着。', 'tut_blk3'],
+      ['claim_quest', '**详细怎么玩，跟着主线走就行** —— 每点一次「去完成」，我都会带你做那一步。',
+        '下面这条就是主线：做完一步回来领奖励，接着下一步。', 'tut_blk4'],
     ];
-    L.forEach(function (x) { U.coach(x[0], x[1], { key: 'tut_hero_' + x[0], mustTap: true }); });
-    U.coach('open_protag', '最后：点开这张主角卡 —— 六维、技能、装备、血统、境界全在里面。',
-      { key: 'tut_hero_open', mustTap: true, swallow: false, queue: true, onDone: tourNext });
-  }
-
-  /* V9.6.36：**主线每一步 = 引导的一步**（父亲大人：合并成一套）。
-     一张表按"当前主线是哪一步 + 现在在哪一页"决定播哪组；每组只播一次（key 记存档），
-     所以老号第一次进这个模块时也会补上。旁白式、逐项、必须点中。 */
-  const TUT = {
-    q01:  { page: 'home',    run: coachHero },                       // 熟悉身体（逐项讲主角卡，已做）
-    q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
-    q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
-    /* q03（招募）/ q04（上阵）的引导**只在 TOUR 链里讲一次** —— 两处都写会把同一个动作教两遍（审计结论）。 */
-    q05:  { page: 'world',   s: ['stage:1'], t: '第 2 关开始出现多波敌人 —— 血量会继承，不会自动回满。' },
-    q06:  { page: 'world',   s: ['stage:2'], t: '第 3 关打完就解锁「装备强化」这条线，回头记得把装备拉一拉。' },
-        /* 审计修正：文案说的是"点一件装备"，锚点却只锚到"装备"这个标签 —— 指的按钮和说的动作对不上。
-       网页版那条锚的是 [data-eqd]（装备格）优先、标签兜底，这里对齐：先锚第一件装备（前缀），
-       没有装备时才落到标签上。 */
-    q07:  { page: 'bag',     s: ['eqd:*', 'bagview:equip'], t: '强化在这里：切到「装备」，点一件装备进去花材料强化。' },
-    q09:  { page: 'buildings', s: ['bup:*'], t: '建筑每升一级都是永久加成 —— 灯芯加挂机产出、训练室加经验、医疗室加离线效率；花的是挂机就能刷的点数。' },
-    q08:  { page: 'world',   s: ['stage:3'], t: '第 4 关是精英关：敌人更硬、掉落更好，打不动就先回首页收挂机收益。' },
-    q10:  { page: 'world',   s: ['stage:11'], t: '第 12 关是这一世界的守关 Boss —— 打完解锁下一个世界。' },
-    q11:  { page: 'corridor',s: ['corridor_fight'], t: '深井：一直往上打、没有重置。每 10 层给一枚深井印记，井内全属性加成。' },
-    q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
-  };
-  function coachByQuest(page) {
-    const cu = Core.currentQuest && Core.currentQuest();
-    const qid = cu && cu.q && cu.q.id;
-    const rule = qid && TUT[qid];
-    if (!rule || rule.page !== page) return false;
-    const key = 'tut_' + qid;
-    if (U.coachSeen(key)) return false;
-    if (rule.run) { rule.run(); return true; }
-    U.coach(rule.s, rule.t, { key: key, mustTap: true });
-    return true;
-  }
-
-  /* V9.6.37：**新解锁的功能也自动开指引**（父亲大人第 2 条：解锁时弹窗打断）。
-     判定方式是"这个模块已解锁 + 这一课没讲过"，所以：
-       · 新号刚解锁 → 第一次进这个模块就弹（并且是强制点中才算过）；
-       · 老号从没进过 → 进去同样补一次。
-     锚点可以写前缀（'bup:*' / 'eqd:*'），动态 id 也能锚。 */
-  const UNLOCK_GUIDE = {
-    recruit:  { page: 'recruit',  s: ['pull1:normal', 'pull1:normal:free'], t: '招募解锁了：每天有免费次数先用掉，抽到的伙伴记得去「队伍」上阵。' },
-    shop:     { page: 'shop',     s: ['shoptab:god'], t: '兑换大厅：四家店各用不同货币，日常用券和材料都在这儿补。' },
-    enhance:  { page: 'bag',      s: ['bagview:equip', 'eqd:*'], t: '装备强化解锁了：切到「装备」、点一件进去，花材料提升数值。' },
-    buildings:{ page: 'buildings',s: ['bup:*'], t: '基地建设：五栋建筑每升一级都是永久加成，花的是挂机就能刷的点数。' },
-    tasks:    { page: 'tasks',    s: ['tasktab:main'], t: '任务解锁了：主线 / 日常 / 周常 / 成就四个标签，做完记得回来领。' },
-    corridor: { page: 'corridor', s: ['corridor_fight'], t: '深井解锁了：一直往上打、没有重置，每 10 层给一枚印记加成。' },
-    bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗血统结晶 + 点数，每级全属性都涨。' },
-    /* 这三条的按钮都是**条件出现**的（能突破/够蛋/够条件才有 id）——
-       找不到目标时 drawCoach 会自动退回"点一下继续"，不会把人卡住。 */
-    geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是血统结晶。' },
-    beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
-    reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
-  };
-  function coachByUnlock(page) {
-    const ids = Object.keys(UNLOCK_GUIDE);
-    for (let i = 0; i < ids.length; i++) {
-      const id = ids[i], g = UNLOCK_GUIDE[id];
-      if (g.page !== page) continue;
-      if (!(Core.isUnlocked && Core.isUnlocked(id))) continue;
-      if (U.coachSeen('tut_unlock_' + id)) continue;
-      U.coach(g.s.length ? g.s : 'page_back', g.t, { key: 'tut_unlock_' + id, mustTap: g.s.length > 0 });
-      return true;
-    }
-    return false;
+    L.forEach(function (x) {
+      U.coach(x[0], x[1] + ' ' + x[2], { key: x[3], queue: true });   // 画布不认 \n，两句用空格接
+    });
   }
 
   /* V9.6.43（父亲大人："开局签订完契约选完系统后，就只能跟着指引先操作一遍，带着玩家整体操作一遍"）：
      把"一页一组"接成**一条链** —— 上一组走完自动进下一组，该换页就换页。
      每一步仍然可以「跳过这一步」（保命阀），但不会停在原地等人自己乱点。
      顺序：逐项讲主角卡 → 点开主角卡 → 回首页领主线奖励 → 去残域打第 1 关。 */
+  /* V9.6.56（父亲大人拍板）：开场**只讲首页三个区块**，不再横跨到副本/招募/队伍 ——
+     那些"详细怎么玩"全部交给主线任务（点「去完成」才开），
+     所以这里只剩这一条：进首页 → 播那三块 + 一句"跟主线走"。
+     要旧的多步链，看 TUT 表（主线步）与 UNLOCK_GUIDE（解锁指引）。 */
   const TOUR = [
-    { key: 'tour_hero',  page: 'home',    run: coachHero },
-    { key: 'tour_claim', page: 'home',    s: ['claim_quest', 'goto_quest'],
-      t: '这里是主线：每做完一步就能在这儿领奖励。以后跟着它走就不会迷路。' },
-    { key: 'tour_dun',   page: 'dungeon', s: ['w:W01'],
-      t: '主线让你打副本：进「残域」，点这个世界，再点第 1 关就开打。' },
-    { key: 'tour_world', page: 'world',   s: ['stage:0'],
-      t: '点第 1 关就开始 —— 一关要一口气打完所有波次，血量继承、不会自动回满。' },
-    /* V9.6.44：链子接着往下走 —— 打完回来领奖励 → 去招募 → 去队伍上阵。
-       这几步也是"进到对应页面且没讲过就播"，所以哪怕玩家中途退出，下次进那一页也会续上。 */
-    { key: 'tour_back',   page: 'home',    s: ['claim_all'],
-      t: '打完了？顺手点一下「收取奖励」—— 挂机一直在攒，你不领它不会自己进账。' },
-    { key: 'tour_rec',    page: 'recruit', s: ['pull1:normal', 'pull1:normal:free'],
-      t: '主线下一步要一名伙伴：每天有免费抽，先用掉 —— 免费抽也计入主线。' },
-    { key: 'tour_team',   page: 'party',   s: ['pslot:0', 'pslot:1', 'pslot:2'],
-      t: '抽到的伙伴来这儿上阵：点空格子放人；长按任意一格可以拖着换位置。' },
+    { key: 'tour_home', page: 'home', run: coachHero },
   ];
+
   /* 开场引导是否"进行中"：开始是 true（允许自动换页），全部走完变 false（此后绝不换页）。 */
   let tourRunning = false;
   function tourLeft() {
