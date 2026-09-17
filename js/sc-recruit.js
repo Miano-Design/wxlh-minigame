@@ -276,7 +276,7 @@
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(c.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
       CV.text(CV.fit(c.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text(CV.fit(c.role + ' · ' + c.faction, cw - 10 * CV.SCALE, CV.FS.sm), acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE,
+      CV.text(CV.fit(c.bloodline + ' · ' + c.faction, cw - 10 * CV.SCALE, CV.FS.sm), acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE,
         { size: CV.FS.sm, align: 'center', color: CV.C.dim });
       CV.hit('ssrpick:' + c.id, x, y, cw, ch);
     });

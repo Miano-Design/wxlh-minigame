@@ -331,7 +331,7 @@
           CV.round(x, y, cw, ch, 6 * CV.SCALE, mine ? CV.C.panel2 : '#00000022', mine ? rarColor(c.rarity) : CV.C.line);
           CV.text(mine ? c.name.slice(0, 2) : '？', x + cw / 2, y + 22 * CV.SCALE,
             { size: CV.FS.sm, align: 'center', color: mine ? rarColor(c.rarity) : CV.C.dim });
-          CV.text(mine ? c.role : c.rarity, x + cw / 2, y + 42 * CV.SCALE,
+          CV.text(mine ? c.bloodline : c.rarity, x + cw / 2, y + 42 * CV.SCALE,
             { size: CV.FS.xs, align: 'center', color: CV.C.dim });
           if (!mine) CV.text(c.rarity, x + cw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.dim });
         });

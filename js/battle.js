@@ -9,9 +9,10 @@ window.Battle = (function () {
      中毒只有回合开始的掉血飘字、眩晕只有一行"无法行动"，而**流血 / 虚弱 / 破防**连一个字都没有，
      只会觉得"怎么突然打不动了 / 怎么突然挨打更疼了"。这里统一走 applyStatus：
      状态真的挂上了就往帧里塞一条，界面飘一行状态名（被抗性挡掉就不飘，免得骗人）。 */
-  function applyStatus(target, frames, id, turns) {
+  /* extra：状态上的额外字段（V9.6.86 起用它带"施加者的攻击"，中毒/灼烧按它算伤害） */
+  function applyStatus(target, frames, id, turns, extra) {
     if (!target || target.hp <= 0) return false;
-    if (!addStatus(target, id, turns)) return false;
+    if (!addStatus(target, id, turns, extra)) return false;
     if (frames) frames.push({ type: 'status', target: target.uid, status: id });
     return true;
   }
@@ -251,7 +252,15 @@ window.Battle = (function () {
         if (u.hp <= 0) continue;
         for (const s of u.statuses) {
           if (s.id === 'poison' || s.id === 'burn') {
-            const dot = Math.max(1, Math.round(u.maxHp * (s.id === 'poison' ? 0.05 : 0.06)));
+            /* V9.6.86 修（本轮挖出来的最大一个坑）：中毒/灼烧原来按**目标最大生命 × 5%/6%** 掉血 ——
+               守关 Boss 有 1382 万血，一次 tick 就是 82 万，**一个会挂灼烧的法师两三轮就能把任何 Boss 烧穿**。
+               实测：一个 Lv.5、拿着本档装备的队伍靠这个把 36 张图全部打穿，整条难度曲线是假的。
+               现在改成按**施加者的攻击**算（50%/tick），并封顶在目标最大生命的 4%：
+                 · 打小怪：和以前差不多（不会因为它把前期变难）
+                 · 打 Boss：从 82 万/ tick 降到"法师攻击的一半（且不超过 Boss 的 4%）"，Boss 重新需要真打
+               施加者不明时（世界机制挂的中毒，施加者是敌人）退回目标最大生命 5%/6% —— 玩家这边的压力不变。 */
+            const base = s.srcAtk ? s.srcAtk * 0.50 : u.maxHp * (s.id === 'poison' ? 0.05 : 0.06);
+            const dot = Math.max(1, Math.min(Math.round(base), Math.round(u.maxHp * 0.04)));
             u.hp = Math.max(0, u.hp - dot);
             frames.push({ type: 'dot', target: u.uid, status: s.id, dmg: dot, killed: u.hp <= 0 });
           }
@@ -439,7 +448,7 @@ window.Battle = (function () {
     const hitMod = u.side === 'ally' ? (cfg.allyHitMod || 0) : 0;
     dealDamage(u, target, 1.0, { hitMod }, frames);
     if (u.side === 'enemy' && mech.onEnemyHit) mech.onEnemyHit(target, frames);
-    if (sb.poisonOnHit) applyStatus(target, frames, 'poison', sb.poisonOnHit);
+    if (sb.poisonOnHit) applyStatus(target, frames, 'poison', sb.poisonOnHit, { srcAtk: u.atk });
   }
 
   function castSkill(u, sk, idx, foes, friends, frames, mech, cfg, lvMult, isUlt) {
@@ -467,8 +476,8 @@ window.Battle = (function () {
               const st = sk.status;
               if (!st.chance || Math.random() < st.chance) {
                 // 技能挂状态同样要看得见（以前飘字/日志里一片安静，玩家只能靠"怎么打不动了"猜）
-                if (st.self) applyStatus(u, frames, st.id, st.turns);
-                else applyStatus(t, frames, st.id, st.turns);
+                if (st.self) applyStatus(u, frames, st.id, st.turns, { srcAtk: u.atk });
+                else applyStatus(t, frames, st.id, st.turns, { srcAtk: u.atk });
               }
             }
           });

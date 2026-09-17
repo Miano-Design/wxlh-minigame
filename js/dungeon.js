@@ -1,7 +1,8 @@
 /* 《残域》副本/关卡/深井：敌人编成、路线生成、奖励 */
 window.Dungeon = (function () {
   const D = window.DATA;
-  const THEME_FACTION = { bio: '先锋', ghost: '异能', mystic: '策略', tech: '科技', god: null };
+  /* 世界主题 → 敌人阵营（V9.6.86 跟着阵营改地名） */
+  const THEME_FACTION = { bio: '灰原', ghost: '幽都', mystic: '雾乡', tech: '锈港', god: null };
 
   function diffMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).mult; }
   function rewardMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).rewardMult; }

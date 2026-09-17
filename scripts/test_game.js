@@ -393,23 +393,23 @@ setParty(['C021']);
 {
   // 找一名血族与一名非血族
   const all = D.characters.map(c => c.id);
-  const vamp = all.find(id => D.charById[id].bloodline === '血族');
-  const other = all.find(id => D.charById[id].bloodline === '魔法');
+  const vamp = all.find(id => D.charById[id].bloodline === '狼人');
+  const other = all.find(id => D.charById[id].bloodline === '科技');
   Core.addChar(vamp); Core.addChar(other);
-  const mk = uid => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族', bloodWorld: 'W20' }; };
+  const mk = uid => { Core.S.equips[uid] = { uid, name: '狼人·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '狼人', bloodWorld: 'W20' }; };
   mk('eqc1'); mk('eqc2'); mk('eqc3'); mk('eqc4');
   Core.S.equips['eqc2'].slot = 'accessory';
   Core.S.equipped[vamp] = { weapon: 'eqc1', armor: null, accessory: 'eqc2' };
   const vampWith = Core.effectiveStats(vamp).atk;
   Core.S.equips['eqc1'].bloodSet = null; Core.S.equips['eqc2'].bloodSet = null;
   const vampWithout = Core.effectiveStats(vamp).atk;
-  Core.S.equips['eqc1'].bloodSet = '血族'; Core.S.equips['eqc2'].bloodSet = '血族';
+  Core.S.equips['eqc1'].bloodSet = '狼人'; Core.S.equips['eqc2'].bloodSet = '狼人';
   // 别的血统穿同样 2 件（血统对不上 → 不激活）
   Core.S.equipped[other] = { weapon: 'eqc3', armor: null, accessory: 'eqc4' };
   const otherWith = Core.effectiveStats(other).atk;
   Core.S.equips['eqc3'].bloodSet = null; Core.S.equips['eqc4'].bloodSet = null;
   const otherWithout = Core.effectiveStats(other).atk;
-  t('血统套装按"穿对人"激活', vampWith > vampWithout && otherWith === otherWithout);
+  t('血统套装按"穿对人"激活（狼人 2 件给攻击）', vampWith > vampWithout && otherWith === otherWithout);
   delete Core.S.equips['eqc1']; delete Core.S.equips['eqc2']; delete Core.S.equips['eqc3']; delete Core.S.equips['eqc4'];
   Core.S.equipped[vamp] = { weapon: null, armor: null, accessory: null };
   Core.S.equipped[other] = { weapon: null, armor: null, accessory: null };
@@ -418,17 +418,17 @@ setParty(['C021']);
 // 26. 穿戴规则（canEquip）：血统套装/神装限同血统、专属限本人、槽位限角色类型
 {
   const vamp = D.characters.find(c => c.bloodline === '血族').id;
-  const mage = D.characters.find(c => c.bloodline === '魔法').id;
+  const tech = D.characters.find(c => c.bloodline === '科技').id;
   if (!Core.S.chars[vamp]) Core.addChar(vamp);
-  if (!Core.S.chars[mage]) Core.addChar(mage);
-  const bloodEq = { uid: 'x1', slot: 'weapon', bloodSet: '魔法' };
-  t('魔法套装魔法血统可穿', Core.canEquip(mage, bloodEq) === true);
-  t('魔法套装血族穿不上', Core.canEquip(vamp, bloodEq) === false);
+  if (!Core.S.chars[tech]) Core.addChar(tech);
+  const bloodEq = { uid: 'x1', slot: 'weapon', bloodSet: '科技' };
+  t('科技套装科技血统可穿', Core.canEquip(tech, bloodEq) === true);
+  t('科技套装血族穿不上', Core.canEquip(vamp, bloodEq) === false);
   if (!Core.S.player.bloodline) Core.choosePlayerBloodline('修真');   // 前面的用例可能换过档
   const myBl = Core.S.player.bloodline;
-  t('主角穿不上别的血统的套装', Core.canEquip('@player', { uid: 'x1b', slot: 'weapon', bloodSet: myBl === '魔法' ? '血族' : '魔法' }) === false);
+  t('主角穿不上别的血统的套装', Core.canEquip('@player', { uid: 'x1b', slot: 'weapon', bloodSet: myBl === '科技' ? '血族' : '科技' }) === false);
   t('主角穿自己血统的套装可以', !!myBl && Core.canEquip('@player', { uid: 'x2', slot: 'weapon', bloodSet: myBl }) === true, myBl || '(主角没选血统)');
-  t('专属装备限本人', Core.canEquip(vamp, { uid: 'x3', slot: 'weapon', charId: mage }) === false && Core.canEquip(mage, { uid: 'x3', slot: 'weapon', charId: mage }) === true);
+  t('专属装备限本人', Core.canEquip(vamp, { uid: 'x3', slot: 'weapon', charId: tech }) === false && Core.canEquip(tech, { uid: 'x3', slot: 'weapon', charId: tech }) === true);
   t('招募角色也有头部槽（世界套装4/6件可达）', Core.canEquip(vamp, { uid: 'x4', slot: 'head' }) === true);
   t('主角六槽全开', Core.canEquip('@player', { uid: 'x5', slot: 'head' }) === true);
   t('equipItem 拒绝血统对不上的套装', Core.equipItem(vamp, (Core.S.equips['x1'] = Object.assign({ name: 't', rarity: 'SR', enhance: 0, base: {}, affixes: [], set: null }, bloodEq), 'x1')) === false);
@@ -1848,6 +1848,7 @@ setParty(['C021']);
   t('每个世界都有 3 档 Boss 血量', D.WORLDS.every(w => Array.isArray(w.bossHp) && w.bossHp.length === 3 && w.bossHp[0] > 0));
   // 血量严格递增；攻击允许小幅回落（有几个世界靠机制换强度，不是纯数值爬坡），但不能掉太多
   t('世界血量单调递增', (() => { for (let i = 1; i < D.WORLDS.length; i++) if (D.WORLDS[i].hp <= D.WORLDS[i - 1].hp) return false; return true; })());
+  t('守关 Boss 血量也单调递增（不能越往后越软）', (() => { for (let i = 1; i < D.WORLDS.length; i++) if (D.WORLDS[i].bossHp[0] <= D.WORLDS[i - 1].bossHp[0]) return false; return true; })());
   t('世界攻击整体向上（允许 ≤20% 回落）', (() => {
     let mx = 0;
     for (const w of D.WORLDS) { if (w.atk < mx * 0.8) return false; mx = Math.max(mx, w.atk); }
@@ -2631,6 +2632,48 @@ setParty(['C021']);
   }
   t('神装箱保底是传说（开不出传说以下的）', ur + my === 600, 'UR ' + ur + ' · MYTH ' + my + ' · 其它 ' + other);
   t('神装箱小概率出神话（≈15%，实测 8%~22%）', my / 600 >= 0.08 && my / 600 <= 0.22, (my / 600 * 100).toFixed(1) + '%');
+}
+
+/* ---- 数据一致性守卫（V9.6.86 加）：这一轮抓到两个"表里没有的值"藏在数据里 ----
+   ① 17 个角色的阵营写着「支援」，而 FACTIONS 只有四个 —— 他们吃不到克制环、也凑不出同乡阵型；
+   ② 11 个剑修角色的 kind 是 'saber'，而 KIND_NAMES 里没有这一项。
+   两个都不会报错，只是"悄悄少一块加成"。所以这里把"每个角色身上的枚举值都必须在表里"钉死。 */
+{
+  t('每个角色的血统都在血统表里', D.characters.every(c => !!D.BLOODLINES[c.bloodline]),
+    D.characters.filter(c => !D.BLOODLINES[c.bloodline]).map(c => c.name).join(',') || '✓');
+  t('每个角色的阵营都在阵营表里（不再有"支援"这种表外值）',
+    D.characters.every(c => D.FACTIONS.indexOf(c.faction) >= 0),
+    D.characters.filter(c => D.FACTIONS.indexOf(c.faction) < 0).map(c => c.name + ':' + c.faction).join(',') || '✓');
+  t('每个角色的战斗模板都在 ATK_ATTR / 表里认得出',
+    D.characters.every(c => c.kind && D.BLOODLINE_KIND[c.bloodline] === c.kind),
+    '血统与战斗模板必须一一对应');
+  /* 血统 = 定位：一支血统只能有一种战斗模板，六支血统的人数与高稀有度都要够玩家挑 */
+  const kindSet = {};
+  D.characters.forEach(c => { kindSet[c.bloodline] = kindSet[c.bloodline] || new Set(); kindSet[c.bloodline].add(c.kind); });
+  t('每支血统只有一种战斗模板（血统就是定位）',
+    Object.values(kindSet).every(st => st.size === 1), JSON.stringify(Object.entries(kindSet).map(([k, v]) => k + ':' + [...v])));
+  const urCount = {};
+  D.characters.forEach(c => { if (c.rarity === 'UR') urCount[c.bloodline] = (urCount[c.bloodline] || 0) + 1; });
+  t('每支血统都有 ≥2 个 UR（想练哪支都有能追的目标）',
+    Object.keys(D.BLOODLINES).every(bl => (urCount[bl] || 0) >= 2), JSON.stringify(urCount));
+  const ssrCount = {};
+  D.characters.forEach(c => { if (c.rarity === 'SSR') ssrCount[c.bloodline] = (ssrCount[c.bloodline] || 0) + 1; });
+  t('每支血统都有 ≥2 个 SSR', Object.keys(D.BLOODLINES).every(bl => (ssrCount[bl] || 0) >= 2), JSON.stringify(ssrCount));
+  /* 名字不能撞车：完全重名 0，且不能出现"一个名字是另一个的前缀"（零 / 零式那种） */
+  const names = D.characters.map(c => c.name);
+  t('伙伴没有完全重名', new Set(names).size === names.length);
+  t('伙伴名字没有"前缀关系"（零 / 零式 这类）', (() => {
+    for (const a of names) for (const b of names) if (a !== b && b.indexOf(a) === 0) return false;
+    return true;
+  })());
+  /* 血统套装的装备名要配血统（射手不能开出斧头） */
+  t('每支血统都有自己的一套装备名（射手出枪、肉盾出盾）',
+    Object.keys(D.BLOODLINES).every(bl => {
+      const n = D.BLOODLINE_EQUIP_NAMES[bl];
+      return n && n.weapon && n.weapon.length >= 2;
+    }));
+  t('血统套装的武器名不会串血统（科技=枪炮，不出现"镇魂铃"）',
+    D.BLOODLINE_EQUIP_NAMES['科技'].weapon.every(x => /枪|炮|弩|刃/.test(x)));
 }
 
 /* ---- 血统套装：第 10 张图起 · 每张图 × 每支血统各一套 · 按世界计件 · 2/4/6 激活 ----

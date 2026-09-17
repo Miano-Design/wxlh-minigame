@@ -237,6 +237,16 @@ window.Core = (function () {
     Object.values(S.equips || {}).forEach(e => {
       if (e && e.bloodSet && !e.bloodWorld) e.bloodWorld = D.WORLDS[Math.max(0, (D.BLOODLINE_MIN_WORLD || 10) - 1)].id;
     });
+    /* V9.6.86：血统体系改成"血统即定位"，**魔法血统被删掉**（成员并入修真）。
+       老存档里跟魔法血统有关的东西必须迁移，否则：主角的技能栏会指向一个不存在的血统（直接白屏级问题），
+       玩家的魔法套装件也永远凑不齐。 */
+    const BL_RENAME = { '魔法': '修真' };
+    if (S.player && BL_RENAME[S.player.bloodline]) S.player.bloodline = BL_RENAME[S.player.bloodline];
+    Object.values(S.equips || {}).forEach(e => {
+      if (!e) return;
+      if (e.bloodSet && BL_RENAME[e.bloodSet]) e.bloodSet = BL_RENAME[e.bloodSet];
+      if (e.godSet && BL_RENAME[e.godSet]) e.godSet = BL_RENAME[e.godSet];
+    });
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});

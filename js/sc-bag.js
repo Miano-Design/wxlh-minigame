@@ -588,7 +588,7 @@
       if (!ch) return;
       const c = S.chars[id];
       const bl = (c.bloodlineLv || 0) > 0 ? ch.bloodline : null;
-      rows.push({ id: id, name: ch.name, sub: 'Lv.' + c.lv + ' · ' + ch.role + ' · ' + (bl || '未觉醒血统'), bl: bl });
+      rows.push({ id: id, name: ch.name, sub: 'Lv.' + c.lv + ' · ' + (bl || '未觉醒血统'), bl: bl });
     });
     const usable = rows.filter(function (r) { return !sd.bloodline || r.bl === sd.bloodline; });
     if (!usable.length) {

@@ -77,7 +77,7 @@
           CV.text(CV.fit(Core.charName(id), cw - PAD * 2, CV.FS.lg, true), x + cw / 2, nameY, { size: CV.FS.lg, bold: true, align: 'center' });
           const meta = id === '@player'
             ? ('Lv.' + S.player.level + ' · 战力 ' + fmt(Core.playerPower()))
-            : ('Lv.' + S.chars[id].lv + ' · ' + (D.charById[id] || {}).role + ' · ' + (D.charById[id] || {}).faction);
+            : ('Lv.' + S.chars[id].lv + ' · ' + (D.charById[id] || {}).bloodline + ' · ' + (D.charById[id] || {}).faction);
           CV.text(CV.fit(meta, cw - PAD * 2, CV.FS.xs), x + cw / 2, nameY + NAME_LH / 2 + 4 * CV.SCALE + META_LH / 2,
             { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
           CV.hit('poke:' + i, x, y, cw, th);
@@ -150,7 +150,7 @@
         const top = U.y, h = 56 * CV.SCALE;
         avatar(id, 38 * CV.SCALE, U.ix() + 19 * CV.SCALE, top + h / 2);
         CV.text(Core.charName(id), U.ix() + 46 * CV.SCALE, top + 20 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text('Lv.' + c.lv + ' · ' + ch.role + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
+        CV.text('Lv.' + c.lv + ' · ' + ch.bloodline + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
           U.ix() + 46 * CV.SCALE, top + 38 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         CV.hit('set:' + id, U.ix(), top, U.iw(), h);
         U.y = top + h + 4 * CV.SCALE;
@@ -181,7 +181,7 @@
         const top = U.y, h = 56 * CV.SCALE;
         avatar(id, 38 * CV.SCALE, U.ix() + 19 * CV.SCALE, top + h / 2);
         CV.text(Core.charName(id), U.ix() + 46 * CV.SCALE, top + 20 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text('Lv.' + c.lv + ' · ' + ch.role + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
+        CV.text('Lv.' + c.lv + ' · ' + ch.bloodline + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
           U.ix() + 46 * CV.SCALE, top + 38 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         CV.hit('pickswap:' + id, U.ix(), top, U.iw(), h);
         U.y = top + h + 4 * CV.SCALE;
