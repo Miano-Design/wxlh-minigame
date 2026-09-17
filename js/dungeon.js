@@ -82,7 +82,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
   function battleRewards(worldId, diff, stage, kind) {
     const tier = D.WORLDS.findIndex(x => x.id === worldId) + 1;
     const rm = rewardMult(diff) * (1 + (stage - 1) * 0.08);
-    const base = { points: 0, exp: 0, story: 0, otherworld: 0, skillChip: 0, bloodCrystal: 0, equipChance: 0, equipMin: null };
+    const base = { points: 0, exp: 0, story: 0, otherworld: 0, skillChip: 0, bloodCrystal: 0, equipChance: 0 };
     if (kind === 'boss') {
       base.points = Math.round((500 + tier * 150) * rm);
       base.exp = Math.round((300 + tier * 80) * rm);
@@ -95,7 +95,10 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
          所以维持原值——不要凭半张表去改经济。 */
       base.bloodCrystal = diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5;
       base.equipChance = 1;
-      base.equipMin = diff === 'hell' ? 'SSR' : 'SR';
+      /* V9.6.78：这里原来写 `equipMin`（守关至少 SR/SSR）——那是**旧掉落表**的产物。
+         现在"这一段图的守关至少出什么档"写在 data.js 的 DROP_BLOCKS.bossMin 里，
+         和世界段一起维护（两处各写一份迟早对不上，实测已经因为跳过封顶导致 W01 出传说）。
+         概率也不再看难度另写一份表，统一由 rollEquipRarity(世界, 来源, 难度) 算。 */
       /* V9.6.76：第 21 张图起，守关 Boss 有概率掉**血统神装（神话）** ——
          末段真正的成长线在这里（见 data.js 的 GOD_SETS）。只给 Boss，不给杂兵/精英：
          "刷神话"该是一件有目标的事，不是刷两关就顺出来的货。 */
@@ -141,9 +144,11 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       && Core.S.worlds[worldId].stages[diff][stage]) || 0;
     const guarantee = (gRule && gStage === 0) ? gRule : null;
     if (guarantee || Math.random() < Math.min(1, r.equipChance * dropBoost)) {
-      const cap = D.stageDropCap(stage);
-      let rarity = guarantee ? guarantee.rarity : D.rollRarity(diff, r.equipMin);
-      if (!r.equipMin) rarity = D.capRarity(rarity, cap);   // Boss保底不受上限影响
+      /* V9.6.78：品质改由**世界段**决定（见 data.js 的 DROP_BLOCKS）——
+         世界序号 + 掉落来源（杂兵/精英/守关）+ 难度，三样一起算；
+         这一段图的上限（cap）是硬的，早期世界无论怎么打都出不了高档货。 */
+      const worldIdx = D.WORLDS.findIndex(x => x.id === worldId) + 1;
+      let rarity = guarantee ? guarantee.rarity : D.rollEquipRarity(worldIdx, kind, diff);
       if (r.mythChance && Math.random() < r.mythChance) rarity = 'MYTH';
       const res = Core.grantEquip(worldId, rarity, guarantee ? guarantee.slot : undefined);
       if (res.equip) got.push({ k: 'equip', v: res.equip });

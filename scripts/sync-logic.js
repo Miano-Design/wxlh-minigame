@@ -24,7 +24,9 @@ const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
 /* 测试与体检脚本：只同步"纯逻辑层"的那几份。
    balance_check / longrun_sim / world_curve 因为要 eval 网页版的 ui.js（界面层），
    路径已经改成读 ../wxlh-game，属于小游戏自己的副本 —— 再同步会把那行路径覆盖掉，所以不同步。 */
-const CHECKS = ['test_game.js', 'cap_audit.js'];
+/* drop_table.js 是"纯逻辑层"的尺子（只读 data.js + dungeon.js，不碰界面），
+   所以两边各留一份、跟着同步 —— 掉落表改完，网页版和小游戏看到的概率表必须是同一张。 */
+const CHECKS = ['test_game.js', 'cap_audit.js', 'drop_table.js'];
 
 let changed = 0, same = 0;
 const JOBS = [];

@@ -1741,11 +1741,6 @@ window.DATA = (function () {
   ];
 
   // 新手掉落保护：按关卡限制掉落品质上限
-  function stageDropCap(stage) {
-    if (stage <= 3) return 'R';
-    if (stage <= 6) return 'SR';
-    return null;
-  }
 
   /* ================= 转生天赋 ================= */
   // 2026-09-12 重构：每个节点写成「文案 + 效果」的对象，文案由效果派生，
@@ -1863,27 +1858,89 @@ window.DATA = (function () {
   });
 
   /* ================= 掉落稀有度 ================= */
-  const DROP_RARITY = {
-    normal: [['N', 0.45], ['R', 0.35], ['SR', 0.16], ['SSR', 0.035], ['UR', 0.005]],
-    hard:   [['N', 0.20], ['R', 0.35], ['SR', 0.30], ['SSR', 0.12], ['UR', 0.03]],
-    hell:   [['N', 0.05], ['R', 0.20], ['SR', 0.35], ['SSR', 0.30], ['UR', 0.10]],
-  };
-  function rollRarity(diff, minRarity) {
-    const table = DROP_RARITY[diff] || DROP_RARITY.normal;
-    let r = Math.random(), acc = 0, result = 'N';
-    for (const [rar, p] of table) { acc += p; if (r <= acc) { result = rar; break; } }
-    /* 比较用 **EQUIP_RARITIES**（装备自己的档位表）。
-       以前用的是 RARITIES（角色稀有度）—— 两张表前五项同名所以一直没露馅，
-       加了神话（MYTH）之后角色表里没有它，indexOf 会返回 -1，把最高档判成最低档。 */
-    if (minRarity && EQUIP_RARITIES.indexOf(result) < EQUIP_RARITIES.indexOf(minRarity)) result = minRarity;
-    return result;
+  /* ================= 装备掉落品质：**按世界段给表**（V9.6.78） =================
+     父亲大人："掉落概率你有写好吗？…不要你在第一个世界就有掉落神装的概率，那太不合理了，
+     神装是后期也算稀有的物品。"
+
+     旧表的问题（这次审查抓出来的）：它**只按难度分**，完全不看世界 ——
+     W01 的杂兵和 W20 的杂兵掉率一模一样；而守关 Boss 走"保底"通道时会**跳过关卡封顶**，
+     于是**第一个世界的守关 Boss 有 0.5% 直接掉传说（UR）**。第一个世界摸到顶级货，
+     后面的世界就没有期待了（跟"神装不该早期出"是同一个毛病）。
+
+     现在的规矩，三条：
+       ① **世界段定表**：这一段图里的杂兵能出什么，写在 DROP_BLOCKS 里，一段一条。
+       ② **种类抬档**：精英 = 整体上移一档，守关 Boss = 上移两档，且 Boss 有保底
+          （"这一段图的守关，至少出一件本段中档以上的货"）。
+       ③ **难度抬档**：困难再上移一档、地狱再上移两档。**但都封在本段的 cap 里** ——
+          所以 W01 就算打地狱也出不了紫装，规则一句话说清、也堵死了"早期摸顶级"。
+     ⚠ **神话（神装）根本不在这张表里**：它只从第 21 张图起的**守关 Boss** 按 mythChance 出
+       （见 dungeon.js）。所以杂兵、精英、任何早期世界，都不存在"掉神装"这条路。 */
+  const DROP_BLOCKS = [
+    { upTo: 2,  w: { N: 0.60, R: 0.40 },                              cap: 'R',   bossMin: 'R' },
+    { upTo: 5,  w: { N: 0.40, R: 0.45, SR: 0.15 },                    cap: 'SR',  bossMin: 'SR' },
+    { upTo: 9,  w: { N: 0.20, R: 0.44, SR: 0.32, SSR: 0.04 },         cap: 'SSR', bossMin: 'SR' },
+    { upTo: 13, w: { N: 0.06, R: 0.40, SR: 0.42, SSR: 0.11, UR: 0.01 }, cap: 'UR', bossMin: 'SSR' },
+    { upTo: 17, w: { R: 0.24, SR: 0.45, SSR: 0.27, UR: 0.04 },        cap: 'UR',  bossMin: 'SSR' },
+    { upTo: 20, w: { R: 0.14, SR: 0.42, SSR: 0.36, UR: 0.08 },        cap: 'UR',  bossMin: 'SSR' },
+    { upTo: 25, w: { R: 0.08, SR: 0.33, SSR: 0.45, UR: 0.14 },        cap: 'UR',  bossMin: 'UR' },
+    { upTo: 30, w: { R: 0.04, SR: 0.26, SSR: 0.50, UR: 0.20 },        cap: 'UR',  bossMin: 'UR' },
+    { upTo: 36, w: { SR: 0.20, SSR: 0.52, UR: 0.28 },                 cap: 'UR',  bossMin: 'UR' },
+  ];
+  function dropBlockOf(worldIdx) {
+    const i = Math.max(1, Math.floor(worldIdx) || 1);
+    return DROP_BLOCKS.find(b => i <= b.upTo) || DROP_BLOCKS[DROP_BLOCKS.length - 1];
   }
-  function capRarity(rar, cap) {
-    if (!cap) return rar;
-    const a = EQUIP_RARITIES.indexOf(rar), b = EQUIP_RARITIES.indexOf(cap);
-    if (a < 0 || b < 0) return rar;        // 表里没有的档位不参与封顶（别把神话封成普通）
-    return a > b ? cap : rar;
+  /* 权重整体上移 steps 档：每档搬 0.5 的比例上去、留 0.5 在原地；越界的并进 cap。
+     ⚠ 这个比例**量过**（scripts/drop_table.js 会把结果打出来）：0.75 时 W10 的守关
+       就有 35% 直接掉传说、"传说"这个词当场贬值；0.5 时是 20%，W18 才到 46%、W31 到 72%,
+       传说是一条**慢慢爬上来**的线，而不是过几张图就人手一件。 */
+  function shiftDropWeights(w, steps, cap) {
+    const order = EQUIP_RARITIES;
+    const capIdx = order.indexOf(cap);
+    let cur = Object.assign({}, w);
+    for (let s = 0; s < steps; s++) {
+      const next = {};
+      Object.entries(cur).forEach(([k, v]) => {
+        const i = Math.max(0, order.indexOf(k));
+        const up = order[Math.min(capIdx, i + 1)];
+        next[up] = (next[up] || 0) + v * 0.5;
+        next[k] = (next[k] || 0) + v * 0.5;
+      });
+      cur = next;
+    }
+    return cur;
   }
+  /* 世界序号（1 起）、掉落来源（normal|elite|boss）、难度 → **归一化后的概率表**。
+     抽品质和体检脚本都读它，保证"看到的表"就是"真在用的表"。
+     表里**永远没有 MYTH**（神话走 dungeon.js 的 mythChance，只给后期守关 Boss）。 */
+  function dropChancesOf(worldIdx, kind, diff) {
+    const b = dropBlockOf(worldIdx);
+    let steps = kind === 'boss' ? 2 : kind === 'elite' ? 1 : 0;
+    if (diff === 'hard') steps += 1;
+    else if (diff === 'hell') steps += 2;
+    const t = shiftDropWeights(b.w, steps, b.cap);
+    const total = Object.values(t).reduce((a, x) => a + x, 0) || 1;
+    const out = {};
+    EQUIP_RARITIES.forEach(r => { if (t[r]) out[r] = +(t[r] / total).toFixed(4); });
+    return { table: out, cap: b.cap, bossMin: b.bossMin };
+  }
+  function rollEquipRarity(worldIdx, kind, diff) {
+    const b = dropBlockOf(worldIdx);
+    const { table } = dropChancesOf(worldIdx, kind, diff);
+    const total = Object.values(table).reduce((a, x) => a + x, 0) || 1;
+    let r = Math.random() * total, acc = 0, out = Object.keys(b.w)[0];
+    for (const rar of EQUIP_RARITIES) {          // 固定档位顺序，保证结果可复现
+      const p = table[rar] || 0;
+      if (!p) continue;
+      acc += p;
+      if (r <= acc) { out = rar; break; }
+    }
+    const minIdx = EQUIP_RARITIES.indexOf(b.bossMin);
+    if (kind === 'boss' && EQUIP_RARITIES.indexOf(out) < minIdx) out = b.bossMin;   // 守关保底
+    return out;
+  }
+  /* 这一段图最高的掉落档（给界面/体检用；神话不在其中） */
+  function dropCapOf(worldIdx) { return dropBlockOf(worldIdx).cap; }
 
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
@@ -1921,8 +1978,8 @@ window.DATA = (function () {
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
     corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,
     CORRIDOR_MARK_STEP, CORRIDOR_MARK_CAP, CORRIDOR_MARK_PCT,
-    DROP_RARITY, rollRarity, capRarity,
-    UNLOCKS, MAIN_QUESTS, stageDropCap,
+    DROP_BLOCKS, dropBlockOf, rollEquipRarity, dropChancesOf, dropCapOf,
+    UNLOCKS, MAIN_QUESTS,
     CURRENCY_INFO, CODEX_REWARDS, enhanceMatTier, MAT_SUBSTITUTE_POINTS,
     GUIDE_CHAPTERS,
     SERUMS, serumById, SERUM_ITEM, SERUM_KEYS,

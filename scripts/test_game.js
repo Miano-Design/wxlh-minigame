@@ -137,15 +137,52 @@ t('主线q01b可完成', qs.find(x => x.q.id === 'q01b').done);
 t('主线q02可完成', qs.find(x => x.q.id === 'q02').done);
 t('领取主线', Core.claimQuest('q01').ok);
 
-// 9c. 新手掉落保护
+/* 9c. 掉落品质保护（V9.6.78 重写成"按世界段"的表之后，规则也跟着换）
+   旧那版是"随机一个品质、再用关卡上限压一次"，只看关卡、不看世界 —— 第一个世界的守关 Boss
+   能直接掉传说。现在断言的是三条能一句话讲清、也能被打破的规则。 */
 {
-  let high = 0;
-  for (let i = 0; i < 200; i++) {
-    const r = D.rollRarity('normal');
-    const capped = D.capRarity(r, D.stageDropCap(1));
-    if (D.RARITIES.indexOf(capped) > 1) high++;
+  const capIdx = id => D.EQUIP_RARITIES.indexOf(id);
+  let bad = 0;
+  for (let i = 0; i < 400; i++) {
+    if (capIdx(D.rollEquipRarity(1, 'boss', 'hell')) > capIdx('R')) bad++;      // W01 打地狱也不行
+    if (capIdx(D.rollEquipRarity(2, 'elite', 'hard')) > capIdx('R')) bad++;
   }
-  t('1-3关不掉SR以上', high === 0);
+  t('W01/W02 无论什么难度、什么来源，都出不了 SR 以上', bad === 0);
+  let myth = 0;
+  for (let i = 0; i < 600; i++) {
+    if (D.rollEquipRarity(1, 'boss', 'hell') === 'MYTH') myth++;
+    if (D.rollEquipRarity(20, 'boss', 'hell') === 'MYTH') myth++;
+    if (D.rollEquipRarity(36, 'normal', 'hell') === 'MYTH') myth++;
+  }
+  t('掉落表里根本没有神话（神话只走守关 Boss 的 mythChance，第 21 张图起）', myth === 0);
+  /* 世界越往后，掉落越好 —— 每一段的期望档位必须不低于前一段。
+     这里**算期望**而不是抽样（抽样 400 次会有 ±0.05 的抖动，把好规则误判成坏的）。 */
+  const expectIdx = (w, kind, diff) => {
+    const t = D.dropChancesOf(w, kind, diff).table;
+    return Object.entries(t).reduce((s, [r, p]) => s + capIdx(r) * p, 0);
+  };
+  let mono = true, prev = -1;
+  for (let w = 1; w <= D.WORLDS.length; w++) {
+    const e = expectIdx(w, 'normal', 'normal');
+    if (e < prev - 1e-9) mono = false;
+    prev = Math.max(prev, e);
+  }
+  t('掉落品质随世界单调不降（不会后面的图掉得更差）', mono);
+  t('精英比杂兵好，守关比精英好（每一段都成立）', (() => {
+    for (let w = 1; w <= D.WORLDS.length; w++) {
+      const a = expectIdx(w, 'normal', 'normal'), b = expectIdx(w, 'elite', 'normal'), c = expectIdx(w, 'boss', 'normal');
+      if (!(a <= b + 1e-9 && b <= c + 1e-9)) return false;
+    }
+    return true;
+  })());
+  t('难度越高掉得越好（普通 ≤ 困难 ≤ 地狱）', (() => {
+    for (let w = 1; w <= D.WORLDS.length; w++) {
+      const a = expectIdx(w, 'boss', 'normal'), b = expectIdx(w, 'boss', 'hard'), c = expectIdx(w, 'boss', 'hell');
+      if (!(a <= b + 1e-9 && b <= c + 1e-9)) return false;
+    }
+    return true;
+  })());
+  /* 注：真跑一遍掉落的测试放在**文件末尾**（那一块要 newGame，会把后面用例依赖的存档冲掉）。 */
 }
 
 // 10. 挂机
@@ -2503,6 +2540,26 @@ setParty(['C021']);
   t('主角穿满之后第 7 关不再保底', g7.got.filter(x => x.k === 'equip').length === 0);
   const again = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 0, 'combat'));
   t('重复刷已通关的关不再保底', again.got.filter(x => x.k === 'equip').length === 0);
+}
+
+/* ---- 掉落实跑（放最后：要 newGame，不冲掉前面用例依赖的存档） ----
+   V9.6.78 的教训：上面几条断言全在**表**上算，走不到 grantRewards 里那几行 ——
+   我把 `let rarity` 顺手改成 `const`，表全绿，但第 21 张图往后的守关一掉神话就抛异常，
+   是长线模拟先炸出来的。所以这里必须真的调一次结算（含神话那条分支）。 */
+{
+  Core.newGame(); Core.setPlayerName('掉落'); Core.choosePlayerBloodline('修真');
+  Core.S.bag.eqCap = 5000;
+  let threw = '', got = { total: 0, myth: 0 };
+  for (let i = 0; i < 400; i++) {
+    try {
+      const g = window.Dungeon.grantRewards('W21', 'normal', 12, 'boss');
+      const eq = (g.got || []).find(x => x.k === 'equip');
+      if (eq && eq.v) { got.total++; if (eq.v.rarity === 'MYTH') got.myth++; }
+    } catch (e) { threw = 'W21 守关：' + e.message; break; }
+    try { window.Dungeon.grantRewards('W01', 'hell', 12, 'boss'); } catch (e) { threw = 'W01 守关：' + e.message; break; }
+  }
+  t('结算掉落真跑：第 21 张图（含神话分支）与第 1 张图都不抛异常', !threw, threw || (got.total + ' 件'));
+  t('第 21 张图守关真的会掉神话（mythChance 是接上的）', got.myth > 0, got.myth + ' / ' + got.total);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
