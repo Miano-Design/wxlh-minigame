@@ -217,7 +217,9 @@
     U.card(function () {
       U.h3('五行相克');
       U.hint('⚔️金 克 🌿木　🌿木 克 ⛰️土　💧水 克 🔥火　🔥火 克 ⚔️金　⛰️土 克 💧水', 2 * CV.SCALE);
-      U.hint('各世界的属性：' + D.WORLDS.map((w) => w.name.slice(0, 2) + (D.worldElementIcon ? D.worldElementIcon(w.id) : '')).join(' · '), 4 * CV.SCALE);
+      /* V9.6.21 自审：`D.worldElementIcon` 不存在（外面 ? : 兜住了，图标一直是空的）
+         正确写法是 ELEMENT_ICON[worldElement(id)]。 */
+      U.hint('各世界的属性：' + D.WORLDS.map((w) => w.name.slice(0, 2) + (D.ELEMENT_ICON[D.worldElement(w.id)] || '')).join(' · '), 4 * CV.SCALE);
     });
   });
   CV.on('beast_hatch1', function () {

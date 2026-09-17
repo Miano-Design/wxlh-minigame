@@ -231,9 +231,15 @@
     CV.render();
   });
   CV.on('goto_quest', () => CV.toast('主线任务：点右侧按钮领取'));
+  /* V9.6.21（父亲大人："主线任务点领取奖励没反应"）：
+     原来调的是 `Core.claimMainQuest` —— **这个函数压根不存在**（core 只有 claimQuest(id)），
+     于是 `r` 一直是 undefined，只弹一句"已领取"、奖励根本没发，看着就像点了没反应。 */
   CV.on('claim_quest', function () {
-    const r = Core.claimMainQuest && Core.claimMainQuest();
-    CV.toast((r && r.msg) || '已领取');
+    const cu = Core.currentQuest && Core.currentQuest();
+    if (!cu || !cu.q) { CV.toast('主线已经走完了'); return; }
+    if (!cu.done) { CV.toast('这一步还没完成'); return; }
+    const r = Core.claimQuest(cu.q.id);
+    CV.toast((r && r.msg) || (r && r.ok ? '已领取' : '还没完成'));
     CV.render();
   });
   CV.on('open_party', function () { CV.push('party'); });

@@ -133,7 +133,10 @@
     cur = id;
     const maxStar = D.RARITY_MAXSTAR[ch.rarity];
     const cost = Core.levelCost(id);
-    const starCost = c.star < maxStar ? D.starCostOf ? D.starCostOf(c.star) : null : null;
+    /* V9.6.21 自审（幽灵接口）：原来写的是 `D.starCostOf(c.star)` —— 没这个函数，
+       外面用 ? : 兜住 → starCost 恒为 null → **升星按钮永远是灰的**（功能等于没了）。
+       正确来源是数据表 D.STAR_COST（core 的升星也是查它）。 */
+    const starCost = c.star < maxStar ? D.STAR_COST[c.star] : null;
     U.begin();
     /* 返回条（二级页左上角返回，照网页版 .page-head） */
     const bh = 40 * CV.SCALE;
