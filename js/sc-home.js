@@ -40,6 +40,20 @@
     { key: 'tut_blk4', page: 'home', target: ['claim_quest', 'goto_quest'], enter: true,
       text: '详细怎么玩，跟着主线走就行 —— 每点一次「去完成」，我都会带你做那一步。 下面这条就是主线：做完一步回来领奖励，接着下一步。' },
   ];
+  /* V9.6.69：首页那一行"还没解锁：…"点开要能看到"怎么解锁" —— 这里存一份当前未解锁的条目 */
+  let lockedEntries = [];
+  /* V9.6.69（资料 §7）：红点收敛 —— 一组里最多亮 2 个，多出来的收进标题的「+N」。
+     满屏红点＝没有红点：到处都亮，玩家反而看不出该先干哪件。 */
+  function trimDots(list) {
+    let shown = 0, hidden = 0;
+    const out = list.map(function (x) {
+      if (!x[4]) return x;
+      if (shown < 2) { shown++; return x; }
+      hidden++;
+      return [x[0], x[1], x[2], x[3], false];
+    });
+    return { list: out, hidden: hidden };
+  }
   function openingLeft() {
     const seen = Core.S.coachSeen || {};
     return OPENING.filter(function (s) { return !seen[s.key]; }).length;
@@ -128,7 +142,11 @@
     q01:  { page: 'protag',  s: ['attr_card'], key: 'tut_blk1x', t: '这是你的属性面板：升级得属性点和技能点，点 +1 分配，六维、技能、装备、血统都在这一页。' },
     q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
     q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
-    /* q03（招募）/ q04（上阵）的引导只在开场三区块里讲一次，不在主线里重复（审计结论）。 */
+    /* V9.6.69：q04「并肩作战」原来没有专门一条（只在开场讲过招募/队伍）——
+       父亲大人指的"第 5 步高亮只亮一小块"就是这一步。现在给它一条：锚点用**整块阵型区**
+       （party_board，两排五格），而不是某个格子或"前排"两个字。 */
+    q04:  { page: 'party',   s: ['party_board'], t: '上阵就在这块：点空格把伙伴放进去（共 5 格，主角占 1 格）。想换位置长按任意一格抓起、拖到别处松手。' },
+    /* q03（招募）的引导只在开场三区块里讲一次，不在主线里重复（审计结论）。 */
     q05:  { page: 'world',   s: ['stage:1'], t: '第 2 关开始出现多波敌人 —— 血量会继承，不会自动回满。' },
     q06:  { page: 'world',   s: ['stage:2'], t: '第 3 关打完就解锁「装备强化」这条线，回头记得把装备拉一拉。' },
     q07:  { page: 'bag',     s: ['eqd:*', 'bagview:equip'], t: '强化在这里：切到「装备」，点一件装备进去花材料强化。' },
@@ -255,6 +273,23 @@
     });
   };
 
+  /* 未解锁一览：名字 + **怎么解锁**（对应网页版「🔒 还没解锁的功能」弹窗） */
+  CV.register('locked', function () {
+    U.begin();
+    U.btn(U.pad(), U.y, 44 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
+    CV.text('还没解锁的功能', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    if (!lockedEntries.length) { U.hint('该解锁的都解锁了。', 4 * CV.SCALE); return; }
+    U.card(function () {
+      U.h3('🔒 一共 ' + lockedEntries.length + ' 项', '解锁条件都写在下面');
+      lockedEntries.forEach(function (x) {
+        U.listRow({ t1: x[1], t2: Core.unlockTip(x[3]) });
+      });
+    });
+    U.hint('点左上角返回首页，接着玩。', 4 * CV.SCALE);
+  });
+  CV.on('open_locked', function () { CV.push('locked'); });
+
   CV.register('home', function () {
     const S = Core.S;
     U.begin();
@@ -354,23 +389,36 @@
     ];
     U.sectionTitle('养成');
     U.tiles(growAll.filter((x) => !x[3] || Core.isUnlocked(x[3])), 3, 'grid:grow');
-    const locked = growAll.filter((x) => x[3] && !Core.isUnlocked(x[3])).map((x) => x[1]);
-    if (locked.length) { U.space(CV.SP[1]); U.hint('还没解锁：' + locked.join(' / ')); }
+    lockedEntries = growAll.filter((x) => x[3] && !Core.isUnlocked(x[3]));
+    const locked = lockedEntries.map((x) => x[1]);
+    /* V9.6.69（资料 §3「逐步披露，但要让玩家看到还能解锁什么」）：
+       未解锁的格子不铺出来（一屏灰的更乱），但这一行**可以点** —— 点开逐条写明怎么解锁。
+       和网页版同一套（那边是弹窗，这边推一个 locked 页）。 */
+    if (locked.length) {
+      U.space(CV.SP[1]);
+      const h = U.hint('还没解锁：' + locked.join(' / ') + '  ›', 0);
+      CV.hit('open_locked', U.ix() - 2, U.y - h, U.iw() + 4, h);
+    }
     /* 日常（网页版 .grid-title「日常」+ 六格；红点与"真的能领"同源） */
     U.space(CV.SP[2]);
     /* 网页版 .grid-title 的 margin 是 `var(--sp3) 2px var(--sp2)`：上 14 / 下 **10**。
        以前只推进了行高、没有下边距，标题跟下面那排卡片贴在一起了（父亲大人截图点出来的）。 */
     const gridTitleH = CV.FS.sm * 1.2;
-    CV.text('日常', U.pad() + 2, U.y + gridTitleH / 2, { size: CV.FS.sm, color: CV.C.dim, ls: 2 });   // .grid-title letter-spacing 2px
+    const dailyTitleY = U.y + gridTitleH / 2;
+    CV.text('日常', U.pad() + 2, dailyTitleY, { size: CV.FS.sm, color: CV.C.dim, ls: 2 });   // .grid-title letter-spacing 2px
     U.y += gridTitleH + CV.SP[1];
-    U.tiles([
+    /* V9.6.69（资料 §7「别让 HUD 到处是点」）：红点收敛 —— 一组里最多亮 2 个，多的收进标题的 +N */
+    const dailyList = trimDots([
       ['open_bounty', '限时悬赏', null, null, bountyDot],
       ['open_tasks', '每日任务', null, 'tasks', taskDot],
       ['open_ach', '成就', null, null, achDot],
       ['open_sign', '求签', null, null, signReady],
       ['open_recruit', '招募伙伴', null, 'recruit', freeDot],
       ['open_shop', '兑换大厅', null, 'shop'],
-    ].filter((x) => !x[3] || Core.isUnlocked(x[3])), 3, 'grid:daily');
+    ].filter((x) => !x[3] || Core.isUnlocked(x[3])));
+    if (dailyList.hidden) CV.text('+' + dailyList.hidden, U.pad() + U.cw(), dailyTitleY,
+      { size: CV.FS.xs, color: CV.C.gold, align: 'right' });
+    U.tiles(dailyList.list, 3, 'grid:daily');
     /* V9.6.7：这一行「全部养成线的总览在「执灯者 → 成长」。」网页版**没有** ——
        父亲大人的规矩是"主页只留功能名，非必要的注释都不要"，删掉。 */
     U.space(CV.SP[2]);

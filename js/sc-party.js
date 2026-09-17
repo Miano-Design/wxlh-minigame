@@ -47,6 +47,9 @@
       const gap = CV.SP[2], th = 115 * CV.SCALE;
       const PAD = 10 * CV.SCALE;
       const NAME_LH = 17.5 * CV.SCALE, META_LH = 15.4 * CV.SCALE;
+      /* V9.6.69（父亲大人："第 5 步的高亮框只亮一小块，应该是整个上阵区域"）：
+         阵型区登记一颗**整块**锚点（两排五格都在里面），引导要指"上阵区域"就指它。 */
+      const boardTop = U.y;
       const drawRow = function (label, slots) {
         const labelTop = U.y + 8 * CV.SCALE;
         CV.text(label, U.ix() + 2 * CV.SCALE, labelTop + 8 * CV.SCALE, { size: CV.FS.md, color: CV.C.dim });
@@ -84,6 +87,7 @@
       drawRow('前排', [0, 1]);
       drawRow('后排', [2, 3, 4]);
       U.y -= CV.SP[2];
+      CV.hit('party_board', U.pad(), boardTop - 8 * CV.SCALE, U.cw(), U.y - boardTop + 8 * CV.SCALE);
     });
 
     /* ② 编队预设（两排各三格，网页版 .btn-grid3） */

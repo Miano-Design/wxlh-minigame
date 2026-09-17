@@ -45,7 +45,9 @@
      现在卡片内统一走 U.ix()/U.iw()（内容左边界 / 内容宽），不在卡片里时等于屏幕内容区。 */
   /* 按钮尺寸（逐条对齐网页版 css）：.btn = min-height 2.75rem(44)・padding 0 18・字号 13；
      .btn.small = min-height 2.5rem(40)・padding 0 13・字号 12；.btn-row .btn 最小宽 5.375rem(86) 且**换行不截断**。 */
-  U.BTN_H = 44; U.BTN_SM = 40; U.BTN_MINW = 86;
+  /* V9.6.69（资料 §10：触控目标 ≥44×44 —— WCAG AAA / Apple HIG 同口径）：
+     小按钮原来是 40（×SCALE≈1.04 也只有 41.6px），手机上容易点不准 → 抬到 44。 */
+  U.BTN_H = 46; U.BTN_SM = 44; U.BTN_MINW = 86;
   U.inCard = false;
   U.inPad = () => (U.inCard ? CV.SP[2] : 0);
   U.ix = () => U.pad() + U.inPad();

@@ -253,7 +253,15 @@
       acts.push({ label: '› 下一关（' + (nw ? nw.name : nx.worldId) + ' ' + (nx.stageIdx + 1) + '/12）', style: 'primary', id: 'dun_next' });
     }
     run = null;
-    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过', rewards, acts, worldId: wid };
+    /* V9.6.69（资料 §4「让玩家觉得自己成功」）：首通给一次**看得见**的庆祝 ——
+       只加表现、不加资源；"人生第一次通关"那一次更明显，而且只放一次（落盘）。 */
+    const firstClear = !!(comp && comp.firstClearReward);
+    if (firstClear) {
+      const firstEver = !S.celebratedFirst;
+      if (firstEver) { S.celebratedFirst = true; Core.save(); }
+      setTimeout(function () { CV.toast(firstEver ? '🎉 第一次通关！干得漂亮' : '🎉 首通！'); }, 320);
+    }
+    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''), rewards, acts, worldId: wid };
   }
 
   function fightWave() {
