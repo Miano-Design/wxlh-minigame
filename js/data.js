@@ -1584,7 +1584,7 @@ window.DATA = (function () {
     { id: 'q08', name: '安身立命', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000 }, unlock: 'buildings,tasks',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[3] > 0 },
     { id: 'q09', name: '大兴土木', desc: '升级 1 次建筑', reward: { points: 2000 },
-      check: S => Object.values(S.buildings).some(lv => lv >= 2) },
+      check: S => Object.values(S.buildings).some(lv => lv >= 1) },   // V9.6.72：建筑从 0 级起，「升级 1 次」就是 ≥1（原来写 ≥2，得多升一级才认）
     { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, bloodCrystal: 100 }, unlock: 'geneLock,corridor',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
     { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { story: 100 },

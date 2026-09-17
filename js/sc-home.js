@@ -361,7 +361,10 @@
         CV.text(CV.fit('主线 · ' + q.q.name, textW, CV.FS.f1, true), U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
         CV.round(U.ix() + tw + 8 * CV.SCALE, top + 3 * CV.SCALE, tagW, 17 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
         CV.text(tag, U.ix() + tw + 8 * CV.SCALE + tagW / 2, top + 11.5 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
-        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + 29 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        /* V9.6.72（父亲大人："通关条件这一行小字注释吧，要符合实际"）：
+           desc 就是判定条件，原样写出来；check 和 desc 必须一致（网页版有审计规则⑥盯着）。 */
+        CV.text(CV.fit('完成条件：' + q.q.desc, textW, CV.FS.sm), U.ix(), top + 24 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + 39 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         U.btn(U.ix() + U.iw() - bw, top, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
       } else {
         CV.text('主线 · 已走完', U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
