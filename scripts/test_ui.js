@@ -1292,11 +1292,21 @@ t('手机适配：有窄屏 / 超窄屏 / 横屏矮屏三档断点', () => {
 t('文字不出格：卡片与关键文字行都有断行 / 省略兜底', () => {
   const css = fs.readFileSync('css/style.css', 'utf8');
   if (!/\.card,\s*\.panel\s*\{[^}]*overflow-wrap:\s*anywhere/.test(css)) throw new Error('卡片没有断词兜底');
-  ['.text-rows .row .rv', '.kv > span:last-child', '.pslot .pname', '.idle-line .il-r'].forEach(sel => {
+  ['.text-rows .row .rv', '.kv > span:last-child', '.pslot .pname'].forEach(sel => {
     const i = css.indexOf(sel);
     if (i < 0) throw new Error('缺规则：' + sel);
     if (!css.slice(i, i + 220).includes('text-overflow: ellipsis')) throw new Error(sel + ' 没有省略号兜底');
   });
+  /* V9.6.3（父亲大人）：【待领】单开一行之后不再裁切 —— 它要么能省略、要么能换行，
+     总之不许"挤在同一行里被裁掉"。 */
+  {
+    const i = css.indexOf('.idle-line .il-r');
+    if (i < 0) throw new Error('缺规则：.idle-line .il-r');
+    const seg = css.slice(i, i + 220);
+    if (!seg.includes('text-overflow: ellipsis') && !seg.includes('overflow-wrap: anywhere')) {
+      throw new Error('.idle-line .il-r 既没有省略号兜底、也没有换行兜底');
+    }
+  }
   if (!css.includes('flex-wrap: wrap')) throw new Error('按钮行没有换行兜底');
 });
 t('免费抽的结果页只有「返回」，用券/货币抽才有「继续招募」', () => {

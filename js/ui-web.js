@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.2';
+  const GAME_VER = '9.6.3';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -757,7 +757,11 @@ window.UI = (function () {
         <span class="il-k">【已挂】</span>
         <!-- V9.5.80：挂满上限时标一下"已满"，不然玩家会以为收益卡住了 -->
         <span class="il-v" id="idle-time">${formatDuration(bank.seconds)}${C().idleFull() ? ' <span class="tag">已满</span>' : ''}</span>
-        <span class="il-k" style="margin-left:auto">【待领】</span>
+      </div>
+      <!-- V9.6.3（父亲大人）：【待领】**单开一行** —— 以前和【已挂】挤在同一行，
+           窄屏（或收益项变多）时那几个数值会被挤到第二行、看着像断行。 -->
+      <div class="idle-line">
+        <span class="il-k">【待领】</span>
         <span class="il-r" id="idle-gains">${idleGainsText(bank)}</span>
       </div>
       <div class="idle-line idle-mini">

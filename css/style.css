@@ -716,7 +716,9 @@ body {
 .idle-line .il-s { color: var(--dim); font-size: var(--fs-sm); min-width: 0; }
 /* V9.5.13：这里以前还有一句 margin-left:auto，和「【待领】」标签上的 auto 撞在一起——
    两个 auto 把标签和数值顶开一大段。auto 只留标签那一个，数值紧跟标签（间距与【已挂】一致）。 */
-.idle-line .il-r { color: var(--dim); text-align: right; white-space: nowrap; font-size: var(--fs-md); min-width: 0; max-width: 78%; overflow: hidden; text-overflow: ellipsis; }
+/* V9.6.3（父亲大人）：【待领】单开一行之后，这一行整行都是它的 —— 不再限制 78% 宽度，
+   窄屏也不会被挤断行（数字多的时候自然换行，而不是被裁掉）。 */
+.idle-line .il-r { color: var(--dim); font-size: var(--fs-md); min-width: 0; overflow-wrap: anywhere; }
 
 /* ---------- 首页入口：纯文字方块（对标参考图的功能按钮） ---------- */
 /* 参考产品的按钮就是一个描边方块里写两个字：挂机 / 挑战 / 收取 / 排序 / 图鉴。

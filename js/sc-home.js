@@ -148,7 +148,7 @@
       const lh = 28 * CV.SCALE, top = U.y;
       const dim = CV.C.dim, txt = CV.C.dim;             // V9.5.28：这一块全部灰字
       const GAP = CV.SP[2];                             // .idle-line gap: var(--sp2)
-      /* 行 1：【挂机】 + ◈x.x/分 + （EXP…/离线…/上限…）—— 依次排开，不再写死坐标 */
+      /* 行 1：【挂机】 + ◈x.x/分 + （EXP…/离线…/上限…） */
       let x = U.ix();
       CV.text('【挂机】', x, top + lh / 2, { size: CV.FS.md, color: dim });
       x += CV.measure('【挂机】', CV.FS.md) + GAP;
@@ -157,7 +157,7 @@
       x += CV.measure(v1, CV.FS.md) + GAP;
       const s1 = 'EXP ' + r0.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h';
       CV.text(CV.fit(s1, U.ix() + U.iw() - x, CV.FS.sm), x, top + lh / 2, { size: CV.FS.sm, color: dim });
-      /* 行 2：【已挂】+ 时长 …… 右端「【待领】+ 收益」（网页版：待领标签带 margin-left:auto） */
+      /* 行 2：【已挂】+ 时长（网页版 V9.6.3 起把【待领】挪到单独一行，这里照做） */
       const y2 = top + lh;
       const dur = G.formatDuration ? G.formatDuration(bank.seconds) : (bank.seconds + '秒');
       const durTxt = dur + (Core.idleFull && Core.idleFull() ? '（已满）' : '');
@@ -165,27 +165,29 @@
       CV.text('【已挂】', x2, y2 + lh / 2, { size: CV.FS.md, color: dim });
       x2 += CV.measure('【已挂】', CV.FS.md) + GAP;
       CV.text(durTxt, x2, y2 + lh / 2, { size: CV.FS.md, color: txt });
+      /* 行 3：【待领】**单开一行**（父亲大人：窄屏就不会被挤断行了） */
+      const y3 = top + lh * 2;
       const gainTxt = '◈ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
         + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '') + (bank.story ? ' · ❖ ' + bank.story : '');
-      const gW = Math.min(CV.measure(gainTxt, CV.FS.md), U.iw() * 0.62);
-      CV.text(CV.fit(gainTxt, gW, CV.FS.md), U.ix() + U.iw(), y2 + lh / 2, { size: CV.FS.md, color: txt, align: 'right' });
-      const k2w = CV.measure('【待领】', CV.FS.md);
-      CV.text('【待领】', U.ix() + U.iw() - gW - GAP - k2w, y2 + lh / 2, { size: CV.FS.md, color: dim });
-      /* 行 3：【分工】+ 名单（长度按剩下的宽度截） */
-      const y3 = top + lh * 2;
-      CV.text('【分工】', U.ix(), y3 + lh / 2, { size: CV.FS.md, color: dim });
-      const x3 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
-      CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空')).join(' · '), U.ix() + U.iw() - x3, CV.FS.sm),
-        x3, y3 + lh / 2, { size: CV.FS.sm, color: dim });
+      let x3 = U.ix();
+      CV.text('【待领】', x3, y3 + lh / 2, { size: CV.FS.md, color: dim });
+      x3 += CV.measure('【待领】', CV.FS.md) + GAP;
+      CV.text(CV.fit(gainTxt, U.ix() + U.iw() - x3, CV.FS.md), x3, y3 + lh / 2, { size: CV.FS.md, color: txt });
+      /* 行 4：【分工】+ 名单 */
+      const y4 = top + lh * 3;
+      CV.text('【分工】', U.ix(), y4 + lh / 2, { size: CV.FS.md, color: dim });
+      const x4 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
+      CV.text(CV.fit(lines.map((l) => l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空')).join(' · '), U.ix() + U.iw() - x4, CV.FS.sm),
+        x4, y4 + lh / 2, { size: CV.FS.sm, color: dim });
       /* 行间虚线（网页版 .idle-line 的 border-bottom: 1px dashed） */
       CV.ctx.save();
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
-      [1, 2].forEach((i) => {
+      [1, 2, 3].forEach((i) => {
         CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + lh * i - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + lh * i - .5); CV.ctx.stroke();
       });
       CV.ctx.restore();
       // 两个按钮（网页版 .btn-row：左小右大，间距 10）
-      const by = top + lh * 3 + 8 * CV.SCALE, bh = 42 * CV.SCALE, gap = 10 * CV.SCALE;
+      const by = top + lh * 4 + 8 * CV.SCALE, bh = U.BTN_H * CV.SCALE, gap = 10 * CV.SCALE;
       const bw = (U.iw() - gap) * 0.42;
       U.btn(U.ix(), by, bw, bh, '派人分工', 'ghost', 'open_idlelines');
       U.btn(U.ix() + bw + gap, by, U.iw() - bw - gap, bh, '收取奖励', 'primary', 'claim_all');
