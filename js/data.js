@@ -1253,15 +1253,15 @@ window.DATA = (function () {
       push('stage', { world: target.w.id, diff: 'normal', stage: target.stage },
         `推进 · ${target.w.name}`,
         `通关「${target.w.name} · 普通」第 ${target.stage} 关`,
-        72, { holy: 400 + target.stage * 30, points: 8000 + target.stage * 1500, item: 'ticket_adv' });
+        12, { holy: 400 + target.stage * 30, points: 8000 + target.stage * 1500, item: 'ticket_adv' });
     }
     // 2) 等级：比当前高 5 级（每期都会往前推）
     const lvTarget = Math.max(10, lv + 5);
-    push('level', { n: lvTarget }, '修炼有成', `玩家等级到达 Lv.${lvTarget}`, 96,
+    push('level', { n: lvTarget }, '修炼有成', `玩家等级到达 Lv.${lvTarget}`, 24,
       { holy: 500, points: 20000 + lvTarget * 500, item: 'ticket_normal' });
     // 3) 强化：按已强化次数往上加
     const enhTarget = Math.max(10, Math.floor(((S.stats && S.stats.enhances) || 0) / 10) * 10 + 10);
-    push('enhance', { n: enhTarget }, '强化达人', `累计强化装备 ${enhTarget} 次`, 120,
+    push('enhance', { n: enhTarget }, '强化达人', `累计强化装备 ${enhTarget} 次`, 24,
       { otherworld: 200 + enhTarget * 10, holy: 400, item: 'ticket_adv' });
     // 4) 剩下一个位置按进度挑：图鉴 / 深井 / 伴生体 / 境界
     const owned = Object.keys(S.chars || {}).length;
@@ -1273,20 +1273,20 @@ window.DATA = (function () {
     const beasts = Object.keys((S.beast && S.beast.owned) || {}).length;
     const realm = (S.player && S.player.realm) || 0;
     if (best < 10) {
-      push('corridor', { n: 10 }, '深井初探', '深井到达第 10 层', 168,
+      push('corridor', { n: 10 }, '深井初探', '深井到达第 10 层', 36,
         { holy: 1200, bloodCrystal: 30 });
     } else if (ssrN < 3) {
-      push('ssr', { n: 3 }, '强者如林', '拥有 3 名 SSR 及以上伙伴', 168,
+      push('ssr', { n: 3 }, '强者如林', '拥有 3 名 SSR 及以上伙伴', 36,
         { holy: 1500, bloodCrystal: 40 });
     } else if (beasts < 3) {
-      push('beast', { n: 3 }, '兽栏初成', '孵化 3 只伴生体', 168,
+      push('beast', { n: 3 }, '兽栏初成', '孵化 3 只伴生体', 36,
         { holy: 1000, points: 60000 });
     } else if (realm < 1) {
-      push('realm', { n: 1 }, '初渡天劫', '完成第一次渡劫（突破到炼气）', 168,
+      push('realm', { n: 1 }, '初渡天劫', '完成第一次渡劫（突破到炼气）', 36,
         { holy: 1200, bloodCrystal: 30 });
     } else {
       const next = Math.min(60, owned + 3);
-      push('chars', { n: next }, '广纳英才', `拥有 ${next} 名伙伴`, 168,
+      push('chars', { n: next }, '广纳英才', `拥有 ${next} 名伙伴`, 36,
         { holy: 1500, points: 80000, item: 'ticket_lim' });
     }
     return out;
