@@ -2594,7 +2594,17 @@ setParty(['C021']);
   const boxNew = Core.boxSourceWorld();
   Core.S.worlds.W20 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
   const boxLate = Core.boxSourceWorld();
-  t('开箱档位跟进度走（新号 W01 · 打通 20 张图后 W20）', boxNew === 'W01' && boxLate === 'W20', boxNew + ' → ' + boxLate);
+  t('开箱档位跟进度走（新号 W01 · 走到第 20 张图就是 W20）', boxNew === 'W01' && boxLate === 'W20', boxNew + ' → ' + boxLate);
+  /* 父亲大人："以开箱时的当前进度为准，比如你 20 就开 20 的套装" ——
+     **已解锁**就算（不用先打通），走到第 25 张图没打完也该开 25 的货 */
+  Core.S.worlds.W25 = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  t('只要解锁了就算当前进度（第 25 张图没打通也开 25 的套装）', Core.boxSourceWorld() === 'W25', Core.boxSourceWorld());
+  /* 开箱出的装备要**真的带上那张图的世界套装**，而且多数是这套（不是随手一件普通装） */
+  Core.S.bag.eqCap = 9000;
+  Core.addItem('box_ur', 300);
+  let wentWorldSet = 0;
+  for (let i = 0; i < 300; i++) { const r = Core.openBox('box_ur'); if (r.equip && r.equip.set === 'W25') wentWorldSet++; }
+  t('箱子主要给"当前进度那张图的世界套装"（≥60%）', wentWorldSet >= 180, wentWorldSet + '/300 件是 W25 套装');
 
   /* ④ 血统神装箱：通关第 20 个世界才上架 · 保底传说 · 小概率神话 */
   Core.newGame(); Core.setPlayerName('神装箱'); Core.choosePlayerBloodline('修真');

@@ -1083,7 +1083,10 @@ window.Core = (function () {
   function factionBuffs(partyIds) { return formationState(partyIds); }
 
   /* ================= 装备操作 ================= */
-  function grantEquip(worldId, rarity, slot) {
+  /* opts.preferWorldSet：开箱专用 —— 世界套装的概率从 60% 抬到 80%
+     （父亲大人："箱子开出来的是那一张图的套装"，见 openBox） */
+  function grantEquip(worldId, rarity, slot, opts0) {
+    opts0 = opts0 || {};
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     const slots = slot ? [slot] : D.DROP_SLOTS;
     const s = slots[Math.floor(Math.random() * slots.length)];
@@ -1096,8 +1099,8 @@ window.Core = (function () {
        偏差给到七三，既照顾主力，又留着"别的血统也能刷出来"的空间。 */
     if (rarity === 'MYTH') opts = { setType: 'god', godSet: randomGodSet() };
     else if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
-    else if (rarity === 'SR') opts = roll < 0.7 ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
-    else if (rarity === 'SSR' || rarity === 'UR') opts = roll < 0.6 ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
+    else if (rarity === 'SR') opts = roll < (opts0.preferWorldSet ? 0.85 : 0.7) ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
+    else if (rarity === 'SSR' || rarity === 'UR') opts = roll < (opts0.preferWorldSet ? 0.8 : 0.6) ? { setType: 'world' } : { setType: 'class', classKind: randomKind() };
     const eq = D.makeEquip(worldId, s, rarity, uid, opts);
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
@@ -2669,22 +2672,25 @@ window.Core = (function () {
     const worldId = boxSourceWorld();
     let rarity = item.rarity;
     if (item.mythBox) rarity = Math.random() < 0.15 ? 'MYTH' : 'UR';   // 保底传说、小概率神话
-    const res = grantEquip(worldId, rarity);
+    /* V9.6.80（父亲大人："箱子开出来的世界套装以开箱时的当前进度为准，比如你 20 就开 20 的套装"）：
+       ① 档位 = 当前进度那张图（见 boxSourceWorld）；
+       ② 而且**主要出那张图的世界套装**（原来跟野外掉落同一套随机：60% 世界套装 / 40% 职业套装，
+          开箱的人往往就是冲着"这一段的套装"去的，所以箱子给到 80%）。 */
+    const res = grantEquip(worldId, rarity, undefined, { preferWorldSet: true });
     save();
     return { ok: true, equip: res.equip, sold: res.sold, gain: res.gain || 0 };
   }
-  /* 开箱按"你打到哪"给档位：取**已通关的最高世界**，没有通关的就取已解锁的最高世界。
-     这样新号的箱子还是新手装（合理），老号的箱子就是当前档位的货（合理）。 */
+  /* 开箱按"你打到哪"给档位 = **已解锁的最高世界**（父亲大人："以开箱时的当前进度为准"）。
+     注意是"已解锁"而不是"已通关"：走到第 20 张图里、哪怕还没打完，箱子也该开 20 的货。
+     新号还没解锁第二张图时给 W01，不会开出超前的东西。 */
   function boxSourceWorld() {
-    let cleared = null, unlocked = null;
+    let unlocked = null;
     D.WORLDS.forEach(w => {
       const st = S.worlds[w.id];
       if (!st || !st.unlocked) return;
       unlocked = w;
-      const arr = st.stages && st.stages.normal;
-      if (arr && arr.length && arr.every(x => x > 0)) cleared = w;
     });
-    return (cleared || unlocked || D.WORLDS[0]).id;
+    return (unlocked || D.WORLDS[0]).id;
   }
   // 批量开箱：逐个结算并汇总
   function openBoxes(itemId, n = 1) {
