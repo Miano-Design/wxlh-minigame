@@ -43,6 +43,9 @@
   /* V9.5.93（父亲大人："文字贴边"）：网页版 .card 有一圈 14px 内边距（padding: var(--sp3)），
      小游戏这边原来只画了卡片框、内容却按卡片边缘排 —— 所有卡片里的文字/按钮都贴着边框。
      现在卡片内统一走 U.ix()/U.iw()（内容左边界 / 内容宽），不在卡片里时等于屏幕内容区。 */
+  /* 按钮尺寸（逐条对齐网页版 css）：.btn = min-height 2.75rem(44)・padding 0 18・字号 13；
+     .btn.small = min-height 2.5rem(40)・padding 0 13・字号 12；.btn-row .btn 最小宽 5.375rem(86) 且**换行不截断**。 */
+  U.BTN_H = 44; U.BTN_SM = 40; U.BTN_MINW = 86;
   U.inCard = false;
   U.inPad = () => (U.inCard ? CV.SP[2] : 0);
   U.ix = () => U.pad() + U.inPad();
@@ -184,12 +187,23 @@
     list.forEach((t, i) => {
       const r = Math.floor(i / cols), c = i % cols;
       const x = U.ix() + c * (cellW + gap), y = startY + r * (th + gap);
+      /* t = [动作, 名字, 小字(可空), 解锁(可空), 红点] —— 和网页版 tile(x) 同一份结构。
+         V9.5.68（父亲大人）：主页格子里**只留功能名**；"有东西可领"改用红点表达。 */
+      const dot = t[4];
       draw(() => {
         CV.round(x, y, cellW, th, 6 * CV.SCALE, CV.C.panel, CV.C.line2);
         const inner = cellW - 12 * CV.SCALE;
         const hasSub = !!(t[2]);
         const cy = hasSub ? y + th / 2 - 7 * CV.SCALE : y + th / 2;
-        CV.text(CV.fit(t[1], inner, CV.FS.lg, true), x + cellW / 2, cy, { size: CV.FS.lg, bold: true, align: 'center' });
+        const nameW = CV.measure(t[1], CV.FS.lg, true);
+        const dotW = dot ? 10 * CV.SCALE : 0;
+        const tx = x + cellW / 2 - (nameW + dotW) / 2;
+        CV.text(CV.fit(t[1], inner - dotW, CV.FS.lg, true), tx, cy, { size: CV.FS.lg, bold: true });
+        if (dot) {                                    // 网页版 .tt-dot：6px 红点，跟在名字右边 4px
+          CV.ctx.beginPath();
+          CV.ctx.arc(tx + nameW + 4 * CV.SCALE + 3 * CV.SCALE, cy - 5 * CV.SCALE, 3 * CV.SCALE, 0, Math.PI * 2);
+          CV.ctx.fillStyle = CV.C.accent; CV.ctx.fill();
+        }
         if (hasSub) CV.text(CV.fit(t[2], inner, CV.FS.xs), x + cellW / 2, cy + 15 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
       });
       if (t[0]) CV.hit(t[0], x, y, cellW, th);
@@ -217,6 +231,7 @@
 
   /* ---------- 按钮 .btn（primary 红渐变 / gold / ghost；高度 44） ---------- */
   U.btn = function (x, y, w, h, label, style, id) {
+    h = h || U.BTN_H * CV.SCALE;
     const g = style === 'primary' ? CV.ctx.createLinearGradient(0, y, 0, y + h)
       : style === 'gold' ? CV.ctx.createLinearGradient(0, y, 0, y + h) : null;
     if (style === 'primary') { g.addColorStop(0, '#c9364a'); g.addColorStop(1, CV.C.accent2); }
@@ -225,16 +240,22 @@
     const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? '#e05a6d40' : style === 'gold' ? '#e6b64c44' : CV.C.line2);
     draw(() => {
       CV.round(x, y, w, h, CV.RADIUS_SM, fill, line);
-      CV.text(CV.fit(label, w - 12, CV.FS.lg), x + w / 2, y + h / 2,
-        { size: CV.FS.lg, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'gold' ? '#fdf3dc' : CV.C.text });
+      /* 长标签换行，不截断 —— 网页版 .btn-row .btn { white-space: normal; line-height: 1.25 } */
+      const size = h <= U.BTN_SM * CV.SCALE ? CV.FS.md : CV.FS.lg;
+      const lines = CV.wrap(label, w - 16 * CV.SCALE, size, 2);
+      const lh = size * 1.25;
+      lines.forEach(function (ln, i) {
+        CV.text(ln, x + w / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh,
+          { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'gold' ? '#fdf3dc' : CV.C.text });
+      });
     });
     if (id) CV.hit(id, x, y, w, h);
     return h;
   };
   /* 一行按钮（等分；网页版 .btn-row） */
   U.btnRow = function (list, gapIn) {
-    const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = 44 * CV.SCALE;
-    const w = (U.iw() - gap * (list.length - 1)) / list.length;
+    const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = U.BTN_H * CV.SCALE;
+    const w = Math.max((U.iw() - gap * (list.length - 1)) / list.length, 0);
     const top = U.y;
     list.forEach((b, i) => U.btn(U.ix() + i * (w + gap), top, w, h, b.label, b.style, b.id));
     U.y = top + h;

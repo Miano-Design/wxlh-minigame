@@ -17,7 +17,7 @@
 
   /* ---------- 世界卡（网页版 .world-card：图标 52 / 标题 / 小字 / 右箭头） ---------- */
   function worldCard(icon, title, sub, tag, id, dim) {
-    const h = 68 * CV.SCALE, top = U.y;
+    const h = 82 * CV.SCALE, top = U.y;      // 网页版 .world-card 实测 82（图标 52 + 上下内边距 14）
     const x = U.pad(), w = U.cw();
     /* 未解锁的世界：整张卡压暗（网页版 .world-card 加了 opacity:.45），不只是标题变灰 */
     if (dim) CV.ctx.globalAlpha = 0.45;
@@ -89,9 +89,9 @@
     U.begin();
     // 返回世界列表
     const backTxt = '‹ 返回世界列表';
-    const bw = CV.measure(backTxt, CV.FS.lg) + 22 * CV.SCALE;      // 按文字自适应，别把字截掉
-    U.btn(U.pad(), U.y, bw, 34 * CV.SCALE, backTxt, 'ghost', 'dun_back');
-    U.space(34 * CV.SCALE + CV.SP[1]);
+    const bw = CV.measure(backTxt, CV.FS.md) + 26 * CV.SCALE;      // .btn.small：左右 13px
+    U.btn(U.pad(), U.y, bw, U.BTN_SM * CV.SCALE, backTxt, 'ghost', 'dun_back');
+    U.space(U.BTN_SM * CV.SCALE + CV.SP[2]);                       // 按钮下 14（.btn margin-bottom）
     // 世界卡
     U.card(function () {
       U.h3(ICON[w.theme] + ' ' + w.name);
@@ -108,7 +108,7 @@
       disabled: d.id !== 'normal' && !Core.worldCleared(w.id, d.id === 'hard' ? 'normal' : 'hard'),
     }));
     {
-      const gap = 6 * CV.SCALE, h = 34 * CV.SCALE;
+      const gap = 6 * CV.SCALE, h = U.BTN_SM * CV.SCALE;
       const cw = (U.cw() - gap * (tabs.length - 1)) / tabs.length;
       const top = U.y;
       tabs.forEach((t, i) => {
@@ -139,7 +139,7 @@
         CV.round(x, y, cw, cw, 10 * CV.SCALE, done ? '#1d2b22' : CV.C.panel2,
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '👹' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
-          { size: isBoss ? 16 : CV.FS.f1, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
+          { size: isBoss ? 16 : 14 * CV.SCALE, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
         if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
         CV.ctx.globalAlpha = 1;
         if (unlocked) CV.hit('stage:' + i, x, y, cw, cw);
@@ -167,8 +167,8 @@
     const arr = (S.worlds[w.id] && S.worlds[w.id].stages[diff]) || [];
     const cleared = arr.map((s, i) => ({ s, i })).filter((x) => x.s > 0);
     U.begin();
-    U.btn(U.pad(), U.y, CV.measure('‹ 返回', CV.FS.lg) + 22 * CV.SCALE, 34 * CV.SCALE, '‹ 返回', 'ghost', 'sweep_back');
-    U.space(34 * CV.SCALE + CV.SP[1]);
+    U.btn(U.pad(), U.y, CV.measure('‹ 返回', CV.FS.md) + 26 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹ 返回', 'ghost', 'sweep_back');
+    U.space(U.BTN_SM * CV.SCALE + CV.SP[2]);
     U.card(function () {
       U.h3('扫荡', w.name + ' · ' + DIFF_NAME[diff]);
       U.kv('今日剩余次数', Core.sweepLeft() + ' / ' + Core.sweepCap());

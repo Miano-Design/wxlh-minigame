@@ -69,44 +69,52 @@
     const keji = D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0);
     const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
     const arena = Core.arenaState(), signSt = Core.signState();
+    /* V9.5.68（父亲大人）：主页格子里**啥小字都不要，只留功能名**——
+       小游戏这边原来照"状态小字"画了「1 人上阵 / Lv.0 / 0 级 / 第 1 台·剩 5 次 …」一屏小字，
+       和网页版已经不一样了。现在按网页版的 growBlock / dailyBlock 逐条对齐：
+       只有功能名；"有东西可领"用红点（悬赏可领 / 任务可领 / 成就有奖励 / 今天还没求签 / 免费抽可用）。 */
+    const achDot = Core.achievementSummary().list.filter((x) => x.done && !x.claimed).length > 0;
+    const signReady = !!signSt.canDraw;
+    const today = Core.todayState ? Core.todayState() : null;
+    const taskDot = !!(today && (today.dailyClaimable + today.weeklyClaimable > 0));
+    const bountyDot = Core.bountyState().claimable > 0;
+    const freeDot = Core.isUnlocked('recruit') && (Core.freeState('normal').ready || Core.freeState('advanced').ready);
     const growAll = [
-      ['open_party', '队伍', S.party.filter(Boolean).length + ' 人上阵'],
-      ['open_grow', '成长', '六条养成线总览'],
-      ['open_sect', '灯阁评级', 'Lv.' + sect.lv],
-      ['open_keji', '秘术阁', keji + ' 级'],
-      ['open_fabao', '法宝', Core.fabaoState().own.length ? Core.fabaoState().own.length + '/' + D.FABAO.length + ' 件' : '去挑一件'],
-      ['open_garden', '药园', Core.gardenState().filter((p) => p.plot).length + ' 块在用'],
-      ['open_arena', '斗法台', '第 ' + arena.floor + ' 台 · 剩 ' + arena.left + ' 次'],
-      ['open_mount', '坐骑', Core.mountState().own.length ? Core.mountState().own.length + '/' + D.MOUNTS.length + ' 匹' : '去驯一匹'],
-      ['open_refine', '炼化台', '装备材料炼血清'],
-      ['open_authority', '灯阁权限', 'Lv.' + au.lv + '/' + au.max, 'buildings'],
-      ['open_buildings', '基地建设', '合计 Lv.' + bLv, 'buildings'],
-      ['open_genelock', '铭刻', S.player.geneLock > 0 ? S.player.geneLock + ' 阶' : '未解锁', 'geneLock'],
-      ['open_beast', '伴生体', Object.keys(S.beast.owned || {}).length ? Object.keys(S.beast.owned || {}).length + ' 只' : '未孵化', 'beast'],
-      ['open_reincarn', '转生天赋', S.player.reincarnations + ' 世', 'reincarn'],
-      ['open_codex', '灯录', Core.codexState().owned + '/' + Core.codexState().total + ' 名', 'recruit'],
+      ['open_party', '队伍'],
+      ['open_grow', '成长'],
+      ['open_sect', '灯阁评级'],
+      ['open_keji', '秘术阁'],
+      ['open_fabao', '法宝'],
+      ['open_garden', '药园'],
+      ['open_arena', '斗法台'],
+      ['open_mount', '坐骑'],
+      ['open_refine', '炼化台'],
+      ['open_authority', '灯阁权限', null, 'buildings'],
+      ['open_buildings', '基地建设', null, 'buildings'],
+      ['open_genelock', '铭刻', null, 'geneLock'],
+      ['open_beast', '伴生体', null, 'beast'],
+      ['open_reincarn', '转生天赋', null, 'reincarn'],
+      ['open_codex', '灯录', null, 'recruit'],
     ];
     U.sectionTitle('养成');
     U.tiles(growAll.filter((x) => !x[3] || Core.isUnlocked(x[3])));
     const locked = growAll.filter((x) => x[3] && !Core.isUnlocked(x[3])).map((x) => x[1]);
     if (locked.length) { U.space(CV.SP[1]); U.hint('还没解锁：' + locked.join(' / ')); }
-    /* 日常（网页版 .grid-title「日常」+ 六格） */
+    /* 日常（网页版 .grid-title「日常」+ 六格；红点与"真的能领"同源） */
     U.space(CV.SP[2]);
     U.y += 16 * CV.SCALE;
-    CV.text('日常', U.pad() + 2, U.y - 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });   // .grid-title：左右各留 2
+    CV.text('日常', U.pad() + 2, U.y - 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
     U.tiles([
-      ['open_bounty', '限时悬赏', '按时重置'],
-      ['open_tasks', '每日任务', '主线 / 日常 / 周常', 'tasks'],
-      ['open_ach', '成就', '长线目标'],
-      ['open_sign', '求签', signSt.canDraw ? '今日还没求' : '今日【' + signSt.tier + '】'],
-      ['open_recruit', '招募伙伴', (function () {
-        const up = D.recruitUpChar();
-        return up ? '本期 UP：' + up.name + ' · ' + up.faction : '去招募伙伴';
-      })(), 'recruit'],
-      ['open_shop', '兑换大厅', '三档商店', 'shop'],
+      ['open_bounty', '限时悬赏', null, null, bountyDot],
+      ['open_tasks', '每日任务', null, 'tasks', taskDot],
+      ['open_ach', '成就', null, null, achDot],
+      ['open_sign', '求签', null, null, signReady],
+      ['open_recruit', '招募伙伴', null, 'recruit', freeDot],
+      ['open_shop', '兑换大厅', null, 'shop'],
     ].filter((x) => !x[3] || Core.isUnlocked(x[3])));
     U.space(CV.SP[2]);
     U.hint('全部养成线的总览在「执灯者 → 成长」。');
+    /* 游历奇遇出来时右侧带上这次奇遇的奖励（网页版 .rs） */
 
     /* ④ 游历（网页版 travelBlock：只有一个「游历奇遇」条） */
     U.sectionTitle('游历');
@@ -115,7 +123,10 @@
       const h = 44 * CV.SCALE, top = U.y, cy = top + h / 2;
       CV.text('【游历奇遇】', U.ix(), cy, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim });
       if (pend) {
-        CV.text(CV.fit(pend.name, U.iw() - 90 * CV.SCALE, CV.FS.md), U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.gold, align: 'right' });
+        const rw = Core.rewardTextOf(pend.effect);
+        const rwW = CV.measure(rw, CV.FS.sm) + 10 * CV.SCALE;
+        CV.text(CV.fit(pend.name, U.iw() - 100 * CV.SCALE - rwW, CV.FS.md), U.ix() + U.iw() - rwW, cy, { size: CV.FS.md, color: CV.C.gold, align: 'right' });
+        CV.text(CV.fit(rw, rwW, CV.FS.sm), U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
         CV.hit('claim_travel', U.pad(), top, U.cw(), h);
       } else {
         CV.text('距下一次 ' + Math.round(Math.max(0, prog.every - prog.sec)) + ' 秒', U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });

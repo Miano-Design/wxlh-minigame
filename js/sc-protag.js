@@ -26,8 +26,8 @@
       ['吸血', pc(st.lifesteal)],
     ];
     const red = Math.min(0.6, (st.resPct || 0) + (st.dmgReduce || 0));
-    if (red > 0) rows.push(['减伤', pc(red)]);
-    rows.push(['技能倍率', '×' + (st.skillMult || 1).toFixed(2)]);
+    rows.push(['减伤', pc(red)]);                                       // 网页版这一行永远在（0% 也显示）
+    rows.push(['技能加成', '+' + Math.round(((st.skillMult || 1) - 1) * 100) + '%']);
     return rows;
   }
 
@@ -85,10 +85,10 @@
         const n = (S.player.attrs && S.player.attrs[a.id]) || 0;
         const top = U.y;
         U.listRow({ t1: a.name + '  ' + a.desc, t2: '已分配 ' + n + ' 点 → +' + n * D.ATTR_POINT_VALUE, rightW: 110 * CV.SCALE });
-        const bw = 46 * CV.SCALE, bw2 = 52 * CV.SCALE, gap = 6 * CV.SCALE;
-        const by = top + (U.y - top) / 2 - 17 * CV.SCALE;
-        U.btn(U.ix() + U.iw() - bw - bw2 - gap, by, bw, 34 * CV.SCALE, '+1', 'ghost', has ? 'attr:' + a.id + ':1' : '');
-        U.btn(U.ix() + U.iw() - bw2, by, bw2, 34 * CV.SCALE, '+10', 'ghost', has ? 'attr:' + a.id + ':10' : '');
+        const bw = 52 * CV.SCALE, bw2 = 58 * CV.SCALE, gap = 6 * CV.SCALE;   // .btn.small：min-width 2.75rem
+        const by = top + (U.y - top) / 2 - 20 * CV.SCALE;
+        U.btn(U.ix() + U.iw() - bw - bw2 - gap, by, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', has ? 'attr:' + a.id + ':1' : '');
+        U.btn(U.ix() + U.iw() - bw2, by, bw2, U.BTN_SM * CV.SCALE, '+10', 'ghost', has ? 'attr:' + a.id + ':10' : '');
       });
     });
 
@@ -107,9 +107,9 @@
         const tw = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE;
         CV.round(U.ix() + nw + 6 * CV.SCALE, top + 1 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
         CV.text(tag, U.ix() + nw + 6 * CV.SCALE + tw / 2, top + 9 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
-        const bw = 40 * CV.SCALE;
+        const bw = 52 * CV.SCALE;
         const canUp = (S.player.skillPoints || 0) > 0 && lv < max;
-        U.btn(U.ix() + U.iw() - bw, top - 4 * CV.SCALE, bw, 30 * CV.SCALE, '+1', 'ghost', canUp ? 'pskill:' + i : '');
+        U.btn(U.ix() + U.iw() - bw, top - 10 * CV.SCALE, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', canUp ? 'pskill:' + i : '');
         U.y = top + 22 * CV.SCALE;
         U.hint(sk.desc || '', 0);
         U.space(CV.SP[1]);
@@ -134,6 +134,10 @@
           CV.text(CV.fit(e.name + ' +' + e.enhance, tw2 - 16 * CV.SCALE, CV.FS.md, true), x + tw2 / 2, y + th / 2 + 6 * CV.SCALE,
             { size: CV.FS.md, bold: true, align: 'center', color: rarColor(e.rarity) });
           CV.hit('eqd:' + eq[slot], x, y, tw2, th);
+          /* 每格右上角「卸下」（网页版 .eq-un，和装备卡同一套） */
+          /* 网页版 .eq-un：30×30 的卸下键，贴右上角 */
+          CV.hit('punequip:' + slot, x + tw2 - 34 * CV.SCALE, y, 34 * CV.SCALE, 30 * CV.SCALE);
+          CV.text('卸下', x + tw2 - 17 * CV.SCALE, y + 15 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
         } else {
           CV.text('未装备', x + tw2 / 2, y + th / 2 + 6 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
         }
@@ -179,6 +183,10 @@
     U.card(function () {
       U.h3('📊 属性面板', '装备 / 血统 / 境界 / 铭刻都已算进来');
       statRows(st).forEach(function (r) { U.kv(r[0], r[1]); });
+    });
+    /* ⑧ 修改名字（网页版主角详情最后一张卡） */
+    U.card(function () {
+      U.btnRow([{ label: '✏️ 修改名字', style: 'ghost', id: 'rename' }]);
     });
   });
 
@@ -230,6 +238,28 @@
       CV.toast(r.msg || '已觉醒');
       CV.render();
     });
+  });
+  Object.keys(D.EQUIP_SLOTS).forEach(function (slot) {
+    CV.on('punequip:' + slot, function () {
+      Core.unequipItem('@player', slot);
+      CV.toast('已卸下');
+      CV.render();
+    });
+  });
+  CV.on('rename', function () {
+    /* 网页版是一个居中小弹窗 + 输入框；小游戏用微信键盘改，改完写回存档 */
+    if (!(G.wx && G.wx.showKeyboard)) { CV.toast('这台设备不支持键盘输入'); return; }
+    try {
+      if (G.wx.onKeyboardConfirm) {
+        G.wx.onKeyboardConfirm(function (res) {
+          const v = String((res && res.value) || '').trim().slice(0, 12);
+          if (v) { Core.setPlayerName(v); CV.toast('名字已修改'); }
+          try { G.wx.hideKeyboard({}); } catch (e) {}
+          CV.render();
+        });
+      }
+      G.wx.showKeyboard({ defaultValue: Core.S.player.name, maxLength: 12, multiple: false, confirmType: 'done', fail: function () {} });
+    } catch (e) { CV.toast('打开键盘失败'); }
   });
   CV.on('autoeq_player', function () {
     const r = Core.autoEquipBest('@player');
