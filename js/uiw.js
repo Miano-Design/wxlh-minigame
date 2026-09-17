@@ -468,20 +468,23 @@
     /* V9.6.38（自审）：mustTap 但这次**没找到锚点**（目标按钮是条件出现的，比如
        "突破铭刻"只在能突破时才有）→ 必须退回"点一下继续"，否则玩家找不到可点的高亮、直接卡死。
        引导的第一原则是"不能把人卡住"，其次才是强制。 */
+    /* V9.6.41（父亲大人："跳过的按钮太大了，点高亮的地方那个小字没必要 ——
+       要么把小字换成'跳过这一步'"）：左边那颗大按钮去掉，
+       右下角那一行**本身就是**操作提示：强制的那条写「跳过这一步 ›」，
+       看到就过的那条写「点一下继续 ›」。 */
     const forced = coachState.mustTap && !!r;
-    CV.text(forced ? '点高亮的地方 ›' : '点一下继续 ›',
-      tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
+    const hint = forced ? '跳过这一步 ›' : '点一下继续 ›';
+    const hw = CV.measure(hint, CV.FS.sm) + 10 * CV.SCALE;
+    const hx = tx + tw - 14 * CV.SCALE - hw, hy = ty + th - 22 * CV.SCALE;
+    CV.text(hint, tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
       { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
     c.restore();
     CV.hitMode = 'screen';
-    /* mustTap 的那条**不铺全屏"随便点"**，只有一颗小小的"跳过这一步"
-       （父亲大人：完全强制 —— 但每一步仍然允许跳过，不然卡住就没救了）；
-       其它条维持"点一下继续"。 */
     if (forced) {
-      const sw = 76 * CV.SCALE, sh = 30 * CV.SCALE;
-      U.btn(tx, ty + th - sh - 6 * CV.SCALE, sw, sh, '跳过这一步', 'ghost', '_coach_ok');
+      /* 热区给足 44 高（手指点得准），但**画出来的只是一行小字** */
+      CV.hit('_coach_ok', hx - 8 * CV.SCALE, hy - 11 * CV.SCALE, hw + 16 * CV.SCALE, 44 * CV.SCALE);
     } else {
-      CV.hit('_coach_ok', 0, 0, CV.W, CV.H);
+      CV.hit('_coach_ok', 0, 0, CV.W, CV.H);     // 看到就过：点哪都算
     }
     CV.hitMode = 'content';
   };
