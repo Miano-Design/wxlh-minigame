@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.1';
+  const GAME_VER = '9.6.2';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -883,20 +883,23 @@ window.UI = (function () {
   function worldsList() {
     const S = C().S;
     const corridorLocked = !C().isUnlocked('corridor');
-    const corridor = `
-      <div class="card world-card ${corridorLocked ? 'locked' : ''}" data-act="open-corridor" style="cursor:pointer;border-color:#8be9e955;${corridorLocked ? 'opacity:.55' : ''}">
+    /* 深井同样是"没解锁就不显示" */
+    const corridor = corridorLocked ? '' : `
+      <div class="card world-card" data-act="open-corridor" style="cursor:pointer;border-color:#8be9e955">
         <div class="world-ico">♾</div>
         <div class="grow">
           <div class="t1">深井 <span class="tag">终局挑战</span></div>
-          <div class="t2">${corridorLocked ? '🔒 ' + C().unlockTip('corridor') : `当前第 ${S.corridor.floor} 层 · 历史最高 ${S.corridor.best} 层`}</div>
+          <div class="t2">当前第 ${S.corridor.floor} 层 · 历史最高 ${S.corridor.best} 层</div>
         </div>
         <span class="chev">›</span>
       </div>`;
-    const worlds = D.WORLDS.map((w, i) => {
+    /* V9.6.2（父亲大人）：**没解锁的世界不显示** —— 以前 20 个全列出来、未解锁的压暗加锁，
+       一屏全是"🔒 通关上一世界解锁"，既没用又碍眼。解锁一个出现一个。 */
+    const worlds = D.WORLDS.filter(w => S.worlds[w.id] && S.worlds[w.id].unlocked).map((w, i) => {
       const st = S.worlds[w.id];
-      const unlocked = st && st.unlocked;
-      const cleared = unlocked && st.stages.normal.every(s => s > 0);
-      const prog = unlocked ? st.stages.normal.filter(s => s > 0).length : 0;
+      const unlocked = true;
+      const cleared = st.stages.normal.every(s => s > 0);
+      const prog = st.stages.normal.filter(s => s > 0).length;
       return `
       <div class="card world-card" data-world="${w.id}" style="cursor:pointer;${unlocked ? '' : 'opacity:.45'}">
         <div class="world-ico">${WORLD_ICONS[w.theme]}</div>
@@ -919,7 +922,8 @@ window.UI = (function () {
         </div>
       </div>`;
     })() : '';
-    return `${resume}<div class="section-title">深井挑战</div>${corridor}<div class="section-title">残域（${D.WORLDS.length}）</div>${worlds}`;
+    const worldCount = D.WORLDS.filter(w => S.worlds[w.id] && S.worlds[w.id].unlocked).length;
+    return `${resume}${corridorLocked ? '' : '<div class="section-title">深井挑战</div>'}${corridor}<div class="section-title">残域（${worldCount}/${D.WORLDS.length}）</div>${worlds}`;
   }
   function worldDetail() {
     const S = C().S;

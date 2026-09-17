@@ -55,14 +55,18 @@
 
   /* ---------- 卡片 .card（bg --panel / 边 --line / 圆角 10 / 内边距 14 / 下边距 14）
      传一个画内容的函数：它按"内容游标"往下画，卡片底由这里先量后画。 ---------- */
-  U.card = function (content) {
-    const pad = CV.SP[2], top = U.y, outer = U.inCard;
+  /* opt.padY：纵向内边距（默认 14，和网页版 .card 一致）。
+     网页版有几张卡是"贴边卡"（比如首页游历条 padding: 2px 14px / 挂机卡 4px 14px 14px），
+     纵向内边距明显更小 —— 用同一个 14 会让卡片白白高一截。 */
+  U.card = function (content, opt) {
+    const pad = CV.SP[2], padY = (opt && opt.padY !== undefined) ? opt.padY * CV.SCALE : pad;
+    const top = U.y, outer = U.inCard;
     U.inCard = true;
-    U.dry = true; U.y = top + pad; content(); const inner = U.y - top - pad;
+    U.dry = true; U.y = top + padY; content(); const inner = U.y - top - padY;
     U.dry = false;
-    const h = inner + pad * 2;
+    const h = inner + padY * 2;
     if (h > 4) CV.card(U.pad(), top, U.cw(), h);
-    U.y = top + pad; content();
+    U.y = top + padY; content();
     U.inCard = outer;
     U.y = top + h + CV.SP[2];
     U.lastBottom = CV.SP[2];

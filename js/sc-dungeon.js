@@ -60,22 +60,25 @@
         ]);
       });
     }
-    /* 深井挑战 */
-    U.sectionTitle('深井挑战');
+    /* 深井挑战：同样"没解锁就不显示"（父亲大人：还没解锁的地图先隐藏，解锁了再出现） */
     const corridorLocked = !Core.isUnlocked('corridor');
-    worldCard('♾', '深井', corridorLocked ? '🔒 ' + Core.unlockTip('corridor')
-      : ('当前第 ' + S.corridor.floor + ' 层 · 历史最高 ' + S.corridor.best + ' 层'),
-      '终局挑战', 'open_corridor', corridorLocked);
-    /* 残域：20 个世界 */
-    U.sectionTitle('残域（' + D.WORLDS.length + '）');
-    D.WORLDS.forEach((w) => {
+    if (!corridorLocked) {
+      U.sectionTitle('深井挑战');
+      worldCard('♾', '深井', '当前第 ' + S.corridor.floor + ' 层 · 历史最高 ' + S.corridor.best + ' 层',
+        '终局挑战', 'open_corridor', false);
+    }
+    /* 残域：**只列已解锁的世界**（V9.6.2 父亲大人："还没解锁的地图就别显示，等解锁了再显示"）——
+       以前把 20 个全列出来、未解锁的压暗加锁，一屏全是"🔒 通关上一世界解锁"，既没用又碍眼。 */
+    const worldList = D.WORLDS.filter((w) => S.worlds[w.id] && S.worlds[w.id].unlocked);
+    U.sectionTitle('残域（' + worldList.length + '/' + D.WORLDS.length + '）');
+    worldList.forEach((w) => {
       const st = S.worlds[w.id];
-      const unlocked = !!(st && st.unlocked);
-      const cleared = unlocked && st.stages.normal.every((s) => s > 0);
-      const prog = unlocked ? st.stages.normal.filter((s) => s > 0).length : 0;
+      const unlocked = true;
+      const cleared = st.stages.normal.every((s) => s > 0);
+      const prog = st.stages.normal.filter((s) => s > 0).length;
       worldCard(ICON[w.theme] || '⚔', w.name,
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
-        cleared ? '已通关' : '', 'w:' + w.id, !unlocked);
+        cleared ? '已通关' : '', 'w:' + w.id, false);
     });
   });
 

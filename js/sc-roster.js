@@ -102,9 +102,15 @@
       U.hint(Object.keys(Core.S.chars).length ? '没有符合条件的伙伴' : '还没有招募到任何伙伴');
       return;
     }
+    /* V9.6.2（父亲大人："执灯者这一排的卡片里内容还是很拥挤"）：按网页版 .char-card 实测重排 ——
+       卡片 **140 高**（原来 122）、内边距 10、头像 46 且下面留 6、名字 13 → 星级 11 → 两行小字 11，
+       每一行紧接上一行（网页版实测：头像 46 + 6 + 名字 18.5 + 星级 15 + 2 + 小字 15 + 2 + 小字 15 = 119.5）。
+       "上阵"角标也按网页版 .inparty：右上角 3/3、左右 5px、11 号字。 */
     const cols = 3, g2 = 10 * CV.SCALE;
     const cw = (U.cw() - g2 * (cols - 1)) / cols;
-    const ch = 122 * CV.SCALE;
+    const ch = 140 * CV.SCALE;
+    const PAD = 10 * CV.SCALE, AV = 46 * CV.SCALE, AV_GAP = 6 * CV.SCALE;
+    const NAME_H = 18.5 * CV.SCALE, SMALL_H = 15 * CV.SCALE;
     const y0 = U.y;
     list.forEach((id, i) => {
       const cx = U.pad() + (i % cols) * (cw + g2), cy = y0 + Math.floor(i / cols) * (ch + g2);
@@ -112,23 +118,30 @@
       const ch0 = D.charById[id], c0 = Core.S.chars[id];
       CV.round(cx, cy, cw, ch, 12 * CV.SCALE, CV.C.panel2, rarColor(ch0.rarity));
       if (isP) {
-        const tw = CV.measure('上阵', CV.FS.xs) + 10 * CV.SCALE;
-        CV.round(cx + cw - tw - 4 * CV.SCALE, cy + 4 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, CV.C.accent);
-        CV.text('上阵', cx + cw - tw / 2 - 4 * CV.SCALE, cy + 12 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#fff' });
+        const tw = CV.measure('上阵', CV.FS.xs) + 10 * CV.SCALE;   // .inparty：padding 1px 5px
+        CV.round(cx + cw - tw - 3 * CV.SCALE, cy + 3 * CV.SCALE, tw, 17 * CV.SCALE, 6 * CV.SCALE, CV.C.accent);
+        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#fff' });
       }
-      // 头像
-      const asz = 46 * CV.SCALE, acx = cx + cw / 2;
-      CV.ctx.beginPath(); CV.ctx.arc(acx, cy + 10 * CV.SCALE + asz / 2, asz / 2, 0, Math.PI * 2);
+      /* 头像 → 名字 → 星级 → 两行小字：每一行的中心都按"上一行结束处"往下推（网页版顺序） */
+      const acx = cx + cw / 2;
+      let ly = cy + PAD;                                  // 内容区顶部
+      const avCy = ly + AV / 2;
+      CV.ctx.beginPath(); CV.ctx.arc(acx, avCy, AV / 2, 0, Math.PI * 2);
       CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = rarColor(ch0.rarity); CV.ctx.stroke();
-      CV.text(nm(id).slice(0, 1), acx, cy + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: rarColor(ch0.rarity) });
-      // 名字 / 星级 / 两行状态
-      CV.text(CV.fit(nm(id), cw - 12 * CV.SCALE, CV.FS.lg, true), acx, cy + 68 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text('★'.repeat(c0.star) + '☆'.repeat(Math.max(0, D.RARITY_MAXSTAR[ch0.rarity] - c0.star)), acx, cy + 84 * CV.SCALE,
+      CV.text(nm(id).slice(0, 1), acx, avCy, { size: AV * 0.44, bold: true, align: 'center', color: rarColor(ch0.rarity) });
+      ly += AV + AV_GAP;
+      CV.text(CV.fit(nm(id), cw - PAD * 2, CV.FS.lg, true), acx, ly + NAME_H / 2, { size: CV.FS.lg, bold: true, align: 'center' });
+      ly += NAME_H;
+      CV.text('★'.repeat(c0.star) + '☆'.repeat(Math.max(0, D.RARITY_MAXSTAR[ch0.rarity] - c0.star)), acx, ly + SMALL_H / 2,
         { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
-      CV.text('Lv.' + c0.lv + ' · 战力 ' + fmt(Core.power(id)), acx, cy + 99 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+      ly += SMALL_H + 2 * CV.SCALE;
+      CV.text('Lv.' + c0.lv + ' · 战力 ' + fmt(Core.power(id)), acx, ly + SMALL_H / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+      ly += SMALL_H + 2 * CV.SCALE;
       const eqn = eqCount(id);
-      CV.text(eqn ? '装备 ' + eqn + '/6' : '未穿装备', acx, cy + 113 * CV.SCALE, { size: CV.FS.xs, color: eqn ? CV.C.dim : CV.C.gold, align: 'center' });
+      const upable = !!Core.levelCost(id);
+      CV.text((eqn ? '装备 ' + eqn + '/6' : '未穿装备') + (upable ? ' · 可升级' : ''), acx, ly + SMALL_H / 2,
+        { size: CV.FS.xs, color: eqn ? CV.C.dim : CV.C.gold, align: 'center' });
       CV.hit('char:' + id, cx, cy, cw, ch);
       CV.on('char:' + id, function () { CV.push('char', { id: id }); });   // 点卡片进详情
     });

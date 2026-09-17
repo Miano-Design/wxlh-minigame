@@ -83,6 +83,7 @@
     clearTimer();
     B.on = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {};
     B.speed = (Core.S.settings && Core.S.settings.speed) || 1;
+    CV.battleSpeed = B.speed;
     B.title = cfg.title || '战斗';
     CV.reset('battle', { title: B.title });
   }
@@ -248,7 +249,10 @@
     const CARD_H = 92 * CV.SCALE;                 // 一张单位卡的高度（头像 + 名字 + 血条 + 百分比）
     const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 我方前排与后排的间距（和网页版 .b-side gap 一致）
-    const FIELD_BOTTOM = CV.H - CV.NAV_H - CV.safeBottom - LOG_H;
+    /* V9.6.2（父亲大人："战斗日志还是出画了"）：这里是**内容坐标**（渲染时已经被顶栏整体下移），
+       所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
+    const CONTENT_H = CV.H - CV.safeBottom - (CV.TOP + 8) - 8;
+    const FIELD_BOTTOM = CONTENT_H - LOG_H;
     /* V9.6.1（父亲大人给的批注）：中间那块不能是空的 —— 敌方 / 我方 / 日志要**紧凑占满一屏**。
        把余量**四等分**（上留白 / 敌我之间×2 / 下留白），也就是敌我空档 = 上下留白的 2 倍，
        和网页版 .b-field 的 `justify-content: space-around` 是同一套几何。 */
@@ -271,7 +275,7 @@
       const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
       list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
     });
-    /* 战斗日志贴着底部（网页版 #battle-log） */
+    /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
     /* 战斗日志（最近 4 行，网页版 #battle-log） */
     U.card(function () {
@@ -371,16 +375,26 @@
     const c = CV.ctx;
     const y = CV.safeTop;
     c.fillStyle = 'rgba(16,12,18,.98)';
-    c.fillRect(0, y, CV.W, 42 * CV.SCALE);
-    CV.text(CV.fit(title, CV.W - 150 * CV.SCALE, CV.FS.f1, true), 12 * CV.SCALE, y + 21 * CV.SCALE, { size: CV.FS.f1, bold: true });
-    const bw = 62 * CV.SCALE;
-    U.btn(CV.W - 12 * CV.SCALE - bw * 2 - 8 * CV.SCALE, y + 8 * CV.SCALE, bw, 26 * CV.SCALE, B.speed + '×速度', 'ghost', 'battle_speed');
-    U.btn(CV.W - 12 * CV.SCALE - bw, y + 8 * CV.SCALE, bw, 26 * CV.SCALE, '撤离', 'ghost', 'battle_quit');
-    CV.TOP = y + 42 * CV.SCALE;
+    c.fillRect(0, y, CV.W, 44 * CV.SCALE);
+    /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）三件事一起修：
+       ① 这一条画在**屏幕坐标**里（在内容裁剪之前），命中区也必须按屏幕坐标登记 ——
+          以前默认按内容坐标登记，手指得往上偏一整个顶栏才点得到（真机同样点不动）；
+       ② 「撤离 / 速度」挪到标题**左边**：微信开发者工具右上角有自己的悬浮面板（真机没有），
+          放右端会被它压住、模拟器里根本点不到（好几位同事都踩过这个坑）；
+       ③ 按钮尺寸按网页版 .btn.small = 40 高。 */
+    CV.hitMode = 'screen';
+    const bw = 66 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, PAD = 12 * CV.SCALE;
+    U.btn(PAD, y + 2 * CV.SCALE, bw, bh, '撤离', 'ghost', 'battle_quit');
+    U.btn(PAD + bw + 8 * CV.SCALE, y + 2 * CV.SCALE, bw, bh, (B.speed || 1) + '×速度', 'ghost', 'battle_speed');
+    CV.hitMode = 'content';
+    const titleX = PAD + bw * 2 + 20 * CV.SCALE;
+    CV.text(CV.fit(title, CV.W - titleX - PAD, CV.FS.f1, true), titleX, y + 22 * CV.SCALE, { size: CV.FS.f1, bold: true });
+    CV.TOP = y + 44 * CV.SCALE;
   };
 
   CV.on('battle_speed', function () {
     B.speed = B.speed >= 3 ? 1 : B.speed + 1;
+    CV.battleSpeed = B.speed;
     if (Core.S.settings) { Core.S.settings.speed = B.speed; Core.save(); }
     CV.render();
   });

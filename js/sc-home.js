@@ -21,7 +21,7 @@
       ['【转生】', S.player.reincarnations + ' 世', '权限 Lv.' + au.lv + ' · 评级 Lv.' + sect.lv],
     ];
     const cardH = U.card(function () {
-      const rowH = 31 * CV.SCALE;
+      const rowH = 33.5 * CV.SCALE;      // 网页版 .text-rows .row 实测 33.5（卡片总高 163）
       const top = U.y;
       rows.forEach(function (r, i) {
         const cy = top + rowH * i + rowH / 2;
@@ -46,23 +46,29 @@
     const mq = Core.mainQuestState();
     const qi = mq.findIndex((x) => !x.claimed);
     const q = qi < 0 ? null : mq[qi];
+    /* V9.6.2（父亲大人："网页版的这个主线卡间距很合理，小游戏显得卡片太大"）：
+       网页版主线卡是一行 .list-row（padding 0），**高度由右侧那个 40px 的按钮决定** →
+       卡片实测 71.3（= 40 + 上下内边距 28 + 边框）。小游戏原来把内容写死成 72 → 卡片 100，白白高了 30。
+       现在照网页版：内容块高 = 按钮高（40），标题/奖励两行在这个高度里排。 */
     U.card(function () {
-      const h = 72 * CV.SCALE, top = U.y;
+      const BH = U.BTN_SM * CV.SCALE, top = U.y;
       if (q) {
-        const bw = 74 * CV.SCALE, bx = U.ix() + U.iw() - bw;
-        CV.text(CV.fit('主线 · ' + q.q.name, U.iw() - bw - 16 * CV.SCALE, CV.FS.f1, true), U.ix(), top + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        const label = q.done ? '领取奖励' : '去完成 ›';
+        const bw = CV.measure(label, CV.FS.md) + 26 * CV.SCALE;
         const tw = CV.measure('主线 · ' + q.q.name, CV.FS.f1, true);
         const tag = '第 ' + (qi + 1) + '/' + mq.length + ' 步';
-        const tagW = CV.measure(tag, CV.FS.sm) + 14 * CV.SCALE;
-        CV.round(U.ix() + tw + 8 * CV.SCALE, top + 14 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
-        CV.text(tag, U.ix() + tw + 8 * CV.SCALE + tagW / 2, top + 23 * CV.SCALE, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
-        CV.text('完成奖励：' + Core.rewardTextOf(q.q.reward), U.ix(), top + 48 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        U.btn(bx, top + 16 * CV.SCALE, bw, 40 * CV.SCALE, q.done ? '领取奖励' : '去完成 ›', q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
+        const tagW = CV.measure(tag, CV.FS.xs) + 14 * CV.SCALE;
+        const textW = U.iw() - bw - 10 * CV.SCALE;
+        CV.text(CV.fit('主线 · ' + q.q.name, textW, CV.FS.f1, true), U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        CV.round(U.ix() + tw + 8 * CV.SCALE, top + 3 * CV.SCALE, tagW, 17 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
+        CV.text(tag, U.ix() + tw + 8 * CV.SCALE + tagW / 2, top + 11.5 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
+        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + 29 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        U.btn(U.ix() + U.iw() - bw, top, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
       } else {
-        CV.text('主线 · 已走完', U.ix(), top + 32 * CV.SCALE, { size: CV.FS.f1, bold: true });
-        CV.text('挑战更高难度与深井', U.ix(), top + 52 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text('主线 · 已走完', U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        CV.text('挑战更高难度与深井', U.ix(), top + 29 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       }
-      U.y = top + h;
+      U.y = top + BH;
     });
 
     /* ③ 养成（网页版 growBlock）：一条线一个入口 + 未解锁的收成一行灰字 */
@@ -120,7 +126,7 @@
     U.sectionTitle('游历');
     const prog = Core.travelProgress(), pend = Core.pendingTravel();
     U.card(function () {
-      const h = 44 * CV.SCALE, top = U.y, cy = top + h / 2;
+      const h = 33 * CV.SCALE, top = U.y, cy = top + h / 2;      // 网页版：行高 33 + 上下内边距 2 → 卡片 39
       CV.text('【游历奇遇】', U.ix(), cy, { size: CV.FS.md, color: pend ? CV.C.gold : CV.C.dim });
       if (pend) {
         const rw = Core.rewardTextOf(pend.effect);
@@ -133,7 +139,7 @@
         CV.hit('open_travel', U.pad(), top, U.cw(), h);
       }
       U.y = top + h;
-    });
+    }, { padY: 2 });
 
     /* ⑤ 挂机（网页版 idleBlock：三行 + 两个按钮；V9.5.27/28：整块灰字、按钮叫"收取奖励"） */
     U.sectionTitle('挂机');
