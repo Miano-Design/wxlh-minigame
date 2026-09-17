@@ -180,8 +180,8 @@
       const y4 = top + lh * 3;
       CV.text('【分工】', U.ix(), y4 + lh / 2, { size: CV.FS.md, color: dim });
       const x4 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
-      /* V9.6.7（父亲大人："没激活就灰色，激活就高亮"）：
-         每条产线单独上色 —— 派了领队的那条整段金色，空着的灰色；
+      /* V9.6.7（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
+         颜色本身就是状态：没派领队（没激活）灰、派了（激活）金。
          超宽时折到第二行（卡片自己会长高），不再用省略号砍掉后半截。 */
       const lhS = CV.FS.sm * 1.45;
       let px = x4, py = y4 + (lh - lhS) / 2, rows = 1;
@@ -192,7 +192,7 @@
           CV.text(' · ', px, py + lhS / 2, { size: CV.FS.sm, color: CV.C.dim });
           px += sw;
         }
-        const t = l.line.name + ' ' + (l.leaderId ? Core.charName(l.leaderId) : '空');
+        const t = l.line.name;
         const w = CV.measure(t, CV.FS.sm);
         if (px + w > U.ix() + U.iw() && px > x4) { px = x4; py += lhS; rows++; }
         CV.text(t, px, py + lhS / 2, { size: CV.FS.sm, color: l.leaderId ? CV.C.gold : dim });

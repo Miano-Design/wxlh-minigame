@@ -459,30 +459,33 @@
       /* 用 dry 两趟量高度：卡片先用虚线框在 dry 趟里不画，这里直接手写结构 */
       const pad = CV.SP[2];
       U.inCard = true; U.dry = true; U.y = top + pad;
-      U.h3(l.line.ico + ' ' + l.line.name, l.per);
-      U.hint((l.line.desc || '') + (led ? (' · 领队【' + l.line.attrName + '】' + l.attrValue + ' → 加成 +' + Math.round((l.bonus || 0) * 100) + '%') : ''), 0);
+      U.h3(l.line.ico + ' ' + l.line.name, l.per, { color: led ? CV.C.gold : CV.C.dim, subColor: led ? CV.C.gold : CV.C.dim });
+      /* V9.6.7（父亲大人）：卡上不写领队名字、也不写具体加成 —— 那两样点进「派遣领队」里看。 */
+      U.hint(l.line.desc || '', 0);
       U.space(CV.SP[1]);
       if (led) U.space(34 * CV.SCALE); else U.space(U.BTN_SM * CV.SCALE);
       const innerH = U.y - top - pad;
       U.dry = false;
       const h = innerH + pad * 2;
-      if (h > 4) CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, CV.C.line);
+      /* V9.6.7（父亲大人："没激活就灰色，激活就高亮" —— 和网页版同一套口径）：
+         没派领队 = 没激活 → 边框虚线、标题/产出压灰；派了领队 = 激活 → 边框与文字一律金色。 */
+      if (h > 4) {
+        if (led) {
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, '#e6b64c66');
+        } else {
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, null);
+          CV.ctx.save();
+          CV.ctx.setLineDash([5, 4]); CV.ctx.lineWidth = 1;
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, null, CV.C.line);
+          CV.ctx.restore();
+        }
+      }
       U.y = top + pad;
-      U.h3(l.line.ico + ' ' + l.line.name, l.per);
-      U.hint((l.line.desc || '') + (led ? (' · 领队【' + l.line.attrName + '】' + l.attrValue + ' → 加成 +' + Math.round((l.bonus || 0) * 100) + '%') : ''), 0);
+      U.h3(l.line.ico + ' ' + l.line.name, l.per, { color: led ? CV.C.gold : CV.C.dim, subColor: led ? CV.C.gold : CV.C.dim });
+      U.hint(l.line.desc || '', 0);
       U.space(CV.SP[1]);
       if (led) {
-        const ah = 34 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bw = 62 * CV.SCALE;
-        const rowTop = U.y;
-        /* 头像：网页版 charAvatar(leader, 34) */
-        CV.round(U.ix(), rowTop, ah, ah, 999, CV.C.panel2, CV.C.line);
-        CV.text(CV.fit(Core.charName(led), ah - 6, CV.FS.sm), U.ix() + ah / 2, rowTop + ah / 2, { size: CV.FS.sm, align: 'center', bold: true });
-        const tx = U.ix() + ah + 8 * CV.SCALE;
-        CV.text(CV.fit(Core.charName(led), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.f1, true), tx, rowTop + ah / 2 - 8 * CV.SCALE, { size: CV.FS.f1, bold: true });
-        CV.text(CV.fit(l.line.attrName + ' ' + l.attrValue + ' · 战力 ' + fmt(Core.power(led)), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.sm),
-          tx, rowTop + ah / 2 + 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        U.btn(U.ix() + U.iw() - bw, rowTop + (ah - bh) / 2, bw, bh, '撤下', 'ghost', 'idleclear:' + l.line.id);
-        U.y = rowTop + ah;
+        U.btnRow([{ label: '查看领队 / 换人', style: 'ghost', id: 'pickleader:' + l.line.id }]);
       } else {
         const no = !bench.length;
         U.btnRow([{ label: no ? '没有可派的伙伴（先去招募）' : '＋ 派一名领队', style: 'ghost', id: no ? '' : 'pickleader:' + l.line.id, dis: no }]);
@@ -499,10 +502,29 @@
   });
   CV.register('pickleader', function () {
     const S = Core.S;
-    U.begin(); head('派领队');
     const line = (D.IDLE_LINES || []).find((l) => l.id === leaderLine);
-    U.hint('选一名**没上阵**的伙伴当「' + ((line || {}).name || '') + '」的领队', 0);
+    const cur = (S.idle.lines || {})[leaderLine];
+    const row = (Core.idleLines() || []).find((x) => x.line.id === leaderLine) || {};
+    U.begin(); head('派遣领队');
+    U.hint('选一名伙伴派往「' + ((line || {}).name || '') + '」', 0);
     U.space(CV.SP[1]);
+    /* V9.6.7（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
+       所以这里先把自己当前的领队摆出来（含撤下），下面才是备选名单。 */
+    if (cur) {
+      U.card(function () {
+        const ah = 40 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bw = 62 * CV.SCALE;
+        U.h3('当前领队', '加成 +' + Math.round((row.bonus || 0) * 100) + '%', { color: CV.C.gold, subColor: CV.C.gold });
+        const top = U.y;
+        CV.round(U.ix(), top, ah, ah, 999, CV.C.panel2, CV.C.line);
+        CV.text(CV.fit(Core.charName(cur), ah - 6, CV.FS.sm), U.ix() + ah / 2, top + ah / 2, { size: CV.FS.sm, align: 'center', bold: true });
+        const tx = U.ix() + ah + 8 * CV.SCALE;
+        CV.text(CV.fit(Core.charName(cur), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.f1, true), tx, top + ah / 2 - 8 * CV.SCALE, { size: CV.FS.f1, bold: true });
+        CV.text(CV.fit('Lv.' + (S.chars[cur] || {}).lv + ' · ' + (line.attrName || '') + ' ' + (row.attrValue || 0) + ' · 战力 ' + fmt(Core.power(cur)),
+          U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.sm), tx, top + ah / 2 + 8 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        U.btn(U.ix() + U.iw() - bw, top + (ah - bh) / 2, bw, bh, '撤下', 'ghost', 'idleclear:' + leaderLine);
+        U.y = top + ah;
+      });
+    }
     const own = Object.keys(S.chars).filter((id) => S.party.indexOf(id) < 0);
     U.card(function () {
       if (!own.length) { U.hint('没有可派的伙伴（先去招募）', 4 * CV.SCALE); return; }
@@ -510,7 +532,9 @@
         const ch = D.charById[id] || {}, c = S.chars[id];
         const top = U.y, h = 52 * CV.SCALE;
         CV.text(Core.charName(id), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text('Lv.' + c.lv + ' · ' + ch.role + ' · ' + ch.faction + ' · 战力 ' + fmt(Core.power(id)),
+        /* 和网页版同一行：Lv. · 这条线看的那项属性值 · 战力（派谁划算一眼能比） */
+        CV.text('Lv.' + c.lv + ' · ' + (line.attrName || '') + ' '
+          + Math.round((((Core.effectiveStats(id) || {}).attrs || {})[line.attr] || 0)) + ' · 战力 ' + fmt(Core.power(id)),
           U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         CV.hit('setleader:' + id, U.ix(), top, U.iw(), h);
         U.y = top + h;

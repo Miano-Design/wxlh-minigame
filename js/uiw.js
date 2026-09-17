@@ -93,7 +93,9 @@
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
       CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
-      CV.text(CV.fit(title, U.iw() - 120, CV.FS.f1, true), U.ix() + bar + gap, cy, { size: CV.FS.f1, bold: true });
+      /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
+      CV.text(CV.fit(title, U.iw() - 120, CV.FS.f1, true), U.ix() + bar + gap, cy,
+        { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text });
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
     });
