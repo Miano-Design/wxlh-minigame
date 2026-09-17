@@ -85,7 +85,11 @@
     const y = CV.H - CV.NAV_H - CV.safeBottom - h - 8 * CV.SCALE;
     const bh = U.BTN_SM * CV.SCALE;
     CV.hitMode = 'screen';
+    /* 和网页版 .batch-bar 一样带一层上投影（原来贴死的平色块，看着很"重"） */
+    CV.ctx.save();
+    CV.ctx.shadowColor = 'rgba(0,0,0,.45)'; CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
     CV.round(pad, y, CV.W - pad * 2, h, 14 * CV.SCALE, 'rgba(18,22,34,.97)', CV.C.line);
+    CV.ctx.restore();
     /* 第一行：快选 N / R / SR + 清空 */
     let x = pad + 12 * CV.SCALE;
     const ry = y + 12 * CV.SCALE;
@@ -124,11 +128,13 @@
         所以这里不再画，只推进游标 —— 位置由 CV.sticky 统一决定，不会出现两层错位。
      ② "离上面间隔太大" —— 吸顶条贴着顶栏下方 4px，内容从它下面接着排。 */
   const TAB_TOP_GAP = 4 * CV.SCALE;      // 标签离顶栏的距离（屏幕坐标）
-  const TAB_BOTTOM_GAP = 6 * CV.SCALE;   // 标签与下面内容的间距
+  /* V9.6.10（父亲大人："现在没有留安全空间，不能直接贴死"）：
+     吸顶条下面必须留一条空带 —— 标签与内容之间 12px 的空气，滚动时内容从这条空带下面消失。 */
+  const TAB_SAFE_GAP = 12 * CV.SCALE;
   function tabCards() {
-    /* 只占位（标签本身由 CV.sticky 画）：让内容从标签下面开始。
-       吸顶条贴在顶栏下方 4px，内容原点在顶栏下方 8px，所以这里按满高让位即可。 */
-    U.y += U.BTN_H * CV.SCALE + TAB_BOTTOM_GAP;
+    /* 只占位（标签本身由 CV.sticky 画）：让内容从"标签 + 安全空间"下面开始。
+       内容原点在顶栏下方 8px、标签从顶栏下方 4px 起，所以让位高度要减掉这 4px 差。 */
+    U.y += U.BTN_H * CV.SCALE + TAB_SAFE_GAP - TAB_TOP_GAP;
   }
   /* 在给定 y（屏幕坐标）画三张标签卡 */
   function drawTabCards(y) {
@@ -214,10 +220,11 @@
     tabCards();
     CV.sticky = function () {
       CV.hitMode = 'screen';
-      /* 吸顶条自带一层不透明底：内容从它下面滚过去时不会透出来 */
+      /* 吸顶条自带一层不透明底，一直铺到安全空间的下沿：
+         滚动时内容滑到这条底下面就被盖住，不会出现在标签旁边的空带里。 */
       const h = U.BTN_H * CV.SCALE;
       CV.ctx.fillStyle = '#0b0e15f5';
-      CV.ctx.fillRect(0, CV.TOP, CV.W, TAB_TOP_GAP + h + 2 * CV.SCALE);
+      CV.ctx.fillRect(0, CV.TOP, CV.W, TAB_TOP_GAP + h + TAB_SAFE_GAP);
       drawTabCards(CV.TOP + TAB_TOP_GAP);
       CV.hitMode = 'content';
     };

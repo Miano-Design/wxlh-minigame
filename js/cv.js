@@ -81,9 +81,14 @@
     const c = CV.ctx;
     c.fillStyle = opt.color || CV.C.text;
     c.font = `${opt.bold ? '600 ' : ''}${opt.size || CV.FS.lg}px ${CV.FONT}`;
+    /* opt.ls：字距（网页版那一堆 letter-spacing）。引擎不支持 letterSpacing 时
+       设不上去、当没写，不会报错。 */
+    const lsOk = ('letterSpacing' in c);
+    if (lsOk && opt.ls) { try { c.letterSpacing = opt.ls + 'px'; } catch (e) {} }
     c.textAlign = opt.align || 'left';
     c.textBaseline = opt.baseline || 'middle';
     c.fillText(String(str), x, y);
+    if (lsOk && opt.ls) { try { c.letterSpacing = '0px'; } catch (e) {} }
   };
   CV.measure = function (str, size, bold) {
     const c = CV.ctx;
@@ -108,6 +113,15 @@
     opt = opt || {};
     CV.round(x, y, w, h, opt.radius === undefined ? CV.RADIUS : opt.radius,
       opt.fill || CV.C.panel, opt.line === null ? null : (opt.line || CV.C.line));
+    /* V9.6.10：网页版 .card 有一条 `inset 0 1px 0 #ffffff08` 的顶部高光 ——
+       卡片"有厚度、不糊"的关键就是它；小游戏原来没画，所以整块看着是平的、笨的。 */
+    if (opt.line !== null) {
+      const r = Math.min(opt.radius === undefined ? CV.RADIUS : opt.radius, w / 2, h / 2);
+      CV.ctx.save();
+      CV.ctx.strokeStyle = '#ffffff0f'; CV.ctx.lineWidth = 1;
+      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, '#ffffff0f');
+      CV.ctx.restore();
+    }
   };
   /* 文字截断：超宽加省略号（网页版的 text-overflow: ellipsis） */
   CV.fit = function (str, maxW, size, bold) {
@@ -182,7 +196,12 @@
     const chromeless = ['welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
     if (chromeless) { CV.TOP = CV.safeTop; CV.NAV_H = 0; }
     c.save();
-    c.fillStyle = CV.C.bg;
+    /* V9.6.10（父亲大人："整体画面笨重、没网页版精致"自审）：
+       网页版 #app 是 `linear-gradient(180deg, --bg2, --bg)`（上略亮、下压暗），
+       小游戏原来是一块平色 —— 平色在手机上会显得糊、重。照网页版铺一层竖向渐变。 */
+    const bgGrad = c.createLinearGradient(0, 0, 0, CV.H);
+    bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+    c.fillStyle = bgGrad;
     c.fillRect(0, 0, CV.W, CV.H);
     c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
     c.beginPath(); c.rect(0, 0, CV.W, CV.H); c.clip();

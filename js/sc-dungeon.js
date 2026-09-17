@@ -143,7 +143,7 @@
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '👹' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
           { size: isBoss ? 16 : 14 * CV.SCALE, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
-        if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
+        if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.ctx.globalAlpha = 1;
         if (unlocked) CV.hit('stage:' + i, x, y, cw, cw);
       }
@@ -187,7 +187,7 @@
         CV.ctx.globalAlpha = 1;
         CV.round(bx, by, cw, cw, 10 * CV.SCALE, sel ? '#1d2b22' : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
         CV.text(String(x.i + 1), bx + cw / 2, by + cw / 2 - 6 * CV.SCALE, { size: CV.FS.f1, bold: true, align: 'center', color: sel ? CV.C.gold : CV.C.text });
-        CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
+        CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.hit('ssel:' + x.i, bx, by, cw, cw);
       });
       const rows = Math.ceil(cleared.length / cols);

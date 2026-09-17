@@ -111,7 +111,7 @@
     /* 网页版 .grid-title 的 margin 是 `var(--sp3) 2px var(--sp2)`：上 14 / 下 **10**。
        以前只推进了行高、没有下边距，标题跟下面那排卡片贴在一起了（父亲大人截图点出来的）。 */
     const gridTitleH = CV.FS.sm * 1.2;
-    CV.text('日常', U.pad() + 2, U.y + gridTitleH / 2, { size: CV.FS.sm, color: CV.C.dim });
+    CV.text('日常', U.pad() + 2, U.y + gridTitleH / 2, { size: CV.FS.sm, color: CV.C.dim, ls: 2 });   // .grid-title letter-spacing 2px
     U.y += gridTitleH + CV.SP[1];
     U.tiles([
       ['open_bounty', '限时悬赏', null, null, bountyDot],

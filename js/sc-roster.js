@@ -24,7 +24,7 @@
   }
   /* 星级（网页版 .stars：金色，字距收紧） */
   function stars(n, max, x, y, size) {
-    CV.text('★'.repeat(n) + '☆'.repeat(Math.max(0, max - n)), x, y, { size: size || CV.FS.sm, color: CV.C.gold });
+    CV.text('★'.repeat(n) + '☆'.repeat(Math.max(0, max - n)), x, y, { size: size || CV.FS.sm, color: CV.C.gold, ls: -1 });
   }
 
   /* V9.6.8（父亲大人）：执灯者的**分类和排序两行都删了** —— 默认顺序已经够用。
@@ -49,17 +49,18 @@
     U.begin();
     /* V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
        "默认的排序顺序就已经能很好的区分这些了"。只留默认顺序 + 右端「📕 图鉴」。 */
-    /* V9.6.9（父亲大人）：图鉴去掉 📕 图标、做成小按钮 —— 分類和排序删掉之后，
-       这一行只剩它一个，没必要占 44 高；缩到 36，整块内容跟着往上提。 */
+    /* V9.6.10（父亲大人："那个已收集的小字跟图鉴那个按钮水平对齐，现在不是很浪费空间吗"）：
+       把「已收集…」搬到**图鉴那一行**、左边，整块内容跟着往上提一行。 */
     const pillH = 36 * CV.SCALE;
     const codexW = CV.measure('图鉴', CV.FS.sm) + 24 * CV.SCALE;
     const gy = U.y;
-    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '图鉴', 'ghost', 'open_codex');
-    U.y = gy + pillH + 4 * CV.SCALE;
-    /* 已收集提示（网页版那行小灰字） */
     const cs = Core.codexState();
-    U.hint('已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length + ' · 当前显示 ' + listSorted().length);
-    U.space(CV.SP[1]);
+    const infoTxt = '已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length
+      + ' · 当前显示 ' + listSorted().length;
+    CV.text(CV.fit(infoTxt, U.cw() - codexW - 10 * CV.SCALE, CV.FS.sm), U.pad(), gy + pillH / 2,
+      { size: CV.FS.sm, color: CV.C.dim });
+    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '图鉴', 'ghost', 'open_codex');
+    U.y = gy + pillH + 8 * CV.SCALE;
     /* 三列卡片网格（.char-grid + .char-card） */
     const list = listSorted();
     if (!list.length) {
@@ -98,7 +99,7 @@
       CV.text(CV.fit(nm(id), cw - PAD * 2, CV.FS.lg, true), acx, ly + NAME_H / 2, { size: CV.FS.lg, bold: true, align: 'center' });
       ly += NAME_H;
       CV.text('★'.repeat(c0.star) + '☆'.repeat(Math.max(0, D.RARITY_MAXSTAR[ch0.rarity] - c0.star)), acx, ly + SMALL_H / 2,
-        { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
+        { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });   // 网页版 .char-card .stars：letter-spacing -1
       ly += SMALL_H + 2 * CV.SCALE;
       CV.text('Lv.' + c0.lv + ' · 战力 ' + fmt(Core.power(id)), acx, ly + SMALL_H / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
       ly += SMALL_H + 2 * CV.SCALE;
@@ -143,7 +144,7 @@
       CV.text(ch.rarity, tx, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true, color: rarColor(ch.rarity) });
       const rw = CV.measure(ch.rarity, CV.FS.f1, true);
       CV.text(CV.fit(nm(id), U.iw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
-      CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold });
+      CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, ls: -1 });
       CV.text(ch.role + ' · ' + ch.faction + ' · ' + ch.bloodline + '血统', tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text('Lv.' + c.lv + ' · 碎片 ' + c.shards + ' · 血统 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });

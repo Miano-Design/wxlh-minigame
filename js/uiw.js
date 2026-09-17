@@ -95,7 +95,7 @@
       CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
       CV.text(CV.fit(title, U.iw() - 120, CV.FS.f1, true), U.ix() + bar + gap, cy,
-        { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text });
+        { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text, ls: 0.2 });   // .card h3 letter-spacing .2px
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
     });
@@ -186,7 +186,7 @@
     const top = U.y + extraTop, lh = CV.FS.md * 1.3;
     draw(() => {
       const cy = top + lh / 2;
-      CV.text(text, U.ix() + 4, cy, { size: CV.FS.md, color: CV.C.text2, bold: true });
+      CV.text(text, U.ix() + 4, cy, { size: CV.FS.md, color: CV.C.text2, bold: true, ls: 1 });   // .section-title letter-spacing 1px
       const w = CV.measure(text, CV.FS.md, true);
       CV.ctx.strokeStyle = CV.C.line; CV.ctx.lineWidth = 1;
       CV.ctx.beginPath(); CV.ctx.moveTo(U.ix() + 4 + w + 10, cy); CV.ctx.lineTo(U.ix() + U.iw() - 4, cy); CV.ctx.stroke();
@@ -356,7 +356,13 @@
     if (!o) return;
     const c = CV.ctx;
     c.fillStyle = 'rgba(0,0,0,.62)'; c.fillRect(0, 0, CV.W, CV.H);
+    /* V9.6.10（自审：整体偏"笨重"）：网页版的浮层 / 底部条都带投影
+       （box-shadow: 0 -4px 1.25rem rgba(0,0,0,.45)），小游戏原来是一块贴死的平色，
+       所以弹窗像"糊"在页面上。这里补一层柔和外投影。 */
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 22 * CV.SCALE; c.shadowOffsetY = 6 * CV.SCALE;
     CV.round(o.x, o.y, o.w, o.h, 14 * CV.SCALE, CV.C.bg2, CV.C.line);
+    c.restore();
     CV.text(o.title, o.x + 14 * CV.SCALE, o.y + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
     o.lines.forEach((ln, i) => CV.text(ln, o.x + 14 * CV.SCALE, o.y + 52 * CV.SCALE + CV.FS.lg * 1.7 * (i + 0.5), { size: CV.FS.lg, color: CV.C.dim }));
     const by = o.y + o.h - 44 * CV.SCALE - 10 * CV.SCALE;
