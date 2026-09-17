@@ -246,6 +246,18 @@
       U.y = y0 + Math.ceil(slots.length / cols) * (th + gap) - gap;
     });
 
+    /* ⑤b 从队伍点进来：底部给「无损换将 / 下阵」（网页版"队伍操作"卡） */
+    if (opts && opts.fromSlot !== undefined && opts.fromSlot !== null) {
+      U.card(function () {
+        U.h3('队伍操作', '当前第 ' + (opts.fromSlot + 1) + ' 位');
+        U.btnRow([
+          { label: '无损换将', style: 'gold', id: 'swap' },
+          { label: '下阵', style: 'ghost', id: 'off' },
+        ]);
+        U.hint('无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，职业专属这类穿不了的会留在他身上。', 4 * CV.SCALE);
+      });
+    }
+
     /* ⑦ 属性面板（照网页版：装备/血统/星级都算进来） */
     const st = Core.effectiveStats(id);
     U.card(function () {
@@ -258,6 +270,24 @@
   });
   CV.on('back', () => CV.pop());
   CV.on('noop', () => {});
+  /* 队伍操作：无损换将（挑人，继承等级/装备）、下阵 */
+  CV.on('swap', function () {
+    const S = Core.S;
+    G.__swapSlot = S.party.indexOf(cur);
+    G.__swapFrom = cur;
+    CV.push('pickswap');
+  });
+  CV.on('off', function () {
+    U.confirm('下阵', '确定让「' + nm(cur) + '」下阵？等级与装备都保留在他的卡上，随时可以再上阵。', function () {
+      const S = Core.S;
+      const i = S.party.indexOf(cur);
+      if (i >= 0) S.party[i] = null;
+      Core.save();
+      CV.pop();
+      CV.toast('已下阵');
+      CV.render();
+    });
+  });
   /* 详情页的动作：升级 / 重生 / 升星 / 血统升级 / 技能 +1 —— 都走 core，页内原地重画 */
   CV.on('lv1', () => { const r = Core.levelUp(cur, 1); CV.toast(r.msg); CV.render(); });
   CV.on('lv10', () => { const r = Core.levelUp(cur, 10); CV.toast(r.msg); CV.render(); });

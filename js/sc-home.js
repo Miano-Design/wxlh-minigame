@@ -208,13 +208,15 @@
     CV.toast((r && r.msg) || '已领取');
     CV.render();
   });
+  CV.on('open_party', function () { CV.push('party'); });
+
   CV.on('open_recruit', function () {
     if (!Core.isUnlocked('recruit')) { CV.toast('🔒 ' + Core.unlockTip('recruit'), 2400); return; }
     CV.push('recruit');
   });
 
   /* 还没复刻的页面：给个明确提示，别点了没反应 */
-  ['open_party', 'open_grow', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
+  [ 'open_grow', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
     'open_sect', 'open_keji', 'open_fabao', 'open_garden', 'open_arena', 'open_mount', 'open_refine',
     'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
     'open_bounty', 'open_tasks', 'open_ach', 'open_sign', 'open_shop'].forEach(function (id) {
