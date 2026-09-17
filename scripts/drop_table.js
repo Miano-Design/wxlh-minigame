@@ -105,3 +105,53 @@ console.log('\n=== ⑤ 期望档位（0=普通 … 4=传说，越高越好）===
   console.log('\n  结论：' + (mono ? '✓ 越往后的世界掉得越好' : '✗ 有世界掉得比前一张差')
     + ' · ' + (order2 ? '✓ 杂兵 ≤ 精英 ≤ 守关' : '✗ 来源之间的档次乱了'));
 }
+
+/* ---------- ⑥ 四条装备线一览（父亲大人："世界套装几套、血统套装几套、专属几套、神装几套，
+   分别的掉落机制整理给我看看"）—— 数字全部摘自数据表与掉落代码，不写死、不凭记忆。 ---------- */
+console.log('\n=== ⑥ 四条装备线：各几套 · 从哪来 ===');
+{
+  const pctR = (n) => (n * 100).toFixed(n * 100 % 1 ? 1 : 0) + '%';
+  const boxNames = ['box_sr', 'box_ssr', 'box_ur', 'box_myth'].map(id => {
+    const it = D.ITEMS[id];
+    const spot = Object.entries(D.SHOPS).flatMap(([sid, s]) => s.items.filter(x => x.item === id).map(x => x.price + ' ' + (D.CURRENCIES.find(c => c.id === s.currency) || {}).name + (x.req ? '·需通' + x.req.world : ''))).join('/');
+    return it.name + '（' + spot + '）';
+  }).join(' · ');
+  /* 一条装备只能属于一条线 —— 占比用**真在用的那条随机线**量（调 grantEquip 抽 4000 次） */
+  const lineShare = (wid, rarity) => {
+    const cnt = { 世界: 0, 血统: 0, 普通: 0 };
+    Core.newGame(); Core.setPlayerName('套装占比'); Core.choosePlayerBloodline('修真');
+    Core.S.bag.eqCap = 999999;
+    for (let i = 0; i < 4000; i++) {
+      const r = Core.grantEquip(wid, rarity);
+      const e = r.equip;
+      if (!e) continue;
+      if (e.bloodSet) cnt.血统++; else if (e.set) cnt.世界++; else cnt.普通++;
+    }
+    return cnt;
+  };
+  console.log('  ① 世界套装 ' + Object.keys(D.SETS).length + ' 套（每个世界一套，2/4/6 件）');
+  console.log('     来源：野外掉落（普通怪 15% / 精英 55% / 守关 100% 各掉一件）＋ W01 前 6 关首通保底'
+    + ' ＋ 装备箱（' + boxNames + '；箱子里开出传说及以下时，走的还是这台随机线）');
+  console.log('     一件装备落在哪条线（实测抽 4000 次）：SR ' + JSON.stringify(lineShare('W10', 'SR'))
+    + ' · SSR ' + JSON.stringify(lineShare('W10', 'SSR')));
+  console.log('  ② 血统套装 ' + Object.keys(D.BLOODLINE_SETS).length + ' 套（' + Object.values(D.BLOODLINE_SETS).map(s => s.name).join(' / ') + '，2/3 件）');
+  console.log('     来源：和世界套装**同一台随机线**（野外掉落 + 装备箱），只是落点不同（见上面那行实测占比）；'
+    + '穿戴要求同血统');
+  console.log('  ③ 血统神装 ' + Object.keys(D.GOD_SETS).length + ' 套（' + Object.values(D.GOD_SETS).map(s => s.name).join(' / ') + '，2/4/6 件）');
+  {
+    const w21 = D.WORLDS[20], w36 = D.WORLDS[35];
+    const rows = ['normal', 'hard', 'hell'].map(d => diffCn[d] + ' ' + pctR(Dun.battleRewards(w21.id, d, 12, 'boss').mythChance || 0));
+    const sameLate = ['normal', 'hard', 'hell'].every(d => (Dun.battleRewards(w21.id, d, 12, 'boss').mythChance || 0) === (Dun.battleRewards(w36.id, d, 12, 'boss').mythChance || 0));
+    console.log('     来源一：第 21 张图起的**守关 Boss**（' + rows.join(' · ') + '）'
+      + (sameLate ? ' —— 概率只跟难度有关，W21 到 W36 一样' : '（各世界不同）'));
+    console.log('     来源二：血统神装箱 ' + pctR(0.15) + ' 升格（其余保底传说）· 通关 W20 后在异界商店上架');
+    console.log('     ⚠ 杂兵、精英、任何第 20 张图之前的世界：**一处都没有**');
+  }
+  console.log('  ④ 伙伴专属 ' + D.SIGNATURE_EQUIPS.length + ' 件（各绑定一名 SSR，UR 品质）');
+  D.SIGNATURE_EQUIPS.forEach(s => {
+    const c = (D.charById || {})[s.charId] || {};
+    console.log('     ' + s.name.padEnd(6) + ' · ' + (c.name || s.charId) + '（' + (c.rarity || '') + '·' + (c.bloodline || '') + '血统）');
+  });
+  console.log('     来源：地狱难度**守关** 5% ＋ UR 装备箱 10%（普通/困难不打地狱，就只剩开箱这条路）');
+  console.log('\n  说明：一件装备只会属于其中一条线（互斥）—— 判定顺序是 专属 > 神装 > 血统套装 > 世界套装 > 普通。');
+}
