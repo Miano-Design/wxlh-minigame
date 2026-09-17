@@ -127,14 +127,16 @@
         按屏幕坐标画（cv.js 的 CV.sticky 钩子），内容区只负责让出它的高度。
         所以这里不再画，只推进游标 —— 位置由 CV.sticky 统一决定，不会出现两层错位。
      ② "离上面间隔太大" —— 吸顶条贴着顶栏下方 4px，内容从它下面接着排。 */
-  const TAB_TOP_GAP = 4 * CV.SCALE;      // 标签离顶栏的距离（屏幕坐标）
-  /* V9.6.10（父亲大人："现在没有留安全空间，不能直接贴死"）：
-     吸顶条下面必须留一条空带 —— 标签与内容之间 12px 的空气，滚动时内容从这条空带下面消失。 */
-  const TAB_SAFE_GAP = 12 * CV.SCALE;
+  /* V9.6.11（父亲大人）："三个标签上下间距又不一致了，不用画边框，把空间等分就行"。
+     之前上面 4、下面 12 —— 上下不等，而且吸顶条铺的是一层**平色**底，
+     页面改成渐变之后这块平色反而显出一条"边框/接缝"。现在：上下都是 10，等距；
+     底不再用平色，改用**和页面同一条渐变**（颜色逐像素对上 → 完全看不见接缝）。 */
+  const TAB_TOP_GAP = 10 * CV.SCALE;     // 标签上面留的空
+  const TAB_SAFE_GAP = 10 * CV.SCALE;    // 标签下面留的空（和上面一样）
   function tabCards() {
-    /* 只占位（标签本身由 CV.sticky 画）：让内容从"标签 + 安全空间"下面开始。
-       内容原点在顶栏下方 8px、标签从顶栏下方 4px 起，所以让位高度要减掉这 4px 差。 */
-    U.y += U.BTN_H * CV.SCALE + TAB_SAFE_GAP - TAB_TOP_GAP;
+    /* 只占位（标签本身由 CV.sticky 画）：让内容从"标签 + 下面那条空"之后开始。
+       内容原点在顶栏下方 8px，标签从顶栏下方 TAB_TOP_GAP 起，所以减掉这 8px 的基准差。 */
+    U.y += U.BTN_H * CV.SCALE + TAB_TOP_GAP + TAB_SAFE_GAP - 8 * CV.SCALE;
   }
   /* 在给定 y（屏幕坐标）画三张标签卡 */
   function drawTabCards(y) {
@@ -220,10 +222,14 @@
     tabCards();
     CV.sticky = function () {
       CV.hitMode = 'screen';
-      /* 吸顶条自带一层不透明底，一直铺到安全空间的下沿：
-         滚动时内容滑到这条底下面就被盖住，不会出现在标签旁边的空带里。 */
+      /* 吸顶条要盖住从下面滚上来的内容，所以得铺一层底；但**不能用平色** ——
+         页面是竖向渐变，平色会显出一条接缝（父亲大人说的"边框"）。
+         这里把**和页面完全同一条渐变**重画一遍、只填这一条带：
+         颜色逐像素对上，等于没画底，却又能挡住内容。 */
       const h = U.BTN_H * CV.SCALE;
-      CV.ctx.fillStyle = '#0b0e15f5';
+      const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
+      bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+      CV.ctx.fillStyle = bgGrad;
       CV.ctx.fillRect(0, CV.TOP, CV.W, TAB_TOP_GAP + h + TAB_SAFE_GAP);
       drawTabCards(CV.TOP + TAB_TOP_GAP);
       CV.hitMode = 'content';

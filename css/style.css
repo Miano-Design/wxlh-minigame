@@ -547,8 +547,13 @@ body {
   position: sticky; top: var(--topbar-h, 5.75rem); z-index: 30;
   display: flex; gap: var(--sp2);
   padding: var(--sp2) 0;
-  margin-bottom: var(--sp2);
-  background: linear-gradient(180deg, #0b0e15f5, #0b0e15e0);
+  /* V9.6.11（父亲大人："三个标签上下间距要一致"）：原来上面 10、下面 10+10=20，上下不等。
+     去掉 margin-bottom，上下都靠 padding（各 10）。 */
+  margin-bottom: 0;
+  /* 底色跟着页面走：页面是 linear-gradient(180deg,--bg2,--bg)，吸顶条用同一条渐变的最上面
+     两档会显出一条接缝（父亲大人说的"像画了边框"）。这里用近乎不透明的纯色 + 模糊，
+     滚动时照样能盖住内容，且不会在深色渐变上切出一道边。 */
+  background: rgba(11, 14, 21, .96);
   backdrop-filter: blur(0.375rem);
 }
 .tab-cards .tab-card {
