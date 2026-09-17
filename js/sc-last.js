@@ -87,7 +87,6 @@
     U.card(function () {
       st.list.forEach(function (x) {
         const b = x.b;
-        const state = x.claimed ? '已领取' : (x.expired ? '已过期' : (x.done ? '可领取' : '进行中'));
         const top = U.y, h = 74 * CV.SCALE;
         const bw = 84 * CV.SCALE;
         /* V9.6.14（自审：父亲人截图里"已领取/进行中"压住了按钮）：
