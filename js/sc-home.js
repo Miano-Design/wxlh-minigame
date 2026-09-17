@@ -209,17 +209,23 @@
     CV.render();
   });
   CV.on('open_party', function () { CV.push('party'); });
+  CV.on('open_grow', function () { CV.push('grow'); });
+  CV.on('open_shop', function () { CV.push('shop'); });
 
   CV.on('open_recruit', function () {
     if (!Core.isUnlocked('recruit')) { CV.toast('🔒 ' + Core.unlockTip('recruit'), 2400); return; }
     CV.push('recruit');
   });
 
-  /* 还没复刻的页面：给个明确提示，别点了没反应 */
-  [ 'open_grow', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
+  /* 还没复刻的页面：给个明确提示，别点了没反应。
+     ⚠ V9.5.99：这里**不能覆盖已经存在的真实处理器** —— CV.on 是同 id 后注册的赢，
+     之前"成长"已经接上真实页面了，又在这里被占位提示盖掉，点了就只弹一句"还在复刻"。
+     现在先查一下有没有处理器，有就跳过，以后每补一页都不用手动从这份清单里删。 */
+  [ 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
     'open_sect', 'open_keji', 'open_fabao', 'open_garden', 'open_arena', 'open_mount', 'open_refine',
     'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
-    'open_bounty', 'open_tasks', 'open_ach', 'open_sign', 'open_shop'].forEach(function (id) {
+    'open_bounty', 'open_tasks', 'open_ach', 'open_sign'].forEach(function (id) {
+    if (CV.onAct[id]) return;                     // 已经有真实页面了，别盖掉
     CV.on(id, () => CV.toast('这一页还在复刻队列里（下一步）'));
   });
 })();

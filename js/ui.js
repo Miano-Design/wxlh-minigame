@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.5.92';
+  const GAME_VER = '9.6.0';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -3961,10 +3961,14 @@ window.UI = (function () {
       </div>
       <div class="b-field">
         <div class="b-row enemies"></div>
-        <!-- V9.5.64（父亲大人）：前排画在上面、后排画在下面，跟队伍页一个方向。
-             以前是反的（后排在上、前排在下），看着就是"前后排颠倒了"。 -->
-        <div class="b-row allies front"></div>
-        <div class="b-row allies back"></div>
+        <!-- V9.6.0（父亲大人）：我方前后排原来被 space-evenly 摊到整屏，两排离得太远、
+             看着不像"一支队伍"。现在把两排收进同一个 .b-side 里（自己固定小间距），
+             敌方在上、我方在下，两边互相分开。 -->
+        <div class="b-side">
+          <!-- V9.5.64（父亲大人）：前排画在上面、后排画在下面，跟队伍页一个方向 -->
+          <div class="b-row allies front"></div>
+          <div class="b-row allies back"></div>
+        </div>
       </div>
       <div id="battle-log"></div>
       `;

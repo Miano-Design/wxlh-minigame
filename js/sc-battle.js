@@ -239,28 +239,36 @@
     const allies = units.filter((u) => u.side === 'ally');
     const front = allies.filter((u) => u.position === 'front');
     const back = allies.filter((u) => u.position === 'back');
-    /* 战场区：顶栏下面到日志卡上面，三行**均匀分布**（网页版 .b-field 是 space-evenly）。
-       敌人一行 / 我方前排 / 我方后排；我方分两行本身就说明了站位。 */
+    /* 战场区：**和网页版同一套规则**（V9.6.0 父亲大人两条意见一起改）——
+         · "敌我离得好近"：小游戏原来从战场顶按固定行高往下堆，满编时三行挤在上半屏；
+         · "我方前后排离得太远"：网页版原来用 space-evenly 把三行摊满整屏，前后排隔了 185px。
+       现在两边都是：**敌方占上方、我方前排+后排收成一组贴在日志上方**，
+       我方两排之间只隔 14px（就是"一支部队"该有的距离），屏幕越高上下留白越多。 */
     const FIELD_TOP = U.y;
     const CARD_H = 92 * CV.SCALE;                 // 一张单位卡的高度（头像 + 名字 + 血条 + 百分比）
-    const rows = [enemies, front, back];
-    const usable = CARD_H * 3 + 24 * CV.SCALE;
-    const gap = Math.max(8 * CV.SCALE, (usable - CARD_H * 3) / 2);
-    rows.forEach((list, ri) => {
+    const LOG_H = 126 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距）
+    const SIDE_GAP = 14 * CV.SCALE;               // 我方前排与后排的间距（和网页版 .b-side gap 一致）
+    const FIELD_BOTTOM = CV.H - CV.NAV_H - CV.safeBottom - LOG_H;
+    const allyBlockH = CARD_H * 2 + SIDE_GAP;
+    const allyTop = Math.max(FIELD_TOP + CARD_H + 16 * CV.SCALE, FIELD_BOTTOM - allyBlockH);
+    const enemyY = FIELD_TOP + Math.max(0, (allyTop - FIELD_TOP - CARD_H)) * 0.42;
+    const rows = [
+      { list: enemies, y: enemyY, ally: false },
+      { list: front, y: allyTop, ally: true },
+      { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },
+    ];
+    rows.forEach((row) => {
+      const list = row.list;
       if (!list.length) return;
       const n = Math.max(1, list.length);
       const g = 8 * CV.SCALE;
-      const isAlly = ri > 0;
-      const maxW = isAlly ? U.cw() * 0.24 : U.cw() * 0.3;
+      const maxW = row.ally ? U.cw() * 0.24 : U.cw() * 0.3;
       const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
       const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
-      const y = FIELD_TOP + ri * (CARD_H + gap);
-      list.forEach((u, i) => unitCard(x0 + i * (cw + g), y, cw, u, isAlly));
+      list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
     });
-    /* 战场之后把游标推到画面底部 —— 网页版的战斗日志是**贴着底部**的一条，
-       中间留白属于"战场"，这样上屏是敌人、下屏是日志，和网页版一致。 */
-    const logTop = CV.H - CV.NAV_H - CV.safeBottom - 96 * CV.SCALE;
-    U.y = Math.max(FIELD_TOP + CARD_H * 3 + gap * 2 + 8 * CV.SCALE, logTop);
+    /* 战斗日志贴着底部（网页版 #battle-log） */
+    U.y = FIELD_BOTTOM + 6 * CV.SCALE;
     /* 战斗日志（最近 4 行，网页版 #battle-log） */
     U.card(function () {
       U.h3('战斗日志');

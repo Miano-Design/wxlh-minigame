@@ -456,7 +456,10 @@ body {
 @media (min-width: 521px) { #battle-overlay { max-width: 32.5rem; left: 50%; transform: translateX(-50%); } }
 #battle-overlay .b-head { display: flex; align-items: center; padding: calc(env(safe-area-inset-top) + 0.625rem) 0.875rem 0.5rem; gap: 0.5rem; }
 #battle-overlay .b-title { font-size: 0.875rem; font-weight: 700; flex: 1; }
-.b-field { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding: 0 0.875rem; }
+/* V9.6.0（父亲大人）：敌方与我方分列上下两端；我方前后排收成一组（间距 0.875rem），
+   不再用 space-evenly 把三行摊满整屏（那样前后排离得太远、不像一支队伍）。 */
+.b-field { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 0.5rem 0.875rem 0.75rem; }
+.b-side { display: flex; flex-direction: column; gap: 0.875rem; }
 .b-row { display: flex; justify-content: center; gap: 0.625rem; flex-wrap: wrap; }
 /* 站位可见化：我方分两行（前排在上、后排在下），敌人优先打前排。
    V9.5.66（父亲大人）：行首的「我方前排 / 我方后排」字条去掉了——
