@@ -254,6 +254,8 @@
           CV.hit('eqd:' + eq[slot], x, y, tw, th);
         } else {
           CV.text('未装备', x + tw / 2, y + th / 2 + 6 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+          /* V9.6.7 自审：空槽以前**点了没反应** —— 网页版是"空格子进这个部位的候选列表" */
+          CV.hit('eqslot:' + id + ':' + slot, x, y, tw, th);
         }
       });
       U.y = y0 + Math.ceil(slots.length / cols) * (th + gap) - gap;

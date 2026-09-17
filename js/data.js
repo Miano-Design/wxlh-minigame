@@ -1510,6 +1510,27 @@ window.DATA = (function () {
     points: 20000, holy: 1000,
     items: { exp_s: 20 },
   };
+  /* 首通保底掉装备（V9.6.6 父亲大人）：开局不再白送一套 R 装备，
+     改成 W01 普通前 6 关**每关首通保底掉 1 件** —— 打完正好凑齐六个部位，
+     但每一件都是自己打出来的。前 3 关 N、后 3 关 R。
+     部位**写在表里**（不写"补空槽"）：掉落是进背包、不会自动穿上，
+     按"空槽"算的话每次都只能挑到第一个空槽，六关下来会掉六把武器。
+     第 4 关起是精英、第 12 关是 Boss（Boss 本来就必掉），所以后段不用再保底。 */
+  const EARLY_GUARANTEE = {
+    W01: { normal: {
+      0: { slot: 'weapon', rarity: 'N' },
+      1: { slot: 'head', rarity: 'N' },
+      2: { slot: 'armor', rarity: 'N' },
+      3: { slot: 'hands', rarity: 'R' },
+      4: { slot: 'legs', rarity: 'R' },
+      5: { slot: 'accessory', rarity: 'R' },
+    } },
+  };
+  const earlyGuarantee = (worldId, diff, stage) => {
+    const w = EARLY_GUARANTEE[worldId];
+    const d = w && w[diff];
+    return (d && d[stage]) || null;
+  };
 
   /* V9.5.66（父亲大人）：被删掉的探索消耗品，只为**老存档退款**保留一张价目表。
      玩家当时是真花 ◈ 点数买的，直接删档等于凭空吞掉他一笔钱，所以加载老档时按原价退回。
@@ -1744,7 +1765,7 @@ window.DATA = (function () {
     ELEMENTS, ELEMENT_ICON, ELEMENT_COUNTER, ELEMENT_BONUS, ELEMENT_PENALTY, worldElement,
     BEASTS, beastById, beastDesc, beastPctAt, BEAST_PCT_NAME, BEAST_RARITY_RATE,
     BEAST_EGG_ITEM, BEAST_EGG_COST, BEAST_MAX_LV, BEAST_SOUL_PER_LV, BEAST_LV_PCT,
-    SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER, RETIRED_ITEMS,
+    SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER, RETIRED_ITEMS, EARLY_GUARANTEE, earlyGuarantee,
     WEEKLY_TASKS, WEEKLY_ALL_REWARD, ACHIEVEMENTS,
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
     corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,

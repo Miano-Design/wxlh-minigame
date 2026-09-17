@@ -317,17 +317,12 @@ window.Core = (function () {
     addCur('points', D.STARTER.points);
     addCur('holy', D.STARTER.holy);
     Object.entries(D.STARTER.items).forEach(([k, v]) => addItem(k, v));
-    /* V9.5.64（父亲大人：副本前期太难）——新手补给里给主角**一整套 R 装备**并直接穿上。
-       数值体检（scripts/balance_check.js）显示：同样等级下"裸装"过不了 W01 后几关，
-       穿一套 R 就顺畅了。第一个世界不该是"逼你先刷装备"的墙。 */
-    (S.starterEquipUids = []).length = 0;
-    [['weapon', 'R'], ['head', 'R'], ['armor', 'R'], ['hands', 'R'], ['legs', 'R'], ['accessory', 'R']]
-      .forEach(([slot, rarity]) => {
-        const uid = 'start_' + slot;
-        S.equips[uid] = D.makeEquip('W01', slot, rarity, uid, { setType: 'plain' });
-        S.equipped['@player'][slot] = uid;
-        S.starterEquipUids.push(uid);
-      });
+    /* V9.6.6（父亲大人）：开局**不再白送一整套 R 装备**。
+       原话："直接给装备好像不太好，就在前面副本保底掉落几件给玩家，有点获得感。"
+       所以改成用**首通保底**把这一套发下去：W01 普通前 6 关每关保底 1 件、部位优先补
+       主角身上空着的槽（见 data.js 的 EARLY_GUARANTEE 和 dungeon.js 的 grantRewards）。
+       正常推图的玩家打完第 6 关正好凑齐一套，但每一件都是自己打出来的。
+       —— 老存档里已经拿到的 start_* 装备不动（送出去的东西不收回）。 */
     unlockWorld('W01');
     save();
   }

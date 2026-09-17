@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.6';
+  const GAME_VER = '9.6.7';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -766,7 +766,7 @@ window.UI = (function () {
       </div>
       <div class="idle-line idle-mini">
         <span class="il-k">【分工】</span>
-        <!-- V9.6.6（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
+        <!-- V9.6.7（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
              颜色本身就是状态：没派领队（没激活）灰、派了（激活）金。 -->
         <span class="il-s">${lines.map(l => `<span style="color:${l.leaderId ? 'var(--gold)' : 'var(--dim)'}">${l.line.name}</span>`).join('<span style="color:var(--line2)"> · </span>')}</span>
       </div>
@@ -2808,7 +2808,7 @@ window.UI = (function () {
       </div>
       ${rows.map(r => {
       const leader = r.leaderId;
-      /* V9.6.6（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
+      /* V9.6.7（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
          派了领队才算激活，标题 / 产出 / 边框一律金色高亮。一眼就能看出哪条线在干活。
          灰色只压文字与边框，操作按钮（＋ 派一名领队）保持正常，别看着像点不动。 */
       return `<div class="card" style="${leader
@@ -2816,7 +2816,7 @@ window.UI = (function () {
         : 'border-style:dashed;border-color:var(--line)'}">
         <h3 style="color:${leader ? 'var(--gold)' : 'var(--dim)'}">${r.line.ico} ${r.line.name}
           <span class="sub" style="${leader ? 'color:var(--gold)' : ''}">${r.per}</span></h3>
-        <!-- V9.6.6（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
+        <!-- V9.6.7（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
              外面只留"这条线在不在干活"（颜色）+ 一个入口。 -->
         <div class="hint mb2"${leader ? '' : ' style="color:var(--dim);opacity:.85"'}>${r.line.desc}</div>
         <button class="btn small block" data-idlepick="${r.line.id}" ${leader || bench.length ? '' : 'disabled'}>${
@@ -2840,7 +2840,7 @@ window.UI = (function () {
     const line = D.IDLE_LINES.find(l => l.id === lineId);
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const cur = S.idle.lines[lineId];
-    /* V9.6.6（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
+    /* V9.6.7（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
        所以这一层要先把自己当前的领队摆出来（含撤下），下面才是备选名单。 */
     const curBlock = cur ? `
       <div class="card" style="border-color:#e6b64c66">

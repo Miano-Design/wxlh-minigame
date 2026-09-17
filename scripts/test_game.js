@@ -2456,5 +2456,39 @@ setParty(['C021']);
   }
 }
 
+/* V9.6.7（父亲大人）：开局**不再白送一整套 R 装备**，改成"前面几关首通保底掉"。
+   这一段自带 Core.newGame()，放在文件最后跑 —— 它会把存档推进到"打完 W01 前 6 关"，
+   放中间会污染后面那些依赖"新档状态"的用例（第一版就是踩了这个坑）。
+   守住三件事：① 新档真的一件都不送；② 前 6 关首通各保底 1 件、正好补齐 6 个槽；
+   ③ 第 7 关首通不再保底。 */
+{
+  Core.newGame();
+  t('开局不白送装备（S.equips 为空）', Object.keys(Core.S.equips).length === 0);
+  t('开局主角身上一件装备都没有', Object.values(Core.S.equipped['@player'] || {}).every(v => !v));
+  t('首通保底表：W01 普通只覆盖前 6 关', D.earlyGuarantee('W01', 'normal', 0).rarity === 'N'
+    && D.earlyGuarantee('W01', 'normal', 5).rarity === 'R' && !D.earlyGuarantee('W01', 'normal', 6)
+    && !D.earlyGuarantee('W01', 'hard', 0) && !D.earlyGuarantee('W02', 'normal', 0));
+  /* 随机钉成 0.99：普通/精英那两档"概率掉落"一律不出，剩下的装备只可能来自保底 */
+  const drops = [];
+  withRandom(0.99, () => {
+    for (let st = 0; st < 6; st++) {
+      const g = Dungeon.grantRewards('W01', 'normal', st, st === 3 ? 'elite' : 'combat');
+      g.got.filter(x => x.k === 'equip').forEach(x => drops.push(x.v));
+      Core.stageComplete('W01', 'normal', st, 3);      // 标记已通，之后再打就不是首通了
+    }
+  });
+  t('前 6 关首通各保底掉 1 件装备（共 6 件）', Object.keys(Core.S.equips).length === 6);
+  t('保底掉的六个部位正好凑齐一套（不重复）',
+    drops.length === 6 && D.PLAYER_SLOTS.every(s => drops.some(e => e.slot === s)));
+  t('保底按表给稀有度：前 3 件 N、后 3 件 R',
+    ['N', 'N', 'N', 'R', 'R', 'R'].every((r, i) => drops[i] && drops[i].rarity === r));
+  /* 掉落只进背包、不自动穿上（网页版和这里一致）；穿不穿由玩家决定（一键最优装备） */
+  t('保底掉落进背包，不自动穿上', Object.values(Core.S.equipped['@player'] || {}).every(v => !v));
+  const g7 = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 6, 'combat'));
+  t('主角穿满之后第 7 关不再保底', g7.got.filter(x => x.k === 'equip').length === 0);
+  const again = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 0, 'combat'));
+  t('重复刷已通关的关不再保底', again.got.filter(x => x.k === 'equip').length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

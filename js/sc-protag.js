@@ -140,6 +140,8 @@
           CV.text('卸下', x + tw2 - 17 * CV.SCALE, y + 15 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
         } else {
           CV.text('未装备', x + tw2 / 2, y + th / 2 + 6 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+          /* V9.6.7 自审：空槽以前点了没反应（网页版空格子进候选列表） */
+          CV.hit('eqslot:@player:' + slot, x, y, tw2, th);
         }
       });
       U.y = y0 + Math.ceil(slots.length / cols) * (th + gap) - gap;

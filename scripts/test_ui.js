@@ -253,7 +253,11 @@ panel('扫荡', () => UI._panels.sweepModal('W01', 'normal'));
 panel('转生与天赋', () => UI._panels.reincarnModal());
 panel('铭刻', () => UI._panels.geneLockModal());
 panel('角色详情（6 装备槽）', () => UI._panels.charDetail('C021'));
-const anyEquipUid = Object.keys(Core.S.equips)[0];
+/* V9.6.7（自审抓到）：这里原来直接取 S.equips[0] —— 它靠的是"开局白送一套 R 装备"。
+   父亲大人把开局赠装改成首通保底之后，新档的 S.equips 是**空的**，
+   于是这条用例被 if 静默跳过（193 → 192 条，没人发现）。体检用例不许依赖别的模块的副作用，
+   自己造一件装备再测。 */
+const anyEquipUid = Object.keys(Core.S.equips)[0] || (Core.grantEquip('W01', 'R', 'weapon').equip || {}).uid;
 if (anyEquipUid) panel('装备详情', () => UI._panels.equipDetail(anyEquipUid));
 
 // ---- 新玩法面板（挂机分工 / 限时悬赏 / 境界渡劫） ----

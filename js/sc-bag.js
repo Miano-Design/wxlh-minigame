@@ -21,6 +21,14 @@
      照网页版做成选择模式：点格子选中 → 底栏显示"已选 N 件 · 预计 ◆ X" → 分解。 */
   let batchMode = false;
   const batchSel = new Set();
+  /* 一行「左文字 + 右按钮」（和 sc-last 的 coreRow 同一套写法；各文件各留一份，不跨文件依赖） */
+  function listBtn(o) {
+    const bw = 84 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+    const rowTop = U.y;
+    const h = U.listRow({ t1: o.t1, t2: o.t2, rightW: o.btn ? (bw + 10 * CV.SCALE) : 0, dim: o.dim, tag: o.tag });
+    if (o.btn) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, o.btn[0], o.btn[1], o.btn[2], o.btn[3]);
+    return h;
+  }
   function batchGain() {
     let gain = 0;
     batchSel.forEach(function (uid) {
@@ -241,6 +249,15 @@
         { label: '用 10 个', style: 'ghost', id: n >= 10 ? 'exp:10' : '' },
         { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'exp:0' : '' },
       ]);
+    } else if (it.type === 'serum') {
+      /* V9.6.7 自审抓到：血清以前**只有"炼"没有"喂"** —— 炼化台能做出来，
+         道具卡上却一个动作按钮都没有（说明里还写着"点这张卡选伙伴喂下"）。
+         补齐网页版那三个按钮 → 「使用血清」选人页。 */
+      U.btnRow([
+        { label: '用 1 支', style: 'ghost', id: n >= 1 ? 'serum:1' : '' },
+        { label: '用 10 支', style: 'ghost', id: n >= 10 ? 'serum:10' : '' },
+        { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'serum:0' : '' },
+      ]);
     } else if (it.type === 'material') {
       U.card(function () { U.note('强化装备时自动优先消耗', 2 * CV.SCALE); });
     } else if (it.type === 'ticket') {
@@ -305,6 +322,12 @@
         { label: eq.lock ? '🔒 已锁定' : '🔓 锁定保护', style: eq.lock ? 'primary' : 'ghost', id: 'eq_lock' },
         { label: '分解（◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3) + '）', style: 'ghost', id: eq.lock ? '' : 'eq_decomp' },
       ]);
+      /* V9.6.7 自审：伙伴身上的装备只能进详情、**没法卸下来**（主角那边才有「卸下」）。
+         网页版两边都有，这里补上 —— 只有真穿在谁身上时才出现。 */
+      if (wearer) {
+        U.space(CV.SP[1]);
+        U.btnRow([{ label: '卸下（从 ' + Core.charName(wearer) + ' 身上）', style: 'ghost', id: 'eq_unequip' }]);
+      }
     });
   });
   CV.on('eq_enh', function () {
@@ -324,6 +347,14 @@
       CV.toast(r.ok ? '分解成功，获得 ◆ ' + r.gain : (r.msg || '分解失败'));
       CV.pop();
     });
+  });
+  CV.on('eq_unequip', function () {
+    const S = Core.S;
+    const who = Object.keys(S.equipped).find(function (cid) { return Object.values(S.equipped[cid] || {}).indexOf(eqUid) >= 0; });
+    if (!who) { CV.toast('这件装备没穿在身上'); return; }
+    Core.unequipItem(who, (S.equips[eqUid] || {}).slot);
+    CV.toast('已卸下');
+    CV.render();
   });
 
   /* ---------- 事件 ---------- */
@@ -400,4 +431,134 @@
   /* 装备详情：背包 / 主角详情 / 伙伴详情三处共用同一个页面（前缀处理器） */
   CV.on('eqd:*', function (uid) { eqUid = uid; CV.push('eqdetail'); });
   CV.on('eq_back', function () { CV.pop(); });
+
+  /* ---------- 使用血清：选人（网页版 pickSerumTarget）----------
+     先选喂几支，再选喂给谁；血统血清只列对应血统的伙伴。已服满的不给点。 */
+  let serumCount = 1;
+  CV.register('serum_pick', function () {
+    const S = Core.S;
+    const it = D.ITEMS[curItem] || {};
+    const sd = it.serum || {};
+    const sid = String(curItem).replace(/^serum_/, '');
+    const have = S.items[curItem] || 0;
+    const cnt = Math.max(1, Math.min(serumCount || 1, have));
+    U.begin();
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
+    CV.text('使用血清', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.note('选择要吃「' + (it.name || '') + ' ×' + cnt + '」的伙伴 —— 永久生效', 0);
+    U.space(CV.SP[2]);
+    /* 候选：主角 + 已拥有的伙伴，血统对得上才列出来 */
+    const rows = [{ id: '@player', name: (S.player.name || '主角'), sub: '主角 · ' + (S.player.bloodline || '未觉醒血统'), bl: S.player.bloodline || null }];
+    Object.keys(S.chars).forEach(function (id) {
+      const ch = D.charById[id];
+      if (!ch) return;
+      const c = S.chars[id];
+      const bl = (c.bloodlineLv || 0) > 0 ? ch.bloodline : null;
+      rows.push({ id: id, name: ch.name, sub: 'Lv.' + c.lv + ' · ' + ch.role + ' · ' + (bl || '未觉醒血统'), bl: bl });
+    });
+    const usable = rows.filter(function (r) { return !sd.bloodline || r.bl === sd.bloodline; });
+    if (!usable.length) {
+      U.card(function () {
+        U.hint('没有可用对象：这支血清只有「' + sd.bloodline + '」血统能用（先去伙伴页觉醒血统）', 4 * CV.SCALE);
+      });
+    } else {
+      U.card(function () {
+        usable.forEach(function (r) {
+          const taken = Core.serumTaken(r.id, sid);
+          const full = taken >= (sd.max || 0);
+          listBtn({
+            t1: r.name, t2: r.sub + ' · 已服 ' + taken + '/' + sd.max + (full ? ' · 已满' : ''),
+            dim: full, tag: full ? '已满' : null,
+            btn: full ? null : ['喂 ' + cnt + ' 支', 'primary', 'serumtarget:' + r.id],
+          });
+        });
+      });
+    }
+    U.btnRow([{ label: '‹ 返回', style: 'ghost', id: 'serum_back' }]);
+  });
+  [1, 10, 0].forEach(function (v) {
+    CV.on('serum:' + v, function () {
+      const n = v === 0 ? (Core.S.items[curItem] || 0) : v;
+      if (n < 1) { CV.toast('道具不足'); return; }
+      serumCount = n; CV.push('serum_pick');
+    });
+  });
+  CV.on('serumtarget:*', function (id) {
+    const r = Core.useSerum(id, String(curItem).replace(/^serum_/, ''), serumCount);
+    CV.toast(r.msg || (r.ok ? '已喂下' : '不能喂'));
+    CV.render();
+  });
+  CV.on('serum_back', function () { CV.pop(); });
+
+  /* ---------- 选择装备（网页版 pickEquipFor）----------
+     V9.6.7 自审抓到：伙伴页 / 主角页的装备格，**空槽点了完全没反应**（只有装了装备的格子能点）。
+     网页版是"空格子 → 进这个部位的候选列表"。这里补齐，伙伴和主角共用同一个页面。 */
+  let pickChar = null, pickSlot = null;
+  function eqBrief(e) {
+    const st = Core.equipStats(e) || { flat: {}, affix: {} };
+    const parts = [];
+    const flat = st.flat || {};
+    if (flat.atk) parts.push('攻+' + Math.round(flat.atk));
+    if (flat.def) parts.push('防+' + Math.round(flat.def));
+    if (flat.hp) parts.push('血+' + Math.round(flat.hp));
+    if (flat.spd) parts.push('速+' + Math.round(flat.spd));
+    Object.keys(st.affix || {}).forEach(function (k) {
+      parts.push(((D.AFFIX_POOL || {})[k] || {}).name + '+' + (st.affix[k] * 100).toFixed(1) + '%');
+    });
+    return parts.join(' ');
+  }
+  function eqTag(e) {
+    if (e.charId) return '专属·' + (((D.charById || {})[e.charId] || {}).name || '?');
+    if (e.classSet) return ((D.CLASS_SETS || {})[e.classSet] || {}).name || '职业套装';
+    if (e.set) return ((D.SETS || {})[e.set] || {}).name || '世界套装';
+    return '普通';
+  }
+  CV.register('equip_pick', function () {
+    const S = Core.S, cid = pickChar, slot = pickSlot;
+    const allowed = (cid === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS) || [];
+    const cur = (S.equipped[cid] || {})[slot];
+    const curEq = cur && S.equips[cur];
+    U.begin();
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'equip_pick_back');
+    CV.text('选择' + (D.EQUIP_SLOTS[slot] || '') + '（' + Core.charName(cid) + '）', U.pad() + U.cw() / 2,
+      U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.note(curEq ? ('当前：' + curEq.name + ' +' + curEq.enhance + ' · 下面是换成这件之后的属性变化')
+      : '该部位还没有装备，装上即为净收益', 0);
+    U.space(CV.SP[2]);
+    const list = Core.inventoryEquips().filter(function (e) {
+      return e.slot === slot && allowed.indexOf(e.slot) >= 0 && Core.canEquip(cid, e);
+    });
+    if (!list.length) {
+      U.card(function () { U.hint('背包中没有该伙伴可穿戴的此部位装备', 4 * CV.SCALE); });
+    } else {
+      U.card(function () {
+        list.forEach(function (e) {
+          const who = Core.equipWearer(e.uid);
+          const isCur = e.uid === cur;
+          listBtn({
+            t1: e.name + ' +' + e.enhance + '　' + eqTag(e),
+            t2: eqBrief(e) + (isCur ? ' · 当前穿戴中' : (who ? (' · ' + Core.charName(who) + '装备中') : '')),
+            btn: isCur ? null : ['装备', 'primary', 'eqwear:' + e.uid],
+          });
+        });
+      });
+    }
+    U.btnRow([{ label: '‹ 返回', style: 'ghost', id: 'equip_pick_back' }]);
+  });
+  CV.on('eqslot:*', function (arg) {
+    const i = String(arg).indexOf(':');
+    if (i < 0) return;
+    pickChar = String(arg).slice(0, i);
+    pickSlot = String(arg).slice(i + 1);
+    CV.push('equip_pick');
+  });
+  CV.on('eqwear:*', function (uid) {
+    const from = Core.equipWearer(uid);
+    const ok = Core.equipItem(pickChar, uid);
+    CV.toast(ok ? (from && from !== pickChar ? ('已装备（从 ' + Core.charName(from) + ' 身上取下）') : '已装备') : '该伙伴无法穿戴此装备');
+    CV.render();
+  });
+  CV.on('equip_pick_back', function () { CV.pop(); });
 })();

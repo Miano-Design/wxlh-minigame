@@ -126,11 +126,21 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     if (r.bloodCrystal) { Core.addCur('bloodCrystal', r.bloodCrystal); got.push({ k: 'bloodCrystal', v: r.bloodCrystal }); }
     // 天赋「灯阁恩赐」的掉落加成：装备掉落率、材料掉落率、宝箱补给率统一按比例提高
     const dropBoost = Core.graceDropMult ? Core.graceDropMult() : 1;
-    if (Math.random() < Math.min(1, r.equipChance * dropBoost)) {
+    /* 首通保底（V9.6.6 父亲大人）：开局不再白送一套 R 装备，改成"前面几关自己打出来"。
+       规则：W01 普通前 6 关，**每关首通**保底 1 件，部位优先补主角身上空着的槽；
+       稀有度按 data.js 的 EARLY_GUARANTEE（前 3 关 N、后 3 关 R）。
+       主角六个槽都满了就不再保底（自限，不需要额外开关）。
+       判定"首通"用 S.worlds[...].stages[...] === 0 —— grantRewards 在 stageComplete 之前调用，
+       所以这时读到的还是"未通关"状态。 */
+    const gRule = D.earlyGuarantee(worldId, diff, stage);
+    const gStage = (Core.S.worlds[worldId] && Core.S.worlds[worldId].stages && Core.S.worlds[worldId].stages[diff]
+      && Core.S.worlds[worldId].stages[diff][stage]) || 0;
+    const guarantee = (gRule && gStage === 0) ? gRule : null;
+    if (guarantee || Math.random() < Math.min(1, r.equipChance * dropBoost)) {
       const cap = D.stageDropCap(stage);
-      let rarity = D.rollRarity(diff, r.equipMin);
+      let rarity = guarantee ? guarantee.rarity : D.rollRarity(diff, r.equipMin);
       if (!r.equipMin) rarity = D.capRarity(rarity, cap);   // Boss保底不受上限影响
-      const res = Core.grantEquip(worldId, rarity);
+      const res = Core.grantEquip(worldId, rarity, guarantee ? guarantee.slot : undefined);
       if (res.equip) got.push({ k: 'equip', v: res.equip });
       else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true });
     }
