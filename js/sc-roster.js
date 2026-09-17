@@ -61,32 +61,37 @@
   CV.register('roster', function () {
     U.begin();
     /* 筛选胶囊行：左边一排胶囊，右端「📕 图鉴」（网页版 V9.5.55） */
-    const pillH = 34 * CV.SCALE, gap = 6 * CV.SCALE;
+    const pillH = 44 * CV.SCALE, gap = 6 * CV.SCALE;      // 网页版 .pill：min-height 2.75rem、gap 0.375rem
+    const codexW = CV.measure('📕 图鉴', CV.FS.md) + 26 * CV.SCALE;   // .btn.small：左右 13px
     let x = U.pad();
     const gy = U.y;
+    /* 图鉴固定在右端（网页版是同一行横向滚动）；筛选用剩下的宽度排，
+       排不下的先不画——否则会像刚才那样把「SR」压在图鉴底下。 */
+    const limit = U.pad() + U.cw() - codexW - gap;
     FILTERS.forEach((f) => {
-      const w = CV.measure(f[1], CV.FS.md) + 24 * CV.SCALE;
+      const w = CV.measure(f[1], CV.FS.md) + 28 * CV.SCALE;   // 左右各 0.875rem
+      if (x + w > limit) return;
       CV.round(x, gy, w, pillH, pillH / 2, filter === f[0] ? '#3a1620' : CV.C.panel, filter === f[0] ? CV.C.accent : CV.C.line);
       CV.text(f[1], x + w / 2, gy + pillH / 2, { size: CV.FS.md, align: 'center', color: filter === f[0] ? CV.C.text : CV.C.text2 });
       CV.hit('rf:' + f[0], x, gy, w, pillH);
       x += w + gap;
     });
-    const codexW = CV.measure('📕 图鉴', CV.FS.md) + 22 * CV.SCALE;
     U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '📕 图鉴', 'ghost', 'open_codex');
-    U.y = gy + pillH + CV.SP[1];
+    U.y = gy + pillH + 6 * CV.SCALE;                       // .pill-tabs padding-bottom 0.375rem
     /* 排序行 */
     const sy = U.y;
-    CV.text('排序', U.pad() + 2, sy + pillH / 2, { size: CV.FS.sm, color: CV.C.dim });
+    const smH = 34 * CV.SCALE, smGap = 4 * CV.SCALE;          // .pill.sm：min-height 2.125rem、gap 0.25rem
+    CV.text('排序', U.pad() + 2, sy + smH / 2, { size: CV.FS.sm, color: CV.C.dim });
     let sx = U.pad() + 30 * CV.SCALE;
     SORTS.forEach((s) => {
-      const w = CV.measure(s[1], CV.FS.sm) + 20 * CV.SCALE;
+      const w = CV.measure(s[1], CV.FS.xs) + 22 * CV.SCALE;   // 左右各 0.6875rem
       if (sx + w > U.pad() + U.cw()) return;                  // 放不下的先不画（窄屏）
-      CV.round(sx, sy, w, pillH, pillH / 2, sort === s[0] ? '#3a1620' : CV.C.panel, sort === s[0] ? CV.C.accent : CV.C.line);
-      CV.text(s[1], sx + w / 2, sy + pillH / 2, { size: CV.FS.sm, align: 'center', color: sort === s[0] ? CV.C.text : CV.C.text2 });
-      CV.hit('rs:' + s[0], sx, sy, w, pillH);
-      sx += w + gap;
+      CV.round(sx, sy, w, smH, smH / 2, sort === s[0] ? '#3a1620' : CV.C.panel, sort === s[0] ? CV.C.accent : CV.C.line);
+      CV.text(s[1], sx + w / 2, sy + smH / 2, { size: CV.FS.xs, align: 'center', color: sort === s[0] ? CV.C.text : CV.C.text2 });
+      CV.hit('rs:' + s[0], sx, sy, w, smH);
+      sx += w + smGap;
     });
-    U.y = sy + pillH + CV.SP[1];
+    U.y = sy + smH + CV.SP[1];
     /* 已收集提示（网页版那行小灰字） */
     const cs = Core.codexState();
     U.hint('已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length + ' · 当前显示 ' + listSorted().length);
