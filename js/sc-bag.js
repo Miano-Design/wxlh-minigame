@@ -371,7 +371,8 @@
     const q = Core.enhanceQuote(eqUid);
     const est = Core.equipStats(eq);
     const set = D.SETS[eq.set];
-    const cs = eq.bloodSet ? D.BLOODLINE_SETS[eq.bloodSet] : null;
+    const bloodKey = eq.bloodSet ? D.bloodlineSetKey(eq.bloodWorld, eq.bloodSet) : null;
+    const cs = bloodKey ? D.BLOODLINE_SETS[bloodKey] : null;
     const gs = eq.godSet ? D.GOD_SETS[eq.godSet] : null;
     const wearer = Object.keys(S.equipped).find((cid) => Object.values(S.equipped[cid] || {}).indexOf(eqUid) >= 0);
     U.card(function () {
@@ -381,7 +382,7 @@
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
       if (gs) U.kv('血统神装', '仅限' + eq.godSet + '血统装备（穿戴者血统要对得上）');
-      if (cs) U.kv('血统套装', '仅限' + eq.bloodSet + '血统激活（和神装同一条规矩）');
+      if (cs) U.kv('血统套装', '仅限' + eq.bloodSet + '血统 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套');
       U.kv('分解可得', '◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3));
     });
     U.card(function () {
@@ -430,7 +431,14 @@
       });
     };
     if (gs) mkSetCard('血统神装', gs.name, gs.text, wornOf(eq.godSet, 'godSet'), 6);
-    else if (cs) mkSetCard('血统套装', cs.name, cs.text, wornOf(eq.bloodSet, 'bloodSet'), 3);
+    else if (cs) {
+      // 血统套装按「同一张图 + 同一支血统」计件（V9.6.83），不能再只比血统名
+      const bcnt = owner ? Object.keys(S.equipped[owner] || {}).filter(function (sl) {
+        const u = S.equipped[owner][sl];
+        return u && S.equips[u] && S.equips[u].bloodSet === eq.bloodSet && S.equips[u].bloodWorld === eq.bloodWorld;
+      }).length : 0;
+      mkSetCard('血统套装', cs.name, cs.text, bcnt, 6);
+    }
     else if (set) mkSetCard('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
     U.card(function () {
       U.h3('强化', '+' + eq.enhance + '/20');
@@ -636,7 +644,7 @@
   function eqTag(e) {
     if (e.charId) return '专属·' + (((D.charById || {})[e.charId] || {}).name || '?');
     if (e.godSet) return ((D.GOD_SETS || {})[e.godSet] || {}).name || '血统神装';
-    if (e.bloodSet) return ((D.BLOODLINE_SETS || {})[e.bloodSet] || {}).name || '血统套装';
+    if (e.bloodSet) { const bk = D.bloodlineSetKey ? D.bloodlineSetKey(e.bloodWorld, e.bloodSet) : null; return (bk && (D.BLOODLINE_SETS || {})[bk] ? D.BLOODLINE_SETS[bk].name : (e.bloodSet + '套装')); }
     if (e.set) return ((D.SETS || {})[e.set] || {}).name || '世界套装';
     return '普通';
   }

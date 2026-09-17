@@ -134,9 +134,11 @@ console.log('\n=== ⑥ 四条装备线：各几套 · 从哪来 ===');
     + ' ＋ 装备箱（' + boxNames + '；箱子里开出传说及以下时，走的还是这台随机线）');
   console.log('     一件装备落在哪条线（实测抽 4000 次）：SR ' + JSON.stringify(lineShare('W10', 'SR'))
     + ' · SSR ' + JSON.stringify(lineShare('W10', 'SSR')));
-  console.log('  ② 血统套装 ' + Object.keys(D.BLOODLINE_SETS).length + ' 套（' + Object.values(D.BLOODLINE_SETS).map(s => s.name).join(' / ') + '，2/3 件）');
+  console.log('  ② 血统套装 ' + Object.keys(D.BLOODLINE_SETS).length + ' 套（第 ' + D.BLOODLINE_MIN_WORLD + ' 张图起，'
+    + (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) + ' 张 × ' + (D.BLOODLINE_KEYS || []).length + ' 支血统各一套，2/4/6 件）'
+    + ' —— 名字带世界，如「' + D.BLOODLINE_SETS[D.bloodlineSetKey('W20', '血族')].name + '」');
   console.log('     来源：和世界套装**同一台随机线**（野外掉落 + 装备箱），只是落点不同（见上面那行实测占比）；'
-    + '穿戴要求同血统');
+    + '穿戴要求同血统，**计件只认同一张图**的件');
   console.log('  ③ 血统神装 ' + Object.keys(D.GOD_SETS).length + ' 套（' + Object.values(D.GOD_SETS).map(s => s.name).join(' / ') + '，2/4/6 件）');
   {
     const w21 = D.WORLDS[20], w36 = D.WORLDS[35];

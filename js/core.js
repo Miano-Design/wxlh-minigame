@@ -444,7 +444,7 @@ window.Core = (function () {
   }
 
   /* ================= 道具 ================= */
-  // 套装加成：世界套装 2/4/6 件；血统套装 2/3 件；血统神装 2/4/6 件（后两者已按血统匹配计入 sets）
+  // 套装加成：世界套装 2/4/6 件；血统套装 2/4/6 件（按"同一张图+同一支血统"计件）；血统神装 2/4/6 件
   function applySetBonuses(pct, sets) {
     Object.entries(sets).forEach(([setId, n]) => {
       if (setId.startsWith('blood:')) {
@@ -1170,7 +1170,7 @@ window.Core = (function () {
   /* ⚠ 这里要的是**血统名**，不是套装 key（V9.6.82 踩过：传错的池子会让 makeEquip 找不到套装、
      静默降级成世界套装 —— 表面不报错，实际血统套装一件都掉不出来）。 */
   function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_KEYS || Object.keys(D.BLOODLINE_SETS)); }
-  // SSR 专属装备（UR，绑定角色）
+  // 伙伴专属装备（UR，绑定角色 · 六支血统各一件）
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     /* 专属装备的基础值按**玩家当前进度**那张图的档位生成（V9.6.83）——
