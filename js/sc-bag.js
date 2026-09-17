@@ -422,7 +422,7 @@
             U.ix() + lw + 6 * CV.SCALE, y + 8 * CV.SCALE, { size: CV.FS.lg, color: on ? CV.C.gold : CV.C.dim });
           U.space(16 * CV.SCALE);
         });
-        if (!owner) U.hint('这件还没穿在人身上 —— 套装件数只算真穿着的装备，穿上才算。', 4 * CV.SCALE);
+        /* V9.6.16（父亲大人）：这行解释多余 —— 件数是 0/3、效果一条条都列着，不用再解释一遍。 */
       });
     };
     if (cs) mkSetCard('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
