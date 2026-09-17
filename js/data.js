@@ -580,6 +580,10 @@ window.DATA = (function () {
     defPct: { name: '防御', min: 0.02, max: 0.22, pct: true },
     resPct: { name: '异常抗性', min: 0.02, max: 0.16, pct: true },
     evaPct: { name: '闪避', min: 0.01, max: 0.07, pct: true },
+    /* V9.6.87：**精神**原来不在词条池里 —— 于是"修真（法师）""念动力（辅助）"这两支血统
+       最想要的属性，掉出来的装备**一件都带不了**；而专属「心识之环」写着 spiritPct，
+       界面上只能显示成英文键名（词条名表里查不到）。补进来，三件事一起解决。 */
+    spiritPct: { name: '精神', min: 0.03, max: 0.22, pct: true },
   };
   const AFFIX_BY_RARITY = { N: 0.25, R: 0.4, SR: 0.6, SSR: 0.8, UR: 1.0, MYTH: 1.35 }; // 词条取值位置（区间内；神话可以越过区间上限，这是它的价值所在）
 
