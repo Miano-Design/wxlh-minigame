@@ -295,7 +295,8 @@
     CV.render();
   });
   CV.on('back_bag', function () { CV.pop(); });
-  CV.on('go_recruit', function () { CV.toast('招募页在下一步复刻里'); });
+  /* 背包空的时候那句「去招募伙伴」——以前只弹一句提示，点了等于没反应。 */
+  CV.on('go_recruit', function () { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); });
   CV.on('item:*', function (id) { curItem = id; CV.push('item'); });   // 前缀处理器：任何道具 id 都走这里
   [1, 10, 0].forEach(function (v) {
     CV.on('box:' + v, function () {
