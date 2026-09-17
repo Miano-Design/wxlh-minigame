@@ -14,6 +14,7 @@ require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血�
 require('./js/sc-home.js');      // 灯阁（首页）
 require('./js/sc-roster.js');   // 执灯者：伙伴总览 + 伙伴详情
 require('./js/sc-recruit.js'); // 招募（三池 + 结果页 + 概率公示）
+require('./js/sc-core-pages.js'); // 评级 / 权限 / 建设 / 境界 / 铭刻 / 伴生体 / 转生 / 灯录
 require('./js/sc-lines.js');   // 秘术阁 / 法宝 / 坐骑 / 药园 / 斗法台 / 求签
 require('./js/sc-grow.js');    // 成长（十三条养成线）+ 兑换大厅（四家店）
 require('./js/sc-party.js');   // 队伍（小队 / 编队预设 / 阵型 / 挑人上阵）

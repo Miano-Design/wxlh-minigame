@@ -222,6 +222,15 @@
   ['open_keji', 'open_fabao', 'open_mount', 'open_garden', 'open_arena', 'open_sign'].forEach(function (id) {
     CV.on(id, function () { CV.push(id.replace('open_', '')); });
   });
+  /* 剩下几条线：评级 / 权限 / 建设 / 境界 / 铭刻 / 伴生体 / 转生 / 灯录 */
+  CV.on('open_sect', function () { CV.push('sect'); });
+  CV.on('open_authority', function () { CV.push('authority'); });
+  CV.on('open_buildings', function () { CV.push('buildings'); });
+  CV.on('open_realm', function () { CV.push('realm'); });
+  CV.on('open_genelock', function () { CV.push('genelock'); });
+  CV.on('open_beast', function () { CV.push('beast'); });
+  CV.on('open_reincarn', function () { CV.push('reincarn'); });
+  CV.on('open_codex', function () { CV.push('codex'); });
   CV.on('open_shop', function () { CV.push('shop'); });
 
   CV.on('open_recruit', function () {
@@ -234,7 +243,6 @@
      之前"成长"已经接上真实页面了，又在这里被占位提示盖掉，点了就只弹一句"还在复刻"。
      现在先查一下有没有处理器，有就跳过，以后每补一页都不用手动从这份清单里删。 */
   [ 'open_travel', 'open_idlelines', 'open_guide', 'open_settings',
-    'open_sect', 'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
     'open_refine', 'open_bounty', 'open_tasks', 'open_ach'].forEach(function (id) {
     if (CV.onAct[id]) return;                     // 已经有真实页面了，别盖掉
     CV.on(id, () => CV.toast('这一页还在复刻队列里（下一步）'));
