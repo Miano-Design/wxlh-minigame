@@ -460,7 +460,11 @@
     lines.forEach(function (ln, i) {
       CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
     });
-    CV.text(coachState.mustTap ? '点高亮的地方 ›' : '点一下继续 ›',
+    /* V9.6.38（自审）：mustTap 但这次**没找到锚点**（目标按钮是条件出现的，比如
+       "突破铭刻"只在能突破时才有）→ 必须退回"点一下继续"，否则玩家找不到可点的高亮、直接卡死。
+       引导的第一原则是"不能把人卡住"，其次才是强制。 */
+    const forced = coachState.mustTap && !!r;
+    CV.text(forced ? '点高亮的地方 ›' : '点一下继续 ›',
       tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
       { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
     c.restore();
@@ -468,7 +472,7 @@
     /* mustTap 的那条**不铺全屏"随便点"**，只有一颗小小的"跳过这一步"
        （父亲大人：完全强制 —— 但每一步仍然允许跳过，不然卡住就没救了）；
        其它条维持"点一下继续"。 */
-    if (coachState.mustTap) {
+    if (forced) {
       const sw = 76 * CV.SCALE, sh = 30 * CV.SCALE;
       U.btn(tx, ty + th - sh - 6 * CV.SCALE, sw, sh, '跳过这一步', 'ghost', '_coach_ok');
     } else {

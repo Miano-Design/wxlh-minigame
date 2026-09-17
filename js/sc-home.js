@@ -69,9 +69,11 @@
     tasks:    { page: 'tasks',    s: ['tasktab:main'], t: '任务解锁了：主线 / 日常 / 周常 / 成就四个标签，做完记得回来领。' },
     corridor: { page: 'corridor', s: ['corridor_fight'], t: '深井解锁了：一直往上打、没有重置，每 10 层给一枚印记加成。' },
     bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗血统结晶 + 点数，每级全属性都涨。' },
-    geneLock: { page: 'genelock', s: [], t: '铭刻解锁了：点满每一条都有永久加成，是长期成长线。' },
-    beast:    { page: 'beast',    s: [], t: '伴生体解锁了：孵化出来能带上场，给全队加属性。' },
-    reincarn: { page: 'reincarn', s: [], t: '转生解锁了：重置等级和世界进度换永久天赋点，中后期主力成长线。' },
+    /* 这三条的按钮都是**条件出现**的（能突破/够蛋/够条件才有 id）——
+       找不到目标时 drawCoach 会自动退回"点一下继续"，不会把人卡住。 */
+    geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是血统结晶。' },
+    beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
+    reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
   };
   function coachByUnlock(page) {
     const ids = Object.keys(UNLOCK_GUIDE);
