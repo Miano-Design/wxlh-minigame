@@ -636,6 +636,11 @@ window.DATA = (function () {
     box_sr: { name: 'SR装备箱', type: 'box', rarity: 'SR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SR 品质装备', src: '兑换大厅各店、每日任务、游历奇遇、药园' },
     box_ssr: { name: 'SSR装备箱', type: 'box', rarity: 'SSR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SSR 品质装备', src: '异界/深井商店、七日登录第 6 天' },
     box_ur: { name: 'UR装备箱', type: 'box', rarity: 'UR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 UR 品质装备；10% 概率开出 SSR 专属装备', src: '异界/深井商店（高阶货币）' },
+    /* V9.6.79（父亲大人："神装可以有购买，不过也得通关第二十个世界后才能购买，且只能购买装备箱，
+       开箱也是概率掉落而已，装备箱也是随机装备箱，保底传说套装，但神装也是小概率出"）
+       —— 血统神装箱：**只有它**能买到神话，而且买到的还是一个"箱"、开出来还得看运气。
+       随机 = 部位随机、血统随机（和守关掉落同一条随机线），所以凑齐一套仍然要攒。 */
+    box_myth: { name: '血统神装箱', type: 'box', rarity: 'MYTH', mythBox: true, use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '随机开出一件【传说】装备，并有 15% 概率升格为【神话·血统神装】（部位与血统均随机）', src: '异界商店（通关残域第 20 个世界后解锁）' },
     beast_egg: { name: '兽魂石', type: 'material', tier: 1, use: '在灯阁「🐾 伴生体」里孵化：10 颗孵 1 只', desc: '伴生体孵化材料：10 颗可以在兽栏孵化 1 只伴生体', src: '副本 Boss（必掉）、精英（概率）、灯阁市集、限时悬赏' },
   };
   // 强化等级 → 材料 tier（+0~4:T1，+5~9:T2，+10~14:T3，+15~19:T4，+19→20:T5）
@@ -726,6 +731,10 @@ window.DATA = (function () {
       '装备 6 种品质：普通 / 精良 / 稀有 / 史诗 / 传说 / **神话**，品质越高基础值和词条越多。',
       '神话（血统神装）：残域第 21 张图起，**守关 Boss** 才有概率掉；六套各对应一支血统（血族/狼人/修真/魔法/科技/念动力），' +
       '只有**同血统的人**穿得上，凑齐 2/4/6 件各有一档效果——末段想继续变强，就靠给主力一人配齐一套。',
+      '血统神装箱：通关**第 20 个世界**后，异界商店才会上架（25000 异界结晶）。开出来保底是【传说】，' +
+      '15% 概率升格成【神话·血统神装】——部位与血统都随机，所以凑套仍然要攒。',
+      '掉落的档位跟着世界走：W01~W02 只出精良、W03~W05 才有稀有、W06 起出史诗、W10 之后才见传说；' +
+      '同一种货，守关比精英好一档、精英比杂兵好一档，困难/地狱再各抬一档（但抬不破本段上限）。',
       '主角和每名伙伴都是 6 个槽位：武器 / 头部 / 胸甲 / 手部 / 腿部 / 饰品，六个部位都能穿。',
       '强化最高 +20，消耗对应等级的强化材料（不够时用点数代用）+ 异界结晶；强化失败不会降级。',
       '材料按强化等级分 5 档：+0~4 基础金属、+5~9 强化合金、+10~14 异界合金、+15~19 虚空晶体、+20 灯阁残片。',
@@ -1523,6 +1532,10 @@ window.DATA = (function () {
       { item: 'box_sr', name: 'SR装备箱', price: 100, stock: -1 },
       { item: 'box_ssr', name: 'SSR装备箱', price: 500, stock: -1 },
       { item: 'box_ur', name: 'UR装备箱', price: 2000, stock: -1 },
+      /* V9.6.79：神话的唯一购买入口 —— **通关第 20 个世界**才上架，而且买的还是"箱"。
+         定价按后期收入量过：后期异界结晶约 3400/天，25000 ≈ 一周多一点 ——
+         是一件值得攒的东西，又不是随手就买（一箱 15% 出神话，凑一套要攒很久）。 */
+      { item: 'box_myth', name: '血统神装箱', price: 25000, stock: -1, req: { world: 'W20' } },
       { item: 'mat_t2', name: '强化合金×10', price: 50, count: 10, stock: -1 },
       { item: 'mat_t3', name: '异界合金×5', price: 100, count: 5, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 300, count: 5, stock: -1, req: { world: 'W04' } },
@@ -1942,6 +1955,24 @@ window.DATA = (function () {
   /* 这一段图最高的掉落档（给界面/体检用；神话不在其中） */
   function dropCapOf(worldIdx) { return dropBlockOf(worldIdx).cap; }
 
+  /* ================= 强化材料档位：按世界推进给（V9.6.79 修） =================
+     旧写法是 `tier = Math.min(5, 世界序号)` —— 于是**第 5 张图之后永远只掉 T5**。
+     可是强化 +5/+10/+15/+20 分别要吃 T2/T3/T4/T5（见 ENHANCE_RATE 与 enhanceQuote），
+     也就是"掉落这一路是断的"：后期玩家只能靠商店和药园补低档材料。
+     现在：本段主档 = 世界序号每 7 张抬一档，**低档按概率跟着掉、越往后掉得越宽** ——
+     推进世界不会把低档材料断掉，一件新装备从 +0 砸到 +20 也不用回头刷前面。 */
+  function matTierWeights(worldIdx) {
+    const idx = Math.max(1, Math.floor(worldIdx) || 1);
+    const main = Math.min(5, Math.floor((idx - 1) / 7) + 1);
+    const w = {}; w[main] = 1;
+    const extra = [0.30, 0.15, 0.08, 0.04];
+    for (let i = 1; i < main; i++) {
+      const t = main - i;
+      w[t] = (w[t] || 0) + extra[Math.min(extra.length - 1, i - 1)];
+    }
+    return w;
+  }
+
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
@@ -1978,7 +2009,7 @@ window.DATA = (function () {
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
     corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,
     CORRIDOR_MARK_STEP, CORRIDOR_MARK_CAP, CORRIDOR_MARK_PCT,
-    DROP_BLOCKS, dropBlockOf, rollEquipRarity, dropChancesOf, dropCapOf,
+    DROP_BLOCKS, dropBlockOf, rollEquipRarity, dropChancesOf, dropCapOf, matTierWeights,
     UNLOCKS, MAIN_QUESTS,
     CURRENCY_INFO, CODEX_REWARDS, enhanceMatTier, MAT_SUBSTITUTE_POINTS,
     GUIDE_CHAPTERS,

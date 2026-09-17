@@ -102,7 +102,11 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       /* V9.6.76：第 21 张图起，守关 Boss 有概率掉**血统神装（神话）** ——
          末段真正的成长线在这里（见 data.js 的 GOD_SETS）。只给 Boss，不给杂兵/精英：
          "刷神话"该是一件有目标的事，不是刷两关就顺出来的货。 */
-      if (tier >= 21) base.mythChance = diff === 'hell' ? 0.35 : diff === 'hard' ? 0.20 : 0.10;
+      /* V9.6.79：守关掉神话的概率从 10/20/35% 收到 **5/12/25%**。
+         起因是 drop_audit 把那本账算了出来：扫荡 60 次守关 = 一天 6 件神话，
+         "神装是后期也算稀有的东西"这句话就站不住了（父亲大人的原话）。
+         收到 5% 之后是 ~3 件/天，给一个 5 人队凑齐 6 件×5 人仍然要几周。 */
+      if (tier >= 21) base.mythChance = diff === 'hell' ? 0.25 : diff === 'hard' ? 0.12 : 0.05;
     } else if (kind === 'elite') {
       base.points = Math.round((80 + tier * 40) * rm * 2.5);
       base.exp = Math.round((60 + tier * 20) * rm * 2.5);
@@ -162,10 +166,19 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
       else if (sigRes.sold) got.push({ k: 'otherworld', v: sigRes.gain, sold: true });
     }
     if (r.exp) got.push({ k: 'exp', v: r.exp });
-    // 强化材料掉落：精英 35%、Boss 必掉 1~2 件，普通战 8% 小概率掉，tier 随世界序号
+    /* 强化材料掉落：精英 35%、Boss 必掉 1~2 件，普通战 8% 小概率掉。
+       V9.6.79：档位改由 D.matTierWeights(世界) 给 —— 旧写法 `Math.min(5, 世界序号)`
+       让第 5 张图之后永远只掉 T5，而 +5/+10/+15 要吃 T2/T3/T4，掉落这一路是断的。 */
     const wi = D.WORLDS.findIndex(x => x.id === worldId);
-    const tier = Math.min(5, wi + 1);
-    const matId = 'mat_t' + tier;
+    const worldIdx = wi + 1;
+    const pickMat = () => {
+      const w = D.matTierWeights(worldIdx);
+      const total = Object.values(w).reduce((a, x) => a + x, 0);
+      let rr = Math.random() * total, acc = 0, t = worldIdx;
+      for (const k of Object.keys(w)) { acc += w[k]; if (rr <= acc) { t = +k; break; } }
+      return 'mat_t' + t;
+    };
+    const matId = pickMat();
     if (kind === 'elite' && Math.random() < Math.min(1, 0.35 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
     if (kind === 'boss') { const n = 1 + (Math.random() < 0.5 ? 1 : 0); if (Core.addItem(matId, n)) got.push({ k: 'item', v: matId, n }); }
     if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
@@ -197,15 +210,12 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
         if (Core.addItem('ticket_lim')) got.push({ k: 'item', v: 'ticket_lim', n: 1 });
       }
     }
-    // 高阶世界的普通战斗也会掉低级材料（前期囤的材料不会因为世界推进变废）
-    if (kind !== 'boss' && tier > 1 && Math.random() < 0.12 * dropBoost) {
-      const lowId = 'mat_t' + (tier - 1);
-      if (Core.addItem(lowId)) got.push({ k: 'item', v: lowId, n: 1 });
-    }
+    /* （旧这里的"高阶世界 12% 掉低一档材料"已经并进 pickMat 的低档权重里：
+       现在每一颗材料的档位都是按世界抽的，天然不会断档。） */
     // 高阶经验模块：W07 起精英/Boss 掉落，等级曲线调整后需要稳定的高阶经验来源
-    if (tier >= 7 && (kind === 'boss' || (kind === 'elite' && Math.random() < 0.3 * dropBoost))) {
-      const expId = tier >= 15 ? 'exp_xxl' : tier >= 11 ? 'exp_xl' : 'exp_l';
-      const n = kind === 'boss' ? (tier >= 11 ? 1 : 2) : 1;
+    if (worldIdx >= 7 && (kind === 'boss' || (kind === 'elite' && Math.random() < 0.3 * dropBoost))) {
+      const expId = worldIdx >= 15 ? 'exp_xxl' : worldIdx >= 11 ? 'exp_xl' : 'exp_l';
+      const n = kind === 'boss' ? (worldIdx >= 11 ? 1 : 2) : 1;
       if (Core.addItem(expId, n)) got.push({ k: 'item', v: expId, n });
     }
     /* 原来的"增益补给 / 高阶消耗品"两段判定同样并进素材掉落：
@@ -213,11 +223,14 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     if (kind !== 'combat' && Math.random() < Math.min(1, 0.30 * dropBoost)) {
       if (Core.addItem(matId, 1)) got.push({ k: 'item', v: matId, n: 1 });
     }
-    // 兽魂石：伴生体的唯一稳定来源。Boss 必掉 1~3 颗，精英 30% 掉 1 颗
-    if (kind === 'boss') {
-      const n = 1 + (Math.random() < 0.5 ? 1 : 0) + (Math.random() < 0.25 ? 1 : 0);
-      if (Core.addItem(D.BEAST_EGG_ITEM, n)) got.push({ k: 'item', v: D.BEAST_EGG_ITEM, n });
-    } else if (kind === 'elite' && Math.random() < Math.min(1, 0.30 * dropBoost)) {
+    /* 兽魂石：伴生体的唯一稳定来源。
+       V9.6.79（drop_audit 算出来的）：原来是"守关**必掉** 1~3 颗、精英 30%"，
+       而扫荡一天能打 60 次守关 → **一天 105 颗**，孵一只要 10 颗 = 一天孵 10 只。
+       全游戏只有 12 只伴生体，等于这个系统两天就被刷穿，兽魂升级那条线也一起废掉。
+       现在：守关 10%、精英 5% → 扫荡约 6 颗/天（12 只约 20 天收齐，重复的转兽魂）。 */
+    if (kind === 'boss' && Math.random() < Math.min(1, 0.10 * dropBoost)) {
+      if (Core.addItem(D.BEAST_EGG_ITEM, 1)) got.push({ k: 'item', v: D.BEAST_EGG_ITEM, n: 1 });
+    } else if (kind === 'elite' && Math.random() < Math.min(1, 0.05 * dropBoost)) {
       if (Core.addItem(D.BEAST_EGG_ITEM, 1)) got.push({ k: 'item', v: D.BEAST_EGG_ITEM, n: 1 });
     }
     return { rewards: r, got };

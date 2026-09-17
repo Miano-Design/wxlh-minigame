@@ -2662,10 +2662,29 @@ window.Core = (function () {
       if (sigRes.equip) return { ok: true, equip: sigRes.equip, signature: true };
       if (sigRes.sold) return { ok: true, sold: true, gain: sigRes.gain || 0 };
     }
-    const world = D.WORLDS[Math.floor(Math.random() * Math.min(3, D.WORLDS.length))];
-    const res = grantEquip(world.id, item.rarity);
+    /* V9.6.79（自审抓到的坑）：这里原来固定从**前三个世界**里抽一个当装备档位 ——
+       于是后期花 2000 异界结晶买的 UR 箱，开出来的武器攻击只有 84~164，
+       **还不如第 10 张图的白装（222）**。箱子越买越亏，等于把"高阶货币出口"做成了废品回收站。
+       现在按"你打到哪"给档位（见 boxSourceWorld）。 */
+    const worldId = boxSourceWorld();
+    let rarity = item.rarity;
+    if (item.mythBox) rarity = Math.random() < 0.15 ? 'MYTH' : 'UR';   // 保底传说、小概率神话
+    const res = grantEquip(worldId, rarity);
     save();
     return { ok: true, equip: res.equip, sold: res.sold, gain: res.gain || 0 };
+  }
+  /* 开箱按"你打到哪"给档位：取**已通关的最高世界**，没有通关的就取已解锁的最高世界。
+     这样新号的箱子还是新手装（合理），老号的箱子就是当前档位的货（合理）。 */
+  function boxSourceWorld() {
+    let cleared = null, unlocked = null;
+    D.WORLDS.forEach(w => {
+      const st = S.worlds[w.id];
+      if (!st || !st.unlocked) return;
+      unlocked = w;
+      const arr = st.stages && st.stages.normal;
+      if (arr && arr.length && arr.every(x => x > 0)) cleared = w;
+    });
+    return (cleared || unlocked || D.WORLDS[0]).id;
   }
   // 批量开箱：逐个结算并汇总
   function openBoxes(itemId, n = 1) {
@@ -3256,7 +3275,7 @@ window.Core = (function () {
     refreshUnlocks, isUnlocked, unlockTip, skillPointsForLevel,
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
-    buyShopItem, openBox, openBoxes, dailyDate, sweepLeft, enhanceMat,
+    buyShopItem, openBox, openBoxes, boxSourceWorld, dailyDate, sweepLeft, enhanceMat,
     addSweepBonus, ensureSweepDay,
     shopReq,
     ensureDaily, task, claimTask, claimAllTasks, loginReward,

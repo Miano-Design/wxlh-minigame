@@ -26,7 +26,7 @@ const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
    路径已经改成读 ../wxlh-game，属于小游戏自己的副本 —— 再同步会把那行路径覆盖掉，所以不同步。 */
 /* drop_table.js 是"纯逻辑层"的尺子（只读 data.js + dungeon.js，不碰界面），
    所以两边各留一份、跟着同步 —— 掉落表改完，网页版和小游戏看到的概率表必须是同一张。 */
-const CHECKS = ['test_game.js', 'cap_audit.js', 'drop_table.js'];
+const CHECKS = ['test_game.js', 'cap_audit.js', 'drop_table.js', 'drop_audit.js'];
 
 let changed = 0, same = 0;
 const JOBS = [];

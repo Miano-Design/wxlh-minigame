@@ -2562,5 +2562,64 @@ setParty(['C021']);
   t('第 21 张图守关真的会掉神话（mythChance 是接上的）', got.myth > 0, got.myth + ' / ' + got.total);
 }
 
+/* ---- 掉落分配（V9.6.79 父亲大人："各种装备或道具材料掉落的几率都检查一下分配合不合理"）----
+   这一块盯的是**这次改掉的四条**，每一条当时都算错过（详见 drop_audit.js 的输出）。 */
+{
+  const dun = window.Dungeon;
+  /* ① 材料档位不能断：第 31 张图要能掉到 T1~T5（强化 +5/+10/+15/+20 各吃一档） */
+  Core.newGame(); Core.setPlayerName('材料'); Core.choosePlayerBloodline('修真');
+  Core.S.bag.eqCap = 100000;
+  const tiers = {};
+  for (let i = 0; i < 3000; i++) {
+    const g = dun.grantRewards('W31', 'normal', 12, 'boss', { noTicket: true });
+    (g.got || []).forEach(x => { if (x.k === 'item' && /^mat_t\d$/.test(x.v)) tiers[x.v] = (tiers[x.v] || 0) + 1; });
+  }
+  t('第 31 张图仍能掉到 T1~T5 全部五档材料（推进不断档）',
+    [1, 2, 3, 4, 5].every(n => (tiers['mat_t' + n] || 0) > 0), JSON.stringify(tiers));
+
+  /* ② 兽魂石日产：全游戏只有 12 只伴生体、10 颗孵一只，日产不能把系统刷穿 */
+  Core.newGame(); Core.setPlayerName('兽魂'); Core.choosePlayerBloodline('修真');
+  Core.S.bag.eqCap = 100000;
+  let eggs = 0;
+  const N = 3000;
+  for (let i = 0; i < N; i++) {
+    const g = dun.grantRewards('W21', 'normal', 12, 'boss', { noTicket: true });
+    eggs += (g.got || []).filter(x => x.v === 'beast_egg').reduce((s, x) => s + (x.n || 1), 0);
+  }
+  const eggDay = eggs / N * 60;
+  t('兽魂石日产 ≤ 15 颗（12 只伴生体不至于两天刷穿）', eggDay <= 15, eggDay.toFixed(1) + ' 颗/天');
+
+  /* ③ 装备箱的档位要跟进度走（曾经固定 W01~W03，后期买的箱子开出来是新手装） */
+  Core.newGame(); Core.setPlayerName('新号'); Core.choosePlayerBloodline('修真');
+  const boxNew = Core.boxSourceWorld();
+  Core.S.worlds.W20 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  const boxLate = Core.boxSourceWorld();
+  t('开箱档位跟进度走（新号 W01 · 打通 20 张图后 W20）', boxNew === 'W01' && boxLate === 'W20', boxNew + ' → ' + boxLate);
+
+  /* ④ 血统神装箱：通关第 20 个世界才上架 · 保底传说 · 小概率神话 */
+  Core.newGame(); Core.setPlayerName('神装箱'); Core.choosePlayerBloodline('修真');
+  const idx = D.SHOPS.otherworld.items.findIndex(x => x.item === 'box_myth');
+  t('神装箱在异界商店里、且写着"通关 W20 才上架"',
+    idx >= 0 && D.SHOPS.otherworld.items[idx].req && D.SHOPS.otherworld.items[idx].req.world === 'W20');
+  const before = Core.buyShopItem('otherworld', idx);
+  t('没通关第 20 个世界时买不到神装箱', !before.ok, before.msg || '');
+  D.WORLDS.slice(0, 20).forEach(w => { Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } }; });
+  Core.addCur('otherworld', 25000);
+  const after = Core.buyShopItem('otherworld', idx);
+  t('通关第 20 个世界后能买到（价格 25000 异界结晶）', after.ok, after.msg || '');
+  Core.S.bag.eqCap = 5000;
+  Core.addItem('box_myth', 600);
+  let my = 0, ur = 0, other = 0;
+  for (let i = 0; i < 600; i++) {
+    const r = Core.openBox('box_myth');
+    if (!r.equip) { other++; continue; }
+    if (r.equip.rarity === 'MYTH') my++;
+    else if (r.equip.rarity === 'UR') ur++;
+    else other++;
+  }
+  t('神装箱保底是传说（开不出传说以下的）', ur + my === 600, 'UR ' + ur + ' · MYTH ' + my + ' · 其它 ' + other);
+  t('神装箱小概率出神话（≈15%，实测 8%~22%）', my / 600 >= 0.08 && my / 600 <= 0.22, (my / 600 * 100).toFixed(1) + '%');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
