@@ -118,7 +118,10 @@
     for (let i = 0; i < TOUR.length; i++) {
       const st = TOUR[i];
       if (S.coachSeen[st.key]) continue;
-      if (CV.top().name !== st.page) { CV.cur = st.page; CV.reset(st.page); }
+      /* V9.6.54（父亲大人：点到别的界面又给我跳到副本界面了、跳来跳去）：
+         **绝不自动换页** —— 以前这里会把玩家从他正在看的页面硬拽到下一步那页，
+         于是碰一下别的界面就被弹回副本，又乱又卡。现在只有他本来就在这一页时才播这一课。 */
+      if (CV.top().name !== st.page) return;
       if (st.run) {
         /* 用 run() 的那一步（逐项讲主角卡）本身没有固定 key，
            这里立刻把 tour 的那把钥匙记上 —— 否则 G.tourNext 每次都会重新跑它、链子走不下去。 */
