@@ -255,9 +255,16 @@
   /* 一行按钮（等分；网页版 .btn-row） */
   U.btnRow = function (list, gapIn) {
     const gap = gapIn === undefined ? 10 * CV.SCALE : gapIn, h = U.BTN_H * CV.SCALE;
-    const w = Math.max((U.iw() - gap * (list.length - 1)) / list.length, 0);
     const top = U.y;
-    list.forEach((b, i) => U.btn(U.ix() + i * (w + gap), top, w, h, b.label, b.style, b.id));
+    /* 宽度按"文字自然宽"比例分（网页版 .btn-row .btn 是 flex: 1 1 auto + min-width 5.375rem）：
+       字多的按钮拿更多宽度，所以"免费抽 1 次（今日还剩 3 次）"这类长标签在网页版是一行，
+       等分宽度会把它们挤成两行。 */
+    const avail = U.iw() - gap * (list.length - 1);
+    const nat = list.map((b) => Math.max(U.BTN_MINW * CV.SCALE, CV.measure(b.label, CV.FS.lg) + 24 * CV.SCALE));
+    const sum = nat.reduce((a, b) => a + b, 0) || 1;
+    const widths = nat.map((w) => Math.max(U.BTN_MINW * CV.SCALE, w * avail / sum));
+    let x = U.ix();
+    list.forEach((b, i) => { U.btn(x, top, widths[i], h, b.label, b.style, b.id); x += widths[i] + gap; });
     U.y = top + h;
     return h;
   };

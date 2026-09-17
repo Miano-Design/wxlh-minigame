@@ -13,6 +13,7 @@ require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫�
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
 require('./js/sc-home.js');      // 灯阁（首页）
 require('./js/sc-roster.js');   // 执灯者：伙伴总览 + 伙伴详情
+require('./js/sc-recruit.js'); // 招募（三池 + 结果页 + 概率公示）
 require('./js/sc-bag.js');     // 背包（道具 / 材料 / 装备 + 装备详情）
 require('./js/sc-protag.js');  // 主角详情（角色页）
 require('./js/sc-battle.js');   // 战斗页（副本 / 深井 / 斗法台共用）
