@@ -8,6 +8,23 @@
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
   const fmt = G.fmt || ((n) => String(n));
 
+  /* ---------- 首次操作引导（网页版 coachmark 的画布版）----------
+     V9.6.30：集中一处按页面查表，挂在 cv.js 渲染完之后（那时 CV.hits 已经齐了）。
+     每条只弹一次（S.coachSeen），一页命中多条时按顺序：这次弹第一条，下次进来弹第二条。 */
+  G.coachFor = function (page) {
+    const C = [
+      ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],
+      ['home', ['claim_all'], '离线期间也在攒，回来点一下就能收。'],
+      ['world', ['stage:0'], '点第 1 关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。'],
+      ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。'],
+      ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。'],
+    ];
+    C.forEach(function (row) {
+      if (row[0] !== page) return;
+      U.coach(row[1], row[2]);
+    });
+  };
+
   CV.register('home', function () {
     const S = Core.S;
     U.begin();
@@ -213,11 +230,6 @@
       U.btn(U.ix() + bw + gap, by, U.iw() - bw - gap, bh, '收取奖励', 'primary', 'claim_all');
       U.y = by + bh;
     });
-
-    /* 首次进首页的引导（网页版 coachmark 的画布版；只弹一次）。
-       必须放在**渲染里**：引导要用 CV.hits 里那颗按钮的矩形当锚点，
-       放模块加载时既没有锚点、还会在开局契约页就盖出来。 */
-    U.coach(['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。');
 
     /* ⑥ 设置（网页版 settingsBlock：只有 玩法指南 / 设置与存档 两块） */
     U.sectionTitle('设置');

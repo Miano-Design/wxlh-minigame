@@ -285,6 +285,8 @@
     CV.y = 0;
     const fn = CV.panels[CV.top().name];
     if (fn) fn(CV.top().opts);
+    /* V9.6.30：引导气泡集中在这里挂 —— 页面画完、CV.hits 已经齐了，查表就知道该给哪颗按钮做引导。 */
+    if (G.coachFor) G.coachFor(CV.top().name);
     /* 内容总高：游标在通用件里（U.y），以前这里读的是 CV.y —— 那个变量在渲染时被归零后
        再没人写过，于是 contentH 恒等于 20、maxScroll 恒为 0，**滚动等于没有**（V9.5.93 修）。 */
     CV.contentH = ((G.U && G.U.y) || CV.y || 0) + 20;

@@ -364,6 +364,7 @@
     /* targetId 可以是数组：同一个位置在不同状态下 id 不一样
        （比如主线那颗按钮，能做时是 claim_quest、不能做时是 goto_quest）。
        这里只记"这一课看没看过"，锚点等渲染时再挑真正存在的那个。 */
+    if (coachState) return;                            // 一次只播一条，其它的留到下次进来
     const key = [].concat(targetId).join('|');
     if (S.coachSeen[key]) return;                      // 看过就不再弹
     coachState = { targetId: targetId, key: key, text: text };
