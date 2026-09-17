@@ -15,70 +15,75 @@
      开局第一组 —— 逐项介绍**主角卡**（主线一「熟悉身体」就是这一步）。
      四行各讲一句，点一下听下一项（swallow：只推进、不跳页），
      最后一步要求**真的点开主角卡**——那才是主线一真正要的动作。 */
-  /* V9.6.56（父亲大人拍板：开场"大范围大概地引导一下"—— 只介绍角色卡 / 养成区 / 日常区，
-     详细怎么玩交给主线任务）：
-       · 只讲**首页这三块**，不再横跨到副本/招募/队伍（那是"跳来跳去、不知道干嘛"的根源）；
-       · 每步**必须点继续**才过（要＝强制），但**不要求点中目标** —— 只高亮 + 讲解，所以不会卡屏；
-       · 最后一句把人**交给主线**：后面每点一次「去完成」，就开那一步的详细指引。 */
-  function coachHero() {
-    const L = [
-      ['hero:0', '① **角色卡**：你的身份和状态都在这 —— 境界（修为阶段）、等级、待分配的属性/技能点、转生次数。',
-        '点开这张卡，六维、技能、装备、血统、境界全在里面。', 'tut_blk1'],
-      ['grid:grow', '② **养成区**：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台…',
-        '前期不用全点，缺什么补什么；每条点进去都会有它自己的说明。', 'tut_blk2'],
-      ['grid:daily', '③ **日常区**：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。',
-        '有红点的就是"有东西可领"，别让它亮着。', 'tut_blk3'],
-      ['claim_quest', '**详细怎么玩，跟着主线走就行** —— 每点一次「去完成」，我都会带你做那一步。',
-        '下面这条就是主线：做完一步回来领奖励，接着下一步。', 'tut_blk4'],
-    ];
-    L.forEach(function (x) {
-      U.coach(x[0], x[1] + ' ' + x[2], { key: x[3], queue: true });   // 画布不认 \n，两句用空格接
-    });
-  }
+  /* ============================================================================
+     开场引导（V9.6.67，父亲大人："第一个引导我点了高亮他就直接进去角色卡了，
+     要不顺便就介绍六维，然后再回到首页介绍别的 —— 你要判定哪些引导是可以点进去二级界面，
+     哪些只是介绍"）。
 
-  /* V9.6.43（父亲大人："开局签订完契约选完系统后，就只能跟着指引先操作一遍，带着玩家整体操作一遍"）：
-     把"一页一组"接成**一条链** —— 上一组走完自动进下一组，该换页就换页。
-     每一步仍然可以「跳过这一步」（保命阀），但不会停在原地等人自己乱点。
-     顺序：逐项讲主角卡 → 点开主角卡 → 回首页领主线奖励 → 去残域打第 1 关。 */
-  /* V9.6.56（父亲大人拍板）：开场**只讲首页三个区块**，不再横跨到副本/招募/队伍 ——
-     那些"详细怎么玩"全部交给主线任务（点「去完成」才开），
-     所以这里只剩这一条：进首页 → 播那三块 + 一句"跟主线走"。
-     要旧的多步链，看 TUT 表（主线步）与 UNLOCK_GUIDE（解锁指引）。 */
-  const TOUR = [
-    { key: 'tour_home', page: 'home', run: coachHero },
+     所以每一步都必须先声明**它是哪一类**：
+       · enter: true   —— **点了就进去**：这一下真的执行那个动作（开角色卡 / 开主线那一步），
+                          进去之后由下一步接着讲（页面切过去就会播）。
+       · 不写 enter     —— **只是介绍**：点高亮只推进讲解，绝不顺手动页面/花资源。
+     back: true 表示"这一步讲完自动退回上一层"（比如讲完六维回首页接着讲养成区）。
+     三步之外不再横跨别的模块 —— 详细怎么玩交给主线（点「去完成」才开）。 */
+  const OPENING = [
+    /* 锚点用**整张卡**（open_protag 才是真的那颗动作；hero:0..3 只是四行的定位锚，
+       没有处理器 —— 拿它当"点进去"的锚，点下去什么都不会发生）。 */
+    { key: 'tut_blk1', page: 'home', target: 'open_protag', enter: true,
+      text: '① 角色卡：你的身份和状态都在这 —— 境界（修为阶段）、等级、待分配的属性/技能点、转生次数。 点开这张卡，里面的六维我接着讲。' },
+    { key: 'tut_blk1x', page: 'protag', target: 'attr_card', back: true, where: '角色卡',
+      text: '这就是六维：升级拿到的属性点在这里一点一点加，每一维管什么下面都写着（生命/速度/技能伤害…）。 看完我带你回首页，接着讲别的。' },
+    { key: 'tut_blk2', page: 'home', target: 'grid:grow',
+      text: '② 养成区：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台… 前期不用全点，缺什么补什么；每条点进去都会有它自己的说明。' },
+    { key: 'tut_blk3', page: 'home', target: 'grid:daily',
+      text: '③ 日常区：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。 有红点的就是"有东西可领"，别让它亮着。' },
+    { key: 'tut_blk4', page: 'home', target: ['claim_quest', 'goto_quest'], enter: true,
+      text: '详细怎么玩，跟着主线走就行 —— 每点一次「去完成」，我都会带你做那一步。 下面这条就是主线：做完一步回来领奖励，接着下一步。' },
   ];
-
-  /* 开场引导是否"进行中"：开始是 true（允许自动换页），全部走完变 false（此后绝不换页）。 */
-  let tourRunning = false;
-  function tourLeft() {
-    const S = Core.S; const seen = S.coachSeen || {};
-    return TOUR.filter(function (st) { return !seen[st.key]; }).length;
+  function openingLeft() {
+    const seen = Core.S.coachSeen || {};
+    return OPENING.filter(function (s) { return !seen[s.key]; }).length;
   }
-  G.tourNext = function () {
-    const S = Core.S;
-    if (tourLeft() === 0) { tourRunning = false; return; }   // 走完 → 关掉自动换页
-    S.coachSeen = S.coachSeen || {};
-    for (let i = 0; i < TOUR.length; i++) {
-      const st = TOUR[i];
-      if (S.coachSeen[st.key]) continue;
-      /* V9.6.55（父亲大人定的边界）：**引导进行中**可以自动换页（带着你一步步走，这是合理的）；
-         **引导结束就不能了** —— 所以只有 tourRunning 为真时才导航。
-         以前的毛病是"引导早就结束了还在后台每帧拽人"，于是碰一下别的界面就被弹回副本。 */
-      if (!tourRunning) return;
-      if (CV.top().name !== st.page) { CV.cur = st.page; CV.reset(st.page); }
-      if (st.run) {
-        /* 用 run() 的那一步（逐项讲主角卡）本身没有固定 key，
-           这里立刻把 tour 的那把钥匙记上 —— 否则 G.tourNext 每次都会重新跑它、链子走不下去。 */
-        S.coachSeen[st.key] = true; Core.save();
-        st.run();
-      }
-      else {
-        U.coach(st.s, st.t, { key: st.key, mustTap: true, queue: true,
-          onDone: (i + 1 < TOUR.length) ? G.tourNext : null });
-      }
-      return;
+  let tourRunning = false;
+  /* 开场链的驱动器：一次只播**当前这一页**的那一步，讲完（或玩家跳过）再叫自己。
+     不主动换页 —— 该进角色卡是玩家按①点进去的，进不去就一直等他。 */
+  G.openingNext = function () {
+    const S = Core.S; S.coachSeen = S.coachSeen || {};
+    if (openingLeft() === 0) { tourRunning = false; return false; }
+    tourRunning = true;
+    if (U.coachActive && U.coachActive()) {
+      /* 正在讲的是**开场链自己**的某一步 → 等它（它讲完会再叫我）；
+         是**别的**引导（解锁/主线/页面）插进来的 → 先把它放下，让开场链把这几步走完。
+         放下的那一条**不标已读**，玩家下次进那一页还会补讲。 */
+      const cur = U.coachCurrent && U.coachCurrent();
+      const mine = cur && OPENING.some(function (s) { return s.key === cur.key; });
+      if (mine) return true;
+      if (U.coachDrop) U.coachDrop();
     }
+    const page = (CV.top() || {}).name;
+    for (let i = 0; i < OPENING.length; i++) {
+      const st = OPENING[i];
+      if (S.coachSeen[st.key]) continue;
+      if (st.page !== page) continue;                      // 不在这一页：先看后面有没有本页的步骤
+      U.coach(st.target, st.text, {
+        key: st.key,
+        mustTap: true,
+        swallow: !st.enter,                                // 只是介绍的那几步：只推进，不执行原动作
+        where: st.where,
+        onDone: function () {
+          if (st.back) CV.pop();                           // 讲完自动退回上一层，接着讲别的
+          G.openingNext();
+        },
+      });
+      return true;
+    }
+    /* V9.6.67：这一页**没有**开场步骤（比如玩家先进了残域）—— 返回 false，
+       让 coachFor 继续往下走（解锁指引 / 主线指引 / 页面指引），
+       不然"开场链没走完"会把所有其它引导一直堵住。 */
+    return false;
   };
+
+  G.tourNext = G.openingNext;   // 老名字留着（别处/文档还提过），指向同一条链
 
   /* ============================================================================
      V9.6.59 紧急恢复：上一版我重写 coachHero 时用切片替换，
@@ -89,6 +94,12 @@
      ============================================================================ */
 
   /* 主线每一步 = 引导的一步（父亲大人：合并成一套） */
+  /* V9.6.67：同一件事只讲一遍 —— 解锁那条 / 主线那条 / 页面那条共用钥匙 */
+  const TOPIC_KEY = {
+    enhance: 'guide_enhance', bloodline: 'guide_bloodline', corridor: 'guide_corridor',
+    recruit: 'guide_recruit', buildings: 'guide_buildings',
+  };
+  const QUEST_TOPIC = { q07: 'enhance', q13: 'bloodline', q11: 'corridor', q09: 'buildings' };
   /* 页面 → 中文名：引导卡里写"去「XX」完成这一步"用（父亲大人：不能只给一张没指向的卡） */
   const PAGE_NAME = {
     home: '灯阁首页', world: '残域·世界页', dungeon: '残域', bag: '背包（切到装备）',
@@ -99,11 +110,22 @@
     bounty: '限时悬赏', idlelines: '挂机分工',
   };
   const TUT = {
+    /* 同一件事的三条入口共用一把钥匙（V9.6.67）：
+       解锁时那条（UNLOCK_GUIDE）、主线那一步（TUT）、页面级那一句（C 表）——
+       谁先讲，另外两条自动跳过，不再连着看三张一模一样的卡。 */
+    /* V9.6.67（查漏补缺）：同一个功能有**三条入口**会各讲一句 ——
+       解锁时（UNLOCK_GUIDE）、主线那一步（TUT）、页面级那一句（下面的 C 表）。
+       三张卡内容几乎一样，玩家会连着看三遍（第一张刚点掉，第二张又冒出来）。
+       给它们**同一把钥匙**：谁先讲，后面两条自动跳过（见 TOPIC_KEY / QUEST_TOPIC）。 */
     /* V9.6.66（与网页版对齐）：主线一「熟悉身体」的落点是**角色页**，就讲角色页里的东西。
        原来这里写的是 run: coachHero（重播首页三区块）—— 玩家点「去完成」进到角色页，
        屏幕上却飘着"① 角色卡：你的身份和状态都在这"那张讲首页的卡，指的还是被盖住的首页。
        （开场三区块由 TOUR 负责，跟主线一不是同一件事。） */
-    q01:  { page: 'protag',  s: ['attr:*'], t: '这是你的属性面板：升级得属性点和技能点，点 +1 分配，六维、技能、装备、血统都在这一页。' },
+    /* V9.6.67：锚点改用整块六维卡（attr_card）—— 加点的 +1/+10 在没点数时**不登记热区**，
+       只锚它们会让这一步在新号上找不到位置；`key` 与开场链那条（tut_blk1x）**共用**，
+       因为讲的是同一件事：谁先讲，另一条自动跳过（否则讲完六维回首页时，
+       这一条会被"顺手登记"，然后挂在首页上指着一个不存在的目标）。 */
+    q01:  { page: 'protag',  s: ['attr_card'], key: 'tut_blk1x', t: '这是你的属性面板：升级得属性点和技能点，点 +1 分配，六维、技能、装备、血统都在这一页。' },
     q01b: { page: 'world',   s: ['stage:0'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
     q02:  { page: 'world',   s: ['stage:0'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
     /* q03（招募）/ q04（上阵）的引导只在开场三区块里讲一次，不在主线里重复（审计结论）。 */
@@ -121,7 +143,9 @@
     const qid = cu && cu.q && cu.q.id;
     const rule = qid && TUT[qid];
     if (!rule || rule.page !== page) return false;
-    const key = 'tut_' + qid;
+    /* 与"解锁时"那一条共用钥匙：同一件事只讲一遍（V9.6.67）。
+       rule.key 用于和**开场链**里讲同一件事的那一步共用（比如主线一 ↔ 开场讲六维）。 */
+    const key = rule.key || TOPIC_KEY[QUEST_TOPIC[qid]] || ('tut_' + qid);
     /* V9.6.66（与网页版同步）：玩家自己点「前往 ›」＝主动求引导，这次必须再讲一遍 */
     if (U.coachSeen(key) && !U.coachForced()) return false;
     if (rule.run) { rule.run(); return true; }
@@ -150,6 +174,7 @@
      判定是"该模块已解锁 + 这一课没讲过"，所以新号刚解锁、老号从没进过，都会补一次。
      锚点可以写前缀（'bup:*' / 'eqd:*'），动态 id 也能锚。 */
   const UNLOCK_GUIDE = {
+    /* 与主线步 / 页面级那两句共用钥匙（V9.6.67）——同一件事只讲一遍 */
     recruit:  { page: 'recruit',  s: ['pull1:normal', 'pull1:normal:free'], t: '招募解锁了：每天有免费次数先用掉，抽到的伙伴记得去「队伍」上阵。' },
     shop:     { page: 'shop',     s: ['shoptab:god'], t: '兑换大厅：四家店各用不同货币，日常用券和材料都在这儿补。' },
     enhance:  { page: 'bag',      s: ['bagview:equip', 'eqd:*'], t: '装备强化解锁了：切到「装备」、点一件进去，花材料提升数值。' },
@@ -179,8 +204,9 @@
       const id = ids[i], g = UNLOCK_GUIDE[id];
       if (g.page !== page) continue;
       if (!(Core.isUnlocked && Core.isUnlocked(id))) continue;
-      if (U.coachSeen('tut_unlock_' + id)) continue;
-      U.coach(g.s.length ? g.s : 'page_back', g.t, { key: 'tut_unlock_' + id, mustTap: g.s.length > 0 });
+      const key = TOPIC_KEY[id] || ('tut_unlock_' + id);
+      if (U.coachSeen(key)) continue;
+      U.coach(g.s.length ? g.s : 'page_back', g.t, { key: key, mustTap: g.s.length > 0 });
       return true;
     }
     return false;
@@ -188,27 +214,19 @@
 
   G.coachFor = function (page) {
     if (G.U && G.U.overlay) return;      // 别的弹窗（比如登录奖励）开着就先不弹引导
+    /* V9.6.67：开场链优先 —— 但**只在这一页真有开场步骤时**才占位。
+       玩家要是先跑去了残域/背包，这里就放行给解锁指引和主线指引，
+       不至于"开场链没走完 → 别的引导全都不给"。 */
+    if (G.openingNext()) return;
     if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
-    if (page === 'home') {
-      const S = Core.S;
-      for (let i = 0; i < TOUR.length; i++) {
-        if (!(S.coachSeen || {})[TOUR[i].key]) {
-          /* 还有没讲过的 → **这次会话里引导算"进行中"**（允许自动换页把你带过去）；
-             全部讲完就关掉，之后无论在哪个页面都绝不换页（V9.6.55 父亲大人定的边界）。 */
-          tourRunning = true;
-          G.tourNext();
-          return;
-        }
-      }
-      tourRunning = false;
-    }
     const C = [
-      ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],
+      /* key 与开场链最后一步（tut_blk4）共用：讲的是同一件事（主线那颗按钮） */
+      ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。', 'tut_blk4'],
       /* 首页的挂机收取改由 TOUR 链讲（tour_back），这里不再重复一遍。 */
       ['world', ['stage:0'], '点第 1 关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。'],
-      ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。'],
-      ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。'],
+      ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。', TOPIC_KEY.recruit],
+      ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
       /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
          每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
       ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
@@ -232,7 +250,8 @@
     C.forEach(function (row) {
       if (row[0] !== page) return;
       /* 页面级的基础引导也走「必须点中」（父亲大人要的是完全强制）—— 之前这几个是「看到就过」。 */
-      U.coach(row[1], row[2], { key: 'tut_page_' + row[0] + '_' + [].concat(row[1]).join('_'), mustTap: true, queue: true });
+      /* row[3] = 与其它入口共用的钥匙（有就不重复讲） */
+      U.coach(row[1], row[2], { key: row[3] || ('tut_page_' + row[0] + '_' + [].concat(row[1]).join('_')), mustTap: true, queue: true });
     });
   };
 

@@ -373,6 +373,14 @@
   let coachForceUntil = 0;
   U.coachForce = function (ms) { coachForceUntil = Date.now() + (ms || 2500); };
   U.coachForced = function () { return Date.now() < coachForceUntil; };
+  /* V9.6.67（查漏补缺）：**战斗页整屏接管，引导在那一页既不画也不挡**。
+     起因：主线 q01b 那类"点第 1 关就开打"的步骤带 waitFor（打完才算过），
+     玩家一点高亮就进了战斗 —— 引导还在，于是把战斗页的撤离 / 加速 / 结算按钮全挡死，
+     只能等打完（或者点"跳过这一步"，可那行小字在战斗画面上根本看不到）。
+     现在战斗期间引导自动让路，打完回到世界页它再接着算。 */
+  function coachSuspended() {
+    try { const t = CV.top && CV.top(); return !!(t && t.name === 'battle'); } catch (e) { return false; }
+  }
   /* V9.6.35（父亲大人定的需求）：引导是**强制、逐项、必须真点到那颗按钮**才放行。
      用法：U.coach(targetId, text, opts)
        opts.key      —— 记进存档的键（默认用 targetId 拼）；老号第一次进某模块时补一次靠它
@@ -390,6 +398,11 @@
        mustTap 改成**默认开** —— 所有引导都只有两条出路：点高亮的那颗，或者点右下角「跳过这一步」。
        以前非强制的那些给了一颗全屏热区（点哪都算过），玩家一边看引导一边还能操作别的东西。 */
     const item = { targetId: targetId, key: key, text: text, mustTap: opts.mustTap !== false, swallow: opts.swallow !== false, onDone: opts.onDone,
+      /* V9.6.67（查漏补缺）：记住它是**在哪一页**登记的。引导是页面在 render 里登记的，
+         而"讲完这一步自动退上一层"（CV.pop）会让那一次 render 的引导挂到上一层去
+         —— 实测：讲完六维回首页，屏幕上飘着一条"血统升级"的卡，指的却是首页上没有的东西。
+         现在换页了就先放下（**不标已读**，等玩家回到那一页再讲）。 */
+      bornPage: (CV.top && CV.top()) ? CV.top().name : null,
       waitFor: opts.waitFor,   // waitFor：**这件事真的做完了**才算过（父亲大人拍板的第 2 条）
       where: opts.where };     // where：这一步要在哪一页做（目标不在本页时告诉玩家去哪）
     /* V9.6.43 自审：同一个 key 不能重复入队 —— 链式引导每帧都会问一次，
@@ -420,12 +433,17 @@
   };
   U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
   U.coachActive = function () { return !!coachState; };   // 触摸层用它挡滚动（引导期间不许滑屏）
+  /* V9.6.67：给"开场链"用的两颗 —— 看当前在讲哪一条 / 把插队的放下来（**不标已读**，
+     它下次进那一页还会补讲）。开场链要一路走完，中途被别的引导插进来会挑错下一步。 */
+  U.coachCurrent = function () { return coachState; };
+  U.coachDrop = function () { coachState = null; };
   /* V9.6.45（父亲大人："小游戏指引一半还是能点到别的窗口"）：
      引导画在最上层只是**视觉**上盖住了，底下那些按钮的热区仍然在 CV.hits 里、照样能派发 ——
      看着被挡住，其实还能点到别的。这里给派发加一道闸：引导在的时候，
      只放行「引导自己的那颗（跳过这一步）」和「高亮的目标」，其余一律吃掉。 */
   U.coachAllows = function (h) {
     if (!coachState) return true;
+    if (coachSuspended()) return true;              // 战斗页：引导让路（见上）
     if (h.id === '_coach_ok') return true;
     const want = [].concat(coachState.targetId);
     for (let i = 0; i < want.length; i++) {
@@ -440,7 +458,7 @@
   const _dispatch = CV.dispatch;
   CV.dispatch = function (id) {
     const st = coachState;
-    if (!st) return _dispatch(id);
+    if (!st || coachSuspended()) return _dispatch(id);   // 战斗页：按原样派发，不拦
     /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
        这里原来是**漏的** —— 只有按下判定（hitAt）过滤了，真正执行动作的这条派发路
        直接 `return _dispatch(id)`，所以高亮期间点别处照样跳页（实测点到了"查看境界·渡劫"）。
@@ -454,14 +472,28 @@
     });
     if (!hit) return true;                       // 点别处：吃掉，什么都不做
     if (st.swallow !== false) { U.coachMark(st); U.coachNext(); return true; }   // 只推进、不执行原动作
+    /* V9.6.67（查漏补缺）：`enter` 那几步的顺序是 ——
+       ① 先标记"这一步讲过了"（否则动作换页之后，这一页的 render 会把它当幽灵清掉，
+          实测表现就是"点了角色卡，后面什么都没有了"）；
+       ② 再执行动作（可能换页 / 开弹窗）；
+       ③ **动作做完**才接着走链（提前走会按旧页面挑下一步 —— 在首页挑出"养成区"，
+          紧接着页面跳到角色卡，那一步就被丢掉了）。 */
+    if (st.waitFor) return _dispatch(id);
+    U.coachMark(st);
+    coachState = null;
     const r = _dispatch(id);
-    /* 带 waitFor（做完才放行）的那几步：点一下不算过，交给每帧的 waitFor 判定，
-       否则玩家点一下高亮就把提示消掉、事却没做成 —— 那正是网页版刚修掉的坑。 */
-    if (coachState === st && !st.waitFor) { U.coachMark(st); U.coachNext(); }
+    setTimeout(function () {
+      if (typeof st.onDone === 'function') st.onDone(); else U.coachNext();
+      CV.render();                                   // 让新一步立刻画出来
+    }, 0);
     return r;
   };
   U.drawCoach = function () {
     if (!coachState) return;
+    if (coachSuspended()) return;                   // 战斗页不画引导（战斗自己的界面优先）
+    /* 换页了就别再画（见 bornPage 的说明）：直接放下，**不标已读、也不跑 onDone**
+       （跑 onDone 会误触发"退回上一层"，把玩家拽到更乱的地方）。 */
+    if (coachState.bornPage && coachState.bornPage !== ((CV.top() || {}).name)) { coachState = null; return; }
     /* V9.6.61（父亲大人拍板第 2 条：**做完才放行**）：
        带 waitFor 的引导，先问"这件事真做完了吗" —— 做完了就直接过、连提示都不留；
        没做完才继续挡着（并且每帧都在问，所以玩家一做完立刻放行，不用再点一次）。 */

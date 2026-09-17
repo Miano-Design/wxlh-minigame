@@ -77,7 +77,8 @@
     });
 
     /* ② 六维属性 */
-    U.card(function () {
+    const attrTop = U.y;
+    const attrH = U.card(function () {
       U.h3('🎯 六维属性', '可用点数 ' + (S.player.attrPoints || 0),
         { btn: { label: '↺ 重置', id: spentAttr > 0 ? 'attr_reset' : '' } });
       const has = (S.player.attrPoints || 0) > 0;
@@ -91,6 +92,10 @@
         U.btn(U.ix() + U.iw() - bw2, by, bw2, U.BTN_SM * CV.SCALE, '+10', 'ghost', has ? 'attr:' + a.id + ':10' : '');
       });
     });
+    /* V9.6.67（父亲大人：点开角色卡"顺便就介绍六维"）：整块六维卡登记一颗**没有动作**的锚点，
+       专门给引导框定位用 —— 加点是"可选动作"，没点数时那两颗 +1 是不登记的，
+       只锚 +1 会让这一步在空点数的新号上找不到位置。 */
+    CV.hit('attr_card', U.pad(), attrTop, U.cw(), attrH);
 
     /* ③ 技能 */
     U.card(function () {
