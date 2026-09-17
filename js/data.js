@@ -464,7 +464,7 @@ window.DATA = (function () {
   const RECRUIT_SLOTS = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
   const PLAYER_SLOTS = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory']; // 主角 6 槽（V5 §22）
   const DROP_SLOTS = ['weapon', 'armor', 'accessory', 'head', 'hands', 'legs'];
-  /* V9.6.76：装备品质多一档 **神话（MYTH）** —— 见下面"阵营神装"那一段。
+  /* V9.6.76：装备品质多一档 **神话（MYTH）** —— 见下面"血统神装"那一段。
      ⚠ 装备品质和**伙伴稀有度是两条线**：D.RARITIES 是角色用的，别往里塞 MYTH，
        不然抽卡概率表、星级上限、重复碎片全都会被带偏。装备自己一条 EQUIP_RARITIES。 */
   const EQUIP_RARITIES = ['N', 'R', 'SR', 'SSR', 'UR', 'MYTH'];
