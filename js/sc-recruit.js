@@ -182,7 +182,7 @@
       const ten = Object.keys(p.ten || p.cost).map((k) => curIcon(k) + fmt((p.ten || p.cost)[k])).join(' + ');
       U.sectionTitle(p.name);
       rateBlock([
-        ['', rate],
+        ['概率', rate],                     // 标签列别空着（父亲大人：看着像漏写了一个词）
         ['单抽', cost + (tk ? ' · 或 🎫 ' + tkName + '×1（现有 ' + tk.n + ' 张）' : '')],
         ['十连', ten + (tk ? ' · 或 🎫 ' + tkName + '×10' : '') + ' · 保底至少 1 个 SR'],
       ], [

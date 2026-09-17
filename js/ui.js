@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.3';
+  const GAME_VER = '9.6.4';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -2226,7 +2226,8 @@ window.UI = (function () {
         : '';
       return `<div class="section-title">${p.name}</div>
         <div class="rate-block">
-          <div class="rate-line"><span class="rl-v">${rate}</span></div>
+          <!-- V9.6.4（父亲大人）：这一行原来只有值、标签列空着，看着像"漏写了一个词" -->
+          <div class="rate-line"><span class="rl-k">概率</span><span class="rl-v">${rate}</span></div>
           ${line('单抽', `${cost}${tk ? ` · 或 🎫 ${tkName}×1（现有 ${tk.n} 张）` : ''}`)}
           ${line('十连', `${ten}${tk ? ` · 或 🎫 ${tkName}×10` : ''} · 保底至少 1 个 SR`)}
           <div class="rate-note">${D.pityText(pid)}</div>
