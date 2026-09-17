@@ -21,7 +21,8 @@ global.Blob = function () {}; global.URL = { createObjectURL: () => '' }; global
    同一支队跑五次能给出"首败在第 10 层"到"第 18 层"五种答案，这种体检报告没法用来做回归。 */
 let seed = 20260917;
 Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
-for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) {
+/* V9.6.66：ui.js 直接读网页版（小游戏工程里不再放界面层副本），故本文件不再被 sync-logic.js 覆盖。 */
+for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', '../wxlh-game/js/ui.js']) {
   eval(fs.readFileSync(f, 'utf8'));
 }
 const Core = window.Core, D = window.DATA, UI = window.UI, Battle = window.Battle, Dungeon = window.Dungeon;

@@ -32,98 +32,12 @@
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [
-      {
-        "type": "file",
-        "value": "_preview_bundle.js"
-      },
-      {
-        "type": "file",
-        "value": "preview.html"
-      },
-      {
-        "type": "file",
-        "value": "preview-ce.html"
-      },
-      {
-        "type": "file",
-        "value": "_ce_probe.html"
-      },
-      {
-        "type": "file",
-        "value": "_ce_sample.html"
-      },
-      {
-        "type": "file",
-        "value": "_ce_bundle.js"
-      },
-      {
-        "type": "file",
-        "value": "ce-四页签-检查.png"
-      },
-      {
-        "type": "file",
-        "value": "ce-子页-检查.png"
-      },
-      {
-        "type": "file",
-        "value": "ce-预览-首页.png"
-      },
-      {
-        "type": "file",
-        "value": "对比-引擎版首页.png"
-      },
-      {
-        "type": "file",
-        "value": "ce-extra.css"
-      },
-      {
-        "type": "file",
-        "value": "ce-预览-无头.png"
-      },
-      {
-        "type": "file",
-        "value": "ce-预览-整页.png"
-      },
-      {
-        "type": "file",
-        "value": "preview-home.png"
-      },
-      {
-        "type": "file",
-        "value": "preview-battle.png"
-      },
-      {
-        "type": "file",
-        "value": "README.md"
-      },
-      {
-        "type": "file",
-        "value": "AD_SLOTS.md"
-      },
-      {
-        "type": "folder",
-        "value": "scripts"
-      },
-      {
-        "type": "file",
-        "value": "index.html"
-      },
-      {
-        "type": "file",
-        "value": "manifest.webmanifest"
-      },
-      {
-        "type": "file",
-        "value": "sw.js"
-      },
-      {
-        "type": "file",
-        "value": "MIGRATION.md"
-      },
-      {
-        "type": "file",
-        "value": "css"
-      }
+      { "type": "file", "value": "README.md" },
+      { "type": "file", "value": "CHANGELOG.md" },
+      { "type": "file", "value": "GM_DOC.md" },
+      { "type": "file", "value": "_preview.html" },
+      { "type": "folder", "value": "scripts" },
+      { "type": "folder", "value": "截图" }
     ],
     "include": []
   },

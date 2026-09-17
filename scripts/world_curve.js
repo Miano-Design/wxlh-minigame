@@ -33,7 +33,8 @@ let seed = 20260917;
 Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
 const reseed = () => { seed = 20260917; };
 
-for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) eval(fs.readFileSync(f, 'utf8'));
+/* V9.6.66：ui.js 直接读网页版（小游戏工程里不再放界面层副本），故本文件不再被 sync-logic.js 覆盖。 */
+for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', '../wxlh-game/js/ui.js']) eval(fs.readFileSync(f, 'utf8'));
 const Core = window.Core, D = window.DATA, Battle = window.Battle, Dun = window.Dungeon, UI = window.UI;
 
 const RARITY_ORDER = { UR: 0, SSR: 1, SR: 2, R: 3, N: 4 };

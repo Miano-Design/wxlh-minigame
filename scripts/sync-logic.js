@@ -14,28 +14,25 @@ const PROJ = path.resolve(__dirname, '..');                    // 本工程根�
 const DST = path.resolve(__dirname, '../js');
 /* 逻辑层 4 份：必须逐字节一致，而且不许碰 DOM */
 const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
-/* 路线 B 额外复用网页版的**界面层**（js/ui.js → js/ui-web.js）：同样逐字节一致。
-   它当然会碰 DOM——那正是我们要复用的"界面字符串工厂"，
-   小游戏里由 js/ce-dom.js 垫一套假 DOM 撑着跑，所以不参与下面的 DOM 检查。
-   js/ui.js 也一起刷（底包快照 index.html 引的就是它），免得两份界面层各老各的。 */
-const EXTRA = { 'ui.js': ['ui-web.js', 'ui.js'], 'main.js': 'main.js' };
-/* 网页版的"包"也一起搬一份（新工程以网页版为底）：入口页、样式、图标清单。
-   注意：小游戏运行时用的是编译好的 js/ce-style.js，css/style.css 只是"底包快照"。 */
-const PACK = [['index.html', 'index.html'], ['css/style.css', 'css/style.css'],
-  ['manifest.webmanifest', 'manifest.webmanifest'], ['sw.js', 'sw.js']];
-/* 测试与体检脚本也一起同步（它们本来就和网页版逐字节一致，各留一份会各自变旧，
-   结果是小游戏这边跑的还是上一版的用例——2026-09-17 发现并补上）。 */
-const CHECKS = ['test_ui.js', 'test_game.js', 'balance_check.js', 'design_audit.js', 'product_audit.js', 'copy_audit.js', 'cap_audit.js', 'data_audit.js', 'longrun_sim.js', 'world_curve.js', 'spec_audit.js'];
+/* V9.6.66（父亲大人点头）：**路线 B 整套拆掉** ——
+   以前这里还顺手把网页版的界面层（ui.js → ui-web.js）/ 入口页 / 样式 / 图标清单，
+   以及"只审网页版"的那几个脚本（test_ui / product_audit / copy_audit /
+   design_audit / spec_audit / data_audit / sync-web）一起搬进来。
+   那些文件小游戏一次都没加载过（入口是 game.js），却让工程里躺着 600KB 的副本，
+   谁看都以为"小游戏有两套界面"。现在只同步**小游戏真正会用**的东西 ——
+   逻辑层 4 份 + 逻辑层的体检脚本；要审网页版的界面，回 ../wxlh-game 跑那边的同名脚本。 */
+/* 测试与体检脚本：只同步"纯逻辑层"的那几份。
+   balance_check / longrun_sim / world_curve 因为要 eval 网页版的 ui.js（界面层），
+   路径已经改成读 ../wxlh-game，属于小游戏自己的副本 —— 再同步会把那行路径覆盖掉，所以不同步。 */
+const CHECKS = ['test_game.js', 'cap_audit.js'];
 
 let changed = 0, same = 0;
 const JOBS = [];
 FILES.forEach(f => JOBS.push([f, f]));
-Object.keys(EXTRA).forEach(k => [].concat(EXTRA[k]).forEach(out => JOBS.push([k, out])));
-PACK.forEach(([a, b]) => JOBS.push([a, b]));
 CHECKS.forEach(f => JOBS.push(['scripts/' + f, 'scripts/' + f]));
 JOBS.forEach(([f, out]) => {
-  const fromJs = FILES.indexOf(f) >= 0 || (EXTRA[f] !== undefined && !f.startsWith('scripts/'));
-  const a = path.join(fromJs ? SRC : WEB_ROOT, f), b = path.join(fromJs ? DST : PROJ, out);
+  const a = path.join(f.startsWith('scripts/') ? WEB_ROOT : SRC, f);
+  const b = path.join(f.startsWith('scripts/') ? PROJ : DST, out);
   if (!fs.existsSync(a)) { console.error('✗ 找不到源文件：' + a); process.exitCode = 1; return; }
   if (f.startsWith('scripts/') && !fs.existsSync(path.dirname(b))) fs.mkdirSync(path.dirname(b), { recursive: true });
   const src = fs.readFileSync(a);

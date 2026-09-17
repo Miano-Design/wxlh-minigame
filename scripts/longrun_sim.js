@@ -28,7 +28,9 @@ global.Blob = function () {}; global.URL = { createObjectURL: () => '' }; global
    （不锁种子时，第 1 天的深井层数在 2~15 之间乱跳，根本没法判断某次改动是好是坏）。 */
 let seed = 20260917;
 Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
-for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', 'js/ui.js']) eval(fs.readFileSync(f, 'utf8'));
+/* V9.6.66：界面层不再往小游戏工程拷副本了，ui.js 直接读网页版（它才是唯一标准）。
+   因为这个原因，本文件不再被 sync-logic.js 覆盖 —— 它是小游戏自己的副本。 */
+for (const f of ['js/data.js', 'js/core.js', 'js/battle.js', 'js/dungeon.js', '../wxlh-game/js/ui.js']) eval(fs.readFileSync(f, 'utf8'));
 const Core = window.Core, D = window.DATA, Dun = window.Dungeon, UI = window.UI;
 
 const DAYS = Math.max(1, Math.min(365, +(process.argv[2] || 30)));

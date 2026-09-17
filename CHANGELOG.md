@@ -15,6 +15,22 @@
 - 引导文案里的 `**` 会被原样画在屏幕上 → 画/量/折行三处统一去掉。
 - 设置里「重跑新手引导」点完直接带回首页并接上开场引导。
 
+### 同批清理：拆掉"路线 B"（小游戏工程里的网页版副本）
+
+父亲大人点头：「可以」。删掉的东西 ——
+
+- `js/ui.js`、`js/ui-web.js`、`js/main.js`（各 300KB 的界面层副本，`game.js` 一次都没加载过）；
+- 网页版底包快照：`index.html`、`css/style.css`、`manifest.webmanifest`、`sw.js`（只当"底包快照"躺着，
+  而且 `index.html` 引的正是上面那三份 JS，留着就是个断链）；
+- 只审网页版的脚本：`test_ui` / `product_audit` / `copy_audit` / `design_audit` / `spec_audit` / `data_audit` / `sync-web`（它们的家在 `../wxlh-game`）。
+
+`scripts/sync-logic.js` 现在**只同步**：逻辑层 4 份 + `test_game` / `cap_audit`；
+`balance_check` / `longrun_sim` / `world_curve` 要 eval 网页版的 `ui.js`，路径改成读 `../wxlh-game`，因此不再被同步覆盖（是小游戏自己的副本）。
+`project.config.json` 的 `packOptions.ignore` 顺手清成"还在的文件"（原来列着一堆早就删掉的 png / html）。
+
+清理后自测：`test_game 645 passed` · `cap_audit` ✓ · `canvas_audit` ✓ · `coach_audit` ✓ · `page_smoke 50/50` ·
+`balance_check` / `world_curve` / `longrun_sim` 都能跑 · 模拟器刷新后照常进游戏、无报错。
+
 ## V9.5.22 · 2026-09-16 · 补上没生效的阵型灰字 + 标题行改按基线对齐
 
 父亲大人：「这里还没改啊」——查证结果：**康康上一版有一处替换没匹配上，规则根本没写进文件，而康康没核对就说改好了**。
