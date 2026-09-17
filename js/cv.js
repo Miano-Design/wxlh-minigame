@@ -297,6 +297,7 @@
     if (CV.sticky) CV.sticky();
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
+    if (G.U && G.U.drawCoach) G.U.drawCoach();        // 引导气泡（首次操作提示，V9.6.27）
     /* 页面级覆盖层（战斗结算这类"整屏一幕"）：**必须在内容裁剪之外**画 ——
        V9.6.1（父亲大人："结算内容也得在画面中间"）：以前结算画在内容层里，被顶栏下移、还跟着滚动，
        既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */

@@ -351,6 +351,70 @@
   };
   CV.on('_cf_no', () => { U.overlay = null; CV.render(); });
   CV.on('_cf_yes', () => { const o = U.overlay; U.overlay = null; if (o && o.onOk) o.onOk(); else CV.render(); });
+  /* ---------- 引导气泡（照网页版 coachmark）----------
+     V9.6.27（父亲大人）：网页版有二十来处"首次操作引导"，小游戏一处都没有 —— 这是目前最大的功能缺口。
+     画布版的做法：**不另存坐标**，直接拿 CV.hits 里那颗热区的矩形当锚点
+     （所以页面怎么写都不用管引导），外面套一圈金色高亮框 + 一张提示卡；点任意位置关掉。
+     只弹一次：看过记进 S.coachSeen。 */
+  let coachState = null;
+  U.coach = function (targetId, text) {
+    const S = G.Core && G.Core.S;
+    if (!S) return;
+    S.coachSeen = S.coachSeen || {};
+    /* targetId 可以是数组：同一个位置在不同状态下 id 不一样
+       （比如主线那颗按钮，能做时是 claim_quest、不能做时是 goto_quest）。
+       这里只记"这一课看没看过"，锚点等渲染时再挑真正存在的那个。 */
+    const key = [].concat(targetId).join('|');
+    if (S.coachSeen[key]) return;                      // 看过就不再弹
+    coachState = { targetId: targetId, key: key, text: text };
+  };
+  U.drawCoach = function () {
+    if (!coachState) return;
+    const S = G.Core.S;
+    const c = CV.ctx;
+    /* 锚点：优先找非屏幕坐标（内容区）的那一颗，换算到屏幕 y */
+    let r = null;
+    const want = [].concat(coachState.targetId);
+    (CV.hits || []).forEach(function (h) {
+      if (r || want.indexOf(h.id) < 0) return;
+      r = h.screen ? { x: h.x, y: h.y, w: h.w, h: h.h } : { x: h.x, y: h.y - (CV.scroll || 0) + CV.TOP + 8, w: h.w, h: h.h };
+    });
+    c.save();
+    c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(0, 0, CV.W, CV.H);
+    const pad = 6;
+    if (r) {
+      /* 高亮框：把锚点"挖"出来（先清一块、再描金框） */
+      c.fillStyle = 'rgba(0,0,0,0)';
+      c.clearRect ? null : null;
+      CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, 12 * CV.SCALE, 'rgba(0,0,0,0)', CV.C.gold, 2);
+    }
+    const lines = CV.wrap(coachState.text, CV.W - 60 * CV.SCALE, CV.FS.lg, 5);
+    const th = 44 * CV.SCALE + lines.length * CV.FS.lg * 1.7;
+    const tw = CV.W - 40 * CV.SCALE;
+    const tx = 20 * CV.SCALE;
+    const ty = r ? Math.min(CV.H - th - 40 * CV.SCALE, r.y + r.h + 16 * CV.SCALE) : (CV.H - th) / 2;
+    CV.round(tx, ty, tw, th, 14 * CV.SCALE, CV.C.panel, CV.C.gold);
+    lines.forEach(function (ln, i) {
+      CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
+    });
+    CV.text('点一下继续 ›', tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
+      { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
+    c.restore();
+    CV.hitMode = 'screen';
+    CV.hit('_coach_ok', 0, 0, CV.W, CV.H);     // 全屏可点：点哪都关
+    CV.hitMode = 'content';
+    coachState.ready = true;
+  };
+  CV.on('_coach_ok', function () {
+    if (!coachState) return;
+    const S = G.Core.S;
+    S.coachSeen = S.coachSeen || {};
+    S.coachSeen[coachState.key] = true;
+    coachState = null;
+    G.Core.save();
+    CV.render();
+  });
+
   U.drawOverlay = function () {
     const o = U.overlay;
     if (!o) return;
