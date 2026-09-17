@@ -112,16 +112,24 @@
     { key: 'tour_team',   page: 'party',   s: ['pslot:0', 'pslot:1', 'pslot:2'],
       t: '抽到的伙伴来这儿上阵：点空格子放人；长按任意一格可以拖着换位置。' },
   ];
+  /* 开场引导是否"进行中"：开始是 true（允许自动换页），全部走完变 false（此后绝不换页）。 */
+  let tourRunning = false;
+  function tourLeft() {
+    const S = Core.S; const seen = S.coachSeen || {};
+    return TOUR.filter(function (st) { return !seen[st.key]; }).length;
+  }
   G.tourNext = function () {
     const S = Core.S;
+    if (tourLeft() === 0) { tourRunning = false; return; }   // 走完 → 关掉自动换页
     S.coachSeen = S.coachSeen || {};
     for (let i = 0; i < TOUR.length; i++) {
       const st = TOUR[i];
       if (S.coachSeen[st.key]) continue;
-      /* V9.6.54（父亲大人：点到别的界面又给我跳到副本界面了、跳来跳去）：
-         **绝不自动换页** —— 以前这里会把玩家从他正在看的页面硬拽到下一步那页，
-         于是碰一下别的界面就被弹回副本，又乱又卡。现在只有他本来就在这一页时才播这一课。 */
-      if (CV.top().name !== st.page) return;
+      /* V9.6.55（父亲大人定的边界）：**引导进行中**可以自动换页（带着你一步步走，这是合理的）；
+         **引导结束就不能了** —— 所以只有 tourRunning 为真时才导航。
+         以前的毛病是"引导早就结束了还在后台每帧拽人"，于是碰一下别的界面就被弹回副本。 */
+      if (!tourRunning) return;
+      if (CV.top().name !== st.page) { CV.cur = st.page; CV.reset(st.page); }
       if (st.run) {
         /* 用 run() 的那一步（逐项讲主角卡）本身没有固定 key，
            这里立刻把 tour 的那把钥匙记上 —— 否则 G.tourNext 每次都会重新跑它、链子走不下去。 */
@@ -142,8 +150,15 @@
     if (page === 'home') {
       const S = Core.S;
       for (let i = 0; i < TOUR.length; i++) {
-        if (!(S.coachSeen || {})[TOUR[i].key]) { G.tourNext(); return; }
+        if (!(S.coachSeen || {})[TOUR[i].key]) {
+          /* 还有没讲过的 → **这次会话里引导算"进行中"**（允许自动换页把你带过去）；
+             全部讲完就关掉，之后无论在哪个页面都绝不换页（V9.6.55 父亲大人定的边界）。 */
+          tourRunning = true;
+          G.tourNext();
+          return;
+        }
       }
+      tourRunning = false;
     }
     const C = [
       ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。'],
