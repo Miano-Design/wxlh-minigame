@@ -380,6 +380,20 @@
       if (r || want.indexOf(h.id) < 0) return;
       r = h.screen ? { x: h.x, y: h.y, w: h.w, h: h.h } : { x: h.x, y: h.y - (CV.scroll || 0) + CV.TOP + 8, w: h.w, h: h.h };
     });
+    /* V9.6.34（父亲大人："你这个提示也没有让画面跟着滚动到对应位置啊"）：
+       目标可能在本屏之外（比如挂机的"收取奖励"在首页下方）——
+       先把它滚进可视区再画引导，否则高亮框和提示都指着屏幕外，等于没引导。
+       做法：算一下目标中心离可视区中心差多少 → 改 CV.scroll → 重画一帧（下一次进来就在视野里了）。 */
+    const viewTop = CV.TOP + 8, viewBot = CV.H - CV.NAV_H - CV.safeBottom - 8;
+    if (r && (r.y < viewTop + 6 || r.y + r.h > viewBot - 6)) {
+      const mid = (viewTop + viewBot) / 2;
+      const want = Math.max(0, Math.min(CV.maxScroll || 0, (CV.scroll || 0) + (r.y + r.h / 2 - mid)));
+      if (Math.abs(want - (CV.scroll || 0)) > 1) {
+        CV.scroll = want;
+        setTimeout(function () { CV.render(); }, 0);   // 滚到位后再画（这一帧先放行）
+        return;
+      }
+    }
     c.save();
     c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(0, 0, CV.W, CV.H);
     const pad = 6;
