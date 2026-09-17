@@ -397,8 +397,39 @@
     CV.toast('战斗速度 ' + v + '×');
     CV.render();
   });
-  CV.on('save_export', function () { CV.toast('导出存档：小游戏里请用「设置与存档 → 存档槽」备份', 2600); });
-  CV.on('save_import', function () { CV.toast('导入存档：小游戏里请用「设置与存档 → 存档槽」读取', 2600); });
+  /* ---------- 存档导出 / 导入 ----------
+     网页版是弹一个文本框让你全选复制 / 粘贴；画布里没有输入框也没有"全选"，
+     小游戏就用**剪贴板**当那个文本框 —— 语义一样（一段可搬走的存档文本），
+     而且是这台设备上唯一能跨设备搬档的路子。 */
+  CV.on('save_export', function () {
+    const json = Core.exportSave();
+    if (!(G.wx && G.wx.setClipboardData)) { CV.toast('这台设备不支持剪贴板'); return; }
+    try {
+      G.wx.setClipboardData({
+        data: json,
+        success: function () { CV.toast('存档已复制到剪贴板（' + json.length + ' 字符），发给别的设备粘贴导入即可', 3200); },
+        fail: function () { CV.toast('复制失败，请重试'); },
+      });
+    } catch (e) { CV.toast('复制失败，请重试'); }
+  });
+  CV.on('save_import', function () {
+    if (!(G.wx && G.wx.getClipboardData)) { CV.toast('这台设备不支持剪贴板'); return; }
+    try {
+      G.wx.getClipboardData({
+        success: function (res) {
+          const txt = String((res && res.data) || '').trim();
+          if (!txt) { CV.toast('剪贴板是空的：先把存档内容复制下来'); return; }
+          if (txt.charAt(0) !== '{') { CV.toast('剪贴板里不是存档内容（要以 { 开头）'); return; }
+          U.confirm('导入存档', '剪贴板里这段存档会**覆盖当前进度**（共 ' + txt.length + ' 字符），确定吗？', function () {
+            const r = Core.importSave(txt);
+            CV.toast(r.ok ? '存档已导入' : (r.msg || '导入失败'));
+            if (r.ok) CV.reset('home'); else CV.render();
+          });
+        },
+        fail: function () { CV.toast('读取剪贴板失败'); },
+      });
+    } catch (e) { CV.toast('读取剪贴板失败'); }
+  });
   [1, 2, 3].forEach(function (n) {
     CV.on('slot_save:' + n, function () {
       Core.saveSlot(n);

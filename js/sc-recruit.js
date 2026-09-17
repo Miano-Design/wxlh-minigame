@@ -220,5 +220,59 @@
     last = { results: n >= 10 ? r.results : [r], pid: pid, n: n, free: false };
     CV.render();
   });
-  CV.on('ssr_ticket', function () { CV.toast('SSR 自选券的选择页在下一步复刻里'); });
+  /* ---------- SSR 自选券（网页版 ssrPickModal） ----------
+     选一名 SSR 入队；已拥有的转成碎片。选完原地换成"结果 + 剩 N 张 + 返回招募"。 */
+  let ssrDone = null;
+  CV.register('ssr_pick', function () {
+    const S = Core.S;
+    U.begin();
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'ssr_back');
+    CV.text('SSR 自选（剩 ' + (S.ssrTicket || 0) + ' 张）', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2,
+      { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    if (ssrDone) {
+      U.card(function () {
+        U.h3('自选结果');
+        U.space(CV.SP[1]);
+        U.note(ssrDone, 0);
+        U.space(CV.SP[1]);
+        U.kv('剩余自选券', (S.ssrTicket || 0) + ' 张');
+      });
+      U.btnRow([{ label: '返回招募', style: 'primary', id: 'ssr_back' }]);
+      return;
+    }
+    U.note('选一名 SSR 伙伴入队；已拥有的伙伴会转成碎片。', 0);
+    U.space(CV.SP[2]);
+    const ssrs = D.characters.filter(function (c) { return c.rarity === 'SSR' && !c.hidden; });
+    const cols = 3, gap = CV.SP[2];
+    const cw = (U.cw() - gap * (cols - 1)) / cols, ch = 132 * CV.SCALE, y0 = U.y;
+    ssrs.forEach(function (c, i) {
+      const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+      const col = rarColor(c.rarity);
+      CV.round(x, y, cw, ch, 12 * CV.SCALE, CV.C.panel2, col);
+      const asz = 46 * CV.SCALE, acx = x + cw / 2;
+      CV.ctx.beginPath(); CV.ctx.arc(acx, y + 10 * CV.SCALE + asz / 2, asz / 2, 0, Math.PI * 2);
+      CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
+      CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
+      CV.text(String(c.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
+      CV.text(CV.fit(c.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
+      CV.text(CV.fit(c.role + ' · ' + c.faction, cw - 10 * CV.SCALE, CV.FS.sm), acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE,
+        { size: CV.FS.sm, align: 'center', color: CV.C.dim });
+      CV.hit('ssrpick:' + c.id, x, y, cw, ch);
+    });
+    U.y = y0 + Math.ceil(ssrs.length / cols) * (ch + gap);
+    U.btnRow([{ label: '‹ 返回招募', style: 'ghost', id: 'ssr_back' }]);
+  });
+  CV.on('ssr_ticket', function () {
+    if ((Core.S.ssrTicket || 0) <= 0) { CV.toast('没有自选券了'); return; }
+    ssrDone = null; CV.push('ssr_pick');
+  });
+  CV.on('ssrpick:*', function (id) {
+    const r = Core.ssrTicketUse(id);
+    if (!r.ok) { CV.toast(r.msg || '无法选择'); return; }
+    ssrDone = r.msg || '已获得';
+    CV.toast('🎫 ' + ssrDone);
+    CV.render();
+  });
+  CV.on('ssr_back', function () { CV.pop(); });
 })();

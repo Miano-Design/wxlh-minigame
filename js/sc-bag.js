@@ -16,6 +16,48 @@
   const fmt = G.fmt || ((n) => String(n));
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
 
+  /* ---------- 批量分解（网页版 equipBatchBar / equipFilterBar 的那颗按钮）----------
+     父亲大人 2026-09-17：装备栏那颗「🧹 批量分解」原来点了只弹一句"下一步复刻"。
+     照网页版做成选择模式：点格子选中 → 底栏显示"已选 N 件 · 预计 ◆ X" → 分解。 */
+  let batchMode = false;
+  const batchSel = new Set();
+  function batchGain() {
+    let gain = 0;
+    batchSel.forEach(function (uid) {
+      const e = Core.S.equips[uid];
+      if (e) gain += (D.DECOMPOSE_GAIN[e.rarity] || 0) + Math.floor((e.enhance || 0) * 3);
+    });
+    return gain;
+  }
+  /* 底栏画成"页面级覆盖层"（CV.pageOverlay）：不跟着内容滚动、也不被顶栏/底栏裁掉 */
+  function batchBar() {
+    if (!batchMode) return;
+    const pad = U.pad(), h = 106 * CV.SCALE;
+    const y = CV.H - CV.NAV_H - CV.safeBottom - h - 8 * CV.SCALE;
+    const bh = U.BTN_SM * CV.SCALE;
+    CV.hitMode = 'screen';
+    CV.round(pad, y, CV.W - pad * 2, h, 14 * CV.SCALE, 'rgba(18,22,34,.97)', CV.C.line);
+    /* 第一行：快选 N / R / SR + 清空 */
+    let x = pad + 12 * CV.SCALE;
+    const ry = y + 12 * CV.SCALE;
+    CV.text('快选：', x, ry + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
+    x += CV.measure('快选：', CV.FS.sm) + 6 * CV.SCALE;
+    ['N', 'R', 'SR'].forEach(function (r) {
+      const bw = 46 * CV.SCALE;
+      U.btn(x, ry, bw, bh, r, 'ghost', 'bselr:' + r);
+      x += bw + 6 * CV.SCALE;
+    });
+    U.btn(x, ry, 54 * CV.SCALE, bh, '清空', 'ghost', 'bclear');
+    /* 第二行：已选 / 预计收益 + 分解 / 取消 */
+    const ry2 = ry + bh + 8 * CV.SCALE;
+    CV.text(CV.fit('已选 ' + batchSel.size + ' 件 · 预计 ◆ ' + fmt(batchGain()), CV.W - pad * 2 - 180 * CV.SCALE, CV.FS.md),
+      pad + 12 * CV.SCALE, ry2 + bh / 2, { size: CV.FS.md });
+    const b2 = 76 * CV.SCALE, g2 = 8 * CV.SCALE;
+    U.btn(CV.W - pad - b2 * 2 - g2 - 12 * CV.SCALE, ry2, b2, bh, '⚡ 分解', 'primary', 'bgo');
+    U.btn(CV.W - pad - b2 - 12 * CV.SCALE, ry2, b2, bh, '取消', 'ghost', 'bclose');
+    CV.hitMode = 'content';
+  }
+
   const TABS = [['item', '道具'], ['mat', '材料'], ['equip', '装备']];
   const POOLS = {
     item: { label: '道具格', capKey: 'itemCap', expKey: 'itemExpands' },
@@ -79,7 +121,12 @@
         CV.hit(expandId, x, y, cw, cw);
         return;
       }
-      CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
+      if (c.sel) {
+        /* 网页版 .bg-slot.sel：红框 + 红色淡底（批量分解时"这件选中了"） */
+        CV.round(x, y, cw, cw, CV.RADIUS, '#d43a4f33', CV.C.accent);
+      } else {
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
+      }
       /* 名字：13px 粗体，最多两行，居中在"数量以上"那块区域（网页版 .bg-name） */
       const lines = CV.wrap(c.name, cw - 14 * CV.SCALE, CV.FS.lg, 2);
       const areaH = cw - 22 * CV.SCALE;                 // 数量占底部 ~22
@@ -116,10 +163,10 @@
       const list = Object.values(S.equips).filter((e) => !worn.has(e.uid));
       used = list.length;
       list.slice(0, cap).forEach((e) => {
-        cells.push({
-          id: 'eqd:' + e.uid, name: (e.lock ? '🔒' : '') + e.name,
-          color: rarColor(e.rarity), sub: '+' + e.enhance,
-        });
+        /* V9.6.7：批量分解模式下，点格子 = 选中/取消（不再进详情页）——网页版同一口径 */
+        cells.push(batchMode
+          ? { id: 'bselu:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance, sel: batchSel.has(e.uid) }
+          : { id: 'eqd:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance });
       });
     } else {
       const isMat = (k) => (D.ITEMS[k] || {}).type === 'material';
@@ -138,18 +185,25 @@
       const full = used >= cap;
       const top = U.y;
       CV.text(pool.label, U.ix(), top + 9 * CV.SCALE, { size: CV.FS.lg, bold: true });
-      CV.text(used + ' / ' + cap + (full ? ' · 满了' : ''), U.ix() + U.iw(), top + 9 * CV.SCALE,
-        { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+      /* V9.6.7：数量只在**一处**画。以前装备栏为了给「批量分解」让位又画了第二遍，
+         第一遍（贴最右）被按钮压住，屏幕上就出现"2 / 50"两截叠在一起。 */
+      const cntTxt = used + ' / ' + cap + (full ? ' · 满了' : '');
+      let cntRight = U.ix() + U.iw();
       /* 装备栏的标题行右侧还有「批量分解」（网页版 .eq-bar） */
       if (view === 'equip') {
-        const bw = CV.measure('🧹 批量分解', CV.FS.sm) + 22 * CV.SCALE;
-        U.btn(U.ix() + U.iw() - bw, top - 14 * CV.SCALE, bw, 34 * CV.SCALE, '🧹 批量分解', 'ghost', 'bag_batch');
-        CV.text(used + ' / ' + cap + (full ? ' · 满了' : ''), U.ix() + U.iw() - bw - 10 * CV.SCALE, top + 9 * CV.SCALE,
-          { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+        /* 网页版 .eq-bar：没开批量时右边一颗「🧹 批量分解」；开了就换成一行提示（挑选动作在底栏） */
+        /* 开了批量之后这颗按钮只是状态标签（挑选动作在底栏），写短一点免得在 34 高的按钮里折成两行 */
+        const lbl = batchMode ? '批量分解中' : '🧹 批量分解';
+        const bw = CV.measure(lbl, CV.FS.sm) + 22 * CV.SCALE;
+        U.btn(U.ix() + U.iw() - bw, top - 14 * CV.SCALE, bw, 34 * CV.SCALE, lbl, batchMode ? 'ghost' : 'ghost',
+          batchMode ? '' : 'bag_batch');
+        cntRight = U.ix() + U.iw() - bw - 10 * CV.SCALE;
       }
+      CV.text(cntTxt, cntRight, top + 9 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + 26 * CV.SCALE;
       grid(cells, used, cap, 'bag_expand:' + view, cost, false);
     });
+    if (view === 'equip' && batchMode) CV.pageOverlay = batchBar;
   });
 
   /* ---------- 道具详情（网页版 itemDetail：名字+数量 / 说明 / 在哪用 / 去哪弄 / 动作 / 返回） ---------- */
@@ -312,7 +366,37 @@
       if ((Core.S.items[curItem] || 0) <= 0) CV.pop(); else CV.render();
     });
   });
-  CV.on('bag_batch', function () { CV.toast('批量分解在下一步复刻里'); });
+  /* ---------- 批量分解：四个动作（网页版 data-batchon/off、data-beq、data-bsel、data-bgo） ---------- */
+  CV.on('bag_batch', function () { batchMode = true; batchSel.clear(); CV.render(); });
+  CV.on('bclose', function () { batchMode = false; batchSel.clear(); CV.render(); });
+  CV.on('bselu:*', function (uid) {
+    if (batchSel.has(uid)) batchSel.delete(uid); else batchSel.add(uid);
+    CV.render();
+  });
+  CV.on('bclear', function () { batchSel.clear(); CV.render(); });
+  /* 快选：把该稀有度里**没穿身上、没锁**的一键选上；再点一次取消 */
+  CV.on('bselr:*', function (rarity) {
+    const worn = new Set();
+    Object.keys(Core.S.equipped).forEach(function (cid) {
+      Object.values(Core.S.equipped[cid] || {}).forEach(function (u) { if (u) worn.add(u); });
+    });
+    const uids = Core.inventoryEquips()
+      .filter(function (e) { return e.rarity === rarity && !worn.has(e.uid) && !e.lock; })
+      .map(function (e) { return e.uid; });
+    const allIn = uids.length > 0 && uids.every(function (u) { return batchSel.has(u); });
+    uids.forEach(function (u) { if (allIn) batchSel.delete(u); else batchSel.add(u); });
+    CV.render();
+  });
+  CV.on('bgo', function () {
+    if (!batchSel.size) { CV.toast('请先点选要分解的装备'); return; }
+    const n = batchSel.size, gain = batchGain();
+    U.confirm('批量分解', '确定分解选中的 ' + n + ' 件装备？将获得 ◆ ' + fmt(gain) + '（异界结晶）', function () {
+      const r = Core.decomposeMany(Array.from(batchSel));
+      CV.toast(r.count ? ('分解 ' + r.count + ' 件 · ◆ +' + fmt(r.gain)) : '没有可分解的装备');
+      batchMode = false; batchSel.clear();
+      CV.render();
+    });
+  });
   /* 装备详情：背包 / 主角详情 / 伙伴详情三处共用同一个页面（前缀处理器） */
   CV.on('eqd:*', function (uid) { eqUid = uid; CV.push('eqdetail'); });
   CV.on('eq_back', function () { CV.pop(); });
