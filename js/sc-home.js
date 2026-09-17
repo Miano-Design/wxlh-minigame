@@ -56,7 +56,38 @@
     return true;
   }
 
+  /* V9.6.37：**新解锁的功能也自动开指引**（父亲大人第 2 条：解锁时弹窗打断）。
+     判定方式是"这个模块已解锁 + 这一课没讲过"，所以：
+       · 新号刚解锁 → 第一次进这个模块就弹（并且是强制点中才算过）；
+       · 老号从没进过 → 进去同样补一次。
+     锚点可以写前缀（'bup:*' / 'eqd:*'），动态 id 也能锚。 */
+  const UNLOCK_GUIDE = {
+    recruit:  { page: 'recruit',  s: ['pull1:normal', 'pull1:normal:free'], t: '招募解锁了：每天有免费次数先用掉，抽到的伙伴记得去「队伍」上阵。' },
+    shop:     { page: 'shop',     s: ['shoptab:god'], t: '兑换大厅：四家店各用不同货币，日常用券和材料都在这儿补。' },
+    enhance:  { page: 'bag',      s: ['bagview:equip', 'eqd:*'], t: '装备强化解锁了：切到「装备」、点一件进去，花材料提升数值。' },
+    buildings:{ page: 'buildings',s: ['bup:*'], t: '基地建设：五栋建筑每升一级都是永久加成，花的是挂机就能刷的点数。' },
+    tasks:    { page: 'tasks',    s: ['tasktab:main'], t: '任务解锁了：主线 / 日常 / 周常 / 成就四个标签，做完记得回来领。' },
+    corridor: { page: 'corridor', s: ['corridor_fight'], t: '深井解锁了：一直往上打、没有重置，每 10 层给一枚印记加成。' },
+    bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗血统结晶 + 点数，每级全属性都涨。' },
+    geneLock: { page: 'genelock', s: [], t: '铭刻解锁了：点满每一条都有永久加成，是长期成长线。' },
+    beast:    { page: 'beast',    s: [], t: '伴生体解锁了：孵化出来能带上场，给全队加属性。' },
+    reincarn: { page: 'reincarn', s: [], t: '转生解锁了：重置等级和世界进度换永久天赋点，中后期主力成长线。' },
+  };
+  function coachByUnlock(page) {
+    const ids = Object.keys(UNLOCK_GUIDE);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i], g = UNLOCK_GUIDE[id];
+      if (g.page !== page) continue;
+      if (!(Core.isUnlocked && Core.isUnlocked(id))) continue;
+      if (U.coachSeen('tut_unlock_' + id)) continue;
+      U.coach(g.s.length ? g.s : 'page_back', g.t, { key: 'tut_unlock_' + id, mustTap: g.s.length > 0 });
+      return true;
+    }
+    return false;
+  }
+
   G.coachFor = function (page) {
+    if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
     if (page === 'home' && !U.coachSeen('tut_hero_open')) coachHero();
     const C = [

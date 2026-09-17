@@ -414,8 +414,18 @@
     /* 锚点：优先找非屏幕坐标（内容区）的那一颗，换算到屏幕 y */
     let r = null;
     const want = [].concat(coachState.targetId);
+    /* 锚点支持"前缀"（写成 'bup:*'）：建筑升级、装备格这类 id 带后缀（bup:core / eqd:eq123），
+       不可能写死，用前缀就能锚到"这一类"里的第一颗（V9.6.37）。 */
+    const match = function (id) {
+      for (let i = 0; i < want.length; i++) {
+        const w = want[i];
+        if (w.slice(-1) === '*') { if (id.indexOf(w.slice(0, -1)) === 0) return true; }
+        else if (id === w) return true;
+      }
+      return false;
+    };
     (CV.hits || []).forEach(function (h) {
-      if (r || want.indexOf(h.id) < 0) return;
+      if (r || !match(h.id)) return;
       r = h.screen ? { x: h.x, y: h.y, w: h.w, h: h.h } : { x: h.x, y: h.y - (CV.scroll || 0) + CV.TOP + 8, w: h.w, h: h.h };
     });
     /* V9.6.34（父亲大人："你这个提示也没有让画面跟着滚动到对应位置啊"）：
