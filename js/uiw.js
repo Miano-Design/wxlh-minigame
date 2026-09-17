@@ -376,7 +376,8 @@
     S.coachSeen = S.coachSeen || {};
     const key = opts.key || [].concat(targetId).join('|');
     if (S.coachSeen[key]) return;                      // 看过就不再弹
-    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false, onDone: opts.onDone };
+    const item = { targetId: targetId, key: key, text: text, mustTap: !!opts.mustTap, swallow: opts.swallow !== false, onDone: opts.onDone,
+      waitFor: opts.waitFor };   // waitFor：**这件事真的做完了**才算过（父亲大人拍板的第 2 条）
     /* V9.6.43 自审：同一个 key 不能重复入队 —— 链式引导每帧都会问一次，
        不拦的话队列会**无限堆积**（每渲染一帧塞一条）。 */
     if (coachState && coachState.key === key) return;
@@ -437,6 +438,14 @@
   };
   U.drawCoach = function () {
     if (!coachState) return;
+    /* V9.6.61（父亲大人拍板第 2 条：**做完才放行**）：
+       带 waitFor 的引导，先问"这件事真做完了吗" —— 做完了就直接过、连提示都不留；
+       没做完才继续挡着（并且每帧都在问，所以玩家一做完立刻放行，不用再点一次）。 */
+    if (coachState.waitFor) {
+      let done = false;
+      try { done = !!coachState.waitFor(); } catch (e) { done = true; }   // 判定出错就别卡人
+      if (done) { U.coachMark(coachState); U.coachNext(); return; }
+    }
     const S = G.Core.S;
     const c = CV.ctx;
     /* 锚点：优先找非屏幕坐标（内容区）的那一颗，换算到屏幕 y */

@@ -111,7 +111,16 @@
     const key = 'tut_' + qid;
     if (U.coachSeen(key)) return false;
     if (rule.run) { rule.run(); return true; }
-    U.coach(rule.s, rule.t, { key: key, mustTap: true });
+    /* V9.6.61（父亲大人拍板第 2 条：做完才放行）：
+       主线这一课的"过关条件"就是**那一步主线本身有没有完成** ——
+       直接绑它的 check()，所以"点一下按钮"不算过，得真做完。
+       （每一步仍然保留「跳过这一步」，所以不会把人卡死。） */
+    const quest = (D.MAIN_QUESTS || []).filter(function (q) { return q.id === qid; })[0];
+    U.coach(rule.s, rule.t, {
+      key: key,
+      mustTap: true,
+      waitFor: quest ? function () { return !!quest.check(Core.S); } : null,
+    });
     return true;
   }
 
