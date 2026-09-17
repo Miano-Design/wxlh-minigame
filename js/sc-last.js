@@ -89,13 +89,16 @@
         const b = x.b;
         const state = x.claimed ? '已领取' : (x.expired ? '已过期' : (x.done ? '可领取' : '进行中'));
         const top = U.y, h = 74 * CV.SCALE;
-        CV.text(CV.fit(b.name, U.iw() * 0.62, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text(state, U.ix() + U.iw(), top + 16 * CV.SCALE,
-          { size: CV.FS.sm, align: 'right', color: x.done && !x.claimed && !x.expired ? CV.C.gold : CV.C.dim });
-        CV.text(CV.fit(b.desc || '', U.iw(), CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        CV.text('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
-          + '　奖励 ' + Core.rewardTextOf(b.reward), U.ix(), top + 56 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         const bw = 84 * CV.SCALE;
+        /* V9.6.14（自审：父亲人截图里"已领取/进行中"压住了按钮）：
+           右侧那一列只留按钮 —— 状态本来就是按钮自己在说（已领取 / 去完成），
+           再飘一个状态字只会跟按钮叠在一起。左侧正文也要按按钮宽度让位。 */
+        const textW = U.iw() - bw - 12 * CV.SCALE;
+        CV.text(CV.fit(b.name, textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(b.desc || '', textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text(CV.fit('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
+          + '　奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm), U.ix(), top + 56 * CV.SCALE,
+          { size: CV.FS.sm, color: CV.C.dim });
         const claimable = x.done && !x.claimed && !x.expired;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           claimable ? '领取奖励' : (x.claimed ? '已领取' : '去完成'), claimable ? 'primary' : 'ghost',

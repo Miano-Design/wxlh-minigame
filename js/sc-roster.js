@@ -114,7 +114,9 @@
   });
   /* rf:* / rs:* 随分类+排序两行一起删掉了（V9.6.8） */
   Object.keys(D.characters).length;                        // 触发表初始化（保持与网页版一致的数据来源）
-  CV.on('open_codex', () => CV.toast('伙伴图鉴在下一批复刻'));
+  /* V9.6.14（自审）：这一行把 sc-home 里"打开灯录页"的处理器**盖掉了**（同 id 是后注册的赢），
+     所以点灯录 / 图鉴只弹一句"下一批复刻" —— 其实 codex 页在 sc-core-pages.js 里早就写好了。
+     删掉这行占位，灯录就真能进去了。 */
 
   /* ================= 伙伴详情（照网页版 charDetail） ================= */
   CV.register('char', function (opts) {
