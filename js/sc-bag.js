@@ -391,12 +391,42 @@
       if (!rows.length) U.hint('这件装备没有附加属性', 4 * CV.SCALE);
       rows.forEach((r) => U.kv(r[0], r[1]));
     });
-    if (set) {
+    /* V9.6.15（父亲大人："装备的套装属性好像都没写，就算没激活也得用灰字写出来几件能激活什么"）：
+       原来这里读的是 `set.bonus` —— **数据里没有这个字段**（数据是 `text`："2件:…　4件:…" + b2/b4/b6），
+       所以这一整张卡只画了一个标题，玩家根本不知道这套能干嘛。
+       现在照网页版 equipDetail 的做法：把 text 按全角空格拆开，逐条列出
+       「N件：效果」，**没到的走灰字、到了的高亮并标"已激活"**；
+       标题右侧写清"已穿 N / 满配 M 件"。件数只算真穿在这个人身上的（没主人就是 0）。 */
+    const owner = wearer || null;
+    const wornOf = function (which, key) {
+      if (!owner) return 0;
+      return Object.keys(S.equipped[owner] || {}).filter(function (sl) {
+        const u = S.equipped[owner][sl];
+        return u && S.equips[u] && S.equips[u][key] === which;
+      }).length;
+    };
+    const mkSetCard = function (title, name, text, cnt, max) {
       U.card(function () {
-        U.h3('🧩 ' + (set.name || '套装'), eq.set);
-        Object.keys(set.bonus || {}).forEach((k) => U.hint(k + ' 件：' + Core.rewardTextOf(set.bonus[k]), 2 * CV.SCALE));
+        U.h3('🧩 ' + title, (name || '') + ' · ' + cnt + '/' + max + ' 件');
+        String(text || '').split('　').forEach(function (part) {
+          const i = part.indexOf(':');
+          if (i < 0) { U.hint(part, 2 * CV.SCALE); return; }
+          const need = parseInt(part.slice(0, i), 10) || 0;
+          const on = cnt >= need;
+          U.space(4 * CV.SCALE);
+          const y = U.y;
+          CV.text(part.slice(0, i + 1), U.ix(), y + 8 * CV.SCALE,
+            { size: CV.FS.lg, color: on ? CV.C.gold : CV.C.dim });
+          const lw = CV.measure(part.slice(0, i + 1), CV.FS.lg);
+          CV.text(CV.fit(part.slice(i + 1) + (on ? ' · 已激活' : ''), U.iw() - lw - 6 * CV.SCALE, CV.FS.lg),
+            U.ix() + lw + 6 * CV.SCALE, y + 8 * CV.SCALE, { size: CV.FS.lg, color: on ? CV.C.gold : CV.C.dim });
+          U.space(16 * CV.SCALE);
+        });
+        if (!owner) U.hint('这件还没穿在人身上 —— 套装件数只算真穿着的装备，穿上才算。', 4 * CV.SCALE);
       });
-    }
+    };
+    if (cs) mkSetCard('职业套装', cs.name, cs.text, wornOf(eq.classSet, 'classSet'), 3);
+    else if (set) mkSetCard('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
     U.card(function () {
       U.h3('强化', '+' + eq.enhance + '/20');
       U.kv('强化材料', q.matHave ? (q.itemName + ' ×1（现有 ' + q.matOwned + '）') : ('无' + q.itemName + ' → 用 ◈ ' + fmt(q.substitute) + ' 代用'));
