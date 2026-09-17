@@ -416,10 +416,9 @@ window.Battle = (function () {
       if (u.kind === 'healer' && lowAlly && lowAlly.hp / lowAlly.maxHp < 0.55 && u.cds.s1 <= 0) {
         u.cds.s1 = cdOf(0); castSkill(u, u.skills.s1, 0, foes, friends, frames, mech, cfg, skillMultLv(0)); return;
       }
-      // 控制优先打 Boss
-      if (u.kind === 'controller' && u.cds.s1 <= 0 && alive(foes).some(f => f.isBoss)) {
-        u.cds.s1 = cdOf(0); castSkill(u, u.skills.s1, 0, foes, friends, frames, mech, cfg, skillMultLv(0)); return;
-      }
+      /* V9.6.86：这里原来有一条"控制型优先打 Boss"的 AI 分支。
+         血统=定位之后已经没有 controller 这个定位了（控制技能按父亲大人的意思分散在各血统里），
+         这条分支永远不会命中，删掉。 */
       if (u.cds.s1 <= 0) { u.cds.s1 = cdOf(0); castSkill(u, u.skills.s1, 0, foes, friends, frames, mech, cfg, skillMultLv(0)); return; }
       if (u.cds.s2 <= 0) { u.cds.s2 = cdOf(1); castSkill(u, u.skills.s2, 1, foes, friends, frames, mech, cfg, skillMultLv(1)); return; }
     }

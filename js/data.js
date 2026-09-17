@@ -152,68 +152,9 @@ window.DATA = (function () {
   const ATK_ATTR = { mage: 'intelligence', controller: 'intelligence', healer: 'spirit', support: 'spirit' };
 
   // 技能模板（按战斗模板）：技能1(CD3) / 技能2(CD5) / 必杀(能量100) / 被动
-  const SKILL_TPL = {
-    warrior: {
-      s1: { name: '重斩', desc: '对单体造成 180% 伤害', cd: 3, type: 'dmg', mult: 1.8, target: 'enemy' },
-      s2: { name: '战意觉醒', desc: '自身攻击 +30%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.3, turns: 3 }, target: 'self' },
-      ult: { name: '裂空斩', desc: '对单体造成 380% 伤害并附加破甲 2 回合', type: 'dmg', mult: 3.8, status: { id: 'sunder', turns: 2 }, target: 'enemy' },
-      passive: { name: '嗜战', desc: '生命低于 50% 时攻击 +20%' },
-    },
-    tank: {
-      s1: { name: '盾击', desc: '造成 120% 伤害并嘲讽 2 回合', cd: 3, type: 'dmg', mult: 1.2, status: { id: 'taunt', turns: 2, self: true }, target: 'enemy' },
-      s2: { name: '铁壁', desc: '获得 25% 最大生命的护盾', cd: 5, type: 'shield', mult: 0.25, target: 'self' },
-      ult: { name: '灯阁壁垒', desc: '全队获得 20% 最大生命护盾并减伤 20%（2 回合）', type: 'teamshield', mult: 0.20, buff: { defPct: 0.2, turns: 2 }, target: 'team' },
-      passive: { name: '坚韧', desc: '受到伤害 -12%' },
-    },
-    ranger: {
-      s1: { name: '连射', desc: '对随机敌人射击 2 次，每次 90% 伤害', cd: 3, type: 'dmg', mult: 0.9, hits: 2, target: 'random' },
-      s2: { name: '瞄准', desc: '自身暴击率 +25%，持续 3 回合', cd: 5, type: 'buff', buff: { critPct: 0.25, turns: 3 }, target: 'self' },
-      ult: { name: '毁灭狙击', desc: '对单体造成 420% 伤害，必定暴击', type: 'dmg', mult: 4.2, sureCrit: true, target: 'enemy' },
-      passive: { name: '猎手直觉', desc: '暴击伤害 +25%' },
-    },
-    mage: {
-      s1: { name: '元素冲击', desc: '对单体造成 190% 伤害并附加燃烧 2 回合', cd: 3, type: 'dmg', mult: 1.9, status: { id: 'burn', turns: 2 }, target: 'enemy' },
-      s2: { name: '法力涌动', desc: '全队技能伤害 +15%，持续 3 回合', cd: 5, type: 'buff', buff: { skillPct: 0.15, turns: 3 }, target: 'team' },
-      ult: { name: '陨星坠落', desc: '对敌方全体造成 260% 伤害', type: 'dmg', mult: 2.6, target: 'allEnemies' },
-      passive: { name: '元素亲和', desc: '技能伤害 +12%' },
-    },
-    healer: {
-      s1: { name: '治疗术', desc: '治疗生命最低的队友 220% 精神', cd: 3, type: 'heal', mult: 2.2, target: 'lowest' },
-      s2: { name: '净化', desc: '清除全队 1 个异常状态并治疗 120% 精神', cd: 5, type: 'cleanseHeal', mult: 1.2, target: 'team' },
-      ult: { name: '生命礼赞', desc: '全队治疗 300% 精神并附加持续恢复 2 回合', type: 'heal', mult: 3.0, status: { id: 'regen', turns: 2 }, target: 'team' },
-      passive: { name: '仁心', desc: '治疗效果 +20%' },
-    },
-    controller: {
-      s1: { name: '精神锁链', desc: '造成 130% 伤害并 40% 概率眩晕 1 回合', cd: 3, type: 'dmg', mult: 1.3, status: { id: 'stun', turns: 1, chance: 0.4 }, target: 'enemy' },
-      s2: { name: '恐惧低语', desc: '敌方全体攻击 -20%，持续 2 回合', cd: 5, type: 'debuff', buff: { atkPct: -0.2, turns: 2 }, target: 'allEnemies' },
-      ult: { name: '思维禁锢', desc: '对单体造成 300% 伤害并眩晕 1 回合', type: 'dmg', mult: 3.0, status: { id: 'stun', turns: 1 }, target: 'enemy' },
-      passive: { name: '精神场', desc: '敌方全体速度 -5%' },
-    },
-    assassin: {
-      s1: { name: '背刺', desc: '造成 200% 伤害，对生命低于 50% 的目标 +50%', cd: 3, type: 'dmg', mult: 2.0, execute: true, target: 'enemy' },
-      s2: { name: '淬毒', desc: '普攻附加中毒 2 回合，持续 3 回合', cd: 5, type: 'buff', buff: { poisonOnHit: 2, turns: 3 }, target: 'self' },
-      ult: { name: '影杀', desc: '对单体造成 400% 伤害并附加流血 3 回合', type: 'dmg', mult: 4.0, status: { id: 'bleed', turns: 3 }, target: 'enemy' },
-      passive: { name: '致命节奏', desc: '暴击率 +10%' },
-    },
-    support: {
-      s1: { name: '激励', desc: '攻击最高的队友攻击 +25%，持续 2 回合', cd: 3, type: 'buff', buff: { atkPct: 0.25, turns: 2 }, target: 'topAlly' },
-      s2: { name: '能量灌注', desc: '为队友回复 30 点能量', cd: 5, type: 'energy', mult: 30, target: 'topAlly' },
-      ult: { name: '灯阁祝福', desc: '全队攻击 +25%、防御 +25%，持续 3 回合', type: 'buff', buff: { atkPct: 0.25, defPct: 0.25, turns: 3 }, target: 'team' },
-      passive: { name: '鼓舞', desc: '全队攻击 +6%' },
-    },
-    saber: {
-      s1: { name: '御剑术', desc: '造成 170% 伤害并无视 30% 防御', cd: 3, type: 'dmg', mult: 1.7, pierce: 0.3, target: 'enemy' },
-      s2: { name: '剑心', desc: '自身闪避 +20%，持续 3 回合', cd: 5, type: 'buff', buff: { evaPct: 0.20, turns: 3 }, target: 'self' },
-      ult: { name: '万剑归宗', desc: '对敌方全体造成 220% 伤害', type: 'dmg', mult: 2.2, target: 'allEnemies' },
-      passive: { name: '剑意', desc: '攻击 +10%' },
-    },
-    vampire: {
-      s1: { name: '血之利爪', desc: '造成 160% 伤害并回复伤害 40% 的生命', cd: 3, type: 'dmg', mult: 1.6, lifesteal: 0.4, target: 'enemy' },
-      s2: { name: '鲜血狂热', desc: '自身攻击 +20%、吸血 +15%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.2, lifesteal: 0.15, turns: 3 }, target: 'self' },
-      ult: { name: '猩红盛宴', desc: '对敌方全体造成 200% 伤害并吸取伤害 30% 的生命', type: 'dmg', mult: 2.0, lifesteal: 0.3, target: 'allEnemies' },
-      passive: { name: '血族本能', desc: '吸血 +10%' },
-    },
-  };
+  /* V9.6.86：这里原来有一张 `SKILL_TPL`（按"定位"给的九套技能）。
+     血统=定位之后，伙伴和主角一样都只有**血统技能**一套（见 BLOODLINE_SKILLS），
+     那张表再没有任何调用点，删掉 —— 留着它下一个人会以为"伙伴用的是另一套技能"。 */
 
   // 60 名角色（前 20 名基础属性取自 V5.0 表格，其余按稀有度总属性区间 + 定位权重生成）
   const CHAR_TABLE = [
@@ -363,7 +304,7 @@ window.DATA = (function () {
       id, name, faction, bloodline, role, kind, rawKind, rarity,
       hidden: hiddenOrA === 'hidden',
       attrs: { muscle: attrs[0], immune: attrs[1], cell: attrs[2], nerve: attrs[3], intelligence: attrs[4], spirit: attrs[5] },
-      skills: SKILL_TPL[kind],   // 占位：BLOODLINE_SKILLS 定义完之后统一换成血统技能
+      skills: null,   // 占位：BLOODLINE_SKILLS 定义完之后统一换成血统技能（V9.6.86 起伙伴也只有血统技能这一套）
     };
   });
   const charById = {};
@@ -881,6 +822,8 @@ window.DATA = (function () {
       '高级货币除了抽卡，还有一条长线出口——「🔑 灯阁权限」（见第 ⑪ 章）：投进去就永久生效，转生也不清空。',
     ] },
     { id: 'gene', title: '⑤ 血统与铭刻', body: [
+      '**血统就是定位**：狼人=战士、修真=法师、血族=刺客、科技=射手、念动力=辅助、泰坦=肉盾。'
+      + '伙伴卡上写的就是血统；他的技能、套装、境界线全跟着这一支走，不用再记第二套“职业”的说法。',
       '伙伴的血统是固定的；主角开局就选一次血统，选完不能改——因为**境界线跟着血统走**（见第 ⑬ 章）。',
       '血统升级消耗血统结晶 + 点数，提升幅度很大，是中期主要成长线。',
       '铭刻 5 阶，靠通关进度 + 玩家等级 + 血统结晶解锁，每阶全队属性加成。',

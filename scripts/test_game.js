@@ -235,7 +235,7 @@ setParty(['C021']);
   t('主角血统选择（开局必经，不受解锁限制）', Core.choosePlayerBloodline('狼人').ok);
   Core.addCur('bloodCrystal', 10000); Core.addCur('points', 1000000);
   t('主角血统升级', Core.upgradePlayerBloodline().ok && Core.S.player.bloodlineLv === 1);
-  t('血统不可更改', !Core.choosePlayerBloodline('魔法').ok);
+  t('血统不可更改', !Core.choosePlayerBloodline('科技').ok);   // V9.6.86：原来用的「魔法」血统已删，那是假通过
   const eq6 = Core.grantEquip('W01', 'SR', 'head');
   eq6.equip.set = null; eq6.equip.bloodSet = null; // 固定为普通装备，排除套装随机性
   t('头部装备主角可穿', Core.equipItem('@player', eq6.equip.uid));
