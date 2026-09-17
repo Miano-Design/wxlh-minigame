@@ -108,7 +108,9 @@
     const res = (last && last.results) || [];
     const cols = 3, gap = CV.SP[2];
     const cw = (U.cw() - gap * (cols - 1)) / cols;
-    const ch = 132 * CV.SCALE;
+    /* V9.6.18（父亲大人："招募卡片太长，把两个功能按钮挤出画了；连抽不该还要下滑"）：
+       卡片从 132 压到 104（头像 46→38、内部间距同步收），10 连刚好 4 行不出画。 */
+    const ch = 104 * CV.SCALE;
     const y0 = U.y;
     res.forEach(function (r, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
@@ -119,21 +121,39 @@
         CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, CV.C.gold);
         CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#241c08' });
       }
-      const asz = 46 * CV.SCALE, acx = x + cw / 2;
-      CV.ctx.beginPath(); CV.ctx.arc(acx, y + 10 * CV.SCALE + asz / 2, asz / 2, 0, Math.PI * 2);
+      const asz = 38 * CV.SCALE, acx = x + cw / 2, atop = y + 8 * CV.SCALE;
+      CV.ctx.beginPath(); CV.ctx.arc(acx, atop + asz / 2, asz / 2, 0, Math.PI * 2);
       CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
-      CV.text(String(r.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
-      CV.text(CV.fit(r.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text(r.isNew ? 'NEW' : ('碎片+' + (r.shards || 0)), acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE,
+      CV.text(String(r.name || '?').slice(0, 1), acx, atop + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
+      CV.text(CV.fit(r.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, atop + asz + 11 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
+      CV.text(r.isNew ? 'NEW' : ('碎片+' + (r.shards || 0)), acx, atop + asz + 27 * CV.SCALE,
         { size: CV.FS.sm, align: 'center', color: r.isNew ? CV.C.green : CV.C.dim });
     });
     U.y = y0 + Math.ceil(res.length / cols) * (ch + gap);
-    /* 继续招募 / 返回（用免费次数抽的那次不给"继续招募"） */
+    /* 继续招募 / 返回（用免费次数抽的那次不给"继续招募"）
+       V9.6.18（父亲大人）：这两个按钮**必须永远在画内** —— 不然连抽还要先下滑，
+       完全不合理。改成**底部固定条**（页面级覆盖层，不跟内容滚），
+       内容底部再让出一条它的高度，牌就不会被压在它下面。 */
     const again = last && !last.free;
-    U.btnRow(again
+    const acts = again
       ? [{ label: '继续招募', style: 'primary', id: 'again' }, { label: '返回', style: 'ghost', id: 'rec_back' }]
-      : [{ label: '返回', style: 'ghost', id: 'rec_back' }]);
+      : [{ label: '返回', style: 'ghost', id: 'rec_back' }];
+    const barH = U.BTN_H * CV.SCALE + 16 * CV.SCALE;
+    U.y += barH;                       // 让出底部条的高度
+    CV.pageOverlay = function () {
+      const c = CV.ctx, y = CV.H - CV.safeBottom - CV.NAV_H - barH;
+      /* 和页面同一条渐变铺底，滚过去的内容不会透出来（也不会切出一条缝） */
+      const g = c.createLinearGradient(0, 0, 0, CV.H);
+      g.addColorStop(0, CV.C.bg2); g.addColorStop(1, CV.C.bg);
+      c.fillStyle = g; c.fillRect(0, y, CV.W, barH);
+      CV.hitMode = 'screen';
+      const keep = U.y, keepIn = U.inCard;
+      U.inCard = false; U.y = y + 8 * CV.SCALE;
+      U.btnRow(acts);
+      U.y = keep; U.inCard = keepIn;
+      CV.hitMode = 'content';
+    };
   });
 
   /* ---------- 概率公示（网页版 recruitRatesModal：**纯文字排版**，不是卡片） ----------
