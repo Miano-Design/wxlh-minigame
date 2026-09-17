@@ -129,7 +129,18 @@
     if (qid === 'q03') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
     if (qid === 'q09') { CV.cur = 'home'; CV.reset('home'); CV.push('buildings'); return; }
     if (qid === 'q04') { CV.cur = 'home'; CV.reset('home'); CV.push('party'); return; }
-    if (qid === 'q07') { CV.cur = 'bag'; CV.reset('bag'); return; }
+    if (qid === 'q07') {
+      /* V9.6.32（父亲大人："点去完成直接跳到背包，也不是引导我去背包、点装备、再强化"）：
+         只"送到页面"不算带路 —— 网页版是「切到装备栏 + 给第一件装备打引导」。
+         这里照做：先切到装备标签，再对第一件装备挂引导，最后干净地进背包页
+         （引导要在 reset 之前登记，reset 那次渲染就会把它画出来）。 */
+      CV.cur = 'bag';
+      CV.dispatch('bagview:equip');
+      const first7 = (Core.inventoryEquips() || [])[0];
+      U.coach(first7 ? ('eqd:' + first7.uid) : 'bagview:equip', '点一件装备进去强化 —— 消耗材料提升数值，成功或失败都算一次。');
+      CV.reset('bag');
+      return;
+    }
     if (qid === 'q11') { CV.cur = 'home'; CV.reset('home'); CV.push('corridor'); return; }
     CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
   }
@@ -139,7 +150,15 @@
   function goDaily(key) {
     if (key === 'recruit1') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
     if (key === 'idle1') { CV.cur = 'home'; CV.reset('home'); return; }
-    if (key === 'enhance1' || key === 'item1') { CV.cur = 'bag'; CV.reset('bag'); return; }
+    if (key === 'enhance1') {
+      CV.cur = 'bag';
+      CV.dispatch('bagview:equip');
+      const firstE = (Core.inventoryEquips() || [])[0];
+      U.coach(firstE ? ('eqd:' + firstE.uid) : 'bagview:equip', '点一件装备进去强化 —— 消耗材料提升数值，成功或失败都算一次。');
+      CV.reset('bag');
+      return;
+    }
+    if (key === 'item1') { CV.cur = 'bag'; CV.reset('bag'); return; }
     CV.cur = 'dungeon'; CV.reset('dungeon');
   }
   const DAILY_MAIN_GO = (D.DAILY_MAIN_GO) || { battle5: '残域打一场', idle1: '灯阁领挂机', enhance1: '装备页强化', recruit1: '招募 1 次', dungeon1: '残域通关一关', item1: '背包用道具' };
