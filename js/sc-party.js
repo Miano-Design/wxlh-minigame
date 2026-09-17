@@ -191,6 +191,19 @@
     if (slot === undefined || slot === null || slot < 0) { CV.toast('这一格不能换'); return; }
     const r = Core.swapPartyMember(slot, id);
     CV.toast(r && r.msg ? r.msg : '已换将');
+    /* V9.6.20（父亲大人："换完将之后详情卡片没有及时切到新将领"）：
+       换将是从详情页 push 出来的，弹回去时那一层还是**进来时的 opts.id**（被换下那位），
+       所以详情页显示的还是旧伙伴。这里把栈里那一层指向新伙伴再弹回去。
+       顺带把 G.__swapFrom 也更新（再点一次"换将"时判重才不会拿旧的人当基准）。 */
+    if (r && r.ok !== false) {
+      for (let i = CV.stack.length - 1; i >= 0; i--) {
+        if (CV.stack[i].name === 'char') {
+          CV.stack[i].opts = Object.assign({}, CV.stack[i].opts, { id: id });
+          break;
+        }
+      }
+      G.__swapFrom = id;
+    }
     CV.pop();
     CV.render();
   });
