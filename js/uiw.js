@@ -285,7 +285,12 @@
     const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? '#e05a6d40' : style === 'gold' ? '#e6b64c44' : CV.C.line2);
     draw(() => {
       if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
+      /* 按下态：网页版 .btn:active 是 scale(.97) + 背景压暗一档。
+         画布里做等价的两件事 —— 四周缩进 1px + 叠一层半透明黑。 */
+      const down = CV.pressed && id && CV.pressed === id;
+      if (down) { x += 1; y += 1; w -= 2; h -= 2; }
       CV.round(x, y, w, h, CV.RADIUS_SM, fill, line);
+      if (down) CV.round(x, y, w, h, CV.RADIUS_SM, 'rgba(0,0,0,.22)', null);
       /* 长标签换行，不截断 —— 网页版 .btn-row .btn { white-space: normal; line-height: 1.25 } */
       const size = h <= U.BTN_SM * CV.SCALE ? CV.FS.md : CV.FS.lg;
       const lines = CV.wrap(label, w - 16 * CV.SCALE, size, 2);

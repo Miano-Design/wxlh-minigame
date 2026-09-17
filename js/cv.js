@@ -429,17 +429,34 @@
     const stopMomentum = () => { if (raf) { try { cancelAnimationFrame(raf); } catch (e) {} raf = null; } };
     /* 滚动：以前框架里**只有读没有写**（CV.scroll 永远是 0），页面一长（首页、残域）下面的内容
        就永远看不到。这里补上拖拽滚动 + 松手惯性，和手机原生滚动手感一致。 */
+    /* 手指这一点命中了哪颗热区（坐标换算规则和 touchend 完全一致 —— 一处写错就会"按下亮 A、抬手触发 B"） */
+    const hitAt = (p) => {
+      const ly = CV.localY(p.y);
+      const overlayOnly = !!(G.U && G.U.overlay);
+      for (let i = CV.hits.length - 1; i >= 0; i--) {
+        const h = CV.hits[i];
+        if (overlayOnly && !h.screen) continue;
+        const wy = h.screen ? p.y : ly;
+        if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) return h;
+      }
+      return null;
+    };
     wx.onTouchStart((e) => {
       const p = toW(e);
       downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
       startScroll = CV.scroll || 0;
       stopMomentum();
+      /* V9.6.40（父亲大人：两侧一致 / 手感）：网页版按钮有 :active 缩放，画布原来点下去毫无反馈。
+         按下先记住"按的是哪颗"，U.btn 会把它画成按下态；抬手或开始滚动就清掉。 */
+      const h = hitAt(p);
+      if (h) { CV.pressed = h.id; CV.render(); }
     });
     wx.onTouchMove((e) => {
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
       if (!moved) return;
+      if (CV.pressed) { CV.pressed = null; CV.render(); }   // 一变成滚动就不算"按着按钮"了
       const now = Date.now(), dt = Math.max(1, now - lastT);
       vel = (p.y - lastY) / dt;                    // px/ms，向下拖为正
       lastY = p.y; lastT = now;
@@ -463,6 +480,7 @@
       }
       /* 点击：内容区登记的是"内容坐标"，这里换算（− 顶栏 − 8 + 滚动）后再比 ——
          以前两边坐标系不同直接比，内容区所有按钮的判定都偏了一整条顶栏。 */
+      if (CV.pressed) { CV.pressed = null; CV.render(); }
       const ly = CV.localY(p.y);
       const overlayOnly = !!(G.U && G.U.overlay);   // 确认弹窗打开时，底下的内容不吃点击
       for (let i = CV.hits.length - 1; i >= 0; i--) {
