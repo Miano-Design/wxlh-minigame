@@ -551,15 +551,17 @@ t('副本带血进场：新一波的血条画的是真实血线，不是满血',
   if (front.indexOf('>30%<') < 0) throw new Error('血条下面没有血线数字');
   if (foes.indexOf('width:100%') < 0) throw new Error('满血的敌人也被画成不满血了');
 });
-t('角色页：有排序、没有搜名字输入框；图鉴在筛选行右上角', () => {
+/* V9.6.8（父亲大人）：执灯者的**分类和排序两行都删了**（默认顺序已经够用），
+   图鉴留下。这条用例跟着反过来守：不该再有 data-filter / data-charsort。 */
+t('角色页：没有分类也没有排序；图鉴还在；没有搜名字输入框', () => {
   const html = UI._panels._screens.charsScreen();
-  if (html.indexOf('data-charsort') < 0) throw new Error('缺排序');
+  if (html.indexOf('data-charsort') >= 0) throw new Error('排序行还在（父亲大人要求删掉）');
+  if (html.indexOf('data-filter="') >= 0) throw new Error('分类行还在（父亲大人要求删掉）');
+  /* 注意别拿"SSR+/已上阵"这些字去判断 —— 伙伴卡上的稀有度角标本来就写着 SSR+ */
+  if (html.indexOf('class="pill') >= 0) throw new Error('分类/排序胶囊还在');
   if (html.indexOf('char-search') >= 0) throw new Error('搜名字输入框还在（父亲大人要求去掉）');
   if (html.indexOf('data-act="open-codex"') < 0) throw new Error('图鉴按钮不见了');
-  // 图鉴必须在筛选行里面（跟"全部/已上阵/SSR+"同一行），不能再单独占一行
-  const iFilter = html.indexOf('data-filter="all"');
-  const iCodex = html.indexOf('data-act="open-codex"');
-  if (iFilter < 0 || iCodex < iFilter || iCodex - iFilter > 900) throw new Error('图鉴没跟筛选放在同一行');
+  if (html.indexOf('filter-bar') < 0) throw new Error('图鉴那一行的容器没了');
 });
 t('悬赏面板写明"过期作废"', () => {
   const html = UI._panels.bountyModal().innerHTML;

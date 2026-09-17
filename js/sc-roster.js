@@ -27,71 +27,33 @@
     CV.text('★'.repeat(n) + '☆'.repeat(Math.max(0, max - n)), x, y, { size: size || CV.FS.sm, color: CV.C.gold });
   }
 
-  /* ---------- 状态：筛选 / 排序（页面级，切页签不丢） ---------- */
-  let filter = 'all', sort = 'default';
-  const FILTERS = [['all', '全部'], ['party', '已上阵'], ['SSR', 'SSR+'], ['N', 'N'], ['R', 'R'], ['SR', 'SR']];
-  const SORTS = [['default', '默认'], ['power', '战力'], ['level', '等级'], ['star', '星级'], ['notmax', '未满级'], ['noequip', '没穿装备']];
+  /* V9.6.8（父亲大人）：执灯者的**分类和排序两行都删了** —— 默认顺序已经够用。
+     所以这里只留一条默认顺序（上阵 → 等级 → 稀有度 → 星级），
+     filter / sort / FILTERS / SORTS 连同它们的点击处理器一起删。 */
   const rarIdx = (id) => D.RARITIES.indexOf(D.charById[id].rarity);
+  /* 卡片右下角「未穿装备 / 可升级」要用它（V9.6.8 删排序时误删过一次，卡片只画出一张就抛异常了） */
   const eqCount = (id) => Object.keys(Core.S.equipped[id] || {}).filter((k) => Core.S.equipped[id][k]).length;
   function listSorted() {
     const S = Core.S;
-    let list = Object.keys(S.chars);
-    if (filter === 'party') list = list.filter((id) => S.party.includes(id));
-    else if (filter === 'SSR') list = list.filter((id) => ['SSR', 'UR'].includes(D.charById[id].rarity));
-    else if (filter !== 'all') list = list.filter((id) => D.charById[id].rarity === filter);
-    const cmp = {
-      /* 网页版默认排序（父亲大人定的）：上阵 → 等级 → 稀有度 → 星级 */
-      default: (a, b) => {
-        const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
-        if (pa !== pb) return pb - pa;
-        if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
-        if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
-        return S.chars[b].star - S.chars[a].star;
-      },
-      power: (a, b) => Core.power(b) - Core.power(a),
-      level: (a, b) => S.chars[b].lv - S.chars[a].lv,
-      star: (a, b) => S.chars[b].star - S.chars[a].star,
-      notmax: (a, b) => (Core.levelCost(a) ? 0 : 1) - (Core.levelCost(b) ? 0 : 1) || Core.power(b) - Core.power(a),
-      noequip: (a, b) => eqCount(a) - eqCount(b) || Core.power(b) - Core.power(a),
-    }[sort] || null;
-    if (cmp) return list.sort(cmp);
-    return list.sort((a, b) => cmp(a, b) || 0);
+    /* 网页版默认排序（父亲大人定的）：上阵 → 等级 → 稀有度 → 星级 */
+    return Object.keys(S.chars).sort((a, b) => {
+      const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
+      if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
+      return S.chars[b].star - S.chars[a].star;
+    });
   }
 
   CV.register('roster', function () {
     U.begin();
-    /* 筛选胶囊行：左边一排胶囊，右端「📕 图鉴」（网页版 V9.5.55） */
-    const pillH = 44 * CV.SCALE, gap = 6 * CV.SCALE;      // 网页版 .pill：min-height 2.75rem、gap 0.375rem
+    /* V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
+       "默认的排序顺序就已经能很好的区分这些了"。只留默认顺序 + 右端「📕 图鉴」。 */
+    const pillH = 44 * CV.SCALE;
     const codexW = CV.measure('📕 图鉴', CV.FS.md) + 26 * CV.SCALE;   // .btn.small：左右 13px
-    let x = U.pad();
     const gy = U.y;
-    /* 图鉴固定在右端（网页版是同一行横向滚动）；筛选用剩下的宽度排，
-       排不下的先不画——否则会像刚才那样把「SR」压在图鉴底下。 */
-    const limit = U.pad() + U.cw() - codexW - gap;
-    FILTERS.forEach((f) => {
-      const w = CV.measure(f[1], CV.FS.md) + 28 * CV.SCALE;   // 左右各 0.875rem
-      if (x + w > limit) return;
-      CV.round(x, gy, w, pillH, pillH / 2, filter === f[0] ? '#3a1620' : CV.C.panel, filter === f[0] ? CV.C.accent : CV.C.line);
-      CV.text(f[1], x + w / 2, gy + pillH / 2, { size: CV.FS.md, align: 'center', color: filter === f[0] ? CV.C.text : CV.C.text2 });
-      CV.hit('rf:' + f[0], x, gy, w, pillH);
-      x += w + gap;
-    });
     U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '📕 图鉴', 'ghost', 'open_codex');
     U.y = gy + pillH + 6 * CV.SCALE;                       // .pill-tabs padding-bottom 0.375rem
-    /* 排序行 */
-    const sy = U.y;
-    const smH = 34 * CV.SCALE, smGap = 4 * CV.SCALE;          // .pill.sm：min-height 2.125rem、gap 0.25rem
-    CV.text('排序', U.pad() + 2, sy + smH / 2, { size: CV.FS.sm, color: CV.C.dim });
-    let sx = U.pad() + 30 * CV.SCALE;
-    SORTS.forEach((s) => {
-      const w = CV.measure(s[1], CV.FS.xs) + 22 * CV.SCALE;   // 左右各 0.6875rem
-      if (sx + w > U.pad() + U.cw()) return;                  // 放不下的先不画（窄屏）
-      CV.round(sx, sy, w, smH, smH / 2, sort === s[0] ? '#3a1620' : CV.C.panel, sort === s[0] ? CV.C.accent : CV.C.line);
-      CV.text(s[1], sx + w / 2, sy + smH / 2, { size: CV.FS.xs, align: 'center', color: sort === s[0] ? CV.C.text : CV.C.text2 });
-      CV.hit('rs:' + s[0], sx, sy, w, smH);
-      sx += w + smGap;
-    });
-    U.y = sy + smH + CV.SP[1];
     /* 已收集提示（网页版那行小灰字） */
     const cs = Core.codexState();
     U.hint('已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length + ' · 当前显示 ' + listSorted().length);
@@ -147,9 +109,7 @@
     });
     U.y = y0 + Math.ceil(list.length / cols) * (ch + g2);
   });
-  CV.on('rf:all', () => { filter = 'all'; CV.render(); });
-  ['party', 'SSR', 'N', 'R', 'SR'].forEach((k) => CV.on('rf:' + k, () => { filter = k; CV.render(); }));
-  SORTS.forEach((s) => CV.on('rs:' + s[0], () => { sort = s[0]; CV.render(); }));
+  /* rf:* / rs:* 随分类+排序两行一起删掉了（V9.6.8） */
   Object.keys(D.characters).length;                        // 触发表初始化（保持与网页版一致的数据来源）
   CV.on('open_codex', () => CV.toast('伙伴图鉴在下一批复刻'));
 

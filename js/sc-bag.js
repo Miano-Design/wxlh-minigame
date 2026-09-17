@@ -21,6 +21,46 @@
      照网页版做成选择模式：点格子选中 → 底栏显示"已选 N 件 · 预计 ◆ X" → 分解。 */
   let batchMode = false;
   const batchSel = new Set();
+  /* 装备页的两行分类（照网页版 equipFilterBar 的 .pill-tabs.tight）。
+     V9.6.8（父亲大人）：分类保留，但去掉「普通」和「SSR+」——
+     "普通"跟"全部"几乎重合；"SSR+"原来挂在部位那行末尾，七个部位 + 它挤到第三行、孤零零一个。 */
+  const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
+  const EQ_SLOTS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
+  let eqCat = 'all', eqSlot = 'all';
+  /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字） */
+  function pillRow(list, cur, prefix) {
+    const h = 40 * CV.SCALE, gap = 6 * CV.SCALE, top = U.y;
+    let x = U.pad();
+    list.forEach(function (t) {
+      const on = cur === t[0];
+      const w = CV.measure(t[1], CV.FS.sm) + 22 * CV.SCALE;
+      CV.round(x, top, w, h, 999, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.sm, align: 'center', color: on ? '#fff' : CV.C.dim });
+      CV.hit(prefix + t[0], x, top, w, h);
+      x += w + gap;
+    });
+    U.y = top + h + 8 * CV.SCALE;
+  }
+  /* .eq-bar：左边「未穿戴 x / y 格」，右边「🧹 批量分解」（开了批量就换成一行状态文字） */
+  function eqBarRow() {
+    const S = Core.S;
+    const worn = new Set();
+    Object.keys(S.equipped).forEach(function (cid) {
+      Object.values(S.equipped[cid] || {}).forEach(function (u) { if (u) worn.add(u); });
+    });
+    const used = Object.keys(S.equips).filter(function (u) { return !worn.has(u); }).length;
+    const cap = S.bag.eqCap;
+    const h = U.BTN_SM * CV.SCALE, top = U.y;
+    CV.text('未穿戴 ' + used + ' / ' + cap + ' 格', U.pad(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim });
+    if (batchMode) {
+      CV.text('批量分解中 · 点格子挑选', U.pad() + U.cw(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'right' });
+    } else {
+      const lbl = '🧹 批量分解';
+      const bw = CV.measure(lbl, CV.FS.sm) + 22 * CV.SCALE;
+      U.btn(U.pad() + U.cw() - bw, top, bw, h, lbl, 'ghost', 'bag_batch');
+    }
+    U.y = top + h + CV.SP[2];
+  }
   /* 一行「左文字 + 右按钮」（和 sc-last 的 coreRow 同一套写法；各文件各留一份，不跨文件依赖） */
   function listBtn(o) {
     const bw = 84 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
@@ -161,6 +201,15 @@
     stashBar();
     const pool = POOLS[view];
     const cap = S.bag[pool.capKey];
+    /* 装备页：两行分类（套装 / 部位）+ 一行「未穿戴 x / y 格 · 批量分解」
+       —— V9.6.8（父亲大人）：小游戏的装备页原来**没有这些分类标签**（网页版有），
+       而且「🧹 批量分解」原来挤在格子卡的标题行里、贴着卡片上沿。现在照网页版
+       拆成独立一行，跟分类同一层、上下留白一致。 */
+    if (view === 'equip') {
+      pillRow(EQ_CATS, eqCat, 'ecat:');
+      pillRow(EQ_SLOTS, eqSlot, 'efilter:');
+      eqBarRow();
+    }
     const cost = D.bagExpandCost(S.bag[pool.expKey] || 0);
     const cells = [];
     let used = 0;
@@ -168,7 +217,12 @@
       /* 格子里只放**没穿在身上的**装备（网页版同口径：穿身上的不占格） */
       const worn = new Set();
       Object.keys(S.equipped).forEach((cid) => Object.values(S.equipped[cid] || {}).forEach((u) => { if (u) worn.add(u); }));
-      const list = Object.values(S.equips).filter((e) => !worn.has(e.uid));
+      let list = Object.values(S.equips).filter((e) => !worn.has(e.uid));
+      /* 两行分类的筛选（网页版 bagEquipList 同款规则） */
+      if (eqSlot !== 'all') list = list.filter((e) => e.slot === eqSlot);
+      if (eqCat === 'world') list = list.filter((e) => !!e.set);
+      else if (eqCat === 'class') list = list.filter((e) => !!e.classSet);
+      else if (eqCat === 'sig') list = list.filter((e) => !!e.charId);
       used = list.length;
       list.slice(0, cap).forEach((e) => {
         /* V9.6.7：批量分解模式下，点格子 = 选中/取消（不再进详情页）——网页版同一口径 */
@@ -184,7 +238,10 @@
         cells.push({ id: 'item:' + k, name: (D.ITEMS[k] || {}).name || k, count: '×' + n });
       });
     }
-    while (cells.length < cap) cells.push({ empty: true });
+    /* 筛选状态下**不补空格子**（网页版同款）：筛出 3 件武器后面还跟着 47 个空格，
+       玩家会以为筛选没生效。 */
+    const filtering = view === 'equip' && (eqCat !== 'all' || eqSlot !== 'all');
+    if (!filtering) while (cells.length < cap) cells.push({ empty: true });
     /* V9.6.4（父亲大人："背包的扩容格也没了"）：格子补满 cap 个之后，**必须再补最后一格**
        —— 网页版是"第 cap+1 格：灰色虚线框 + ＋"，点了问"是否支付 ◈x 扩容"。
        上一版排格子的循环只补了空格，把这一格漏掉了（grid() 里画 add 格的分支一直没被触发）。 */
@@ -193,21 +250,10 @@
       const full = used >= cap;
       const top = U.y;
       CV.text(pool.label, U.ix(), top + 9 * CV.SCALE, { size: CV.FS.lg, bold: true });
-      /* V9.6.7：数量只在**一处**画。以前装备栏为了给「批量分解」让位又画了第二遍，
-         第一遍（贴最右）被按钮压住，屏幕上就出现"2 / 50"两截叠在一起。 */
-      const cntTxt = used + ' / ' + cap + (full ? ' · 满了' : '');
-      let cntRight = U.ix() + U.iw();
-      /* 装备栏的标题行右侧还有「批量分解」（网页版 .eq-bar） */
-      if (view === 'equip') {
-        /* 网页版 .eq-bar：没开批量时右边一颗「🧹 批量分解」；开了就换成一行提示（挑选动作在底栏） */
-        /* 开了批量之后这颗按钮只是状态标签（挑选动作在底栏），写短一点免得在 34 高的按钮里折成两行 */
-        const lbl = batchMode ? '批量分解中' : '🧹 批量分解';
-        const bw = CV.measure(lbl, CV.FS.sm) + 22 * CV.SCALE;
-        U.btn(U.ix() + U.iw() - bw, top - 14 * CV.SCALE, bw, 34 * CV.SCALE, lbl, batchMode ? 'ghost' : 'ghost',
-          batchMode ? '' : 'bag_batch');
-        cntRight = U.ix() + U.iw() - bw - 10 * CV.SCALE;
-      }
-      CV.text(cntTxt, cntRight, top + 9 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+      /* V9.6.8：「🧹 批量分解」搬去上面的 .eq-bar 行（原来挤在这一行、贴着卡片上沿），
+         标题行就只剩「装备格」+ 数量，不再有两截数字叠在一起的问题。 */
+      CV.text(used + ' / ' + cap + (full ? ' · 满了' : ''), U.ix() + U.iw(), top + 9 * CV.SCALE,
+        { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + 26 * CV.SCALE;
       grid(cells, used, cap, 'bag_expand:' + view, cost, false);
     });
@@ -399,6 +445,9 @@
   });
   /* ---------- 批量分解：四个动作（网页版 data-batchon/off、data-beq、data-bsel、data-bgo） ---------- */
   CV.on('bag_batch', function () { batchMode = true; batchSel.clear(); CV.render(); });
+  /* 装备页两行分类的点击 */
+  EQ_CATS.forEach(function (t) { CV.on('ecat:' + t[0], function () { eqCat = t[0]; CV.render(); }); });
+  EQ_SLOTS.forEach(function (t) { CV.on('efilter:' + t[0], function () { eqSlot = t[0]; CV.render(); }); });
   CV.on('bclose', function () { batchMode = false; batchSel.clear(); CV.render(); });
   CV.on('bselu:*', function (uid) {
     if (batchSel.has(uid)) batchSel.delete(uid); else batchSel.add(uid);

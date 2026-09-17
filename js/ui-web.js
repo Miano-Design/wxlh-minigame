@@ -4,7 +4,7 @@ window.UI = (function () {
   const C = () => window.Core;
   const $view = () => document.getElementById('view');
   /* 版本号只有这一处：设置页显示它、GM 门禁提示也用它（改版本号时和 index.html/sw.js 一起改，见 scripts/test_ui.js） */
-  const GAME_VER = '9.6.7';
+  const GAME_VER = '9.6.8';
   /* GM 面板是内部工具，但它跟着正式包一起上线了（线上连点 7 次就能开，还能刷货币并导出存档）。
      线上要求 URL 带 ?gm=1 才认，本地开发照旧直接开（V9.5）。 */
   /* V9.5.61（父亲大人）：GM 门禁**取消**了 —— 手机上也要能进。
@@ -766,7 +766,7 @@ window.UI = (function () {
       </div>
       <div class="idle-line idle-mini">
         <span class="il-k">【分工】</span>
-        <!-- V9.6.7（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
+        <!-- V9.6.8（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。
              颜色本身就是状态：没派领队（没激活）灰、派了（激活）金。 -->
         <span class="il-s">${lines.map(l => `<span style="color:${l.leaderId ? 'var(--gold)' : 'var(--dim)'}">${l.line.name}</span>`).join('<span style="color:var(--line2)"> · </span>')}</span>
       </div>
@@ -1538,11 +1538,11 @@ window.UI = (function () {
   }
 
   /* ================= 角色 ================= */
-  let charFilter = 'all';
-  let charSort = 'default';   // V9.5.46（父亲大人）：默认＝上阵优先 → 等级 → 稀有度 → 星级
+  /* V9.6.8（父亲大人）：执灯者的**分类和排序两行都删掉了** ——
+     "默认的排序顺序就已经能很好的区分这些了，没必要了"。
+     所以这里只保留一条默认顺序（上阵优先 → 等级 → 稀有度 → 星级），
+     charFilter / charSort / CHAR_SORTS 连同它们的入口一起删，不留"没有 UI 的状态"。 */
   let charQuery = '';
-  // 排序里最有用的两条是「未满级优先」和「没穿装备优先」——它们直接回答"我下一步该练谁"
-  const CHAR_SORTS = [['default', '默认'], ['power', '战力'], ['level', '等级'], ['star', '星级'], ['notmax', '未满级'], ['noequip', '没穿装备']];
   function equippedCount(id) {
     const sl = C().S.equipped[id] || {};
     return Object.keys(sl).filter(k => sl[k]).length;
@@ -1550,33 +1550,19 @@ window.UI = (function () {
   function charListSorted() {
     const S = C().S;
     let list = Object.keys(S.chars);
-    if (charFilter === 'party') list = list.filter(id => S.party.includes(id));
-    else if (charFilter === 'SSR') list = list.filter(id => ['SSR', 'UR'].includes(D.charById[id].rarity));
-    else if (charFilter !== 'all') list = list.filter(id => D.charById[id].rarity === charFilter);
     const q = charQuery.trim().toLowerCase();
     if (q) list = list.filter(id => cname(id).toLowerCase().indexOf(q) >= 0);
     const rar = id => D.RARITIES.indexOf(D.charById[id].rarity);
-    const cmps = {
-      // 父亲大人定的默认顺序：①上阵的排前面 ②等级高的 ③稀有度高的 ④同稀有度看星级
-      default: (a, b) => {
-        const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
-        if (pa !== pb) return pb - pa;
-        const la = S.chars[a].lv, lb = S.chars[b].lv;
-        if (la !== lb) return lb - la;
-        const ra = rar(a), rb = rar(b);
-        if (ra !== rb) return rb - ra;
-        return S.chars[b].star - S.chars[a].star;
-      },
-      power: (a, b) => C().power(b) - C().power(a),
-      level: (a, b) => S.chars[b].lv - S.chars[a].lv,
-      star: (a, b) => S.chars[b].star - S.chars[a].star,
-      // "还能不能升级"直接问 levelCost（和实际养成逻辑同源，不另写一套判断）
-      notmax: (a, b) => (C().levelCost(a) ? 0 : 1) - (C().levelCost(b) ? 0 : 1) || C().power(b) - C().power(a),
-      noequip: (a, b) => equippedCount(a) - equippedCount(b) || C().power(b) - C().power(a),
-    };
-    const cmp = cmps[charSort] || cmps.default;
-    if (charSort === 'default') return list.sort(cmp);     // 默认排序里已经含稀有度/星级
-    return list.sort((a, b) => cmp(a, b) || rar(b) - rar(a));
+    /* 父亲大人定的默认顺序：①上阵的排前面 ②等级高的 ③稀有度高的 ④同稀有度看星级 */
+    return list.sort((a, b) => {
+      const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      const la = S.chars[a].lv, lb = S.chars[b].lv;
+      if (la !== lb) return lb - la;
+      const ra = rar(a), rb = rar(b);
+      if (ra !== rb) return rb - ra;
+      return S.chars[b].star - S.chars[a].star;
+    });
   }
   function charGridHtml() {
     const S = C().S;
@@ -1600,17 +1586,12 @@ window.UI = (function () {
   }
   function charsScreen() {
     const S = C().S;
-    const filters = [['all', '全部'], ['party', '已上阵'], ['SSR', 'SSR+'], ['N', 'N'], ['R', 'R'], ['SR', 'SR']];
     const cs = C().codexState();
     return `
-      <!-- V9.5.55（父亲大人）：搜名字输入框去掉；图鉴挪到筛选那一行右上角 -->
+      <!-- V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
+           默认顺序已经够用。图鉴留着，还是在这一行的右上角。 -->
       <div class="filter-bar">
-        <div class="pill-tabs" style="flex:1 1 auto;min-width:0">${filters.map(([k, n]) => `<div class="pill ${charFilter === k ? 'active' : ''}" data-filter="${k}">${n}</div>`).join('')}</div>
-        <button class="btn small ghost" data-act="open-codex" style="flex:0 0 auto">📕 图鉴</button>
-      </div>
-      <div class="filter-bar">
-        <span class="flabel">排序</span>
-        <div class="pill-tabs grow-pills">${CHAR_SORTS.map(([k, n]) => `<div class="pill ${charSort === k ? 'active' : ''}" data-charsort="${k}">${n}</div>`).join('')}</div>
+        <button class="btn small ghost push" data-act="open-codex" style="margin-left:auto">📕 图鉴</button>
       </div>
       <div style="font-size:0.6875rem;color:var(--dim);margin:0 2px 0.5rem">已收集 ${cs.owned}/${cs.total} · 拥有 ${Object.keys(S.chars).length} · 当前显示 ${charListSorted().length}</div>
       <div class="char-grid" id="char-list">${charGridHtml()}</div>`;
@@ -1877,17 +1858,18 @@ window.UI = (function () {
   function bagEquipList() {
     const worn = equippedUidSet(C().S);
     let shown = C().inventoryEquips().filter(eq => !worn.has(eq.uid));
-    if (equipFilter === 'SSR') shown = shown.filter(e => ['SSR', 'UR'].includes(e.rarity));
-    else if (equipFilter !== 'all') shown = shown.filter(e => e.slot === equipFilter);
-    if (equipCatFilter === 'normal') shown = shown.filter(e => !e.set && !e.classSet && !e.charId);
-    else if (equipCatFilter === 'world') shown = shown.filter(e => !!e.set);
+    if (equipFilter !== 'all') shown = shown.filter(e => e.slot === equipFilter);
+    if (equipCatFilter === 'world') shown = shown.filter(e => !!e.set);
     else if (equipCatFilter === 'class') shown = shown.filter(e => !!e.classSet);
     else if (equipCatFilter === 'sig') shown = shown.filter(e => !!e.charId);
     return shown;
   }
   function equipFilterBar() {
-    const filters = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品'], ['SSR', 'SSR+']];
-    const catFilters = [['all', '全部'], ['normal', '普通'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
+    /* V9.6.8（父亲大人）：装备页的分类**保留**，但去掉「普通」和「SSR+」两枚 ——
+       "普通"跟"全部"几乎重合、看不出区别；"SSR+"原来挂在部位那一行末尾，
+       七个部位 + 它正好挤到第三行、孤零零一个，看着像掉出来的。 */
+    const filters = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
+    const catFilters = [['all', '全部'], ['world', '世界套装'], ['class', '职业套装'], ['sig', '专属']];
     const u = C().bagUsage();
     return `
       <div class="pill-tabs tight mb2">${catFilters.map(([k, n]) => `<div class="pill sm ${equipCatFilter === k ? 'active' : ''}" data-ecat="${k}">${n}</div>`).join('')}</div>
@@ -2808,7 +2790,7 @@ window.UI = (function () {
       </div>
       ${rows.map(r => {
       const leader = r.leaderId;
-      /* V9.6.7（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
+      /* V9.6.8（父亲大人）：没派领队就是"没激活"——整张卡压成灰的、边框走虚线；
          派了领队才算激活，标题 / 产出 / 边框一律金色高亮。一眼就能看出哪条线在干活。
          灰色只压文字与边框，操作按钮（＋ 派一名领队）保持正常，别看着像点不动。 */
       return `<div class="card" style="${leader
@@ -2816,7 +2798,7 @@ window.UI = (function () {
         : 'border-style:dashed;border-color:var(--line)'}">
         <h3 style="color:${leader ? 'var(--gold)' : 'var(--dim)'}">${r.line.ico} ${r.line.name}
           <span class="sub" style="${leader ? 'color:var(--gold)' : ''}">${r.per}</span></h3>
-        <!-- V9.6.7（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
+        <!-- V9.6.8（父亲大人）：卡上不再写领队名字和具体加成 —— 那两样点进「派遣领队」里看，
              外面只留"这条线在不在干活"（颜色）+ 一个入口。 -->
         <div class="hint mb2"${leader ? '' : ' style="color:var(--dim);opacity:.85"'}>${r.line.desc}</div>
         <button class="btn small block" data-idlepick="${r.line.id}" ${leader || bench.length ? '' : 'disabled'}>${
@@ -2840,7 +2822,7 @@ window.UI = (function () {
     const line = D.IDLE_LINES.find(l => l.id === lineId);
     const bench = Object.keys(S.chars).filter(id => !S.party.includes(id));
     const cur = S.idle.lines[lineId];
-    /* V9.6.7（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
+    /* V9.6.8（父亲大人）：领队是谁、加多少，都在**这一层**看 —— 上面那张卡就不写了。
        所以这一层要先把自己当前的领队摆出来（含撤下），下面才是备选名单。 */
     const curBlock = cur ? `
       <div class="card" style="border-color:#e6b64c66">
@@ -4677,8 +4659,7 @@ switch (act) {
     });
     root.querySelectorAll('[data-char]').forEach(el => el.onclick = () => charDetail(el.dataset.char));
     root.querySelectorAll('[data-eqd]').forEach(el => el.onclick = () => equipDetail(el.dataset.eqd));
-    root.querySelectorAll('[data-filter]').forEach(el => el.onclick = () => { charFilter = el.dataset.filter; render(); });
-    root.querySelectorAll('[data-charsort]').forEach(el => el.onclick = () => { charSort = el.dataset.charsort; render(); });
+    /* [data-filter] / [data-charsort] 随执灯者的分类+排序一起删掉了（V9.6.8） */
     root.querySelectorAll('[data-efilter]').forEach(el => el.onclick = () => { equipFilter = el.dataset.efilter; render(); });
     root.querySelectorAll('[data-ecat]').forEach(el => el.onclick = () => { equipCatFilter = el.dataset.ecat; render(); });
     // 批量分解

@@ -755,8 +755,8 @@ body {
 
 /* ---------- 列表工具栏（筛选 / 排序 / 搜索） ---------- */
 .filter-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-.filter-bar .flabel { font-size: 0.6875rem; color: var(--dim); flex: 0 0 auto; }
-.filter-bar .grow-pills { flex: 1; padding-bottom: 0; margin-bottom: 0; }
+/* V9.6.8（父亲大人）：执灯者的分类 + 排序两行删掉之后，.flabel（"排序"两个字）和
+   .grow-pills 就没人用了 —— 留着只会让后来的人以为还有这么一行，一并清掉。 */
 /* V9.5.71：.search-input 是"图鉴搜名字"的输入框，V9.5.55 撤掉搜索框后没人用了，删 */
 
 /* ---------- 数值跳动（货币收支） ---------- */
