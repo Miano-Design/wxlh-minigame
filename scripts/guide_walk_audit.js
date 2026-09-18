@@ -54,14 +54,24 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /* 等"状态不再变"再判，而不是死等固定毫秒 ——
    V9.6.102：批量跑（机器有负载）时固定 sleep 会等到不够，量出来就是"偶发串台"；
    一把会自己抖的尺子比没有尺子更糟（红了分不清是代码坏了还是运气差）。 */
-async function settle(maxMs) {
+async function settle(collect, maxMs) {
   const t0 = Date.now();
-  let last = null;
-  while (Date.now() - t0 < (maxMs || 400)) {
-    await wait(15);
+  let last = null, same = 0;
+  await wait(60);                     // 最少等 60ms：引导里有 setTimeout(…,0) 的接续
+  while (Date.now() - t0 < (maxMs || 600)) {
+    await wait(20);
+    /* 把这一段时间里"屏幕上出现过哪几句引导"记下来 ——
+       同一页会渲染多次，玩家**第一眼**看到的那句才是要判的（V9.6.103）。 */
+    const cur = U && U.coachCurrent && U.coachCurrent();
+    if (collect && cur && cur.text) {
+      const tx = String(cur.text).trim();
+      if (collect.indexOf(tx) < 0) collect.push(tx);
+    }
     const key = ((U && U.coachCurrent() && U.coachCurrent().key) || '-') + '|'
       + ((CV.top() || {}).name || '?') + '|' + (U && U.coachCount ? U.coachCount() : '?');
-    if (key === last) return;
+    /* **连续两次**采样都一样才算稳定 —— 只比一次，在机器有负载时会提前收工（偶发假报） */
+    if (key === last) { same++; if (same >= 2) return; }
+    else { same = 0; }
     last = key;
   }
 }
@@ -110,6 +120,9 @@ console.log('\n=== 新手引导：真走一遍 ===');
     if (!U.coachActive()) { await wait(60); if (!U.coachActive()) break; }
     const st = U.coachCurrent();
     if (!st) break;
+    /* 开场链只跟**它自己**的步骤：最后一步（tut_blk4）点下去会真的开主线，
+       再往下跟就会走进战斗 —— 那是③段要测的事。 */
+    if (['tut_blk1', 'tut_blk1x', 'tut_blk2', 'tut_blk3', 'tut_blk4'].indexOf(st.key) < 0) break;
     const page = CV.top().name;
     const hit = findHit(st.targetId);
     if (!hit) {
@@ -178,6 +191,7 @@ console.log('\n=== 新手引导：真走一遍 ===');
        新的一条会进队列，等上一条走完自己接上。 */
     if (!U.coachActive() && U.coachCount && U.coachCount() > 0) U.coachNext();
     const st = U.coachCurrent();
+    /* 判"玩家第一眼看到的那句"：优先用这段时间里出现过的第一句 */
     let mark;
     if (!st) { qNoCoach++; mark = '**没讲解**（队列 ' + (U.coachCount ? U.coachCount() : 0) + '）'; }
     else {
@@ -219,19 +233,18 @@ console.log('\n=== 新手引导：真走一遍 ===');
   Core.S.coachSeen = {};
   ['tut_blk1', 'tut_blk1x', 'tut_blk2', 'tut_blk3', 'tut_blk4'].forEach((k) => { Core.S.coachSeen[k] = true; });
   let walkBad = 0, walked = 0;
-  for (let n = 0; n < 27; n++) {
+  /* 推进方式：每一步**显式**把存档推到"当前正是这一步"（前 n 步已领）——
+     这样不会像"边做边领"那样偶尔跳步/重复；但**引导状态不清**，
+     所以"上一步的引导串到这一步"这类问题照样测得出来。 */
+  const ALLQ = Core.mainQuestState();
+  for (let n = 0; n < ALLQ.length; n++) {
+    Core.S.quests.claimed = ALLQ.slice(0, n).map((x) => x.q.id);
     CV.cur = 'home'; CV.reset('home');
     let cu = Core.currentQuest() || {};
     const q = cu.q;
     if (!q) break;
     walked++;
-    /* 做完了就先领奖（真实玩家也是这样：卡片右边那颗按钮） */
-    if (cu.done && !cu.claimed) {
-      CV.dispatch('claim_quest'); await settle();
-      CV.cur = 'home'; CV.reset('home');
-      cu = Core.currentQuest() || {};       // ← 领完之后"当前这一步"会往前挪，必须重新取
-    }
-    const qNow = cu.q || q;
+    const qNow = cu.q;
     /* 开场链若还在，先按玩家那样点掉它（真实流程里它是强制的） */
     let guard = 0;
     while (U.coachActive() && guard++ < 12) {
@@ -242,26 +255,27 @@ console.log('\n=== 新手引导：真走一遍 ===');
       if (!hit0) break;
       CV.dispatch(hit0.id); await settle();
     }
+    const seenTexts = [];
     CV.dispatch('goto_quest');
-    await settle();
+    await settle(seenTexts);
     const page = CV.top().name;
     if (!U.coachActive() && U.coachCount && U.coachCount() > 0) U.coachNext();
     const st = U.coachCurrent();
+    /* 判"玩家第一眼看到的那句"：优先用这段时间里出现过的第一句 */
+    const firstText = seenTexts.length ? seenTexts[0] : (st && st.text ? String(st.text).trim() : null);
     const want = (TUT_OF[qNow.id] && TUT_OF[qNow.id].t) || null;
     let mark;
     if (!st) { walkBad++; mark = '**没讲**'; }
-    else if (want && String(st.text).trim() !== String(want).trim()) {
+    /* V9.6.103：**引导表里没有这一步**必须算失败 ——
+       以前这里 `want` 为空就跳过文案比对，于是 q03（表里漏了）悄悄走了兜底"送残域"
+       却一直显示 ✓，直到父亲大人报"主线 4 被引导到副本去了"。 */
+    else if (!want) { walkBad++; mark = '**引导表里没有这一步的落点/文案**（现在停在 ' + page + '）'; }
+    else if (want && firstText !== String(want).trim()) {
       walkBad++;
-      mark = '**讲的是别的事**：' + String(st.text).slice(0, 18) + '…（这一步该讲：' + String(want).slice(0, 14) + '…）';
+      mark = '**讲的是别的事**：' + String(firstText || '(空)').slice(0, 18) + '…（这一步该讲：' + String(want).slice(0, 14) + '…）';
     } else { mark = '✓ ' + page; }
     console.log('  ' + String(n + 1).padStart(2) + '. ' + String(qNow.id).padEnd(11) + ' → ' + mark);
     U.coachDrop();
-    /* 真实玩家会把这一步做掉；这里为了能继续往下走，直接把条件判定推成"已完成" */
-    try {
-      const all = Core.mainQuestState();
-      const cur = all.find((x) => x.q.id === q.id);
-      if (cur && !cur.claimed) { cur.done = true; Core.S.quests.claimed.push(q.id); }
-    } catch (e) {}
   }
   console.log('\n连续走了 ' + walked + ' 步 · 讲错/没讲 ' + walkBad + ' 步');
   console.log('结论：' + (walkBad === 0 ? '每一步都讲的是它自己的那句话，没有串台 ✓' : '有 ' + walkBad + ' 步串台 ✗') + '\n');

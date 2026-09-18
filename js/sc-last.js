@@ -153,8 +153,13 @@
       CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf); return;
     }
     if (dest) { CV.cur = 'home'; CV.jump(dest); return; }   // 直接跳过去，别在中间渲染首页（V9.6.102）
-    /* 兜底：引导表里没写落点的，仍然送去残域（不该发生 —— 有 guide_audit 盯着） */
-    CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
+    /* 兜底：引导表里没写落点的（说明那张表漏了这一步）。
+       V9.6.103：**不许再把人送进残域** —— 原来这里就是"送残域"，
+       于是任何一步只要表里漏了，玩家看到的就是"点主线 4 被带去看副本"。
+       现在停在首页并把话说清楚（同时 guide_walk_audit 会把这种漏作为失败报出来）。 */
+    U.coachForce(0);
+    CV.cur = 'home'; CV.reset('home');
+    CV.toast('这一步的入口还没配好，先回首页（已记录）');
   }
   /* 首页的「去完成」也要用它 —— 挂到 G 上共用（sc-home 比 sc-last 先加载，但按钮是点击时才跑，拿得到） */
   G.goQuest = goQuest;
