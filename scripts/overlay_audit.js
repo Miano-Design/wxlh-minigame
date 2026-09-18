@@ -29,10 +29,12 @@ const ctxStub = new Proxy({}, {
   set(t, k, v) { t[k] = v; return true; },
 });
 const canvas = { width: 390, height: 844, getContext: () => ctxStub, toDataURL: () => '' };
+const touch = { start: [], move: [], end: [] };
 global.wx = {
   createCanvas: () => canvas,
   getWindowInfo: () => ({ windowWidth: 390, windowHeight: 844, pixelRatio: 3, safeArea: { top: 44, bottom: 810 } }),
-  onTouchStart() {}, onTouchMove() {}, onTouchEnd() {}, onWindowResize() {}, onShow() {}, onHide() {},
+  onTouchStart(fn) { touch.start.push(fn); }, onTouchMove(fn) { touch.move.push(fn); }, onTouchEnd(fn) { touch.end.push(fn); },
+  onWindowResize() {}, onShow() {}, onHide() {},
   getStorageSync() { return null; }, setStorageSync() {}, removeStorageSync() {},
   setClipboardData() {}, getClipboardData() {}, showKeyboard() {}, onKeyboardConfirm() {}, offKeyboardConfirm() {},
 };
@@ -43,6 +45,8 @@ global.wx = {
 const CV = global.CV, G = global.GameGlobal;
 CV.setup(global.wx.getWindowInfo());
 const U = G.U;
+/* 底栏页签的处理器是在**真实入口 game.js** 里注册的，这里补上（否则"恢复可用"那条测不出来） */
+(CV.NAV_TABS || []).forEach((t) => { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
 /* U.confirm 会顺手重画一帧（当前页是首页）—— 先把存档铺好，否则页面渲染会取不到数据 */
 global.Core.newGame();
 global.Core.setPlayerName('弹窗体检');
@@ -96,6 +100,43 @@ check('普通确认（短句，双按钮）', {}, '撤离', '确定撤离？这�
 check('普通确认（长句折到 3~4 行）', {},
   '确定撤离？',
   '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。撤离之后这一关要重新打，队伍血量按当前状态保留。');
+
+/* ---------- 模态是不是"真挡住"：弹窗开着的时候，底栏不许被点到 ----------
+   起因（V9.6.95 自审实测）：弹窗开着时点底栏居然真的换页了 ——
+   `overlayOnly` 只挡了内容层热区，顶栏/底栏是 screen 标记，照样放行。
+   这里走**真触摸管线**（CV.bindTouch 绑的 wx.onTouch* ）验一遍。 */
+CV.bindTouch();
+function tapAt(x, y) {
+  const ev = { touches: [{ clientX: x, clientY: y }], changedTouches: [{ clientX: x, clientY: y }] };
+  touch.start.forEach((fn) => fn(ev));
+  touch.end.forEach((fn) => fn(ev));
+}
+(function modalBlocksNav() {
+  CV.reset('home');
+  const bagHit = (CV.hits || []).find((h) => h.id === 'tab:bag');
+  if (!bagHit) { t('底栏页签热区能找到（前置条件）', false, '没找到 tab:bag'); return; }
+  const cx = bagHit.x + bagHit.w / 2, cy = bagHit.y + bagHit.h / 2;
+  U.confirm('测试弹窗', '弹窗打开时点底栏不应该换页。', function () {});
+  const before = CV.top().name;
+  tapAt(cx, cy);                       // 点"背包"页签
+  t('弹窗打开时点底栏不换页（模态真挡住）', CV.top().name === before,
+    before + ' → ' + CV.top().name);
+  t('弹窗自己那颗按钮仍然能点', !!(U.overlay), '弹窗还开着（刚才那下没被它吃掉）');
+  const okHit = (CV.hits || []).find((h) => h.id === '_cf_yes');
+  if (okHit) tapAt(okHit.x + okHit.w / 2, okHit.y + okHit.h / 2);
+  t('点弹窗按钮能关掉它', !U.overlay, U.overlay ? '还开着' : '已关闭');
+  /* 关掉之后再点底栏应该恢复正常。
+     注意：引导如果还挂着，"点别处一律吃掉"**是它的正常职责**（父亲大人要的强制引导），
+     所以这里先把它放下再测底栏 —— 否则测的就不是"弹窗关了没"，而是"引导在不在"。 */
+  /* 换到一个**没有引导会冒出来**的页面再测底栏（首页一渲染，开场链就会重新武装自己 ——
+     那是它该干的活，不是这条用例要测的东西）。 */
+  if (U.coachDrop) U.coachDrop();
+  CV.reset('gm');
+  const b2 = (CV.hits || []).find((h) => h.id === 'tab:bag');
+  if (b2) tapAt(b2.x + b2.w / 2, b2.y + b2.h / 2);
+  t('弹窗关掉后底栏恢复可用', CV.top().name === 'bag',
+    '当前页 ' + CV.top().name + ' · 页签热区' + (b2 ? '找到' : '**没找到**') + ' · 引导' + (U.coachActive && U.coachActive() ? '还在' : '已放'));
+})();
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
 process.exitCode = fail ? 1 : 0;

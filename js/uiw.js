@@ -547,6 +547,11 @@
      只放行「引导自己的那颗（跳过这一步）」和「高亮的目标」，其余一律吃掉。 */
   U.coachAllows = function (h) {
     if (!coachState) return true;
+    /* V9.6.95（自审：弹窗按钮点不动）：引导在的时候只放行"高亮那颗"，
+       但**弹窗是更高一层的模态** —— 弹窗打开期间，引导一律不拦，
+       由触摸层的"只放行弹窗按钮"那条规则统一把关。
+       否则会出现：引导还挂着 → 弹窗弹出来 → 点「确定」被引导吃掉，玩家卡住。 */
+    if (G.U && G.U.overlay) return true;
     if (coachSuspended()) return true;              // 战斗页：引导让路（见上）
     if (h.id === '_coach_ok') return true;
     const want = [].concat(coachState.targetId);
@@ -562,6 +567,11 @@
   const _dispatch = CV.dispatch;
   CV.dispatch = function (id) {
     const st = coachState;
+    /* V9.6.95（自审：弹窗按钮点不动）：**弹窗比引导高一层**。
+       引导在的时候这条派发会把"非高亮"的动作全吃掉 —— 弹窗自己的「确定 / 收下」
+       也被一起吃了，于是"引导还挂着 + 弹窗弹出来"时玩家点不动弹窗，卡住。
+       弹窗打开期间一律按原样派发：能不能点由触摸层那条"只放行弹窗按钮"把关。 */
+    if (G.U && G.U.overlay) return _dispatch(id);
     if (!st || coachSuspended()) return _dispatch(id);   // 战斗页：按原样派发，不拦
     /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
        这里原来是**漏的** —— 只有按下判定（hitAt）过滤了，真正执行动作的这条派发路
@@ -736,8 +746,10 @@
     });
     const by = o.y + o.btnY;
     const bw = (o.w - PAD * 2 - 10 * CV.SCALE) / 2;
-    /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记 */
-    CV.hitMode = 'screen';
+    /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记。
+       V9.6.95：这里是**真模态** —— 用 'overlay' 模式登记，触摸层会只放行这两颗按钮，
+       底栏/顶栏/吸顶条在弹窗打开期间一律不吃点击（以前弹窗开着还能点底栏换页）。 */
+    CV.hitMode = 'overlay';
     if (o.single) {
       U.btn(o.x + PAD, by, o.w - PAD * 2, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
     } else {

@@ -248,7 +248,17 @@
        · 顶栏 / 底栏 / 确认弹窗：直接按屏幕坐标画 → 'screen'
      登记时带上坐标系，派发时各自换算，两边都不再错位。 */
   CV.hitMode = 'content';
-  CV.hit = function (id, x, y, w, h) { CV.hits.push({ id, x, y, w, h, screen: CV.hitMode === 'screen' }); };
+  /* V9.6.95（自审：弹窗开着时点底栏居然能换页）：
+     屏幕坐标的热区分两种 —— 顶栏 / 底栏 / 吸顶条是"平时就在那儿"的，
+     而弹窗自己那两颗按钮是"模态"的。以前只有一个 screen 标记，于是弹窗打开时
+     底栏照样能点（模态等于没挡住）。现在多一个 modal 标记，触摸层按它放行。 */
+  CV.hit = function (id, x, y, w, h) {
+    CV.hits.push({
+      id: id, x: x, y: y, w: w, h: h,
+      screen: CV.hitMode === 'screen' || CV.hitMode === 'overlay',
+      modal: CV.hitMode === 'overlay',
+    });
+  };
   /* 屏幕坐标 → 内容坐标（含滚动） */
   CV.localY = function (py) { return py - (CV.TOP + 8) + (CV.scroll || 0); };
   CV.dispatch = function (id) {
@@ -343,7 +353,10 @@
     if (CV.sticky) CV.sticky();
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
-    if (G.U && G.U.drawCoach) G.U.drawCoach();        // 引导气泡（首次操作提示，V9.6.27）
+    /* V9.6.95：弹窗开着的时候**不画引导气泡** ——
+       以前顺序反了（引导画在弹窗上面），玩家看到的是"引导压在确认框上"，
+       点确认又会被引导吃掉（同一个病根：没把弹窗当成更高一层的模态）。 */
+    if (G.U && G.U.drawCoach && !G.U.overlay) G.U.drawCoach();   // 引导气泡（首次操作提示，V9.6.27）
     /* 页面级覆盖层（战斗结算这类"整屏一幕"）：**必须在内容裁剪之外**画 ——
        V9.6.1（父亲大人："结算内容也得在画面中间"）：以前结算画在内容层里，被顶栏下移、还跟着滚动，
        既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */
@@ -488,7 +501,8 @@
       const overlayOnly = !!(G.U && G.U.overlay);
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
-        if (overlayOnly && !h.screen) continue;
+        /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
+        if (overlayOnly && !h.modal) continue;
         /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
         if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
@@ -544,7 +558,8 @@
       const overlayOnly = !!(G.U && G.U.overlay);   // 确认弹窗打开时，底下的内容不吃点击
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
-        if (overlayOnly && !h.screen) continue;
+        /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
+        if (overlayOnly && !h.modal) continue;
         /* 引导在的时候，只认它自己那颗（V9.6.66）—— 与 hitAt 同一条规矩，
            否则"按下没反应、抬手却真的跳页了"。 */
         if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
