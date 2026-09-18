@@ -1787,11 +1787,14 @@ setParty(['C021']);
   t('法宝初始一件没有', fs0.own.length === 0 && !fs0.on);
   t('法宝表 20 件', D.FABAO.length >= 20);
   t('每件法宝都有名字/价格/效果', D.FABAO.every(f => f.name && f.cost > 0 && Object.keys(f.eff).length));
-  Core.S.cur.otherworld = 0;
-  t('结晶不够买不了', !Core.buyFabao('fb01').ok);
-  Core.addCur('otherworld', 100000);
+  /* V9.6.112：法宝改成**扣 ◈ 点数**（原来扣 ◆ 异界结晶，最便宜 1000 ——
+     新号打完一张图才 200 ◆，主线"获得 1 件法宝"根本做不到）。
+     这条断言跟着货币走，别让它继续按老口径把正确行为判成失败。 */
+  Core.S.cur.points = 0;
+  t('点数不够买不了', !Core.buyFabao('fb01').ok);
+  Core.addCur('points', 100000);
   const b1 = Core.buyFabao('fb01');
-  t('结晶够能买法宝', b1.ok && Core.fabaoState().own.includes('fb01'));
+  t('点数够能买法宝', b1.ok && Core.fabaoState().own.includes('fb01'));
   t('买完自动戴上', Core.fabaoState().on === 'fb01');
   t('不能重复买同一件', !Core.buyFabao('fb01').ok);
   const stA = Core.effectivePlayerStats();

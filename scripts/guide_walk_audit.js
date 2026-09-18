@@ -87,7 +87,7 @@ function findHit(targets) {
   const hits = CV.hits || [];
   for (let k = 0; k < want.length; k++) {
     const w = String(want[k]);
-    for (let i = hits.length - 1; i >= 0; i--) {
+    for (let i = 0; i < hits.length; i++) {
       const id = String(hits[i].id);
       if (w.slice(-1) === '*') { if (id.indexOf(w.slice(0, -1)) === 0) return hits[i]; }
       else if (id === w) return hits[i];

@@ -1518,7 +1518,14 @@ window.Core = (function () {
     const cost = { points: q.points, otherworld: q.otherworld };
     // 先判够不够，再扣材料——顺序反了会白吞材料（档案里的同类问题）
     if (!canAfford(cost)) {
-      return { ok: false, msg: q.matHave ? '点数或异界结晶不足' : `点数不足（无${q.itemName}，需代用 ◈ ${q.substitute}）` };
+      /* V9.6.112（真流程审计）：报错要说清**差哪一种**。
+         原来不管差点数还是差异界结晶都写"点数不足" —— 玩家兜里 2 万点数、
+         只差 2 个 ◆，屏幕上却说"点数不足"，只会当成 bug 或者以为自己看错了。 */
+      const short = [];
+      if ((S.cur.points || 0) < q.points) short.push('点数 ◈' + q.points);
+      if ((S.cur.otherworld || 0) < q.otherworld) short.push('异界结晶 ◆' + q.otherworld);
+      const lack = short.length ? short.join(' + ') : '材料';
+      return { ok: false, msg: q.matHave ? (`不够 ${lack}`) : (`不够 ${lack}（无${q.itemName}，需额外代用 ◈ ${q.substitute}）`) };
     }
     if (q.matHave) {
       S.items[q.itemId]--;
@@ -2491,8 +2498,15 @@ window.Core = (function () {
     if (!f) return { ok: false, msg: '没有这件法宝' };
     if (!S.fabao) S.fabao = { own: [], on: null };
     if (S.fabao.own.includes(id)) return { ok: false, msg: `已经有「${f.name}」了` };
-    if ((S.cur.otherworld || 0) < f.cost) return { ok: false, msg: `◆ 异界结晶不足（需要 ${f.cost}）` };
-    addCur('otherworld', -f.cost);
+    /* V9.6.112（真流程审计抓到的死结）：法宝原来是**扣 ◆ 异界结晶**，最便宜的一件要 1000 ◆ ——
+       而新号打完整个世界才拿 200 ◆，主线却把"获得 1 件法宝"排在**第 4 关刚开完**的时候：
+       界面上按钮全是灰的（买不起就不登记热区），引导指不到任何东西，这一步永远完不成，
+       后面整条主线陪着一起卡。
+       改回**◈ 点数**（这也是引导文案一直在写的口径：「法宝：花 ◈ 点数买一件」）——
+       ◈ 是前期就充裕的货币，价格量级（1000~15000）本来就是按点数定的。
+       秘术阁继续扣 ◆（13 起）——那条线是真正的 ◆ 消耗口。 */
+    if ((S.cur.points || 0) < f.cost) return { ok: false, msg: `◈ 点数不足（需要 ${f.cost}）` };
+    addCur('points', -f.cost);
     S.fabao.own.push(id);
     if (!S.fabao.on) S.fabao.on = id;
     save();

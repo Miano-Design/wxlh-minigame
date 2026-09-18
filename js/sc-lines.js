@@ -93,9 +93,11 @@
         CV.text(CV.fit(f.name, U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         CV.text(CV.fit(f.desc, U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.sm), tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         if (!own) {
-          const can = (Core.S.cur.otherworld || 0) >= f.cost;
+          /* V9.6.112：法宝改扣 **◈ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
+             最便宜也要 1000，新号根本买不起，主线"获得 1 件法宝"永远完不成。 */
+          const can = (Core.S.cur.points || 0) >= f.cost;
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-            '◆ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
+            '◈ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
         } else {
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
             wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', wearing ? '' : 'fabao_wear:' + f.id);

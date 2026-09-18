@@ -49,7 +49,7 @@ files.forEach((f) => {
   try { require(p); } catch (e) { loadErrors.push(f + ' → ' + e.message); }
 });
 
-const CV = global.CV, Core = global.Core, D = global.DATA;
+const CV = global.CV, Core = global.Core, D = global.DATA, U = global.GameGlobal.U;
 if (loadErrors.length) { console.log('**有文件加载失败**：'); loadErrors.forEach(x => console.log('  ' + x)); process.exit(1); }
 CV.setup(wx.getWindowInfo());
 
@@ -66,6 +66,10 @@ Core.S.party = ['@player', vamp, null, null, null];
 
 function drawEq(uid) {
   TEXTS.length = 0;
+  /* V9.6.112：装备详情页现在**第一次进来会挂一条引导**（"点「强化」花材料升一级"），
+     而引导是真模态 —— 它会把 `CV.dispatch('eqd:其它件')` 吃掉（那不是它指的那颗）。
+     这把尺子量的是**画法**，不是引导，所以先把引导清掉再画。 */
+  if (U && U.coachClearAll) U.coachClearAll();
   CV.dispatch('eqd:' + uid);
   CV.reset('eqdetail');
   return TEXTS.join(' | ');

@@ -127,7 +127,26 @@
     /* 点「去完成」= 换一件事讲：先把当前这条和排队的都清掉，
        否则上一条（常常就是首页那条"主线每一步做完都能领奖励"）会接着冒出来。 */
     if (U.coachClearAll) U.coachClearAll();
-    U.coachForce(2500);          // 主动求引导：这一步的说明这次一定再讲一遍（与网页版同步）
+    /* 主动求引导：**只让这一步那条**再讲一遍（父亲大人："第一关的指引打完之后出来还是它"
+       —— 以前这个窗口对所有引导都生效，点完这一步别的页的卡片也会跳出来）。 */
+    U.coachForce(2500, G.questGuideKey ? G.questGuideKey(qid) : null);
+    /* V9.6.112（父亲大人："第一关的指引打完之后出来还是第一关的指引"）：
+       这一步的判定**已经满足了** —— 最常见的就是"打完第 1 关"同时满足了下一步
+       （q01b 打完一场战斗 ↔ q02 通关第 1 关），于是玩家刚回到世界页，
+       「去完成」又把他送回世界页、高亮又指着**第 1 关**，讲一句"每通关一关解锁下一关"。
+       玩家感受：做完出来还是同一条引导，像是没更新。
+
+       已经做完的步骤，玩家唯一还剩的动作只有一个：**回首页领奖**。
+       所以这里不再往"做那件事"的界面送，而是回首页高亮「领取奖励」并说清楚。 */
+    const qDone = (D.MAIN_QUESTS || []).find(function (x) { return x.id === qid; });
+    if (qDone && qDone.check(Core.S)) {
+      U.coachForce(2500, 'tut_claim_' + qid);
+      CV.cur = 'home'; CV.reset('home');
+      U.coach(['claim_quest', 'goto_quest'],
+        '这一步已经做完了 —— 点「领取奖励」收下，领完自动接下一步。',
+        { key: 'tut_claim_' + qid, mustTap: true });
+      return;
+    }
     const worldOf = { q12: 'W02', q14: 'W02', q15: 'W03' }[qid] || 'W01';
     /* V9.6.99（新手引导"真走一遍"的脚本抓出来的）：
        原来这里**自己另写了一套落点**，只特判了 q01/q13/q03/q09/q04/q07/q11 七步，
@@ -179,7 +198,8 @@
   G.goQuest = goQuest;
 
   function goDaily(key) {
-    U.coachForce(2500);
+    /* 每日任务的「前往」同理：只让这条每日引导再讲一遍（别把别的页的卡片带出来） */
+    U.coachForce(2500, 'daily_' + key);
     if (key === 'recruit1') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
     if (key === 'idle1') { CV.cur = 'home'; CV.reset('home'); return; }
     if (key === 'enhance1') {

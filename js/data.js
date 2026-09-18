@@ -1827,7 +1827,11 @@ window.DATA = (function () {
     { id: 'q04', name: '并肩作战', desc: '让 1 名伙伴上阵', reward: { story: 50 },
       check: S => S.party.filter(id => id && id !== '@player').length >= 1 },
     /* 一条顶原来的三条：打通第 4 关，顺便把 兑换/强化/基地/任务 全解锁 */
-    { id: 'q05', name: '一路推进', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000 }, unlock: 'shop,enhance,buildings,tasks',
+    /* V9.6.112（真流程审计抓到的死结）：强化一次要 点数 + **异界结晶 ◆**（见 enhanceCost），
+       可第 4 关之前**没有任何 ◆ 收入**（世界首通奖励要打完整个世界才发）——
+       于是"强化 1 次装备"这一步卡死，后面整条主线跟着停。
+       这一步正好是解锁强化的那一步，奖励里补上 ◆，玩家拿到钥匙的同时拿到开门的那点钱。 */
+    { id: 'q05', name: '一路推进', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000, otherworld: 30 }, unlock: 'shop,enhance,buildings,tasks',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[3] > 0 },
     { id: 'q07', name: '第一次强化', desc: '强化 1 次装备', reward: { points: 3000 },
       check: S => S.stats.enhances >= 1 },

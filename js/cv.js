@@ -583,7 +583,12 @@
     /* 滚动：以前框架里**只有读没有写**（CV.scroll 永远是 0），页面一长（首页、残域）下面的内容
        就永远看不到。这里补上拖拽滚动 + 松手惯性，和手机原生滚动手感一致。 */
     /* 手指这一点命中了哪颗热区（坐标换算规则和 touchend 完全一致 —— 一处写错就会"按下亮 A、抬手触发 B"） */
-    const hitAt = (p) => {
+    /* ignoreCoach：**跳过引导那道闸**。
+       只有"长按抓起"用它 —— 引导自己教的就是"长按任意一格抓起、拖到别处松手"，
+       而引导在的时候 hitAt 只放行它自己那颗（队伍页放行的是 party_board 那块**没有动作**的锚点），
+       于是长按拿到的是一块点不动的区域、CV.grabCfg.from() 返回 null → 抓不起来。
+       玩家在引导里试拖 → 拖不动（父亲大人："还是拖拽不了"）。 */
+    const hitAt = (p, ignoreCoach) => {
       const ly = CV.localY(p.y);
       const overlayOnly = !!(G.U && G.U.overlay);
       let fallback = null;          // 没有处理器的锚点区域 → 兜底候选
@@ -592,7 +597,7 @@
         /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
         if (overlayOnly && !h.modal) continue;
         /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
-        if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
+        if (!ignoreCoach && G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
         if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
         /* V9.6.108（父亲大人："队伍上阵又上不了了，其他东西也都点不了了"）：
@@ -610,7 +615,7 @@
        （长按抓起与"拿着东西点目标格"都要用它，口径和 hitAt 完全一致） */
     const grabSlotAt = (p) => {
       if (!CV.grabCfg || !CV.grabCfg.from) return null;
-      const h = hitAt(p);
+      const h = hitAt(p, true);          // 抓起不看引导那道闸（见 hitAt 的 ignoreCoach）
       if (!h) return null;
       const idx = CV.grabCfg.from(h.id);
       return (idx === null || idx === undefined) ? null : idx;
@@ -642,8 +647,11 @@
       if (h) { CV.pressed = h.id; CV.render(); }
       /* V9.6.111：长按抓起（队伍换位）——按下这一格是"可抓起"的，就等 420ms（和网页版同一个值）。 */
       clearGrabTimer();
-      if (h && CV.grabCfg && CV.grabCfg.from) {
-        const idx = CV.grabCfg.from(h.id);
+      if (CV.grabCfg && CV.grabCfg.from) {
+        /* V9.6.112（父亲大人："还是拖拽不了"）：这里原来用的是**过了引导闸门**的那颗
+           （引导在时是 party_board 那块没有动作的锚点）→ 永远抓不起来。
+           抓起要单独查一次"这一格能不能拿起"（不看引导闸），战斗/其它页面不受影响。 */
+        const idx = grabSlotAt(p);
         if (idx !== null && idx !== undefined) {
           grabTimer = setTimeout(function () {
             grabTimer = null;

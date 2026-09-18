@@ -463,6 +463,13 @@
      （网页版同一个毛病，父亲大人："又没说要干嘛"）。用一个短窗口的开关把"主动要的"和
      "路过顺手讲的"分开。 */
   let coachForceUntil = 0;
+  /* 这次"主动求引导"是为**哪一条**破例（null = 不限定，老口径） */
+  let coachForceKey = null;
+  /* V9.6.112（父亲大人："第一关的指引打完之后出来还是第一关的指引"）：
+     「去完成」开的那 2.5 秒强制窗口，原来对**所有**引导都有效 ——
+     玩家做完这一步、再回到那一页，同一条卡片又冒出来讲一遍（看着就是没更新）。
+     现在这个窗口**每条只破例一次**：主动求一次就讲一次，之后照常按"已看过"收敛。 */
+  const coachForcedUsed = {};
   /* V9.6.68（资料 §5「引导每一步都要能测」）：本地引导漏斗 —— 形状与网页版一致，
      记 看过/点过/跳过/没指到 + 累计毫秒；GM 面板里能看（sc-last 的调试页）。 */
   function coachFunnel(key, what, ms) {
@@ -475,8 +482,23 @@
     G.Core.save();
   }
   U.coachFunnel = coachFunnel;
-  U.coachForce = function (ms) { coachForceUntil = Date.now() + (ms || 2500); };
+  U.coachForce = function (ms, onlyKey) {
+    coachForceUntil = Date.now() + (ms || 2500);
+    /* V9.6.112（父亲大人："招募的指引得点好几下才能换"／"第一关的指引打完之后出来还是它"）：
+       「去完成」开的那 2.5 秒窗口，原来对**所有**引导都有效 ——
+       于是玩家点完这一步、只要这 2.5 秒里又渲染了别的页，那一页的基础引导也会跳出来。
+       现在窗口**只对玩家点的那一步破例**（onlyKey 传进来是谁，就只有谁能再讲一遍），
+       而且每条只破例一次：同一条不会因为换页回来又讲第二遍。 */
+    coachForceKey = onlyKey || null;
+    for (const k in coachForcedUsed) delete coachForcedUsed[k];
+  };
   U.coachForced = function () { return Date.now() < coachForceUntil; };
+  /* 这一次"主动求引导"还能不能为**这一条**破例 */
+  const forcedNow = function (key) {
+    if (Date.now() >= coachForceUntil) return false;
+    if (coachForceKey && String(coachForceKey) !== String(key)) return false;
+    return !coachForcedUsed[key];
+  };
   /* V9.6.67（查漏补缺）：**战斗页整屏接管，引导在那一页既不画也不挡**。
      起因：主线 q01b 那类"点第 1 关就开打"的步骤带 waitFor（打完才算过），
      玩家一点高亮就进了战斗 —— 引导还在，于是把战斗页的撤离 / 加速 / 结算按钮全挡死，
@@ -497,7 +519,8 @@
     if (!S) return;
     S.coachSeen = S.coachSeen || {};
     const key = opts.key || [].concat(targetId).join('|');
-    if (S.coachSeen[key] && !U.coachForced()) return;  // 看过就不再弹（除非玩家主动又要了一次）
+    if (S.coachSeen[key] && !forcedNow(key)) return;   // 看过就不再弹（玩家主动又要了，才再讲一次）
+    if (forcedNow(key)) coachForcedUsed[key] = true;   // 破例只给一次
     /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
        mustTap 改成**默认开** —— 所有引导都只有两条出路：点高亮的那颗，或者点右下角「跳过这一步」。
        以前非强制的那些给了一颗全屏热区（点哪都算过），玩家一边看引导一边还能操作别的东西。 */
@@ -640,7 +663,13 @@
     promoteCoach();
     const r = _dispatch(id);
     setTimeout(function () {
-      if (typeof st.onDone === 'function') st.onDone(); else U.coachNext();
+      /* V9.6.112（父亲大人："上阵也得上两个"）：这一下**可能已经把玩家带到下一页**，
+         而那一页会在自己的 render 里登记一条新引导（比如挑人页的"点一个伙伴，他就上阵了"）。
+         原来这里无条件 `U.coachNext()` —— 它会把**刚登记的那条**当成"当前这条"清掉，
+         于是新页面上一条提示都没有，玩家看着一列名字不知道还要再点一下。
+         现在：只有"没有新引导顶上来"时才推进队列。 */
+      if (typeof st.onDone === 'function') st.onDone();
+      else if (!coachState) U.coachNext();
       CV.render();                                   // 让新一步立刻画出来
     }, 0);
     return r;
@@ -685,7 +714,12 @@
     for (let wi = 0; wi < want.length && !r; wi++) {
       const w = String(want[wi]);
       const hits = CV.hits || [];
-      for (let i = hits.length - 1; i >= 0; i--) {
+      /* V9.6.112（真流程审计）：**前缀锚点取"登记顺序里的第一颗"**，不是最后一颗。
+         热区是按绘制顺序登记的（第一行先登记），而"最后一颗"在列表尾部 ——
+         于是 `fabao_buy:*` 高亮指向**最贵的那件法宝**、`garden_plant:*` 指向最后一垄地
+         （种子最贵的那垄）：玩家点下去买不起，引导还赖着不走，
+         看着就是"点了没反应、要连点好几下"。取第一颗＝最便宜/最前面那颗，才是玩家会先点的。 */
+      for (let i = 0; i < hits.length; i++) {
         const id = String(hits[i].id);
         const ok = w.slice(-1) === '*' ? id.indexOf(w.slice(0, -1)) === 0 : id === w;
         if (ok) { r = rectOf(hits[i]); break; }

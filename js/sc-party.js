@@ -313,7 +313,14 @@
     CV.render();
   });
   [0, 1, 2, 3, 4].forEach(function (i) {
-    CV.on('pslot:' + i, function () { pickSlot = i; CV.push('pickparty'); });
+    CV.on('pslot:' + i, function () {
+      pickSlot = i;
+      CV.push('pickparty');
+      /* V9.6.112（父亲大人："上阵也得上两个"）：上阵是**两步** —— 点空格、再点一个人。
+         第二步的说明写在 sc-home 的页面引导表里（['pickparty', …]）——
+         引导的登记要交给"页面一渲染就查表"那条通路：在这一下里直接登记，
+         会被引导引擎随后那次"推进队列"清掉（见 uiw.js 里 coachNext 那处修复）。 */
+    });
     CV.on('poke:' + i, function () {
       const id = Core.S.party[i];
       if (id === '@player') { CV.push('protag'); return; }

@@ -132,7 +132,20 @@
     mount: '坐骑', garden: '药园', arena: '斗法台', sign: '求签', refine: '炼化台',
     bounty: '限时悬赏', idlelines: '挂机分工',
   };
+  /* V9.6.112（父亲大人："第一关的指引打完之后出来还是第一关的指引"）：
+     「接着打哪一关」不能写死成 stage:0 —— 打完第 1 关回到世界页，高亮还指着第 1 关，
+     玩家只会觉得引导没更新。这里永远给**第一个还没通关**的普通关。
+     （写死关号的那几步（q05 指第 4 关、q10/q14/q15 指第 12 关）保持不动：
+       它们本来就是"打到那一关"，而且"已经做完了"那一步由 goQuest 直接送回首页领奖。） */
+  function nextStageAnchor(wid) {
+    const w = (G.Core && G.Core.S && G.Core.S.worlds && G.Core.S.worlds[wid]) || null;
+    const arr = (w && w.stages && w.stages.normal) || [];
+    for (let i = 0; i < arr.length; i++) if (!arr[i]) return 'stage:' + i;
+    return 'stage:11';
+  }
   const TUT = {
+    /* V9.6.112（父亲大人："第一关的指引打完之后出来还是第一关的指引"）：见 nextStageAnchor ——
+       「接着打哪一关」永远指向**第一个还没通关**的普通关，不写死。 */
     /* 同一件事的三条入口共用一把钥匙（V9.6.67）：
        解锁时那条（UNLOCK_GUIDE）、主线那一步（TUT）、页面级那一句（C 表）——
        谁先讲，另外两条自动跳过，不再连着看三张一模一样的卡。 */
@@ -149,8 +162,12 @@
        因为讲的是同一件事：谁先讲，另一条自动跳过（否则讲完六维回首页时，
        这一条会被"顺手登记"，然后挂在首页上指着一个不存在的目标）。 */
     q01:  { page: 'protag',  s: ['attr_card'], key: 'tut_blk1x', t: '这是你的属性面板：升级得属性点和技能点，点 +1 分配，六维、技能、装备、血统都在这一页。' },
-    q01b: { page: 'world',   s: ['stage:0', 'stage_grid'], t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
-    q02:  { page: 'world',   s: ['stage:0', 'stage_grid'], t: '每通关一关解锁下一关，右下角会在打完后直接给你「下一关」。' },
+    q01b: { page: 'world',   s: function () { return [nextStageAnchor('W01'), 'stage_grid']; },
+            t: '这一关就是你的第一场仗 —— 点它直接开打；一关要一口气打完所有波次。' },
+    /* V9.6.112：锚点改成**下一关**（打完第 1 关就指第 2 关），文案也跟着说"接着打"。
+       以前写死 stage:0：玩家刚打完第 1 关，出来又看见一条指着第 1 关的引导。 */
+    q02:  { page: 'world',   s: function () { return [nextStageAnchor('W01'), 'stage_grid']; },
+            t: '接着往下打 —— 打完一关会自动解锁下一关，结算页右下角直接给你「下一关」。' },
     /* V9.6.69：q04「并肩作战」原来没有专门一条（只在开场讲过招募/队伍）——
        父亲大人指的"第 5 步高亮只亮一小块"就是这一步。现在给它一条：锚点用**整块阵型区**
        （party_board，两排五格），而不是某个格子或"前排"两个字。 */
@@ -167,16 +184,37 @@
        （那一刻的兜底是"送残域"），玩家点主线 4 就被送去看副本 ✗。
        而且 V9.6.66 定的规矩是"玩家主动点去完成，永远该有话说" —— 所以补一条**独立**的：
        自己的 key（go_q03），不跟开场那条共用，点了就一定讲一遍。 */
-    q03:  { page: 'recruit', s: ['pull1:normal', 'pull1:normal:free'], key: 'go_q03',
+    /* V9.6.112（父亲大人："招募的指引得点好几下才能换"）：
+       这一步原来用的是**自己一把钥匙**（go_q03），于是同一页会连着讲三条几乎一样的卡：
+       解锁那条（guide_recruit）、页面那条（guide_recruit）、主线这条（go_q03）——
+       玩家点掉一张又来一张，感受就是"得点好几下才能换"。
+       现在三处**共用一把钥匙**（TOPIC_KEY.recruit）；玩家点「去完成」时 goQuest 会开
+       coachForce 窗口，所以"主动求引导"照样会再讲一遍，不会漏。 */
+    q03:  { page: 'recruit', s: ['pull1:normal', 'pull1:normal:free'], key: TOPIC_KEY.recruit,
             t: '招募伙伴：每天有免费次数，先用掉 —— 免费抽也计入这条主线。想多抽就往下选池子。' },
     /* V9.6.74：q05 合并了原来的第 2/3/4 关；q06/q08 已删（任务表里没有它们了） */
-    q05:  { page: 'world',   s: ['stage:3', 'stage_grid'], t: '一路推进到第 4 关 —— 打完这一关会解锁「装备强化 / 基地建设 / 每日任务」。' },
+    /* V9.6.112（quest_play_audit 抓到的第二处）：原来写 stage:3（第 4 关）——
+       可那时候第 4 关**还没解锁、页面上根本没登记热区**，锚点就退成 stage_grid
+       那块**没有动作**的整片区域：玩家点高亮什么都不发生，还得点好几下才换，
+       "一路推进到第 4 关"这一步永远做不完。
+       改成"第一个还没通关的那一关"（一定是已解锁、点了就开打的那一颗），
+       玩家顺着 2→3→4 一路打下去，文案说的还是"推进到第 4 关"。 */
+    q05:  { page: 'world',   s: function () { return [nextStageAnchor('W01'), 'stage_grid']; },
+            t: '一路推进到第 4 关 —— 打完这一关会解锁「装备强化 / 基地建设 / 每日任务」。' },
     q07:  { page: 'bag',     s: ['eqd:*', 'bagview:equip'], t: '强化在这里：切到「装备」，点一件装备进去花材料强化。' },
     q09:  { page: 'buildings', s: ['bup:*'], t: '建筑每升一级都是永久加成 —— 灯芯加挂机产出、训练室加经验、医疗室加离线效率；花的是挂机就能刷的点数。' },
-    q10:  { page: 'world',   s: ['stage:11', 'stage_grid'], t: '第 12 关是这一世界的守关 Boss —— 打完解锁下一个世界。' },
+    q10:  { page: 'world',   s: function () { return [nextStageAnchor('W01'), 'stage_grid']; },
+            t: '第 12 关是这一世界的守关 Boss —— 打完解锁下一个世界。一路打过去。' },
     q11:  { page: 'corridor', s: ['corridor_fight'], t: '深井：一直往上打、没有重置。每 10 层给一枚深井印记，井内全属性加成。' },
     /* V9.6.74（主线重排，与网页版同一条链）：补上"系统课"这几步的引导 —— 每条只教一件不同的事 */
-    q_tasks:   { page: 'tasks',     s: ['tasktab:main'],   t: '做完的日常任务在这里领（主线 / 日常 / 周常 / 成就四个标签）。' },
+    /* V9.6.112（真流程审计）：锚点原来只有**标签页**（点它只是切标签，什么事都没发生），
+       玩家点完发现这一步还是没完成。现在优先指"能领的那颗按钮"，没得领才退回标签。 */
+    /* V9.6.112（真流程审计）：任务页默认停在**主线**标签，而"领 1 次奖励"要做的是
+       **日常**标签里的「领取」；锚点原来只指主线标签 → 点一下只是切标签、这一步永远完不成。
+       现在优先指"能领的那颗按钮"，没有就指「日常」标签 —— 切过去之后
+       （waitFor 还挂着）高亮会自动移到那颗「领取」，玩家照着一路点就完成了。 */
+    q_tasks:   { page: 'tasks',     s: ['task_claim:*', 'tasktab:daily'],
+                 t: '做完的任务在这页点「领取」收下 —— 日常任务在「日常」标签里。' },
     q_keji:    { page: 'keji',      s: ['keji_up:*'],      t: '秘术阁：每条点一下按 ◆ 异界结晶升级、立刻永久生效。先挑一条主修的堆。' },
     q_fabao:   { page: 'fabao',     s: ['fabao_buy:*'],    t: '法宝：花 ◈ 点数买一件，「带上」它。给的是效果（吸血 / 开场能量 / 减伤），不是数值。' },
     q_garden:  { page: 'garden',    s: ['garden_plant:*'], t: '药园：空地上种一次，过一段时间回来收（不收就一直长着）。' },
@@ -186,15 +224,20 @@
     q_realm:   { page: 'realm',     s: ['realm_try'],      t: '境界渡劫：攒够材料就突破一小阶，全属性永久上涨；失败只扣材料、等级不掉。' },
     q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：重置等级与世界进度换永久天赋点（条件逐次抬高，第 1 次 Lv.100 + 铭刻 2 阶 + 灯芯 Lv.20）。' },
     /* V9.6.75（父亲大人："你安排"）：再补两条每天都会碰的系统 —— 挂机分工 / 限时悬赏 */
-    q_idle:    { page: 'idlelines', s: ['pickleader:*'],   t: '挂机分工：4 条产线各派 1 名领队（看领队**对应那一维**，不是战力）；没派领队的产线不产出。' },
+    /* V9.6.112：派领队要有"没上阵的伙伴"才登记按钮 —— 手上只有一名伙伴、还上了阵的玩家，
+       这一页一个按钮都没有（引导只能退成一张讲不清的卡片）。文案里把这条出路写上。 */
+    q_idle:    { page: 'idlelines', s: ['pickleader:*'],   t: '挂机分工：4 条产线各派 1 名领队（看领队**对应那一维**，不是战力）；没派领队的产线不产出。没有可派的伙伴就先回首页去招募。' },
     q_bounty:  { page: 'bounty',    s: ['bounty_claim:*'], t: '限时悬赏：达成后手动领奖，到点作废 —— 别让它白白过期。' },
     /* 伴生体在潜影窟第 3 关解锁，灯录随收集推进 —— 都放在这个位置 */
     q_beast:   { page: 'beast',     s: ['beast_hatch1'],   t: '伴生体：用兽魂石孵化，孵出来带上场给全队加属性。' },
     q_codex:   { page: 'codex',     s: ['codex_claim:*'],  t: '灯录：收集伙伴解锁里程碑奖励，收满了就回来领。' },
     /* V9.6.70（静态审计查出来的）：q12 / q14 / q15 原来**没有引导** —— 点了「去完成」只是跳到那个世界、什么都不说。 */
-    q12:  { page: 'world', s: ['stage:0', 'stage_grid'],   t: '下一个世界「潜影窟」：点第 1 关开打。换个世界敌人会更硬 —— 打不动就回首页收挂机收益、回队伍练一练再回来。' },
-    q14:  { page: 'world', s: ['stage:11', 'stage_grid'],  t: '这一关打完就通关整个潜影窟了 —— 点第 12 关（守关 Boss）。' },
-    q15:  { page: 'world', s: ['stage:11', 'stage_grid'],  t: '最后这个世界「怨声旧宅」的守关 Boss —— 点第 12 关。打之前先把挂机收益收掉、装备拉满。' },
+    q12:  { page: 'world', s: function () { return [nextStageAnchor('W02'), 'stage_grid']; },
+            t: '下一个世界「潜影窟」：点第 1 关开打。换个世界敌人会更硬 —— 打不动就回首页收挂机收益、回队伍练一练再回来。' },
+    q14:  { page: 'world', s: function () { return [nextStageAnchor('W02'), 'stage_grid']; },
+            t: '这一关打完就通关整个潜影窟了 —— 点第 12 关（守关 Boss）。' },
+    q15:  { page: 'world', s: function () { return [nextStageAnchor('W03'), 'stage_grid']; },
+            t: '最后这个世界「怨声旧宅」的守关 Boss —— 点第 12 关。打之前先把挂机收益收掉、装备拉满。' },
     q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
   };
   /* V9.6.99（"点去完成把我送到别的界面、弹窗内容还不对"）：
@@ -204,6 +247,57 @@
   G.questTarget = function (qid) { return (TUT[qid] && TUT[qid].page) || null; };
   /* 引导表本身也挂出去一份（只读）：审计脚本要用它核对"这一步该讲哪句话" */
   G.questGuide = TUT;
+  /* V9.6.112（父亲大人："招募的指引得点好几下才能换"）：**页面引导表**从 coachFor 里提出来，
+     提到模块级 —— 这样"同一条主线步"和"同一页的基础引导"能对上同一把钥匙（见 pageGuideKey）。
+     原来这两张表各算各的 key，同一件事在两处各说一遍：玩家点掉一张又来一张，
+     感受就是"得点好几下才能换"。 */
+  const PAGE_GUIDE = [
+    /* key 与开场链最后一步（tut_blk4）共用：讲的是同一件事（主线那颗按钮） */
+    ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。', 'tut_blk4'],
+    /* V9.6.112：这条和 q01b 的引导讲的是**同一件事**（点第 1 关开打）。
+       以前各用各的钥匙 → 玩家在 q01b 那条点掉之后，这条又冒出来讲一遍，
+       看着就是"第一关的指引打完之后出来还是第一关的指引"。现在共用 q01b 的钥匙。 */
+    ['world', function () { return [nextStageAnchor('W01')]; },
+      '点这一关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。', 'tut_q01b'],
+    ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。', TOPIC_KEY.recruit],
+    ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
+    /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
+       每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
+    ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
+    ['fabao',    ['fabao_buy:*'],     '法宝：花 ◈ 点数买，「带上」一个。它给的是**效果**（吸血 / 开场能量 / 减伤），不是数值。'],
+    ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性；养成线里最省事的一条。'],
+    ['garden',   ['garden_plant:*'],  '药园：空地上种，过一段时间回来收 —— 不收就一直长着，别忘了。'],
+    ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ + ♜，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
+    ['sign',     ['sign_draw'],       '求签：每天免费摇一次，签文给**当天**的挂机加成 + 一点硬通货。'],
+    ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼血清，血清喂给伙伴是**永久**加成（每人每种有上限）。'],
+    ['bounty',   ['bounty_claim:*'],  '限时悬赏：到点作废、达成才有奖励；四条全部结束后可以开新一期。'],
+    ['idlelines',['pickleader:*'],    '挂机分工：4 条产线各派 1 名领队，领队战力越高产出越高；没派领队的产线不产出。'],
+    /* 这四条是"看数值/被动成长"的页，没有单一主按钮 —— 锚点留空（引擎会自动退成"点一下继续"），
+       但话必须说清"花什么、涨什么、多久涨"，不然玩家进来只会看到一屏数字。 */
+    ['authority', [], '灯阁权限：花 ✦ 圣洁晶石 + ◆ 结晶升，给的全是**倍率** —— 挂机产出、离线上限、离线效率、每日扫荡次数。'],
+    ['sect',      [], '灯阁评级：**打关卡自动涨**，每级全队全属性 +0.5% —— 不用手动点，所以别在这页找按钮。'],
+    ['realm',     [], '境界渡劫：每突破一小阶**全属性永久上涨**，36 阶走满合计 +50.4%。渡劫入口在这张卡下面的按钮。'],
+    ['codex',     [], '灯录：收集伙伴解锁里程碑奖励，收满了就回来领。'],
+    ['roster',    [], '执灯者：上阵的排前面（带红色角标），点卡片看详情 —— 等级、星级、血统、装备都在里面。'],
+    ['char',      ['lv1'], '伙伴详情：升级 / 升星 / 血统升级 / 装备全在这一页；最下面是属性面板和队伍操作（从队伍点进来才有）。'],
+    /* V9.6.112（父亲大人："上阵也得上两个"）：**两步的流程，第二步也要有人说话**。
+       上阵 = 点空格 → 进挑人页 → 点一个伙伴；强化 = 点一件装备 → 进装备详情 → 点「强化」。
+       以前引导只在第一步把话说完，玩家进到第二页看着一列名字/一堆按钮愣在那里。 */
+    ['pickparty', ['set:*', 'page_back'], '点一个伙伴，他就上阵了 —— 左上角可以取消，不用怕点错。'],
+    ['eqdetail',  ['eq_enh', 'eq_back'],  '点「强化」花材料升一级 —— 成功或失败都算一次，强化不会掉级。'],
+  ];
+  /* 同一页、同一个首锚点 = 同一件事 → 用同一把钥匙（谁先讲，另一处自动跳过） */
+  function pageGuideKey(page, anchors) {
+    const first = String([].concat(anchors || [])[0] || '');
+    for (let i = 0; i < PAGE_GUIDE.length; i++) {
+      const row = PAGE_GUIDE[i];
+      if (row[0] !== page) continue;
+      const rowAnchors = (typeof row[1] === 'function') ? row[1]() : row[1];
+      if (String([].concat(rowAnchors || [])[0] || '') !== first) continue;
+      return row[3] || ('tut_page_' + page + '_' + [].concat(rowAnchors).join('_'));
+    }
+    return null;
+  }
   function coachByQuest(page) {
     const cu = Core.currentQuest && Core.currentQuest();
     const qid = cu && cu.q && cu.q.id;
@@ -211,7 +305,13 @@
     if (!rule || rule.page !== page) return false;
     /* 与"解锁时"那一条共用钥匙：同一件事只讲一遍（V9.6.67）。
        rule.key 用于和**开场链**里讲同一件事的那一步共用（比如主线一 ↔ 开场讲六维）。 */
-    const key = rule.key || TOPIC_KEY[QUEST_TOPIC[qid]] || ('tut_' + qid);
+    /* V9.6.112：钥匙的优先级 —— 这一步自己写的 > 主题共用钥匙 > **本页基础引导那一把** > 按步号。
+       第三档是这一版补的：同一件事在"主线步"和"页面引导"里各有一份文案，
+       以前两边各算各的 key → 同一件事讲两遍（"得点好几下才能换"）。 */
+    /* V9.6.112：锚点允许写成**函数**（"接着打下一关"这种要按当前进度算的）。
+       其余地方照旧读 rule.s（字符串数组）。先算锚点，钥匙要用它去对页面引导表。 */
+    const anchors = (typeof rule.s === 'function') ? rule.s() : rule.s;
+    const key = rule.key || TOPIC_KEY[QUEST_TOPIC[qid]] || pageGuideKey(page, anchors) || ('tut_' + qid);
     /* V9.6.66（与网页版同步）：玩家自己点「前往 ›」＝主动求引导，这次必须再讲一遍 */
     if (U.coachSeen(key) && !U.coachForced()) return false;
     if (rule.run) { rule.run(); return true; }
@@ -235,7 +335,7 @@
        CV.hits 已经齐了）：锚点能匹配到某颗热区、且那颗热区有处理器 → 才算"有用"。
        （V9.6.106 第一版只查了 onAct 的键名，漏掉"逐个注册"的写法 ——
          队伍的空格是 pslot:0…4，锚点写 pslot:* 就匹配不到键名，于是被误判成"点了没用"。） */
-    const actionable = [].concat(rule.s || []).some(function (anchor) {
+    const actionable = [].concat(anchors || []).some(function (anchor) {
       const a = String(anchor);
       return (CV.hits || []).some(function (h) {
         const id = String(h.id);
@@ -246,7 +346,7 @@
         return i > 0 && !!CV.onAct[id.slice(0, i + 1) + '*'];            // 前缀处理器
       });
     });
-    U.coach(rule.s, rule.t, {
+    U.coach(anchors, rule.t, {
       key: key,
       queue: true,          // V9.6.71：玩家主动点「去完成」的那一步，不能被别的引导挤掉
       mustTap: true,
@@ -258,6 +358,14 @@
     });
     return true;
   }
+  /* V9.6.112：把"这一步用的引导钥匙"算给外面（goQuest 要用它开"只对这一条破例"的窗口）——
+     口径和上面 coachByQuest 里那一行**必须一致**，所以抽成一个函数，两边都调它。 */
+  G.questGuideKey = function (qid) {
+    const rule = TUT[qid];
+    if (!rule) return null;
+    const anchors = (typeof rule.s === 'function') ? rule.s() : rule.s;
+    return rule.key || TOPIC_KEY[QUEST_TOPIC[qid]] || pageGuideKey(rule.page, anchors) || ('tut_' + qid);
+  };
 
   /* 新解锁的功能也自动开指引（父亲大人第 2 条：解锁时弹窗打断）。
      判定是"该模块已解锁 + 这一课没讲过"，所以新号刚解锁、老号从没进过，都会补一次。
@@ -318,38 +426,13 @@
     if (U.coachForced && U.coachForced() && coachByQuest(page)) return;
     if (coachByUnlock(page)) return;     // 刚解锁的模块优先讲
     if (coachByQuest(page)) return;      // 主线那一步优先（合并成一套：一次只讲一件事）
-    const C = [
-      /* key 与开场链最后一步（tut_blk4）共用：讲的是同一件事（主线那颗按钮） */
-      ['home', ['claim_quest', 'goto_quest'], '主线每一步做完都能领奖励 —— 右边那颗按钮。', 'tut_blk4'],
-      /* 首页的挂机收取改由 TOUR 链讲（tour_back），这里不再重复一遍。 */
-      ['world', ['stage:0'], '点第 1 关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。'],
-      ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。', TOPIC_KEY.recruit],
-      ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
-      /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
-         每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
-      ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
-      ['fabao',    ['fabao_buy:*'],     '法宝：花 ◆ 异界结晶买，「带上」一个。它给的是**效果**（吸血 / 开场能量 / 减伤），不是数值。'],
-      ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性；养成线里最省事的一条。'],
-      ['garden',   ['garden_plant:*'],  '药园：空地上种，过一段时间回来收 —— 不收就一直长着，别忘了。'],
-      ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ + ♜，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
-      ['sign',     ['sign_draw'],       '求签：每天免费摇一次，签文给**当天**的挂机加成 + 一点硬通货。'],
-      ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼血清，血清喂给伙伴是**永久**加成（每人每种有上限）。'],
-      ['bounty',   ['bounty_claim:*'],  '限时悬赏：到点作废、达成才有奖励；四条全部结束后可以开新一期。'],
-      ['idlelines',['pickleader:*'],    '挂机分工：4 条产线各派 1 名领队，领队战力越高产出越高；没派领队的产线不产出。'],
-      /* 这四条是"看数值/被动成长"的页，没有单一主按钮 —— 锚点留空（引擎会自动退成"点一下继续"），
-         但话必须说清"花什么、涨什么、多久涨"，不然玩家进来只会看到一屏数字。 */
-      ['authority', [], '灯阁权限：花 ✦ 圣洁晶石 + ◆ 结晶升，给的全是**倍率** —— 挂机产出、离线上限、离线效率、每日扫荡次数。'],
-      ['sect',      [], '灯阁评级：**打关卡自动涨**，每级全队全属性 +0.5% —— 不用手动点，所以别在这页找按钮。'],
-      ['realm',     [], '境界渡劫：每突破一小阶**全属性永久上涨**，36 阶走满合计 +50.4%。渡劫入口在这张卡下面的按钮。'],
-      ['codex',     [], '灯录：收集伙伴解锁里程碑奖励，收满了就回来领。'],
-      ['roster',    [], '执灯者：上阵的排前面（带红色角标），点卡片看详情 —— 等级、星级、血统、装备都在里面。'],
-      ['char',      ['lv1'], '伙伴详情：升级 / 升星 / 血统升级 / 装备全在这一页；最下面是属性面板和队伍操作（从队伍点进来才有）。'],
-    ];
-    C.forEach(function (row) {
+    PAGE_GUIDE.forEach(function (row) {
       if (row[0] !== page) return;
+      /* V9.6.112：锚点允许写成**函数**（"接着打下一关"要按当前进度算） */
+      const anchors = (typeof row[1] === 'function') ? row[1]() : row[1];
       /* 页面级的基础引导也走「必须点中」（父亲大人要的是完全强制）—— 之前这几个是「看到就过」。 */
       /* row[3] = 与其它入口共用的钥匙（有就不重复讲） */
-      U.coach(row[1], row[2], { key: row[3] || ('tut_page_' + row[0] + '_' + [].concat(row[1]).join('_')), mustTap: true, queue: true });
+      U.coach(anchors, row[2], { key: row[3] || ('tut_page_' + row[0] + '_' + [].concat(anchors).join('_')), mustTap: true, queue: true });
     });
   };
 

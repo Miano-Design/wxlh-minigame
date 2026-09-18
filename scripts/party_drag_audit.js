@@ -251,6 +251,25 @@ const dropAt = (p) => { move(p); end(p); };
       'party=' + party());
   }
 
+  /* ── ⑪ 引导开着的时候也必须能拖（父亲大人："还是拖拽不了"的真凶就在这里） ──
+     上一版这把尺子把所有引导都标成"已看过"再测 —— 于是**恰好绕开了玩家真正所在的场景**：
+     队伍页上正挂着"上阵就在这块…长按任意一格抓起、拖到别处松手"那条引导。
+     引导在的时候 hitAt 只放行它自己那颗（队伍页放行的是 party_board 那块**没有动作**的锚点），
+     长按拿到的是它 → from() 返回 null → 永远抓不起来。 */
+  {
+    fresh();
+    /* 故意不清 coachSeen 之外的：这里反过来**挂上**那条队伍引导 */
+    U.coach(['pslot:*', 'party_board'], '上阵就在这块：点空格把伙伴放进去。想换位置长按任意一格抓起、拖到别处松手。');
+    CV.render();
+    const guideOn = !!U.coachActive();
+    const grabbed = await grabAt(1);
+    const b = scr(slot(4));
+    move(b); end(b);
+    t('⑪ 挂着"长按抓起"引导时也拖得动（引导不能把拖拽一起挡掉）',
+      guideOn && grabbed && Core.S.party[4] === 'C021' && Core.S.party[1] === null,
+      '引导在=' + guideOn + ' 抓起=' + grabbed + ' party=' + party());
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exitCode = fail ? 1 : 0;
 })();
