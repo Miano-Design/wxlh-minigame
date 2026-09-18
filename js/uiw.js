@@ -611,20 +611,15 @@
       return (w.slice(-1) === '*') ? (id.indexOf(w.slice(0, -1)) === 0) : (id === w);
     });
     if (!hit) return true;                       // 点别处：吃掉，什么都不做
-    if (st.swallow !== false) {
-      coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
-      U.coachMark(st); U.coachNext(); return true;
-    }   // 只推进、不执行原动作
-    /* V9.6.67（查漏补缺）：`enter` 那几步的顺序是 ——
-       ① 先标记"这一步讲过了"（否则动作换页之后，这一页的 render 会把它当幽灵清掉，
-          实测表现就是"点了角色卡，后面什么都没有了"）；
-       ② 再执行动作（可能换页 / 开弹窗）；
-       ③ **动作做完**才接着走链（提前走会按旧页面挑下一步 —— 在首页挑出"养成区"，
-          紧接着页面跳到角色卡，那一步就被丢掉了）。 */
-    if (st.waitFor) return _dispatch(id);
+    /* V9.6.107（父亲大人："直接点高亮区域取消就行了"）：
+       点中高亮那颗 = ①**执行它的动作**（点关卡就开打、点空格就上阵…）
+                    + ②**把这条引导收掉**（不再留着把整页锁死）。
+       以前分成"只推进"（swallow:true）和"等做完才放行"（waitFor）两条路，
+       后者会把玩家锁在那一步上（高亮指错地方时就是死锁）。 */
     coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
     U.coachMark(st);
     coachState = null;
+    promoteCoach();
     const r = _dispatch(id);
     setTimeout(function () {
       if (typeof st.onDone === 'function') st.onDone(); else U.coachNext();
@@ -718,21 +713,19 @@
     /* V9.6.38（自审）：mustTap 但这次**没找到锚点**（目标按钮是条件出现的，比如
        "突破铭刻"只在能突破时才有）→ 必须退回"点一下继续"，否则玩家找不到可点的高亮、直接卡死。
        引导的第一原则是"不能把人卡住"，其次才是强制。 */
-    /* V9.6.41（父亲大人："跳过的按钮太大了，点高亮的地方那个小字没必要 ——
-       要么把小字换成'跳过这一步'"）：左边那颗大按钮去掉，
-       右下角那一行**本身就是**操作提示：强制的那条写「跳过这一步 ›」，
-       看到就过的那条写「点一下继续 ›」。 */
-    /* V9.6.66（父亲大人："引导时只能点高亮区域"）：只有"点高亮那颗"和"点这行小字跳过"两种操作，
-       屏幕上其它地方**一律不吃** —— 不再有"点哪都算过"的全屏热区。 */
-    const hint = '跳过这一步 ›';
-    const hw = CV.measure(hint, CV.FS.sm) + 10 * CV.SCALE;
-    const hx = tx + tw - 14 * CV.SCALE - hw, hy = ty + th - 22 * CV.SCALE;
-    CV.text(hint, tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
-      { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
+    /* V9.6.107（父亲大人："把引导的跳过这一步去掉，就直接点高亮区域取消就行了"）：
+       · 不再有「跳过这一步」那颗按钮；
+       · **点高亮区域本身就既执行动作、又把这个引导收掉**（见 CV.dispatch 里那条）；
+       · 万一这一页连高亮都找不到（目标按钮是条件出现的，比如"突破铭刻"只在能突破时才有），
+         就点**任意处继续** —— 绝不把玩家锁死（上一版就是"找不到高亮 + 那行小字在屏幕上很难看见"
+         导致整页点不动）。 */
     c.restore();
     CV.hitMode = 'screen';
-    /* 热区给足 44 高（手指点得准），但**画出来的只是一行小字** */
-    CV.hit('_coach_ok', hx - 8 * CV.SCALE, hy - 11 * CV.SCALE, hw + 16 * CV.SCALE, 44 * CV.SCALE);
+    if (!r) {
+      CV.text('点任意处继续 ›', tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
+        { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
+      CV.hit('_coach_ok', 0, 0, CV.W, CV.H);
+    }
     /* V9.6.68（资料 §5）：卡片真的画出来了 → 记一次「看过」并开始计时；
        没找到锚点（指不到那颗）另记一笔「没指到」，这是最该修的一种。 */
     coachState._t0 = Date.now();

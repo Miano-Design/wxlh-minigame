@@ -216,10 +216,10 @@ console.log('\n=== 新手引导：真走一遍 ===');
            判定用"这颗热区在 onAct 里有没有处理器（精确或前缀）"。 */
         const hid = String(hit.id);
         const hd = CV.onAct[hid] || (function () { const i = hid.indexOf(':'); return i > 0 ? CV.onAct[hid.slice(0, i + 1) + '*'] : null; })();
-        const needWait = !!(st.waitFor || st.swallow === false);
-        if (needWait && !hd) {
-          qBad++; mark = '**高亮那颗没有动作（点了没反应、还挡住别处）**：' + hid;
-        }
+        /* V9.6.107：高亮那颗**没有动作**已经不算卡死了 ——
+           现在"点高亮"本身就会把这条引导收掉（有动作就顺带执行），
+           所以这里只提示一句，不判失败。 */
+        if (!hd) mark += ' · 注：这颗没有动作（点它＝关闭引导）';
       }
     }
     console.log('  ' + String(n + 1).padStart(2) + '. ' + String((q && q.id) || '?').padEnd(5)
