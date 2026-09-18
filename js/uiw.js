@@ -372,18 +372,43 @@
   }
   U.confirm = function (title, text, onOk, opt) {
     opt = opt || {};
+    /* V9.6.94（父亲大人："离线后开启游戏的弹窗字也贴一起了"）：
+       以前弹窗高度是一套公式、drawOverlay 又是另一套坐标 —— 两边必然漂移。
+       带奖励胶囊的离线收益弹窗里，"离线期间…"那行小字就压到了按钮上。
+       现在**只在这里排一次版**：每一块的 y 都在这个循环里定下来，
+       drawOverlay 只负责照着这些坐标画，不可能再对不上。 */
+    const PAD = 14 * CV.SCALE;
     const bw = Math.min(CV.W - 40, 420), x = (CV.W - bw) / 2;
-    const inner = bw - 28 * CV.SCALE;
+    const inner = bw - PAD * 2;
+    const LH_T = CV.FS.f1 * 1.35;      // 标题行盒 20.25
+    const LH_L = CV.FS.lg * 1.7;       // 正文行盒 22.1
+    const LH_N = CV.FS.xs * 1.7;       // 小字行盒 18.7
     const lines = CV.wrap(text, inner, CV.FS.lg, 9);
     const rows = (opt.chips && opt.chips.length) ? chipRows(opt.chips.filter(Boolean), inner) : [];
     const note = opt.note ? CV.wrap(opt.note, inner, CV.FS.xs, 3) : [];
-    const chipsH = rows.length * (CHIP_H + CHIP_GAP);
-    const noteH = note.length * CV.FS.xs * 1.7;
-    const h = 52 * CV.SCALE + lines.length * CV.FS.lg * 1.7 + chipsH + noteH + 54 * CV.SCALE + CV.SP[2];
+    let cy = PAD;
+    const titleY = cy + LH_T / 2; cy += LH_T;
+    const lineY = [];
+    if (lines.length) cy += 8 * CV.SCALE;
+    lines.forEach(function () { cy += LH_L; lineY.push(cy - LH_L / 2); });
+    const chipY = [];
+    if (rows.length) {
+      cy += 10 * CV.SCALE;
+      rows.forEach(function (row, i) { chipY.push(cy + CHIP_H / 2); cy += CHIP_H + (i < rows.length - 1 ? CHIP_GAP : 0); });
+    }
+    const noteY = [];
+    if (note.length) {
+      cy += 8 * CV.SCALE;
+      note.forEach(function () { cy += LH_N; noteY.push(cy - LH_N / 2); });
+    }
+    cy += 16 * CV.SCALE;               // 按钮与上面内容的间距
+    const btnY = cy; cy += 44 * CV.SCALE;
+    const h = cy + PAD;
     const y = (CV.H - h) / 2;
     U.overlay = {
       x: x, y: y, w: bw, h: h, title: title, lines: lines, text: text, onOk: onOk,
       rows: rows, note: note, single: opt.cancel === false, okLabel: opt.okLabel || '确定',
+      pad: PAD, titleY: titleY, lineY: lineY, chipY: chipY, noteY: noteY, btnY: btnY,
     };
     CV.render();
   };
@@ -689,11 +714,14 @@
     c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 22 * CV.SCALE; c.shadowOffsetY = 6 * CV.SCALE;
     CV.round(o.x, o.y, o.w, o.h, 14 * CV.SCALE, CV.C.bg2, CV.C.line);
     c.restore();
-    CV.text(o.title, o.x + 14 * CV.SCALE, o.y + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
-    o.lines.forEach((ln, i) => CV.text(ln, o.x + 14 * CV.SCALE, o.y + 52 * CV.SCALE + CV.FS.lg * 1.7 * (i + 0.5), { size: CV.FS.lg, color: CV.C.dim }));
+    /* 所有 y 都由 U.confirm 排好版（o.titleY / o.lineY / o.chipY / o.noteY / o.btnY），
+       这里只负责照着画 —— V9.6.94 起不再各算各的。 */
+    const PAD = o.pad || 14 * CV.SCALE;
+    CV.text(o.title, o.x + PAD, o.y + o.titleY, { size: CV.FS.f1, bold: true });
+    o.lines.forEach((ln, i) => CV.text(ln, o.x + PAD, o.y + o.lineY[i], { size: CV.FS.lg, color: CV.C.dim }));
     /* 奖励胶囊（居中折行）——网页版 .reward-chips */
-    let cy = o.y + 52 * CV.SCALE + o.lines.length * CV.FS.lg * 1.7 + CV.SP[1] / 2 + CHIP_H / 2;
-    (o.rows || []).forEach(function (row) {
+    (o.rows || []).forEach(function (row, ri) {
+      const cy = o.y + o.chipY[ri];
       const total = row.reduce((s, c) => s + c.w, 0) + CHIP_GAP * (row.length - 1);
       let cx = o.x + (o.w - total) / 2;
       row.forEach(function (c) {
@@ -701,21 +729,20 @@
         CV.text(c.t, cx + c.w / 2, cy, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
         cx += c.w + CHIP_GAP;
       });
-      cy += CHIP_H + CHIP_GAP;
     });
     /* 说明小字 */
     (o.note || []).forEach(function (ln, i) {
-      CV.text(ln, o.x + o.w / 2, cy + CV.FS.xs * 1.7 * (i + 0.5), { size: CV.FS.xs, align: 'center', color: CV.C.dim });
+      CV.text(ln, o.x + o.w / 2, o.y + o.noteY[i], { size: CV.FS.xs, align: 'center', color: CV.C.dim });
     });
-    const by = o.y + o.h - 44 * CV.SCALE - 10 * CV.SCALE;
-    const bw = (o.w - 28 * CV.SCALE - 10 * CV.SCALE) / 2;
+    const by = o.y + o.btnY;
+    const bw = (o.w - PAD * 2 - 10 * CV.SCALE) / 2;
     /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记 */
     CV.hitMode = 'screen';
     if (o.single) {
-      U.btn(o.x + 14 * CV.SCALE, by, o.w - 28 * CV.SCALE, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+      U.btn(o.x + PAD, by, o.w - PAD * 2, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
     } else {
-      U.btn(o.x + 14 * CV.SCALE, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
-      U.btn(o.x + 14 * CV.SCALE + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+      U.btn(o.x + PAD, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
+      U.btn(o.x + PAD + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
     }
     CV.hitMode = 'content';
   };
