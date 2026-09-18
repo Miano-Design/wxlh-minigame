@@ -104,6 +104,20 @@ window.Core = (function () {
   }
   // 彻底删除进度（阻止 beforeunload 等钩子重新写入）
   function wipeSave() {
+    /* V9.6.100（父亲大人给的复现步骤："开局选一个血统 → 设置里删档重开 → 选另一个血统 →
+       进游戏还是旧血统"）：这里原来**只删硬盘上的档，没清内存里的 S**。
+       于是删档之后内存里还是旧那个主角（血统还挂着）——
+       再选血统时 choosePlayerBloodline 第一句就是 `if (S.player.bloodline) return 失败`，
+       新选择被拒绝，界面又没看返回值、照样把人放进游戏 → 玩家看到旧血统。
+       （网页版之所以没这毛病：它删完档会 location.reload()，内存跟着一起清。）
+       另外 suppressSave 原来是**开了不关**：就算不 reload，之后所有存盘都是空操作，
+       玩家重开这一局玩多久都不会落盘。现在两件事一起修：
+       删档 = 真的回到"全新档"（内存 + 硬盘 + 存盘开关）。 */
+    S = defaultState();
+    offlineSettled = true;      // 全新档没有离线窗口要保
+    /* suppressSave 仍然保持"关着"：网页版删完档会立刻 reload，
+       期间任何一次 beforeunload / 定时存盘都不许把**旧档写回去**（这是它原来的用处）。
+       存盘开关由 newGame() 负责恢复 —— "开始新游戏"才代表真的重新开始。 */
     suppressSave = true;
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   }
@@ -357,6 +371,11 @@ window.Core = (function () {
   function newGame() {
     S = defaultState();
     offlineSettled = true;     // 新档没有"离线窗口"要保，存盘照常盖章（V9.6.92）
+    /* V9.6.100：**开始新游戏 = 恢复存盘**。
+       wipeSave() 会把 suppressSave 关上（防"删档后又被 beforeunload 写回旧档"），
+       小游戏没有 reload 这一步，所以必须由 newGame 负责重新打开存盘开关 ——
+       否则"删档重开"之后玩家这一局玩多久都不会落盘。 */
+    suppressSave = false;
     S.player.name = '';   // 创建角色时填写
     // 旧档境界换算（10 大境 → 36 小阶，×4）只能作用在"V9 之前的老档"上。
     // 这个标记以前要等第一次读档才写入，于是新档第一次读档时也被乘了 4

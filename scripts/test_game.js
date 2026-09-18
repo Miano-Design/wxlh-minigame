@@ -343,6 +343,10 @@ setParty(['C021']);
 {
   Core.wipeSave();
   t('wipeSave 后 save 被抑制', (Core.save(), !store['wxlh_save_v5']));
+  /* V9.6.100：wipeSave 现在也会把内存清成"空壳"（defaultState）——
+     这是有意的（否则旧档会留在内存里、下一局选血统会被"不可更改"挡住）。
+     真实流程里紧接着就调 newGame()，测试也照做，否则后面的块拿到的是空壳。 */
+  Core.newGame();
 }
 
 // 23. 主角技能加点
@@ -2121,6 +2125,30 @@ setParty(['C021']);
     !!g && !g.cheat && g.seconds > 100 * 60, g ? (g.seconds / 60).toFixed(0) + ' 分' : 'null');
   Core.save();
   t('结算之后再存盘，lastTs 照常推到"现在"', (Date.now() - Core.S.idle.lastTs) < 5000);
+}
+
+/* V9.6.100（父亲大人给的复现步骤）：**删档重开之后，内存里的档也要一起清掉**。
+   原来 wipeSave() 只删硬盘上的那条记录、没清内存里的 S，于是：
+     开局选修真 → 设置里删档重开 → 选科技 → choosePlayerBloodline 看到
+     `S.player.bloodline` 还挂着"修真"，直接返回"血统一旦选择不可更改" →
+     界面又没看返回值，照样把人放进游戏 → 玩家看到的就是**旧血统**。
+   另一半是 suppressSave 开了不关：删档之后所有存盘都变成空操作，这一局玩多久都不落盘。 */
+{
+  Core.newGame(); Core.setPlayerName('删档前'); Core.choosePlayerBloodline('修真');
+  Core.save();
+  Core.wipeSave();
+  t('删档后内存里也是全新档（血统 / 等级 / 资源都归零）',
+    !Core.S.player.bloodline && Core.S.player.level === 0 && (Core.S.cur.points || 0) === 0,
+    '血统「' + Core.S.player.bloodline + '」· 等级 ' + Core.S.player.level + ' · 点数 ' + Core.S.cur.points);
+  const r = Core.choosePlayerBloodline('科技');
+  t('删档后能重新选血统（不会被上一局的选择锁住）', r.ok && Core.S.player.bloodline === '科技',
+    r.ok ? '已选 ' + Core.S.player.bloodline : '被拒：' + r.msg);
+  Core.newGame();                                   // 真实流程：删档 → 回到开局 → 开始新游戏
+  t('开始新游戏后又能选了（新档血统为空）', !Core.S.player.bloodline);
+  Core.choosePlayerBloodline('科技');
+  Core.setPlayerName('删档后');
+  Core.save();
+  t('删档重开后新档能正常存盘（newGame 恢复了存盘开关）', !!localStorage.getItem('wxlh_save_v5'));
 }
 
 /* V9.5.75（父亲大人：招募券只能系统赠送）：券下架之后我又量了一次日产量，

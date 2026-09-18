@@ -524,6 +524,11 @@
   CV.on('wipe_save', function () {
     U.confirm('删除当前进度', '会清掉这台设备上的全部进度，重新从开局契约开始。确定吗？', function () {
       Core.wipeSave();
+      /* V9.6.100：删档 = 内存也回到全新档，所以这里必须补一次 newGame() ——
+         defaultState() 是"零资源"的空壳（点数 0），newGame() 才会发开局资源、
+         并**恢复存盘开关**（wipeSave 会把它关上，防旧档被写回）。 */
+      Core.newGame();
+      Core.ensureDaily && Core.ensureDaily();
       CV.reset('welcome');
     });
   });
