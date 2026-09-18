@@ -80,14 +80,17 @@ let step = 0, stuck = 0, qNoAnchor = 0;
 
 /* 目标锚点 → 当前渲染出来的热区（引导同款匹配：支持前缀） */
 function findHit(targets) {
+  /* V9.6.106：**锚点列表的顺序说了算**（和引导引擎一致）——
+     先拿第一个锚点找热区，找不到才看第二个。以前按"热区注册顺序"取，
+     后注册的整块区域会盖过前面的空格锚点，量出来的目标和玩家看到的不一致。 */
   const want = [].concat(targets || []);
   const hits = CV.hits || [];
-  for (let i = hits.length - 1; i >= 0; i--) {
-    const h = hits[i];
-    for (let k = 0; k < want.length; k++) {
-      const w = want[k];
-      if (w.slice(-1) === '*') { if (String(h.id).indexOf(w.slice(0, -1)) === 0) return h; }
-      else if (h.id === w) return h;
+  for (let k = 0; k < want.length; k++) {
+    const w = String(want[k]);
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const id = String(hits[i].id);
+      if (w.slice(-1) === '*') { if (id.indexOf(w.slice(0, -1)) === 0) return hits[i]; }
+      else if (id === w) return hits[i];
     }
   }
   return null;
@@ -149,7 +152,11 @@ console.log('\n=== 新手引导：真走一遍 ===');
   const off = log.filter((r) => r.vis === '**在屏幕外**').length;
   console.log('\n走了 ' + log.length + ' 步 · 指不到 ' + bad + ' 处 · 在屏幕外 ' + off + ' 处');
   console.log('走过的页面顺序：' + pages.join(' → '));
-  const done = !U.coachActive() && log.length > 0;
+  /* "开场链走完了"的判据：五个开场步骤**都标记成已看过** ——
+     而不是"当前没有引导"：开场链走完的那一刻，下一条（主线引导）往往已经接上了
+     （那是好事），以前这么判会误报"没走完"（V9.6.106 修）。 */
+  const OPEN_KEYS = ['tut_blk1', 'tut_blk1x', 'tut_blk2', 'tut_blk3', 'tut_blk4'];
+  const done = log.length > 0 && OPEN_KEYS.every(function (k) { return !!(Core.S.coachSeen || {})[k]; });
   console.log('结论：' + (done && !bad && !off ? '整条引导能走完，每一步都指得到、都在屏幕内 ✓'
     : (done ? '能走完，但有 ' + (bad + off) + ' 处要修' : '**没走完**（走不动了）')) + '\n');
 
@@ -201,7 +208,19 @@ console.log('\n=== 新手引导：真走一遍 ===');
          ② 页面上**根本没有**这个锚点 —— 那才是真漏。这里按第 ① 种归类，只记一笔不判失败。 */
       if (!hit) { qNoAnchor++; mark = '（条件未满足：退成居中卡片，文字照给）'; }
       else if (!visible(hit)) { qOff++; mark = '**在屏幕外**（' + hit.id + '）'; }
-      else { qOk++; mark = '✓ 指到 ' + hit.id; }
+      else {
+        qOk++; mark = '✓ 指到 ' + hit.id;
+        /* V9.6.106（父亲大人："队伍上阵又上不了了"）：**高亮必须点了有用**。
+           带 waitFor（做完才放行）的引导，如果高亮那颗**没有处理器**，
+           玩家就会：点高亮没反应 + 点别处被引导吃掉 → 彻底卡死（队伍页上不了阵就是这么来的）。
+           判定用"这颗热区在 onAct 里有没有处理器（精确或前缀）"。 */
+        const hid = String(hit.id);
+        const hd = CV.onAct[hid] || (function () { const i = hid.indexOf(':'); return i > 0 ? CV.onAct[hid.slice(0, i + 1) + '*'] : null; })();
+        const needWait = !!(st.waitFor || st.swallow === false);
+        if (needWait && !hd) {
+          qBad++; mark = '**高亮那颗没有动作（点了没反应、还挡住别处）**：' + hid;
+        }
+      }
     }
     console.log('  ' + String(n + 1).padStart(2) + '. ' + String((q && q.id) || '?').padEnd(5)
       + ' ' + String((q && q.name) || '').padEnd(6) + ' → ' + page.padEnd(10) + ' ' + mark);

@@ -154,7 +154,13 @@
     /* V9.6.69：q04「并肩作战」原来没有专门一条（只在开场讲过招募/队伍）——
        父亲大人指的"第 5 步高亮只亮一小块"就是这一步。现在给它一条：锚点用**整块阵型区**
        （party_board，两排五格），而不是某个格子或"前排"两个字。 */
-    q04:  { page: 'party',   s: ['party_board'], t: '上阵就在这块：点空格把伙伴放进去（共 5 格，主角占 1 格）。想换位置长按任意一格抓起、拖到别处松手。' },
+    /* V9.6.106（父亲大人："现在队伍上阵又上不了了"）：
+       这一步的锚点原来只有 `party_board`（整块阵型区）—— 它**没有任何动作**，
+       而这一步又是"做完才放行"（要真的上阵 1 名伙伴）。于是：高亮指向一块点不动的区域，
+       其余点击全被引导吃掉 → **玩家在队伍页上不了阵**。
+       现在锚点先给**真能点的空格**（`pslot:*` → 点它开挑人页 → 选中伙伴即完成这一步），
+       整块阵型区退成第二顺位（没有空格时才用它做视觉锚点）。 */
+    q04:  { page: 'party',   s: ['pslot:*', 'party_board'], t: '上阵就在这块：点空格把伙伴放进去（共 5 格，主角占 1 格）。想换位置长按任意一格抓起、拖到别处松手。' },
     /* V9.6.103（父亲大人："主线 4 的去完成引导还是错的，引导到副本去了"）：
        q03「第一位同伴」原来**在这张表里没有条目** —— 开场三区块讲过招募，所以当时
        "不重复讲"是对的；但落点也必须在这张表里，否则 goQuest 拿不到目标页、掉进兜底
@@ -218,14 +224,36 @@
        就不能再挂 waitFor —— 否则引导刚登记就被判定"做完"、当场自己消失，玩家什么都看不见。
        没做过的才用"做完才放行"。 */
     const alreadyDone = quest ? !!quest.check(Core.S) : false;
+    /* V9.6.106（"队伍上阵又上不了了"）：**锚点必须点了有用**。
+       以前不管锚点有没有动作，一律 swallow:false + waitFor（做完才放行）——
+       于是只要锚点是一块"区域"（party_board / attr_card 这种纯视觉锚点），
+       就会出现：高亮的地方点了没反应、点别处又被引导吃掉 → 玩家彻底卡住。
+       现在先看有没有"真能点"的那一颗：
+         · 有 → 照旧：点高亮真的生效，做完才放行；
+         · 没有 → 这一条只当讲解：点高亮只是翻页（swallow:true），也不挂"做完才放行"。 */
+    /* 判"点了有用"要**看这一页真正登记出来的热区**（coachFor 是在页面画完之后才跑的，
+       CV.hits 已经齐了）：锚点能匹配到某颗热区、且那颗热区有处理器 → 才算"有用"。
+       （V9.6.106 第一版只查了 onAct 的键名，漏掉"逐个注册"的写法 ——
+         队伍的空格是 pslot:0…4，锚点写 pslot:* 就匹配不到键名，于是被误判成"点了没用"。） */
+    const actionable = [].concat(rule.s || []).some(function (anchor) {
+      const a = String(anchor);
+      return (CV.hits || []).some(function (h) {
+        const id = String(h.id);
+        const matched = a.slice(-1) === '*' ? id.indexOf(a.slice(0, -1)) === 0 : id === a;
+        if (!matched) return false;
+        if (CV.onAct[id]) return true;                                  // 精确处理器
+        const i = id.indexOf(':');
+        return i > 0 && !!CV.onAct[id.slice(0, i + 1) + '*'];            // 前缀处理器
+      });
+    });
     U.coach(rule.s, rule.t, {
       key: key,
       queue: true,          // V9.6.71：玩家主动点「去完成」的那一步，不能被别的引导挤掉
       mustTap: true,
       /* swallow:false = 点高亮的那一下**真的生效**（点关卡就开打、点装备就进强化）。
          配 waitFor 用：点完不消提示，等这一步真做完才放行。 */
-      swallow: false,
-      waitFor: (quest && !alreadyDone) ? function () { return !!quest.check(Core.S); } : null,
+      swallow: !actionable,
+      waitFor: (actionable && quest && !alreadyDone) ? function () { return !!quest.check(Core.S); } : null,
       where: PAGE_NAME[rule.page] || rule.page,
     });
     return true;

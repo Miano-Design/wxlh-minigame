@@ -659,18 +659,25 @@
     const want = [].concat(coachState.targetId);
     /* 锚点支持"前缀"（写成 'bup:*'）：建筑升级、装备格这类 id 带后缀（bup:core / eqd:eq123），
        不可能写死，用前缀就能锚到"这一类"里的第一颗（V9.6.37）。 */
-    const match = function (id) {
-      for (let i = 0; i < want.length; i++) {
-        const w = want[i];
-        if (w.slice(-1) === '*') { if (id.indexOf(w.slice(0, -1)) === 0) return true; }
-        else if (id === w) return true;
-      }
-      return false;
+    /* V9.6.106（父亲大人："队伍上阵又上不了了"）：
+       一条引导可以写**一串**锚点（'pslot:*, party_board'），以前是"按热区注册顺序取第一个命中的"——
+       后注册的整块区域（party_board）会盖过前面的空格锚点，于是高亮指向一块**点不动的区域**，
+       配"做完才放行"就把玩家卡死。
+       现在**锚点列表的顺序说了算**：先拿第一个锚点去找热区，找不到才看第二个 ——
+       写在前面的就是优先。 */
+    const rectOf = function (h) {
+      return h.screen ? { x: h.x, y: h.y, w: h.w, h: h.h }
+        : { x: h.x, y: h.y - (CV.scroll || 0) + CV.TOP + 8, w: h.w, h: h.h };
     };
-    (CV.hits || []).forEach(function (h) {
-      if (r || !match(h.id)) return;
-      r = h.screen ? { x: h.x, y: h.y, w: h.w, h: h.h } : { x: h.x, y: h.y - (CV.scroll || 0) + CV.TOP + 8, w: h.w, h: h.h };
-    });
+    for (let wi = 0; wi < want.length && !r; wi++) {
+      const w = String(want[wi]);
+      const hits = CV.hits || [];
+      for (let i = hits.length - 1; i >= 0; i--) {
+        const id = String(hits[i].id);
+        const ok = w.slice(-1) === '*' ? id.indexOf(w.slice(0, -1)) === 0 : id === w;
+        if (ok) { r = rectOf(hits[i]); break; }
+      }
+    }
     /* V9.6.34（父亲大人："你这个提示也没有让画面跟着滚动到对应位置啊"）：
        目标可能在本屏之外（比如挂机的"收取奖励"在首页下方）——
        先把它滚进可视区再画引导，否则高亮框和提示都指着屏幕外，等于没引导。
