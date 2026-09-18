@@ -189,6 +189,8 @@
      sc-last 的 goQuest 以前自己另写了一套落点（只特判 7 步、其余全丢进残域），
      于是秘术阁/药园/求签/斗法台/伴生体/灯录/转生…统统被送到残域。现在它来问这里。 */
   G.questTarget = function (qid) { return (TUT[qid] && TUT[qid].page) || null; };
+  /* 引导表本身也挂出去一份（只读）：审计脚本要用它核对"这一步该讲哪句话" */
+  G.questGuide = TUT;
   function coachByQuest(page) {
     const cu = Core.currentQuest && Core.currentQuest();
     const qid = cu && cu.q && cu.q.id;

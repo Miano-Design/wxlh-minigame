@@ -124,6 +124,9 @@
   let taskTab = 'main';
   /* 「前往 ›」的落点（逐条照网页版 gotoQuest / gotoDaily 的映射） */
   function goQuest(qid) {
+    /* 点「去完成」= 换一件事讲：先把当前这条和排队的都清掉，
+       否则上一条（常常就是首页那条"主线每一步做完都能领奖励"）会接着冒出来。 */
+    if (U.coachClearAll) U.coachClearAll();
     U.coachForce(2500);          // 主动求引导：这一步的说明这次一定再讲一遍（与网页版同步）
     const worldOf = { q12: 'W02', q14: 'W02', q15: 'W03' }[qid] || 'W01';
     /* V9.6.99（新手引导"真走一遍"的脚本抓出来的）：
@@ -149,7 +152,7 @@
     if (WORLD_STEPS[qid] || dest === 'world') {
       CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf); return;
     }
-    if (dest) { CV.cur = 'home'; CV.reset('home'); CV.push(dest); return; }
+    if (dest) { CV.cur = 'home'; CV.jump(dest); return; }   // 直接跳过去，别在中间渲染首页（V9.6.102）
     /* 兜底：引导表里没写落点的，仍然送去残域（不该发生 —— 有 guide_audit 盯着） */
     CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
   }

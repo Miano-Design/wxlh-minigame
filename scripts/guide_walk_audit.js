@@ -48,8 +48,23 @@ const CV = global.CV, Core = global.Core, G = global.GameGlobal, D = global.DATA
 CV.setup(global.wx.getWindowInfo());
 (CV.NAV_TABS || []).forEach((t) => { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
 const U = G.U;
+const TUT_OF = G.questGuide || {};
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/* 等"状态不再变"再判，而不是死等固定毫秒 ——
+   V9.6.102：批量跑（机器有负载）时固定 sleep 会等到不够，量出来就是"偶发串台"；
+   一把会自己抖的尺子比没有尺子更糟（红了分不清是代码坏了还是运气差）。 */
+async function settle(maxMs) {
+  const t0 = Date.now();
+  let last = null;
+  while (Date.now() - t0 < (maxMs || 400)) {
+    await wait(15);
+    const key = ((U && U.coachCurrent() && U.coachCurrent().key) || '-') + '|'
+      + ((CV.top() || {}).name || '?') + '|' + (U && U.coachCount ? U.coachCount() : '?');
+    if (key === last) return;
+    last = key;
+  }
+}
 const log = [];
 let step = 0, stuck = 0, qNoAnchor = 0;
 
@@ -181,5 +196,75 @@ console.log('\n=== 新手引导：真走一遍 ===');
   console.log('\n主线：指到 ' + qOk + ' · 条件未满足（居中卡片） ' + qNoAnchor + ' · 在屏幕外 ' + qOff + ' · 没讲解 ' + qNoCoach);
   console.log('（"条件未满足"是设计 —— 那些按钮本来就要有条件才出现；"没讲解"才是点了什么都没发生）');
   console.log('结论：' + ((qOff + qNoCoach) === 0 ? '27 步每一步点了都有反应、都指得到或退成卡片 ✓' : '有 ' + (qOff + qNoCoach) + ' 处要修') + '\n');
-  process.exitCode = (done && !bad && !off && (qOff + qNoCoach) === 0) ? 0 : 1;
+
+  /* ================== ③ 连续走：从新档一路点到底 ==================
+     上面 ② 是"每一步单独开一局"，看不见**跨步骤的串扰** ——
+     上一步的引导还挂在队列里、下一步冒出来，或者奖励领完引导没跟上，
+     玩家感受到的就是"引导走错乱了"。这里一局到底：
+       做完 → 领奖 → 下一步「去完成」 → 看这一次讲的是不是**这一步自己的话**。
+     判定用**文案**：当前引导的文字必须等于这一步在引导表里写的那句。 */
+  console.log('=== 连续走：一局到底，逐步核对"这次讲的是不是这一步的话" ===');
+  Core.newGame();
+  Core.setPlayerName('连贯体检');
+  Core.choosePlayerBloodline('修真');
+  (D.UNLOCKS || []).forEach((u) => { Core.S.unlocks[u.id] = true; });
+  ['W01', 'W02', 'W03'].forEach((wid) => {
+    Core.S.worlds[wid] = Core.S.worlds[wid]
+      || { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+    Core.S.worlds[wid].unlocked = true;
+  });
+  /* 开场链按真实流程**已经走完**（真实玩家是被强制走完它才会去点主线的）——
+     否则开场链最后一步（"跟着主线走"，enter:true 会真的执行导航）会插进主线第一步里，
+     量出来的就不是主线引导本身了。 */
+  Core.S.coachSeen = {};
+  ['tut_blk1', 'tut_blk1x', 'tut_blk2', 'tut_blk3', 'tut_blk4'].forEach((k) => { Core.S.coachSeen[k] = true; });
+  let walkBad = 0, walked = 0;
+  for (let n = 0; n < 27; n++) {
+    CV.cur = 'home'; CV.reset('home');
+    let cu = Core.currentQuest() || {};
+    const q = cu.q;
+    if (!q) break;
+    walked++;
+    /* 做完了就先领奖（真实玩家也是这样：卡片右边那颗按钮） */
+    if (cu.done && !cu.claimed) {
+      CV.dispatch('claim_quest'); await settle();
+      CV.cur = 'home'; CV.reset('home');
+      cu = Core.currentQuest() || {};       // ← 领完之后"当前这一步"会往前挪，必须重新取
+    }
+    const qNow = cu.q || q;
+    /* 开场链若还在，先按玩家那样点掉它（真实流程里它是强制的） */
+    let guard = 0;
+    while (U.coachActive() && guard++ < 12) {
+      const st0 = U.coachCurrent();
+      const mine0 = ['tut_blk1', 'tut_blk1x', 'tut_blk2', 'tut_blk3', 'tut_blk4'].indexOf(st0 && st0.key) >= 0;
+      if (!mine0) break;
+      const hit0 = findHit(st0.targetId) || findHit(['_coach_ok']);
+      if (!hit0) break;
+      CV.dispatch(hit0.id); await settle();
+    }
+    CV.dispatch('goto_quest');
+    await settle();
+    const page = CV.top().name;
+    if (!U.coachActive() && U.coachCount && U.coachCount() > 0) U.coachNext();
+    const st = U.coachCurrent();
+    const want = (TUT_OF[qNow.id] && TUT_OF[qNow.id].t) || null;
+    let mark;
+    if (!st) { walkBad++; mark = '**没讲**'; }
+    else if (want && String(st.text).trim() !== String(want).trim()) {
+      walkBad++;
+      mark = '**讲的是别的事**：' + String(st.text).slice(0, 18) + '…（这一步该讲：' + String(want).slice(0, 14) + '…）';
+    } else { mark = '✓ ' + page; }
+    console.log('  ' + String(n + 1).padStart(2) + '. ' + String(qNow.id).padEnd(11) + ' → ' + mark);
+    U.coachDrop();
+    /* 真实玩家会把这一步做掉；这里为了能继续往下走，直接把条件判定推成"已完成" */
+    try {
+      const all = Core.mainQuestState();
+      const cur = all.find((x) => x.q.id === q.id);
+      if (cur && !cur.claimed) { cur.done = true; Core.S.quests.claimed.push(q.id); }
+    } catch (e) {}
+  }
+  console.log('\n连续走了 ' + walked + ' 步 · 讲错/没讲 ' + walkBad + ' 步');
+  console.log('结论：' + (walkBad === 0 ? '每一步都讲的是它自己的那句话，没有串台 ✓' : '有 ' + walkBad + ' 步串台 ✗') + '\n');
+
+  process.exitCode = (done && !bad && !off && (qOff + qNoCoach) === 0 && walkBad === 0) ? 0 : 1;
 })();

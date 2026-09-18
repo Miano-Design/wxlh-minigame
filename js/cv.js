@@ -283,6 +283,16 @@
   CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
   CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
   CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
+  /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
+     中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
+     那一次首页渲染会把首页自己那条引导（"主线每一步做完都能领奖励"）登记下来，
+     而玩家点「去完成」时正带着"这次必须再讲一遍"的开关 —— 于是抢在目标页前面冒出来，
+     玩家看到的就是首页那句话，而不是这一步该讲的话（实测 27 步里 23 步串台）。 */
+  CV.jump = function (name, opts) {
+    CV.stack = [{ name: 'home', opts: {} }, { name: name, opts: opts || {} }];
+    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null;
+    CV.render();
+  };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
 
   /* ---------- 渲染一帧 ---------- */

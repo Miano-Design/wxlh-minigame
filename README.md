@@ -83,6 +83,7 @@ node scripts/spacing_audit.js      # 行距尺子：canvas 里两行文字有没
 node scripts/overlay_audit.js      # 弹窗布局尺子：标题/正文/胶囊/小字/按钮之间不许重叠
 node scripts/bloodline_leak_audit.js  # 血统串味：讲玩家自己的页面里不许出现别的血统/境界名
 node scripts/api_audit.js           # 界面调用尺子：Core.*/D.* 必须真的存在（不存在会渲染 undefined / 变死键）
+node scripts/guide_walk_audit.js   # 引导真走一遍：开场链 + 27 步主线（落点/锚点/是否在屏幕内/是否串台）
 node scripts/switch_save_audit.js  # 换档审计：删档/导入/读档槽之后，全页面不许有上一局的残留与烂字
 node scripts/equip_render_audit.js # 该画的装备卡有没有真画出来（静默 bug）
 node scripts/canvas_audit.js       # canvas 界面与网页版口径一致性
