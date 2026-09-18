@@ -2087,6 +2087,27 @@ setParty(['C021']);
   t('离线 4 分钟：主角经验也进了账', Core.S.player.exp - e0 === g.gains.exp);
 }
 
+/* V9.6.92：**开机流程里先存了一次盘，离线收益不能因此被吃掉**。
+   save() 里那句 `S.idle.lastTs = Date.now()`（存盘 = 刚见过玩家）是有意行为，
+   但它要求"先结算、后存盘"。只要中间多一次存盘 —— 引导漏斗统计、下架道具退款提示、
+   某个界面初始化 —— 离线几小时的窗口就被那一下悄悄抹平，玩家只会觉得"我明明关了几小时"。
+   小游戏 V9.6.90 真踩到过（coachFunnel 在首帧渲染时存了一次）。
+   修法：读档之后、settleOffline 之前，存盘不许动 lastTs。 */
+{
+  Core.newGame(); Core.setPlayerName('离线窗口'); Core.choosePlayerBloodline('修真');
+  const snap = JSON.parse(JSON.stringify(Core.S));
+  snap.v = 5;
+  snap.idle.lastTs = Date.now() - 2 * 3600 * 1000;      // 离线 2 小时
+  localStorage.setItem('wxlh_save_v5', JSON.stringify(snap));
+  Core.load();
+  Core.save();                       // ← 模拟"开机流程里的杂项存盘"
+  const g = Core.settleOffline();
+  t('开机先存盘也不会吃掉离线收益（离线窗口只在结算后才盖章）',
+    !!g && !g.cheat && g.seconds > 100 * 60, g ? (g.seconds / 60).toFixed(0) + ' 分' : 'null');
+  Core.save();
+  t('结算之后再存盘，lastTs 照常推到"现在"', (Date.now() - Core.S.idle.lastTs) < 5000);
+}
+
 /* V9.5.75（父亲大人：招募券只能系统赠送）：券下架之后我又量了一次日产量，
    发现"扫荡守关 Boss 60 次"每天能刷出约 30 张高级券（= 每天白送 7 个 SSR）。
    现在规则改成：**手打副本照旧掉券，扫荡不掉** —— 这条用例把两个方向都钉住。 */

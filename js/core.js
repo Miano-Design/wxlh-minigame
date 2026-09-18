@@ -80,9 +80,17 @@ window.Core = (function () {
 
   let suppressSave = false;
   let saveFailed = false;
+  /* V9.6.92：**离线窗口只在结算过之后才允许被"存盘盖章"**。
+     背景：save() 里那句 `S.idle.lastTs = Date.now()` 是有意行为（存盘 = 刚见过玩家），
+     但它有个致命前提 —— 开机必须先 settleOffline 再存盘。
+     只要开机流程里在结算之前多一次存盘（引导漏斗统计、下架道具退款提示、某个 UI 初始化……），
+     离线几小时的收益就被那一下悄悄抹掉，玩家只会觉得"我明明关了几小时，怎么什么都没有"。
+     小游戏 V9.6.90 真的踩到了（coachFunnel 在首帧渲染时存了一次）。
+     现在改成：**载入存档后、结算完成前，任何存盘都不动 lastTs**。 */
+  let offlineSettled = false;
   function save() {
     if (suppressSave) return;
-    S.idle.lastTs = Date.now();
+    if (offlineSettled) S.idle.lastTs = Date.now();
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(S));
       saveFailed = false;
@@ -107,6 +115,9 @@ window.Core = (function () {
       if (!data || data.v !== 5) return false;
       S = Object.assign(defaultState(), data);
       migrate();
+      /* 刚读进来的存档带着"上次见到玩家"的时间戳 —— 在 settleOffline 跑来认领它之前，
+         中途任何一次存盘都不许把它冲掉（V9.6.92，见 save() 与 offlineSettled 的说明）。 */
+      offlineSettled = false;
       return true;
     } catch (e) { return false; }
   }
@@ -345,6 +356,7 @@ window.Core = (function () {
   }
   function newGame() {
     S = defaultState();
+    offlineSettled = true;     // 新档没有"离线窗口"要保，存盘照常盖章（V9.6.92）
     S.player.name = '';   // 创建角色时填写
     // 旧档境界换算（10 大境 → 36 小阶，×4）只能作用在"V9 之前的老档"上。
     // 这个标记以前要等第一次读档才写入，于是新档第一次读档时也被乘了 4
@@ -1944,6 +1956,7 @@ window.Core = (function () {
   function settleOffline() {
     const now = Date.now();
     const last = S.idle.lastTs || now;
+    offlineSettled = true;    // 从这一刻起，存盘可以正常把 lastTs 推到"现在"（V9.6.92）
     if (now < last - 60000) { S.idle.lastTs = now; return { cheat: true }; }   // 防改时间
     const elapsedSec = Math.min((now - last) / 1000, offlineCapHours() * 3600);
     if (elapsedSec < 60) { S.idle.lastTs = now; return null; }
