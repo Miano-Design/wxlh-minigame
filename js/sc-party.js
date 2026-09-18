@@ -7,7 +7,12 @@
         · 伙伴格：头像 40 + 名字 + 「Lv.N · 定位 · 阵营」（点一下进伙伴详情，底部可无损换将 / 下阵）
      ② 📌 编队预设：存预设 1/2/3 + 套用预设 1/2/3（两排各三格）+「当前预设：1— 2— 3—」
      ③ 🧩 阵型：主角可补位（阵容上满 5 人才成阵）→ 当前构成 / 成阵 / 加成 + 五个阵型行 + 克制环
-   长按拖动换位的交互在 canvas 上代价大，这里用"点格子 → 选伙伴"达到同一目的（语义一致、不会点错）。
+   V9.6.111（父亲大人："小游戏队伍拖拽换位不了"）：
+   这里原来写着"长按拖动在 canvas 上代价大，改用点格子选伙伴"—— 可引导和玩法说明
+   一直教玩家"长按抓起、拖到别处松手"，玩家照着做拖不动，等于教了个假操作。
+   现在长按拖拽真的做了（实现在 cv.js 的触摸管线里，页面只挂一份 CV.grabCfg）：
+   长按 420ms 抓起 → 拖到别的格子松手＝换位 / 拖到「前排·后排」标签＝整排搬人 /
+   拿着时点一下目标格也能放下（网页版同款备用路径）。
 */
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
@@ -50,21 +55,112 @@
       /* V9.6.69（父亲大人："第 5 步的高亮框只亮一小块，应该是整个上阵区域"）：
          阵型区登记一颗**整块**锚点（两排五格都在里面），引导要指"上阵区域"就指它。 */
       const boardTop = U.y;
-      const drawRow = function (label, slots) {
+      /* V9.6.111（父亲大人："队伍拖拽换位不了"）：挂上"长按抓起、拖到别处松手"。
+         规则（与网页版一致）：
+           from(id)   —— 这颗热区能不能抓起，能就给出它代表几号位
+           targetAt(p) —— 手指现在压在几号位（用来画落点）
+           drop(a,b)  —— 松手落定时换位（走核心的 swapPositions，含各种合法性判定）
+         抓起/落点的高亮画在每格的 round 描边上（下面 drawRow 里读 CV.grab）。 */
+      const slotRect = {};      // 下标 → {x,y,w,h}（本帧），给 targetAt 用
+      /* 「前排 / 后排」那两条标签也是落点 —— 指过去＝整排搬人。
+         这条是**引导文案里写着的**（data.js：「直接拖到「前排 / 后排」那行字上也能整排搬人」），
+         canvas 原来只认格子，玩家照着文案拖到那行字上会"没反应"（＝无效操作）。 */
+      const rowRect = {};       // 'front' / 'back' → {x,y,w,h}（标签那一条）
+      CV.grabCfg = {
+        /* 有人的格子登记的是 `poke:<i>`、空格是 `pslot:<i>` —— 两种都要能抓起
+           （父亲大人要拖的正是"有伙伴的那一格"）。 */
+        from: function (id) {
+          const s = String(id);
+          if (s.indexOf('pslot:') === 0) return Number(s.slice(6));
+          if (s.indexOf('poke:') === 0) return Number(s.slice(5));
+          return null;
+        },
+        targetAt: function (p) {
+          const ly = p.y - (CV.TOP + 8) + (CV.scroll || 0);
+          for (const k in slotRect) {
+            const r = slotRect[k];
+            if (p.x >= r.x && p.x <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) return Number(k);
+          }
+          for (const k in rowRect) {
+            const r = rowRect[k];
+            if (p.x >= r.x && p.x <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) return 'row:' + k;
+          }
+          return null;
+        },
+        drop: function (a, b) {
+          const r = Core.swapPositions(a, b);
+          CV.toast((r && r.msg) || (r && r.ok ? '已换位' : '换不了'));
+          CV.render();
+        },
+      };
+      /* V9.6.111：抓起状态的提示条 —— 网页版是标题下面那条 .drag-bar
+         「已抓起「XX」 · 拖到别的位置松手放下 ［取消］」。
+         手机上一弹提示框就挡住半个屏幕，所以照网页版**画在页面上**：
+         手里拿着谁、怎么放下、想放弃点哪 —— 一眼看得见，不用猜。 */
+      if (CV.grab) {
+        const gid = S.party[CV.grab.from];
+        const gname = gid ? Core.charName(gid) : '';
+        const bh = 30 * CV.SCALE, btop = U.y, bw = 56 * CV.SCALE;
+        CV.round(U.ix(), btop, U.iw(), bh, 6 * CV.SCALE, 'rgba(230,182,76,.10)', 'rgba(230,182,76,.45)');
+        CV.text(CV.fit('已抓起「' + gname + '」 · 拖到别的位置松手放下', U.iw() - bw - 20 * CV.SCALE, CV.FS.xs),
+          U.ix() + 8 * CV.SCALE, btop + bh / 2, { size: CV.FS.xs, color: CV.C.gold });
+        U.btn(U.ix() + U.iw() - bw - 6 * CV.SCALE, btop + 4 * CV.SCALE, bw, bh - 8 * CV.SCALE, '取消', 'ghost', 'pgrab_cancel');
+        U.y = btop + bh + CV.SP[2];
+      }
+      const drawRow = function (label, rowKey, slots) {
         const labelTop = U.y + 8 * CV.SCALE;
         CV.text(label, U.ix() + 2 * CV.SCALE, labelTop + 8 * CV.SCALE, { size: CV.FS.md, color: CV.C.dim });
+        rowRect[rowKey] = { x: U.ix(), y: labelTop - 2 * CV.SCALE, w: U.iw(), h: 20 * CV.SCALE };
         const y = labelTop + 16.5 * CV.SCALE + 6 * CV.SCALE;
         const cw = label === '后排' ? (U.iw() - gap * 2) / 3 : (U.iw() - gap) / 2;
+        /* V9.6.111：手里拿着东西时，**其他每一格**都描成金色虚线 —— 网页版是
+           `.party-grid.grabbed .pslot { border-style: dashed }`，就是告诉玩家"这些地方都能放"。
+           canvas 里没有 CSS，只能自己画虚线（没有 setLineDash 的机型当没这回事，不报错）。 */
+        const dashRound = function (rx, ry, rw, rh) {
+          const c = CV.ctx;
+          if (!c.setLineDash) return;
+          try {
+            c.save();
+            c.setLineDash([5 * CV.SCALE, 4 * CV.SCALE]);
+            c.strokeStyle = 'rgba(230,182,76,.55)'; c.lineWidth = 1;
+            const r = CV.RADIUS;
+            c.beginPath();
+            c.moveTo(rx + r, ry);
+            c.arcTo(rx + rw, ry, rx + rw, ry + rh, r);
+            c.arcTo(rx + rw, ry + rh, rx, ry + rh, r);
+            c.arcTo(rx, ry + rh, rx, ry, r);
+            c.arcTo(rx, ry, rx + rw, ry, r);
+            c.closePath(); c.stroke();
+            c.restore();
+          } catch (e) { }
+        };
         slots.forEach(function (i, k) {
           const x = U.ix() + k * (cw + gap);
+          slotRect[i] = { x: x, y: y, w: cw, h: th };
           const id = S.party[i];
+          const grabbing = CV.grab && CV.grab.from === i;
+          const aiming = CV.grab && CV.grab.over === i;
+          const holding = !!CV.grab && !grabbing;   // 手里拿着东西，而且拿的不是这一格
           if (!id) {
             CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.line2);
-            CV.text('＋ 上阵', x + cw / 2, y + th / 2, { size: CV.FS.lg, color: CV.C.dim, align: 'center' });
+            /* 空格：拿着东西时它就是一个"可以放"的落点（网页版 pslot-ph 同款文案） */
+            CV.text(holding ? '放这里' : '＋ 上阵', x + cw / 2, y + th / 2,
+              { size: aiming ? CV.FS.lg : CV.FS.md, color: aiming ? CV.C.gold : CV.C.dim, align: 'center' });
+            if (aiming) CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 2);
+            if (grabbing) CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 3);
+            else if (holding) dashRound(x, y, cw, th);
             CV.hit('pslot:' + i, x, y, cw, th);
             return;
           }
           CV.round(x, y, cw, th, CV.RADIUS, CV.C.panel2, id === '@player' ? CV.C.gold : rarColor((D.charById[id] || {}).rarity));
+          /* 抓起那格描金边；手指压住的那格再画一圈金边 + 头顶写「放这里」 */
+          if (grabbing) CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 3);
+          else if (holding) dashRound(x, y, cw, th);
+          if (aiming && !grabbing) {
+            CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 2);
+            CV.round(x + 2 * CV.SCALE, y - 18 * CV.SCALE, cw - 4 * CV.SCALE, 16 * CV.SCALE, 6 * CV.SCALE, CV.C.gold);
+            CV.text('放这里', x + cw / 2, y - 10 * CV.SCALE, { size: CV.FS.xs, color: '#241c08', align: 'center', bold: true });
+          }
           if (id === '@player') {
             const tw = CV.measure('主角', CV.FS.xs) + 10 * CV.SCALE;
             CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, null, 'rgba(230,182,76,.4)');
@@ -74,7 +170,8 @@
           const avTop = y + PAD + 8 * CV.SCALE;
           avatar(id, 40 * CV.SCALE, x + cw / 2, avTop + 20 * CV.SCALE);
           const nameY = avTop + 40 * CV.SCALE + 8 * CV.SCALE + NAME_LH / 2;
-          CV.text(CV.fit(Core.charName(id), cw - PAD * 2, CV.FS.lg, true), x + cw / 2, nameY, { size: CV.FS.lg, bold: true, align: 'center' });
+          CV.text(CV.fit(Core.charName(id), cw - PAD * 2, CV.FS.lg, true), x + cw / 2, nameY,
+            { size: CV.FS.lg, bold: true, align: 'center', color: grabbing ? CV.C.gold : undefined });   // 网页版 .pslot.grabbing .pname 是金色
           const meta = id === '@player'
             ? ('Lv.' + S.player.level + ' · 战力 ' + fmt(Core.playerPower()))
             : ('Lv.' + S.chars[id].lv + ' · ' + (D.charById[id] || {}).bloodline + ' · ' + (D.charById[id] || {}).faction);
@@ -83,9 +180,16 @@
           CV.hit('poke:' + i, x, y, cw, th);
         });
         U.y = y + th + CV.SP[2];
+        /* 手指压在这一排的标签上＝要"整排搬过去"：那一条高亮 + 右侧写「放这里」 */
+        if (CV.grab && CV.grab.over === 'row:' + rowKey) {
+          const r = rowRect[rowKey];
+          CV.round(r.x, r.y, r.w, r.h, 6 * CV.SCALE, 'rgba(230,182,76,.14)', CV.C.gold, 2);
+          CV.text('放这里', r.x + r.w - 6 * CV.SCALE, r.y + r.h / 2,
+            { size: CV.FS.xs, color: CV.C.gold, align: 'right', bold: true });
+        }
       };
-      drawRow('前排', [0, 1]);
-      drawRow('后排', [2, 3, 4]);
+      drawRow('前排', 'front', [0, 1]);
+      drawRow('后排', 'back', [2, 3, 4]);
       U.y -= CV.SP[2];
       CV.hit('party_board', U.pad(), boardTop - 8 * CV.SCALE, U.cw(), U.y - boardTop + 8 * CV.SCALE);
     });
@@ -192,6 +296,8 @@
     });
   });
   CV.on('party_back', function () { CV.pop(); });
+  /* 抓起状态里点「取消」＝放回原位（提示条上那颗按钮；离开队伍页也会自动放下） */
+  CV.on('pgrab_cancel', function () { CV.grab = null; CV.grabCfg = null; CV.toast('已放回原位'); CV.render(); });
   /* 无损换将：挑一个伙伴换到这一格（等级继承、装备能穿就跟着转 —— 走 core.swapPartyMember） */
   CV.on('pickswap:*', function (id) {
     const slot = G.__swapSlot;

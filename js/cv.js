@@ -128,6 +128,38 @@
       for (let i = 0; i < 3; i++) rr(L + i * (mw + gap), top, mw, h * 0.30, h * 0.04);
       c.restore();
     },
+    /* V9.6.111（父亲大人："灯阁小队前面有一个乱码"）：
+       画布的中文字体里**没有 ⚔**（DOM 有字体回退，canvas 是"豆腐块"）——
+       网页版标题写的是「⚔️ 灯阁小队」，小游戏照抄就成了乱码。
+       按父亲大人定的规矩（"缺少的图标都重新画进去"），这里自己画**交叉双剑**：
+       两道长刃斜交叉、各自一段护手、一段短柄、一颗尾珠 —— 纯路径，任何设备都画得出来。
+       （底栏「残域」那个图标也是它，一处画好两处都好看。） */
+    '⚔': function (c, x, y, s, color) {
+      const w = s * 0.96, h = s * 0.96;
+      const x0 = x - w / 2, y0 = y - h / 2;
+      const P = (nx, ny) => [x0 + nx * w, y0 + ny * h];
+      const seg = (a, b, lw) => {
+        c.lineWidth = Math.max(1, lw);
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+      };
+      c.save();
+      c.strokeStyle = color; c.fillStyle = color;
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      /* 一把剑：tip（剑尖）→ guard（护手所在处）→ grip（柄尾） */
+      const sword = (tip, guard, grip) => {
+        seg(tip, guard, s * 0.115);                       // 刃
+        const dx = guard[0] - tip[0], dy = guard[1] - tip[1];
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const px = -dy / len, py = dx / len;              // 刃的垂直方向
+        const gl = s * 0.15;                              // 护手半长
+        seg([guard[0] - px * gl, guard[1] - py * gl], [guard[0] + px * gl, guard[1] + py * gl], s * 0.075);
+        seg(guard, grip, s * 0.085);                      // 柄
+        c.beginPath(); c.arc(grip[0], grip[1], s * 0.055, 0, Math.PI * 2); c.fill();   // 尾珠
+      };
+      sword(P(0.13, 0.05), P(0.63, 0.60), P(0.75, 0.74));
+      sword(P(0.87, 0.05), P(0.37, 0.60), P(0.25, 0.74));
+      c.restore();
+    },
   };
   CV.hasGlyph = function (str) {
     const t = String(str == null ? '' : str);
@@ -140,7 +172,20 @@
   /* V9.6.66（父亲大人："字都画出来了"级别的小毛病）：引导文案里用 **粗体** 标重点，
      但画布不认 markdown —— 结果是**星号原样画在屏幕上**（截图里就是"① **角色卡**：…"）。
      统一在三个入口（画 / 量 / 折行）把这两顆星号去掉，宽度和绘制口径就永远一致。 */
-  function _md(str) { return String(str == null ? '' : str).replace(/\*\*/g, ''); }
+  /* V9.6.111：顺手去掉**变体选择符 U+FE0F / U+FE0E** 和**连接符 U+200D**。
+     这三个都是"零宽"的排版控制字符，网页版靠字体回退把它们吃掉；
+     画布却会当成独立字符去量宽度、找字形 —— 找不到就是一个小方块（看着像乱码）。
+     组合式 emoji（🧙‍♂️ 男法师这种"基础 emoji + 连接符 + 性别符"）画布合成不了，
+     所以先按表降级成"它能显示的那个主体"，再兜底剥掉剩下的控制字符。 */
+  const ZWJ_FALLBACK = {
+    '🧙‍♂️': '🧙', '🧙‍♀️': '🧙',
+    '🧑‍⚕️': '🧑', '👨‍👩‍👧': '👨', '🏳️‍🌈': '🏳️',
+  };
+  function _md(str) {
+    let s = String(str == null ? '' : str);
+    for (const k in ZWJ_FALLBACK) if (s.indexOf(k) >= 0) s = s.split(k).join(ZWJ_FALLBACK[k]);
+    return s.replace(/\*\*/g, '').replace(/[\uFE0E\uFE0F\u200D]/g, '');
+  }
   CV.plain = _md;
   CV.text = function (str, x, y, opt) {
     opt = opt || {};
@@ -289,9 +334,23 @@
   CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
   /* 换页时把"页面级覆盖层"清掉 —— 否则结算层会跟着下一页一起被画出来（V9.6.1 修） */
-  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
-  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
-  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.render(); };
+  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.grabCfg = null; CV.dropGrab(); CV.render(); };
+  /* ---------- 长按抓起 · 拖动换位（V9.6.111） ----------
+     父亲大人："小游戏队伍拖拽换位不了。"——以前这件事**根本没做**：
+     sc-party 里写着"长按拖动在 canvas 上代价大，改成点格子选伙伴"，
+     可引导和文案一直写着"长按抓起、拖到别处松手"，玩家照着做当然拖不动。
+     现在补上，规则与网页版一致：
+       · 长按 420ms 抓起（手指滑走＝在滚动，不算抓）；
+       · 抓起后高亮那一格，手指压到哪一格就把它标成落点（写"放这里"）；
+       · 松手落在别的格子＝换位（Core.swapPositions）；落回自己/空白＝原地放下；
+       · 抓起状态下**也可以直接点目标格**（网页版同款：点一下即可换过去）。
+     页面只要挂一份 CV.grabCfg：{ from(id)->下标, targetAt(p)->下标, drop(from,to) }。 */
+  CV.grab = null;
+  CV.grabCfg = null;
+  CV.dropGrab = function () { CV.grab = null; };
+
+  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render(); };
+  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render(); };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
      中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
      那一次首页渲染会把首页自己那条引导（"主线每一步做完都能领奖励"）登记下来，
@@ -507,6 +566,15 @@
     };
     const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
     let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
+    /* V9.6.111：长按抓起用的计时器（和网页版同一个时长） */
+    const GRAB_MS = 420;
+    let grabTimer = null;
+    /* 本次手势是不是"抓着东西的那一次"。区别对待很重要：
+       · 长按刚触发 → 这次手势就是"拖"，松手落在别的格子＝换位、落回原处＝还原地拿着；
+       · 拿着东西时**再点一下目标格** → 新的手势，松手＝就在那一格放下（网页版同款备用路径）；
+       · 拿着东西时点的是别的东西（返回、预设…）→ 这一下手势照常执行，手里那格不动。 */
+    let gestureGrab = false;
+    function clearGrabTimer() { if (grabTimer) { clearTimeout(grabTimer); grabTimer = null; } }
     /* V9.6.66（父亲大人："引导时……不能滑动界面"）：引导期间**整屏锁死** ——
        手指滑动不再滚页，也不会触发惯性；点也只有"高亮的那颗 / 跳过这一步"能被 hitAt 认出来。 */
     let coachLock = false;
@@ -538,21 +606,69 @@
       }
       return fallback;
     };
+    /* V9.6.111：手指这一点压在哪一格"能拿起的那格"上？不是就 null。
+       （长按抓起与"拿着东西点目标格"都要用它，口径和 hitAt 完全一致） */
+    const grabSlotAt = (p) => {
+      if (!CV.grabCfg || !CV.grabCfg.from) return null;
+      const h = hitAt(p);
+      if (!h) return null;
+      const idx = CV.grabCfg.from(h.id);
+      return (idx === null || idx === undefined) ? null : idx;
+    };
     wx.onTouchStart((e) => {
       const p = toW(e);
       downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
       startScroll = CV.scroll || 0;
       stopMomentum();
       coachLock = coachOn();
+      gestureGrab = false;
+      /* 手里已经拿着一格（上一次长按的残留）：
+         · 点的是"能拿起的那一格" → 这次手势就是"放下的手势"，松手在那一格放下；
+         · 点的是别的东西 → 手里那格不动，这一下照常当普通点击走（返回/预设照样能点）。 */
+      if (CV.grab) {
+        const gIdx = grabSlotAt(p);
+        if (CV.grab.fresh) {
+          gestureGrab = true;                       // 还是"创造抓取"的那一次手势，继续拖着
+        } else if (gIdx !== null) {
+          gestureGrab = true;
+          CV.grab.over = gIdx;
+          CV.render();
+        }
+        if (gestureGrab) return;
+      }
       /* V9.6.40（父亲大人：两侧一致 / 手感）：网页版按钮有 :active 缩放，画布原来点下去毫无反馈。
          按下先记住"按的是哪颗"，U.btn 会把它画成按下态；抬手或开始滚动就清掉。 */
       const h = hitAt(p);
       if (h) { CV.pressed = h.id; CV.render(); }
+      /* V9.6.111：长按抓起（队伍换位）——按下这一格是"可抓起"的，就等 420ms（和网页版同一个值）。 */
+      clearGrabTimer();
+      if (h && CV.grabCfg && CV.grabCfg.from) {
+        const idx = CV.grabCfg.from(h.id);
+        if (idx !== null && idx !== undefined) {
+          grabTimer = setTimeout(function () {
+            grabTimer = null;
+            CV.grab = { from: idx, x: p.x, y: p.y, over: idx, fresh: true };
+            gestureGrab = true;
+            CV.pressed = null;
+            try { if (wx.vibrateShort) wx.vibrateShort({ type: 'medium' }); } catch (e2) {}
+            CV.render();
+          }, GRAB_MS);
+        }
+      }
     });
     wx.onTouchMove((e) => {
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
+      /* 抓起中：不滚页面，只跟手 + 更新落点高亮 */
+      if (CV.grab && gestureGrab) {
+        CV.grab.x = p.x; CV.grab.y = p.y;
+        if (CV.grabCfg && CV.grabCfg.targetAt) CV.grab.over = CV.grabCfg.targetAt(p);
+        stopMomentum();
+        CV.render();
+        return;
+      }
+      if (moved) clearGrabTimer();        // 手指滑走＝在滚页面，不算长按
       if (coachLock || coachOn()) { CV.pressed = null; return; }     // 引导在：不滚、不给按下态
       if (!moved) return;
       if (CV.pressed) { CV.pressed = null; CV.render(); }   // 一变成滚动就不算"按着按钮"了
@@ -564,6 +680,30 @@
     });
     wx.onTouchEnd((e) => {
       const p = toW(e);
+      clearGrabTimer();
+      /* 松手时"手里拿着东西"，且这一下就是抓着的手势：
+         落点在哪一格 —— 换到那一格；落回自己或空白 —— 手里继续拿着（等下一下拖动或点选，
+         网页版就是这套规矩：松在空白处不会掉出去，还能移到别处再放）。
+         拿着东西时**再点自己那一格** = 放回原位。 */
+      if (CV.grab && gestureGrab) {
+        const g = CV.grab;
+        const to = (g.over === undefined || g.over === null) ? null : g.over;
+        const wasFresh = !!g.fresh;
+        g.fresh = false;
+        if (to !== null && to !== g.from && CV.grabCfg && CV.grabCfg.drop) {
+          CV.grab = null;
+          try { CV.grabCfg.drop(g.from, to); } catch (e3) {}
+        } else if (!wasFresh && to === g.from) {
+          CV.grab = null;                       // 再点一下自己＝放回原位（网页版同款）
+          CV.toast('已放回原位');
+        } else {
+          g.over = null;                        // 落在空白处：手里还拿着，落点高亮收掉
+        }
+        CV.pressed = null; CV.render();
+        gestureGrab = false;
+        return;
+      }
+      gestureGrab = false;
       if (coachLock && moved) { coachLock = false; return; }          // 引导期间的滑动：整下丢掉
       coachLock = false;
       if (moved) {                                 // 松手 → 惯性
@@ -606,6 +746,10 @@
        或者松手后还继续自己滚。取消 = 这一下不算点击，只把状态清干净。 */
     if (wx.onTouchCancel) {
       wx.onTouchCancel(() => {
+        /* 手里拿着东西时被打断（来电/切后台/系统手势）：这一下不算"放下"，
+           继续拿着，但**不能再算"刚抓起的那一次手势"**（否则下一次点按钮会被当成继续拖）。 */
+        if (CV.grab) CV.grab.fresh = false;
+        gestureGrab = false;
         CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
       });
     }
