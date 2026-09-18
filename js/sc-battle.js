@@ -81,6 +81,11 @@
   function clearTimer() {
     if (B.timer) { clearTimeout(B.timer); B.timer = null; }
     if (B.autoT) { clearInterval(B.autoT); B.autoT = null; }
+    /* V9.6.98（自审：定时器泄漏）：打击特效那个 55ms 的 interval（fxT）原来只有 finish()
+       和"自己发现没有特效了"两条路会清 —— **撤离**那条路不清，于是离开战斗页之后
+       它还会以 18fps 重画最多 0.9 秒（白耗电、还会重画一个新页面）。
+       撤离=离场，就该立刻全清。 */
+    if (fxT) { clearInterval(fxT); fxT = null; }
   }
   function pushLog(line) { B.log.push(line); if (B.log.length > 60) B.log.shift(); }
   function nameOf(uid) { const u = B.units[uid]; return u ? u.name : ''; }

@@ -56,6 +56,16 @@ G.Battle.run = function () {
 };
 
 let pass = 0, fail = 0;
+/* 定时器记账（V9.6.98）：离开战斗页之后**不该还有战斗的定时器在跑** ——
+   以前那个 55ms 的打击特效 interval 在"撤离"那条路上没清，会继续重画最多 0.9 秒。 */
+const liveTimers = new Set();
+const _setTimeout = global.setTimeout, _setInterval = global.setInterval;
+const _clearTimeout = global.clearTimeout, _clearInterval = global.clearInterval;
+global.setTimeout = function (fn, ms) { const h = _setTimeout(function () { liveTimers.delete(h); return fn.apply(this, arguments); }, ms); liveTimers.add(h); return h; };
+global.setInterval = function (fn, ms) { const h = _setInterval(fn, ms); liveTimers.add(h); return h; };
+global.clearTimeout = function (h) { liveTimers.delete(h); return _clearTimeout(h); };
+global.clearInterval = function (h) { liveTimers.delete(h); return _clearInterval(h); };
+
 const t = (name, ok, extra) => {
   if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); }
   else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); }
@@ -121,6 +131,18 @@ console.log('\n=== 战斗页生命周期审计 ===');
   CV.dispatch('battle_quit');       // 打开确认弹窗
   if (G.U && G.U.overlay && G.U.overlay.onOk) G.U.overlay.onOk();
   t('撤离后闸门放开', UI.busy() === false, 'busy() = ' + String(UI.busy()));
+  await wait(60);
+  t('撤离后没有战斗定时器还在跑（不白耗电、不偷偷重画）', liveTimers.size === 0,
+    liveTimers.size ? liveTimers.size + ' 个定时器还活着' : '全清');
+  /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
+     运行期这条不好造（假战斗只有一帧，特效早就自己停了）——所以补一条源码断言，
+     免得以后有人把 clearTimer 里那行删回去。 */
+  {
+    const src = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    const clearFn = (src.match(/function clearTimer\(\)\s*\{[\s\S]*?\n  \}/) || [''])[0];
+    t('离场清理 clearTimer 里包含打击特效定时器 fxT', /clearInterval\(fxT\)/.test(clearFn),
+      clearFn ? '已包含' : '**没找到 clearTimer**');
+  }
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exitCode = fail ? 1 : 0;

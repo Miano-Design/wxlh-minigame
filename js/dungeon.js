@@ -21,7 +21,8 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
        所以给前六个世界一个 0.60→0.95 的平滑系数（第 7 个世界起完全不动）：
        敌人 HP 与攻击都乘它，守关 BOSS 自己那份也一样乘 —— 目标是把"守关"从
        前面关卡的 2.6~3.0 倍压到 1.3~1.6 倍，前期不再在最后一关突然变成墙。 */
-    const ease = wi >= 7 ? 1 : 0.40 + wi * 0.0857;
+    const EASE = [0.26, 0.31, 0.37, 0.50, 0.60, 0.72, 0.86];
+    const ease = wi < EASE.length ? EASE[wi] : 1;
     const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
     const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
     const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);           // 防御放缓，避免伤害坍缩
