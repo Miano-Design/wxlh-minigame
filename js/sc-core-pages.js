@@ -132,6 +132,12 @@
         U.space(CV.SP[1]);
         U.btnRow([{ label: '⚡ 渡劫（成功率 ' + Math.round(nx.rate * 100) + '%）', style: 'primary', id: 'realm_try' }]);
         U.hint('失败也扣材料与点数（等级不掉）', 4 * CV.SCALE);
+      } else {
+        /* V9.6.90：网页版走到大圆满时是**一张明确的卡**（"已至大圆满 / 当前境界已是这条血统的终点"）。
+           小游戏原来这里什么都不画 —— 玩家看到一张空卡，只能猜"是不是卡了"。 */
+        U.space(CV.SP[1]);
+        U.h3('已至大圆满');
+        U.note('当前境界已是这条血统的终点。', 2 * CV.SCALE);
       }
     });
     /* 境界线：9 大境 × 4 小阶（网页版把整条线都列出来） */
@@ -328,7 +334,7 @@
         list.forEach(function (c, i) {
           const mine = !!Core.S.chars[c.id];
           const x = U.ix() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
-          CV.round(x, y, cw, ch, 6 * CV.SCALE, mine ? CV.C.panel2 : '#00000022', mine ? rarColor(c.rarity) : CV.C.line);
+          CV.round(x, y, cw, ch, 6 * CV.SCALE, mine ? CV.C.panel2 : 'rgba(0,0,0,.13)', mine ? rarColor(c.rarity) : CV.C.line);
           CV.text(mine ? c.name.slice(0, 2) : '？', x + cw / 2, y + 22 * CV.SCALE,
             { size: CV.FS.sm, align: 'center', color: mine ? rarColor(c.rarity) : CV.C.dim });
           CV.text(mine ? c.bloodline : c.rarity, x + cw / 2, y + 42 * CV.SCALE,

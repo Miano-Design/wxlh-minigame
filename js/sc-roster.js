@@ -188,7 +188,9 @@
         { label: '重生', style: 'ghost', id: c.lv > 1 ? 'reborn' : 'noop' },
       ]);
       U.space(CV.SP[1]);
+      /* V9.6.90：与网页版同一句（网页版还带一句"经验模块在背包里用，直接进这个池子"） */
       U.hint(cost ? '升下一级需要 ' + fmt(cost.exp) + ' 伙伴经验 + ◈ ' + fmt(cost.points)
+        + ' · 经验模块在背包里用，直接进这个池子'
         : '已满级', 4 * CV.SCALE);
     });
 

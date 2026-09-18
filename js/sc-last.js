@@ -181,7 +181,7 @@
     tabs.forEach(function (t) {
       const on = taskTab === t[0];
       const w = Math.max(72 * CV.SCALE, CV.measure(t[1], CV.FS.md) + 28 * CV.SCALE);
-      CV.round(x, top, w, h, 999, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.round(x, top, w, h, 999, on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
       CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit('tasktab:' + t[0], x, top, w, h);
       x += w + gap;
@@ -470,8 +470,10 @@
   });
   [1, 2, 3].forEach(function (n) {
     CV.on('slot_save:' + n, function () {
-      Core.saveSlot(n);
-      CV.toast('已存入存档槽 ' + n);
+      /* V9.6.90：网页版这里会看返回值 ——「存不进去」必须说出来（配额满 / 隐私模式），
+         原来无条件报"已存入"，玩家以为存上了，其实一个字都没落盘。 */
+      const ok = Core.saveSlot(n);
+      CV.toast(ok ? '已存入存档槽 ' + n : '保存失败（存储空间不足？）');
       CV.render();
     });
     CV.on('slot_load:' + n, function () {
@@ -494,7 +496,7 @@
       if (G.wx.offKeyboardConfirm) G.wx.offKeyboardConfirm();
       G.wx.onKeyboardConfirm(function (res) {
         const nm = String((res && res.value) || '').trim();
-        if (!nm) { CV.toast('名字不能为空'); return; }
+        if (!nm) { CV.toast('请输入名字'); return; }   // V9.6.90：与网页版同一句
         const r = Core.createProtagonist(nm);
         CV.toast(r.msg || (r.ok ? '已创建' : '创建失败'));
         CV.render();
@@ -535,6 +537,9 @@
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
     CV.text('调试面板（GM）', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    /* V9.6.90：与网页版同一句警示（网页版 GM 面板顶部那行红字） */
+    U.hint('仅用于开发测试，滥用会破坏游戏乐趣', 0, CV.C.accent);
+    U.space(CV.SP[1]);
     U.card(function () {
       U.h3('一键发资源');
       U.btnRow([
@@ -661,7 +666,7 @@
          没派领队 = 没激活 → 边框虚线、标题/产出压灰；派了领队 = 激活 → 边框与文字一律金色。 */
       if (h > 4) {
         if (led) {
-          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, '#e6b64c66');
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, 'rgba(230,182,76,.4)');
         } else {
           CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, null);
           CV.ctx.save();

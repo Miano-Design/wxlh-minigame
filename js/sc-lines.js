@@ -275,7 +275,7 @@
       D.SIGNS.forEach(function (s) {
         const top = U.y, h = 52 * CV.SCALE;
         const tw = CV.measure(s.tier, CV.FS.xs) + 12 * CV.SCALE;
-        CV.round(U.ix(), top + 16 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_SM, null, '#e6b64c66');
+        CV.round(U.ix(), top + 16 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_SM, null, 'rgba(230,182,76,.4)');
         CV.text(s.tier, U.ix() + tw / 2, top + 24.5 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
         const tx = U.ix() + tw + 10 * CV.SCALE;
         const pw = CV.measure(Math.round(s.weight) + '%', CV.FS.sm) + 4 * CV.SCALE;

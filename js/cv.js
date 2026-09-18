@@ -19,7 +19,7 @@
     C: {
       bg: '#07090e', bg2: '#0b0e15',
       panel: '#111621', panel2: '#161d2a', panel3: '#1d2534',
-      line: '#232b3b', line2: '#333e55', lineSoft: '#ffffff0d',
+      line: '#232b3b', line2: '#333e55', lineSoft: 'rgba(255,255,255,.05)',
       text: '#e9edf6', text2: '#b6bfd0', dim: '#7a849b',
       accent: '#d43a4f', accent2: '#97273a', gold: '#e6b64c',
       green: '#56c894', blue: '#6ec6ff', red: '#d43a4f',
@@ -210,8 +210,8 @@
     if (opt.line !== null) {
       const r = Math.min(opt.radius === undefined ? CV.RADIUS : opt.radius, w / 2, h / 2);
       CV.ctx.save();
-      CV.ctx.strokeStyle = '#ffffff0f'; CV.ctx.lineWidth = 1;
-      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, '#ffffff0f');
+      CV.ctx.strokeStyle = 'rgba(255,255,255,.06)'; CV.ctx.lineWidth = 1;
+      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, 'rgba(255,255,255,.06)');
       CV.ctx.restore();
     }
   };
@@ -373,20 +373,26 @@
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
     const PAD = 12 * CV.SCALE;                       // 网页版顶栏左右 0.75rem
-    const name = (S && S.player.name) || '执灯者';
+    /* V9.6.90（技能《weixin-game》§布局：右上角是**系统胶囊按钮区**，约 87×44）：
+       小游戏右上角永远压着微信那颗「···」胶囊，顶栏这一行的文字不能顶到它下面去。
+       名字 + Lv + 铭刻名整行都按这个右边界收着写。 */
+    const CAPSULE_W = 87 * CV.SCALE;
+    const ROW_RIGHT = CV.W - PAD - CAPSULE_W;
     const lv = (S && S.player.level) || 0;
     const ny = top + 10 * CV.SCALE + 10 * CV.SCALE;   // 行内中线
-    CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
-    const nw = CV.measure(name, CV.FS.f1, true);
     /* Lv. 胶囊：网页版 .plv（金色描边 + 圆角 7 + 左右 6px） */
     const lvTxt = 'Lv.' + lv;
     const lw = CV.measure(lvTxt, CV.FS.sm) + 12 * CV.SCALE;
-    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, '#e6b64c66');
+    /* 名字最长 12 个字，得先按"胶囊让开后的可用宽度"截断（不然长名字会钻到系统胶囊底下） */
+    const name = CV.fit((S && S.player.name) || '执灯者', ROW_RIGHT - PAD - lw - 20 * CV.SCALE, CV.FS.f1, true);
+    CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
+    const nw = CV.measure(name, CV.FS.f1, true);
+    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, 'rgba(230,182,76,.4)');
     CV.text(lvTxt, PAD + nw + 10 * CV.SCALE + lw / 2, ny, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
     /* 铭刻名（网页版 .genelock：11px 红字，只在解锁后出现） */
     if (S && S.player.geneLock > 0 && D && D.GENE_LOCKS && D.GENE_LOCKS[S.player.geneLock - 1]) {
       const gt = '铭刻·' + D.GENE_LOCKS[S.player.geneLock - 1].name;
-      CV.text(CV.fit(gt, CV.W - PAD * 2 - nw - lw - 30, CV.FS.sm), PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE, ny,
+      CV.text(CV.fit(gt, ROW_RIGHT - (PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE), CV.FS.sm), PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE, ny,
         { size: CV.FS.sm, color: CV.C.accent });
     }
     /* 货币行：三个主力货币 + 全部货币（图标 + 数值，胶囊 40 高） */
@@ -453,10 +459,12 @@
     CV.round(x, y, w, 34, 999, 'rgba(0,0,0,.85)', CV.C.line);
     CV.text(t.msg, CV.W / 2, y + 17, { size: CV.FS.lg, align: 'center' });
   };
-  CV.toast = function (msg) {
+  /* V9.6.90：加了时长参数（网页版 toast(msg, ms) 同款）——
+     退款说明这类长句子 1.6 秒根本读不完。 */
+  CV.toast = function (msg, ms) {
     CV.toasts = [{ msg, t: Date.now() }];
     CV.render();
-    setTimeout(() => { CV.toasts = []; CV.render(); }, 1600);
+    setTimeout(() => { CV.toasts = []; CV.render(); }, ms || 1600);
   };
 
   /* ---------- 触摸 ---------- */
@@ -546,6 +554,15 @@
         }
       }
     });
+    /* V9.6.90（技能《weixin-game》§触摸事件）：**触摸取消也要接**。
+       来电、切前后台、系统手势打断时微信只发 onTouchCancel 不发 onTouchEnd ——
+       原来没接，于是"按下态"和"滑动惯性"会卡在那里：按钮一直是按下样子，
+       或者松手后还继续自己滚。取消 = 这一下不算点击，只把状态清干净。 */
+    if (wx.onTouchCancel) {
+      wx.onTouchCancel(() => {
+        CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
+      });
+    }
   };
 
   G.CV = CV;

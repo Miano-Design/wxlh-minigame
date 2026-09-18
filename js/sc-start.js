@@ -57,7 +57,8 @@
       U.y = top + h;
     });
     U.space(CV.SP[3]);
-    U.btnRow([{ label: '以这个名字进入残域', style: 'primary', id: 'name_ok' }]);
+    /* V9.6.90：按钮文案与网页版对齐（网页版 showCharCreate 那颗是「创建并开始探索」） */
+    U.btnRow([{ label: '创建并开始探索', style: 'primary', id: 'name_ok' }]);
 
   });
   CV.on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });

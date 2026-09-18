@@ -134,7 +134,9 @@
     U.y = top + lines.length * lhPx;
     return lines.length * lhPx;
   }
-  U.hint = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.sm, 1.7, CV.C.dim, gapTop, widthIn); };
+  /* V9.6.90：第 3 个参数以前叫 widthIn（两栏卡用的可用宽度），但全仓从来没人传过宽度，
+     倒是有地方想传"颜色" —— 统一改成 color，别再让调用方猜。 */
+  U.hint = function (text, gapTop, color) { return wrapBlock(text, CV.FS.sm, 1.7, color || CV.C.dim, gapTop); };
   U.note = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop, widthIn); };
 
   /* ---------- 说明框 .event-desc（网页版：bg --panel / 圆角 10 / 内边距 12 / 13px 灰字 1.7 行高）
@@ -287,7 +289,10 @@
     if (style === 'primary') { g.addColorStop(0, '#c9364a'); g.addColorStop(1, CV.C.accent2); }
     if (style === 'gold') { g.addColorStop(0, '#b98d2a'); g.addColorStop(1, '#87631a'); }
     const fill = g || (style === 'ghost' ? null : CV.C.panel2);
-    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? '#e05a6d40' : style === 'gold' ? '#e6b64c44' : CV.C.line2);
+    /* V9.6.90：颜色一律 rgba()，**不许用 8 位 hex**（#RRGGBBAA）——
+       微信画布对这个格式"部分支持/不稳定"，赋值失败时画布会**保持上一次的填充色**，
+       表现就是"黑底黑字"（父亲大人最早报的那个毛病）。见 canvas_audit 的同名规则。 */
+    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? 'rgba(224,90,109,.25)' : style === 'gold' ? 'rgba(230,182,76,.27)' : CV.C.line2);
     draw(() => {
       if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
       /* 按下态：网页版 .btn:active 是 scale(.97) + 背景压暗一档。
@@ -343,14 +348,81 @@
      而它按**屏幕坐标**算 y 却是在**内容层**里画的：谁哪天顺手用了它，
      按钮就会整体下移一整个顶栏、贴着底栏甚至出画。留着就是一颗雷。 */
 
-  /* ---------- 确认弹窗（网页版 confirmBox：居中、两个按钮） ---------- */
-  U.confirm = function (title, text, onOk) {
+  /* ---------- 确认弹窗（网页版 confirmBox：居中、两个按钮） ----------
+     V9.6.90：加了 opt —— 网页版好几处弹窗是"一串奖励胶囊 + 下面一个按钮"
+     （离线收益 / 七日登录），canvas 原来只有"两行字 + 取消/确定"，
+     所以那两个弹窗在小游戏里根本没法照着做。现在支持：
+       opt.chips   奖励胶囊文案数组（自动居中折行）
+       opt.note    按钮上方的一行灰色小字
+       opt.cancel  false = 只有一个按钮（offline / 公告这类）
+       opt.okLabel 那个按钮的字（默认"确定"） */
+  const CHIP_H = 26, CHIP_GAP = 6 * CV.SCALE;
+  /* 胶囊居中折行：返回 [[{t,w},…], …] */
+  function chipRows(list, maxW) {
+    const rows = [[]];
+    let used = 0;
+    list.forEach(function (t) {
+      const w = CV.measure(t, CV.FS.sm) + 22 * CV.SCALE;
+      const row = rows[rows.length - 1];
+      if (row.length && used + w + CHIP_GAP > maxW) { rows.push([]); used = 0; }
+      rows[rows.length - 1].push({ t: t, w: w });
+      used += w + CHIP_GAP;
+    });
+    return rows.filter((r) => r.length);
+  }
+  U.confirm = function (title, text, onOk, opt) {
+    opt = opt || {};
     const bw = Math.min(CV.W - 40, 420), x = (CV.W - bw) / 2;
-    const lines = CV.wrap(text, bw - 28 * CV.SCALE, CV.FS.lg, 8);
-    const h = 52 * CV.SCALE + lines.length * CV.FS.lg * 1.7 + 54 * CV.SCALE;
+    const inner = bw - 28 * CV.SCALE;
+    const lines = CV.wrap(text, inner, CV.FS.lg, 9);
+    const rows = (opt.chips && opt.chips.length) ? chipRows(opt.chips.filter(Boolean), inner) : [];
+    const note = opt.note ? CV.wrap(opt.note, inner, CV.FS.xs, 3) : [];
+    const chipsH = rows.length * (CHIP_H + CHIP_GAP);
+    const noteH = note.length * CV.FS.xs * 1.7;
+    const h = 52 * CV.SCALE + lines.length * CV.FS.lg * 1.7 + chipsH + noteH + 54 * CV.SCALE + CV.SP[2];
     const y = (CV.H - h) / 2;
-    U.overlay = { x, y, w: bw, h, title, lines, text, onOk };
+    U.overlay = {
+      x: x, y: y, w: bw, h: h, title: title, lines: lines, text: text, onOk: onOk,
+      rows: rows, note: note, single: opt.cancel === false, okLabel: opt.okLabel || '确定',
+    };
     CV.render();
+  };
+  /* 离线收益 / 时间异常（与网页版 showOfflineGains 同一份文案，V9.6.90） */
+  U.offlineGains = function (g) {
+    if (!g) return;
+    if (g.cheat) {
+      U.confirm('⚠ 时间异常', '检测到系统时间被修改，本次离线收益已取消。',
+        function () { CV.render(); }, { cancel: false, okLabel: '知道了' });
+      return;
+    }
+    const D = G.DATA || {};
+    const fmt = G.fmt || ((n) => String(n));
+    const dur = G.formatDuration ? G.formatDuration(g.seconds) : (g.seconds + ' 秒');
+    const chips = [];
+    chips.push('◈ +' + fmt(g.gains.points));
+    chips.push('EXP +' + fmt(g.gains.exp));
+    if (g.gains.otherworld) chips.push('◆ +' + g.gains.otherworld);
+    if (g.gains.story) chips.push('❖ +' + g.gains.story);
+    if (g.gains.matCount && g.gains.matItem) {
+      const it = (D.ITEMS || {})[g.gains.matItem];
+      chips.push('⚙️ ' + ((it && it.name) || g.gains.matItem) + '×' + g.gains.matCount);
+    }
+    if (g.gains.matStashed) chips.push('📮 待领箱 +' + g.gains.matStashed);
+    U.confirm('欢迎回来，执灯者',
+      '离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）',
+      function () { CV.render(); },
+      { cancel: false, okLabel: '收下', chips: chips, note: '离线期间挂机分工的产线一样在跑。' });
+  };
+  /* 七日登录（与网页版 showLoginReward 同一份文案） */
+  U.loginReward = function (r) {
+    if (!r) return;
+    const D = G.DATA || {};
+    const txt = r.reward.ssrTicket ? '🎫 SSR自选券'
+      : ((G.Core && G.Core.rewardTextOf) ? G.Core.rewardTextOf(r.reward) : '第 ' + r.day + ' 天奖励');
+    const moon = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗'][Math.max(0, Math.min(6, r.day - 1))];
+    U.confirm('七日登录 · 第 ' + r.day + ' 天', '今日奖励',
+      function () { CV.render(); },
+      { cancel: false, okLabel: '收下', chips: [moon + ' ' + txt] });
   };
   CV.on('_cf_no', () => { U.overlay = null; CV.render(); });
   CV.on('_cf_yes', () => { const o = U.overlay; U.overlay = null; if (o && o.onOk) o.onOk(); else CV.render(); });
@@ -619,12 +691,32 @@
     c.restore();
     CV.text(o.title, o.x + 14 * CV.SCALE, o.y + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
     o.lines.forEach((ln, i) => CV.text(ln, o.x + 14 * CV.SCALE, o.y + 52 * CV.SCALE + CV.FS.lg * 1.7 * (i + 0.5), { size: CV.FS.lg, color: CV.C.dim }));
+    /* 奖励胶囊（居中折行）——网页版 .reward-chips */
+    let cy = o.y + 52 * CV.SCALE + o.lines.length * CV.FS.lg * 1.7 + CV.SP[1] / 2 + CHIP_H / 2;
+    (o.rows || []).forEach(function (row) {
+      const total = row.reduce((s, c) => s + c.w, 0) + CHIP_GAP * (row.length - 1);
+      let cx = o.x + (o.w - total) / 2;
+      row.forEach(function (c) {
+        CV.round(cx, cy - CHIP_H / 2, c.w, CHIP_H, 999, CV.C.panel2, CV.C.line);
+        CV.text(c.t, cx + c.w / 2, cy, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
+        cx += c.w + CHIP_GAP;
+      });
+      cy += CHIP_H + CHIP_GAP;
+    });
+    /* 说明小字 */
+    (o.note || []).forEach(function (ln, i) {
+      CV.text(ln, o.x + o.w / 2, cy + CV.FS.xs * 1.7 * (i + 0.5), { size: CV.FS.xs, align: 'center', color: CV.C.dim });
+    });
     const by = o.y + o.h - 44 * CV.SCALE - 10 * CV.SCALE;
     const bw = (o.w - 28 * CV.SCALE - 10 * CV.SCALE) / 2;
     /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记 */
     CV.hitMode = 'screen';
-    U.btn(o.x + 14 * CV.SCALE, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
-    U.btn(o.x + 14 * CV.SCALE + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, '确定', 'primary', '_cf_yes');
+    if (o.single) {
+      U.btn(o.x + 14 * CV.SCALE, by, o.w - 28 * CV.SCALE, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+    } else {
+      U.btn(o.x + 14 * CV.SCALE, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
+      U.btn(o.x + 14 * CV.SCALE + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+    }
     CV.hitMode = 'content';
   };
 })();

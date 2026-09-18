@@ -67,7 +67,7 @@
           CV.round(x, y, cw, th, CV.RADIUS, CV.C.panel2, id === '@player' ? CV.C.gold : rarColor((D.charById[id] || {}).rarity));
           if (id === '@player') {
             const tw = CV.measure('主角', CV.FS.xs) + 10 * CV.SCALE;
-            CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, null, '#e6b64c66');
+            CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, null, 'rgba(230,182,76,.4)');
             CV.text('主角', x + 4 * CV.SCALE + tw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
           }
           /* 头像 40（上留 8）、名字 13/行高 17.5、小字 11/行高 15.4 —— 全按网页版实测 */
@@ -121,7 +121,7 @@
       D.FORMATIONS.forEach(function (f) {
         const on = fb.hit.indexOf(f.id) >= 0;
         const h = 40 * CV.SCALE, top = U.y;
-        if (on) CV.round(U.ix(), top, U.iw(), h, 6 * CV.SCALE, '#56c89414', '#2f5b41');
+        if (on) CV.round(U.ix(), top, U.iw(), h, 6 * CV.SCALE, 'rgba(86,200,148,.08)', '#2f5b41');
         else CV.round(U.ix(), top, U.iw(), h, 6 * CV.SCALE, null, CV.C.line);
         CV.text(f.name, U.ix() + 8 * CV.SCALE, top + 13 * CV.SCALE, { size: CV.FS.lg, bold: true, color: on ? CV.C.green : CV.C.text });
         CV.text(f.reqText, U.ix() + 8 * CV.SCALE, top + 30 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });

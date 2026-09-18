@@ -36,7 +36,7 @@
     list.forEach(function (t) {
       const on = cur === t[0];
       const w = CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE;
-      CV.round(x, top, w, h, 999, on ? '#d43a4f22' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.round(x, top, w, h, 999, on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
       CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit(prefix + t[0], x, top, w, h);
       x += w + gap;
@@ -189,7 +189,7 @@
       const r = Math.floor(i / cols), col = i % cols;
       const x = U.ix() + col * (cw + gap), y = top + r * (cw + gap);
       if (c.empty) {
-        CV.round(x, y, cw, cw, CV.RADIUS, '#00000022', CV.C.line);
+        CV.round(x, y, cw, cw, CV.RADIUS, 'rgba(0,0,0,.13)', CV.C.line);
         return;
       }
       if (c.add) {
@@ -204,7 +204,7 @@
       }
       if (c.sel) {
         /* 网页版 .bg-slot.sel：红框 + 红色淡底（批量分解时"这件选中了"） */
-        CV.round(x, y, cw, cw, CV.RADIUS, '#d43a4f33', CV.C.accent);
+        CV.round(x, y, cw, cw, CV.RADIUS, 'rgba(212,58,79,.2)', CV.C.accent);
       } else {
         CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
       }

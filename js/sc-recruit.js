@@ -55,7 +55,7 @@
         /* 网页版只在**有券**时才画这一行（`tk && tk.n > 0`）；没券什么都不显示 */
         if (tk && tk.n > 0) {
           const txt = '🎫 ' + tkName + ' ×' + tk.n;
-          CV.round(U.ix(), U.y, U.iw(), rowH, 8 * CV.SCALE, null, '#ffd76a66');
+          CV.round(U.ix(), U.y, U.iw(), rowH, 8 * CV.SCALE, null, 'rgba(255,215,106,.4)');
           CV.text(CV.fit(txt, U.iw() - 16 * CV.SCALE, CV.FS.xs), U.ix() + 9 * CV.SCALE, U.y + rowH / 2,
             { size: CV.FS.xs, color: CV.C.text });
           U.y += rowH + 8 * CV.SCALE;
@@ -77,7 +77,7 @@
             const bh = 30 * CV.SCALE;
             CV.ctx.save();
             const grd = CV.ctx.createLinearGradient(U.ix(), 0, U.ix() + U.iw(), 0);
-            grd.addColorStop(0, '#ffd76a22'); grd.addColorStop(1, 'transparent');
+            grd.addColorStop(0, 'rgba(255,215,106,.13)'); grd.addColorStop(1, 'transparent');
             CV.round(U.ix(), U.y, U.iw(), bh, 6 * CV.SCALE, grd);
             CV.round(U.ix(), U.y, 3 * CV.SCALE, bh, 2 * CV.SCALE, CV.C.gold);
             CV.ctx.restore();
