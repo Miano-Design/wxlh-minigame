@@ -259,6 +259,15 @@
       modal: CV.hitMode === 'overlay',
     });
   };
+  /* V9.6.108：这颗热区有没有处理器（精确 id 或前缀处理器）。
+     "给引导当锚点"的整块区域（party_board / attr_card / stage_grid…）没有处理器 ——
+     它们不该吃点击，否则会把手感全吃掉（点队伍空位却派发了 party_board → 上不了阵）。 */
+  function hitHasHandler(h) {
+    const id = String(h.id);
+    if (CV.onAct[id]) return true;
+    const i = id.indexOf(':');
+    return i > 0 && !!CV.onAct[id.slice(0, i + 1) + '*'];
+  }
   /* 屏幕坐标 → 内容坐标（含滚动） */
   CV.localY = function (py) { return py - (CV.TOP + 8) + (CV.scroll || 0); };
   CV.dispatch = function (id) {
@@ -509,6 +518,7 @@
     const hitAt = (p) => {
       const ly = CV.localY(p.y);
       const overlayOnly = !!(G.U && G.U.overlay);
+      let fallback = null;          // 没有处理器的锚点区域 → 兜底候选
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
         /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
@@ -516,9 +526,17 @@
         /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
         if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
-        if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) return h;
+        if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
+        /* V9.6.108（父亲大人："队伍上阵又上不了了，其他东西也都点不了了"）：
+           **优先给"有处理器"的热区**。没有处理器的是给引导当锚点的整块区域
+           （队伍阵型 party_board、六维卡 attr_card、关卡格 stage_grid…），
+           它们盖在真按钮上面，以前会把点击全吃掉 ——
+           实测：点队伍空位，派发的却是 party_board（没有处理器）→ 什么都不发生 → 上不了阵。
+           现在这类区域退成兜底：只有底下确实没有别的可点时才轮到它（那时点它＝关掉引导）。 */
+        if (!hitHasHandler(h)) { if (!fallback) fallback = h; continue; }
+        return h;
       }
-      return null;
+      return fallback;
     };
     wx.onTouchStart((e) => {
       const p = toW(e);
@@ -566,6 +584,7 @@
       if (CV.pressed) { CV.pressed = null; CV.render(); }
       const ly = CV.localY(p.y);
       const overlayOnly = !!(G.U && G.U.overlay);   // 确认弹窗打开时，底下的内容不吃点击
+      let fallback = null;
       for (let i = CV.hits.length - 1; i >= 0; i--) {
         const h = CV.hits[i];
         /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
@@ -574,10 +593,12 @@
            否则"按下没反应、抬手却真的跳页了"。 */
         if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
         const wy = h.screen ? p.y : ly;
-        if (p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h) {
-          CV.dispatch(h.id); return;
-        }
+        if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
+        /* V9.6.108：优先给有处理器的热区；锚点区域退成兜底（同 hitAt） */
+        if (!hitHasHandler(h)) { if (!fallback) fallback = h; continue; }
+        CV.dispatch(h.id); return;
       }
+      if (fallback) CV.dispatch(fallback.id);      // 底下没有别的可点：点它＝关掉引导
     });
     /* V9.6.90（技能《weixin-game》§触摸事件）：**触摸取消也要接**。
        来电、切前后台、系统手势打断时微信只发 onTouchCancel 不发 onTouchEnd ——

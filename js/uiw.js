@@ -582,6 +582,24 @@
     }
     return false;
   };
+  /* V9.6.108（父亲大人："队伍上阵又上不了了，其他东西也都点不了了"）：
+     判断一颗热区是不是**当前引导要你点的那一片**。
+     用途：有些热区是"给引导当锚点"的整块区域（队伍阵型 party_board、六维卡 attr_card、
+     关卡格 stage_grid…），它们**没有动作**却盖在真按钮上面 ——
+     以前触摸层会把点击派发给它们（因为它们在有引导时"被放行"），于是
+     点队伍空位派发的是 party_board → 什么都不发生 → 上不了阵、整页像死了。
+     现在这类"没有处理器的锚点"只有在"引导正开着、且它就是引导目标"时才吃点击
+     （那时点它＝关掉引导），其余情况一律让下面的真按钮拿到点击。 */
+  U.coachIsTarget = function (h) {
+    if (!coachState) return false;
+    const want = [].concat(coachState.targetId);
+    for (let i = 0; i < want.length; i++) {
+      const w = String(want[i]);
+      if (w.slice(-1) === '*') { if (String(h.id).indexOf(w.slice(0, -1)) === 0) return true; }
+      else if (String(h.id) === w) return true;
+    }
+    return false;
+  };
   /* 点中"高亮的那颗"才算过。swallow=true 时这一下**只推进引导、不执行原动作**
      （逐项介绍用：点一下"【境界】"只是听下一项，不该顺手把页面跳走）。 */
   const _dispatch = CV.dispatch;
@@ -702,7 +720,13 @@
        如果那一步的按钮**当前不可用**（比如资源不够），也照样写明，别让人对着一个不亮的按钮发呆。 */
     const textAll = coachState.text + ((!r && coachState.where) ? ('  → 去「' + coachState.where + '」完成这一步。') : '');
     const lines = CV.wrap(textAll, CV.W - 60 * CV.SCALE, CV.FS.lg, 6);
-    const th = 44 * CV.SCALE + lines.length * CV.FS.lg * 1.7;
+    /* V9.6.108（父亲大人："去了那个小字后框也没跟着缩上去"）：
+       卡片高度原来按"上下各 22"算（44），其中下面那 22 是留给「跳过这一步」那行小字的。
+       小字去掉之后，底部就多出一整条空白。现在按内容算：
+         有高亮 → 底部只留 10；
+         没高亮 → 底部留 20（那里还要写一行「点任意处继续 ›」）。 */
+    const padBottom = r ? 10 : 20;
+    const th = 22 * CV.SCALE + lines.length * CV.FS.lg * 1.7 + padBottom * CV.SCALE;
     const tw = CV.W - 40 * CV.SCALE;
     const tx = 20 * CV.SCALE;
     const ty = r ? Math.min(CV.H - th - 40 * CV.SCALE, r.y + r.h + 16 * CV.SCALE) : (CV.H - th) / 2;
@@ -722,7 +746,7 @@
     c.restore();
     CV.hitMode = 'screen';
     if (!r) {
-      CV.text('点任意处继续 ›', tx + tw - 14 * CV.SCALE, ty + th - 16 * CV.SCALE,
+      CV.text('点任意处继续 ›', tx + tw - 14 * CV.SCALE, ty + th - 11 * CV.SCALE,
         { size: CV.FS.sm, color: CV.C.gold, align: 'right' });
       CV.hit('_coach_ok', 0, 0, CV.W, CV.H);
     }

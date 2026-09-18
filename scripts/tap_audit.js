@@ -133,5 +133,51 @@ Object.keys(CV.panels || {}).forEach((page) => {
 });
 
 console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.panels || {}).length + ' 个');
+
+/* ---- V9.6.108：**锚点区域不许吃点击** ----
+   有些热区是"给引导当锚点"的整块区域（party_board / attr_card / stage_grid / grid:* / hero:*），
+   它们没有处理器，却盖在真按钮上面 —— 触摸层是"最后登记的那颗优先"，
+   于是点真按钮时派发的是这些区域 → 什么都不发生。
+   实测就是这么把"队伍上阵"整页点死的（点空位派发 party_board）。
+   这里逐页检查：对每一颗"没有处理器"的热区，看它压住了哪些"有处理器"的热区，
+   然后在**真按钮的中心**点一下，确认那颗真按钮的处理器真的跑到。 */
+{
+  let eaten = 0, checked = 0;
+  const hasH = (id) => {
+    if (CV.onAct[id]) return true;
+    const i = String(id).indexOf(':');
+    return i > 0 && !!CV.onAct[String(id).slice(0, i + 1) + '*'];
+  };
+  Object.keys(CV.panels || {}).forEach((page) => {
+    openState();
+    /* 每页都从干净状态开始：上一页留下的弹窗/引导热区会把结果带偏 */
+    if (U) { U.overlay = null; if (U.coachClearAll) U.coachClearAll(); }
+    let hits = [];
+    try { CV.reset(page); hits = (CV.hits || []).slice(); } catch (e) { return; }
+    const dead = hits.filter((h) => !hasH(h.id));
+    const live = hits.filter((h) => hasH(h.id));
+    dead.forEach((d) => {
+      live.forEach((l) => {
+        /* 只在**同一坐标系**里比：屏幕坐标（顶栏/底栏/弹窗）和内容坐标（页面内容）
+           数值上会"重叠"，但那不是真的压住（V9.6.108 修假警报）。 */
+        if (!!d.screen !== !!l.screen) return;
+        const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+        const inside = cx >= d.x && cx <= d.x + d.w && cy >= d.y && cy <= d.y + d.h;
+        if (!inside) return;
+        checked++;
+        /* 真按钮的中心如果也落在锚点区域里 → 点那里，看真正跑到的是谁 */
+        const top = hits.slice().reverse().find((h) => !!h.screen === !!l.screen
+          && cx >= h.x && cx <= h.x + h.w && cy >= h.y && cy <= h.y + h.h && hasH(h.id));
+        const winner = top ? top.id : null;
+        if (winner !== l.id) {
+          eaten++;
+          console.log('  ⚠ 被锚点吃掉：' + page + ' 页的「' + l.id + '」被「' + d.id + '」压住，点它会派发成 ' + (winner || '（什么都不是）'));
+        }
+      });
+    });
+  });
+  console.log('\n锚点覆盖检查：核了 ' + checked + ' 处 · 被吃掉 ' + eaten + ' 处');
+  if (eaten) { bad++; }
+}
 console.log('结论：' + (bad ? '✗ 有 ' + bad + ' 处崩溃' : '没有交互崩溃 ✓') + (warn ? '；' + warn + ' 个死键待核' : '；没有死键 ✓') + '\n');
 process.exitCode = bad ? 1 : 0;
