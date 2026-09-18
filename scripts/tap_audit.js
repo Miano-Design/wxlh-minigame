@@ -54,7 +54,11 @@ CV.setup(global.wx.getWindowInfo());
 /* 故意没有动作的热区：①纯给引导当锚点（attr_card / party_board / stage_grid / hero:N / grid:*）
    ②调试暗门（gm_tap 由连点计数处理） */
 const INERT = ['attr_card', 'party_board', 'stage_grid', 'gm_tap', 'hero:', 'grid:'];
-const inertOk = (id) => INERT.indexOf(id) >= 0 || /^poke:/.test(id) === false && false;
+/* V9.6.109（尺子自审）：这行原来是 `INERT.indexOf(id) >= 0 || /^poke:/.test(id) === false && false`
+   —— 后半截恒为 false（`x === false && false`），是当初改到一半留下的乱码。
+   行为上没错，但"看不懂的表达式"本身就是隐患，现在写成一句人话：
+   锚点类热区（纯给引导当落点）不算死键。 */
+const inertOk = (id) => INERT.indexOf(id) >= 0;
 
 let bad = 0, warn = 0, taps = 0;
 

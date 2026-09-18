@@ -210,7 +210,11 @@ if (dupKeys.length) fail('这些 key 重了但没在 TOPIC_KEY 里声明共用�
 else console.log('✓ 规则② key 没有意外重复');
 
 /* ---------- ③ 每个主线步都要有引导（或有写明理由的豁免） ---------- */
-const EXEMPT = { q03: '招募在开场三区块里讲过，不重复' };
+/* V9.6.109（尺子自审）：这条豁免过期了 —— q03「第一位同伴」**已经有自己的引导条目**了
+   （V9.6.103 补的：玩家主动点「去完成」永远该有话说）。
+   留着豁免反而危险：哪天那条引导被删掉，这把尺子也不会吭声。
+   现在豁免表清空 —— 27 步必须**每步都有引导**。 */
+const EXEMPT = {};
 const questBlock = data.slice(data.indexOf('const MAIN_QUESTS = ['), data.indexOf('\n  ];', data.indexOf('const MAIN_QUESTS = [')));
 const quests = [];
 questBlock.replace(/\{ id: '([a-z0-9_]+)', name: '([^']+)'/g, (m, id, name) => { quests.push({ id: id, name: name }); return m; });

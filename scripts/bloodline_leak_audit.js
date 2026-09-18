@@ -45,7 +45,11 @@ const CV = global.CV, Core = global.Core, D = global.DATA;
 CV.setup(global.wx.getWindowInfo());
 
 /* 「讲玩家自己」的页面 —— 这些页里出现别的血统名一律算串味 */
-const MY_PAGES = ['home', 'protag', 'realm', 'party', 'bag', 'bag_mat', 'bag_equip', 'gm', 'settings', 'grow', 'achievement'];
+/* V9.6.109（尺子自审）：原来列了 `bag_mat` / `bag_equip` 两个**根本不存在的页面名** ——
+   它们是早期"背包分池各一页"的写法，现在道具/材料/装备都是 `bag` 页里的标签，
+   装备详情是 `eqdetail`、道具详情是 `item`。页面名不存在时循环会静默跳过，
+   等于**白写两行**（看着覆盖了，其实没查）。现在按真实页面名来。 */
+const MY_PAGES = ['home', 'protag', 'realm', 'party', 'bag', 'item', 'eqdetail', 'gm', 'settings', 'grow'];
 const ALL = Object.keys(D.BLOODLINES);
 const REALMS = {}; ALL.forEach((b) => { REALMS[b] = D.BLOODLINES[b].realms; });
 /* 「渡劫」既是修真那条线的第 9 个大境名，也是全站通用的**动作词**
