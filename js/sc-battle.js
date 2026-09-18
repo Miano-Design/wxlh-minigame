@@ -524,8 +524,11 @@
   G.BattleUI = {
     buildAllies,
     state: B,
+    /* V9.6.89（父亲大人报的"网页版斗法台能连点跳层"）：小游戏这边同一套结构，
+       也补上防重入 —— 连点两下挑战只会开一场，而不是两场各自结算。 */
+    busy: function () { return !!(B.on && B.res); },
     /* 打一场：cfg = { title, allies, enemies, worldId, maxRounds, onEnd(win,res,hpLeft), onQuit, onClose } */
-    run(cfg) { start(cfg); fight(G.Battle.run({ allies: cfg.allies, enemies: cfg.enemies, worldId: cfg.worldId, maxRounds: cfg.maxRounds, allyHitMod: (G.Battle.MECHANICS[cfg.worldId] || {}).allyHitMod || 0 })); },
+    run(cfg) { if (this.busy()) { CV.toast('战斗进行中…'); return false; } start(cfg); fight(G.Battle.run({ allies: cfg.allies, enemies: cfg.enemies, worldId: cfg.worldId, maxRounds: cfg.maxRounds, allyHitMod: (G.Battle.MECHANICS[cfg.worldId] || {}).allyHitMod || 0 })); },
     fight,
     clear: function () { clearTimer(); B.on = false; B.res = null; B.panel = null; B.cfg = null; },
   };

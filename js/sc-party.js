@@ -130,7 +130,10 @@
         CV.text(buff, U.ix() + U.iw() - 8 * CV.SCALE, top + 30 * CV.SCALE, { size: CV.FS.xs, color: on ? CV.C.green : CV.C.dim, align: 'right' });
         U.y = top + h + 6 * CV.SCALE;
       });
-      U.hint('克制环：先锋→策略→科技→异能→先锋（克制伤害+15%）', 4 * CV.SCALE);
+      /* V9.6.89：这句原来**写死了旧阵营名**（先锋→策略→科技→异能），
+         阵营改地名之后小游戏这边还挂着老名字。现在从 D.FACTIONS 现场拼，
+         以后改阵营名不会再漏掉这一处。 */
+      U.hint('克制环：' + D.FACTIONS.concat([D.FACTIONS[0]]).join('→') + '（克制伤害+15%）', 4 * CV.SCALE);
     });
   });
 
