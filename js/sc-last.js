@@ -126,15 +126,16 @@
   function goQuest(qid) {
     U.coachForce(2500);          // 主动求引导：这一步的说明这次一定再讲一遍（与网页版同步）
     const worldOf = { q12: 'W02', q14: 'W02', q15: 'W03' }[qid] || 'W01';
-    if (qid === 'q01' || qid === 'q13') { CV.cur = 'home'; CV.reset('home'); CV.push('protag'); return; }
-    if (qid === 'q03') { CV.cur = 'home'; CV.reset('home'); CV.push('recruit'); return; }
-    if (qid === 'q09') { CV.cur = 'home'; CV.reset('home'); CV.push('buildings'); return; }
-    if (qid === 'q04') { CV.cur = 'home'; CV.reset('home'); CV.push('party'); return; }
+    /* V9.6.99（新手引导"真走一遍"的脚本抓出来的）：
+       原来这里**自己另写了一套落点**，只特判了 q01/q13/q03/q09/q04/q07/q11 七步，
+       其余全部走最后那行 —— 也就是**统统丢进残域**。实测 27 步里有 19 步是错的：
+       秘术阁 / 法宝 / 药园 / 求签 / 斗法台 / 坐骑 / 挂机分工 / 悬赏 / 境界 / 伴生体 /
+       灯录 / 转生 / 日常任务…点「去完成」全被送到残域，屏幕上还飘一句
+       "点第 1 关就直接开打" —— 父亲大人报的"点了它跳去别处、弹窗内容不对"就是这里。
+       现在落点**只认引导表**（sc-home 的 TUT：每一步在哪一页、指哪颗，表里写着），
+       这里不再维护第二份映射，以后加主线步也不会再漏。 */
     if (qid === 'q07') {
-      /* V9.6.32（父亲大人："点去完成直接跳到背包，也不是引导我去背包、点装备、再强化"）：
-         只"送到页面"不算带路 —— 网页版是「切到装备栏 + 给第一件装备打引导」。
-         这里照做：先切到装备标签，再对第一件装备挂引导，最后干净地进背包页
-         （引导要在 reset 之前登记，reset 那次渲染就会把它画出来）。 */
+      /* 装备强化：不能只"送到背包"，得切到装备栏 + 给第一件装备打引导（网页版同款） */
       CV.cur = 'bag';
       CV.dispatch('bagview:equip');
       const first7 = (Core.inventoryEquips() || [])[0];
@@ -142,7 +143,14 @@
       CV.reset('bag');
       return;
     }
-    if (qid === 'q11') { CV.cur = 'home'; CV.reset('home'); CV.push('corridor'); return; }
+    const dest = (G.questTarget && G.questTarget(qid)) || null;
+    /* 战斗类主线步（在「残域」里）：直达对应世界的关卡页，由 world 页的引导指到那一关 */
+    const WORLD_STEPS = { q01b: 1, q02: 1, q05: 1, q10: 1, q12: 1, q14: 1, q15: 1 };
+    if (WORLD_STEPS[qid] || dest === 'world') {
+      CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf); return;
+    }
+    if (dest) { CV.cur = 'home'; CV.reset('home'); CV.push(dest); return; }
+    /* 兜底：引导表里没写落点的，仍然送去残域（不该发生 —— 有 guide_audit 盯着） */
     CV.cur = 'dungeon'; CV.reset('dungeon'); CV.dispatch('w:' + worldOf);
   }
   /* 首页的「去完成」也要用它 —— 挂到 G 上共用（sc-home 比 sc-last 先加载，但按钮是点击时才跑，拿得到） */

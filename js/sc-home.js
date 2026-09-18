@@ -184,6 +184,11 @@
     q15:  { page: 'world', s: ['stage:11', 'stage_grid'],  t: '最后这个世界「怨声旧宅」的守关 Boss —— 点第 12 关。打之前先把挂机收益收掉、装备拉满。' },
     q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
   };
+  /* V9.6.99（"点去完成把我送到别的界面、弹窗内容还不对"）：
+     每一步该去哪一页、指哪一颗，**这张表就是唯一出处**。
+     sc-last 的 goQuest 以前自己另写了一套落点（只特判 7 步、其余全丢进残域），
+     于是秘术阁/药园/求签/斗法台/伴生体/灯录/转生…统统被送到残域。现在它来问这里。 */
+  G.questTarget = function (qid) { return (TUT[qid] && TUT[qid].page) || null; };
   function coachByQuest(page) {
     const cu = Core.currentQuest && Core.currentQuest();
     const qid = cu && cu.q && cu.q.id;
