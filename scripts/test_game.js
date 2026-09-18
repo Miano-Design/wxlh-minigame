@@ -1352,6 +1352,21 @@ setParty(['C021']);
   t('境界共 36 小阶', D.REALMS.length === 36);
   t('首阶是炼气初期', D.REALMS[0].full === '炼气初期' && D.REALMS[0].lv === 10);
   t('末阶是渡劫大圆满', D.REALMS[35].full === '渡劫大圆满' && D.REALMS[35].lv === 100);
+  /* V9.6.97：血统各有自己的境界名（狼人=兽崽/幼狼… 科技=改造体/义体兵… 修真=炼气/筑基…）。
+     全局渡劫表 D.REALMS 上的 name/full 是**当年只有一条境界线时写死的修真名**，
+     界面上一律不许直接读它 —— 父亲大人报过"小游戏选科技，进游戏变成修真了"，
+     根因就是小游戏境界页那句「下一阶 · 」取了 nx.full。
+     境界名必须走 D.realmName(血统, 阶) / realmState().curName / nextName。
+     这条是源码级断言，网页版与小游戏同时受检（小游戏的 test_game 是逐字节同步过去的）。 */
+  {
+    const uiFiles = fs.readdirSync('js').filter((f) => /^ui\.js$/.test(f) || /^sc-.*\.js$/.test(f) || f === 'uiw.js');
+    const offenders = uiFiles.filter((f) => {
+      const src = fs.readFileSync(path.join('js', f), 'utf8');
+      return /REALMS\[[^\]]*\]\.(name|full)|\bnx\.full\b|\bnext\.full\b|\.nextName\s*\)\s*\|\|\s*[A-Za-z_$][\w$]*\.full/.test(src);
+    });
+    t('境界显示名一律走 realmName(血统, 阶)，界面不直接读渡劫表的 name/full',
+      offenders.length === 0, offenders.join('、') || '干净');
+  }
   t('36 阶加成总量≈旧 10 境的 +50%', Math.abs(D.REALMS.length * D.REALM_PCT - 0.5) < 0.02);
 
   Core.S.items.mat_t1 = 2;

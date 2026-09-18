@@ -81,6 +81,7 @@ node scripts/boot_audit.js         # 开机与心跳：挂机入池 / 离线结�
 node scripts/parity_audit.js       # 两仓对表：网页版有、小游戏没跟的界面文案（相似度分档）
 node scripts/spacing_audit.js      # 行距尺子：canvas 里两行文字有没有挤在一起（按 CSS 行高核）
 node scripts/overlay_audit.js      # 弹窗布局尺子：标题/正文/胶囊/小字/按钮之间不许重叠
+node scripts/bloodline_leak_audit.js  # 血统串味：讲玩家自己的页面里不许出现别的血统/境界名
 node scripts/equip_render_audit.js # 该画的装备卡有没有真画出来（静默 bug）
 node scripts/canvas_audit.js       # canvas 界面与网页版口径一致性
 node scripts/coach_audit.js        # 引导表自洽

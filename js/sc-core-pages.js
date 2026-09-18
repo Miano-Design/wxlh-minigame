@@ -125,7 +125,14 @@
       const nx = st.next;
       if (nx) {
         U.space(CV.SP[1]);
-        U.h3('下一阶 · ' + (nx.full || nx.name), '成功率 ' + Math.round(nx.rate * 100) + '%');
+        /* V9.6.97（父亲大人："选科技，进游戏变成修真了"）——**就是这一行**：
+           `nx` 是全局渡劫表 D.REALMS（等级 / 消耗 / 成功率），它上面的 `name`/`full`
+           是**修真那条线**的名字（炼气 / 筑基 / 金丹…），当初只有一个境界线时写死的。
+           血统=定位之后，每支血统有自己的境界名，网页版早就改成 `st.nextName`（血统感知），
+           小游戏这行漏了 —— 于是任何血统进来都会看到「下一阶 · 炼气」，
+           看着就像"血统被换成修真了"。 */
+        /* 回退一律用 '—'，**不许再退回渡劫表的旧名字**（那正是当初串味的来源） */
+        U.h3('下一阶 · ' + (st.nextName || '—'), '成功率 ' + Math.round(nx.rate * 100) + '%');
         U.kv('等级要求', 'Lv.' + nx.lv + '（当前 Lv.' + Core.S.player.level + '）', Core.S.player.level >= nx.lv ? CV.C.green : CV.C.dim);
         U.kv('渡劫材料', ((D.ITEMS[st.matItem] || {}).name || st.matItem) + ' ' + st.haveMat + ' / ' + st.matN);
         U.kv('点数', '◈ ' + fmt(st.points));
