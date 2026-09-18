@@ -572,6 +572,17 @@
     const S = Core.S;
     const it = D.ITEMS[curItem] || {};
     const sd = it.serum || {};
+    /* V9.6.101（换档审计抓到的）：curItem 是模块级变量，换档之后可能还停在上一次的血清上，
+       这时 `sd.max` 是 undefined —— 页面会画出「已服 0/undefined」这种烂字。
+       参数缺失就优雅退场，别照着上一局画。 */
+    if (!it.serum) {
+      U.begin();
+      U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
+      U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+      U.hint('这支血清的数据不在了（可能刚换过存档）—— 回背包重新点一次就好。', 0);
+      return;
+    }
+    const serumMax = sd.max || 0;
     const sid = String(curItem).replace(/^serum_/, '');
     const have = S.items[curItem] || 0;
     const cnt = Math.max(1, Math.min(serumCount || 1, have));
@@ -599,9 +610,9 @@
       U.card(function () {
         usable.forEach(function (r) {
           const taken = Core.serumTaken(r.id, sid);
-          const full = taken >= (sd.max || 0);
+          const full = taken >= serumMax;
           listBtn({
-            t1: r.name, t2: r.sub + ' · 已服 ' + taken + '/' + sd.max + (full ? ' · 已满' : ''),
+            t1: r.name, t2: r.sub + ' · 已服 ' + taken + '/' + serumMax + (full ? ' · 已满' : ''),
             dim: full, tag: full ? '已满' : null,
             btn: full ? null : ['喂 ' + cnt + ' 支', 'primary', 'serumtarget:' + r.id],
           });

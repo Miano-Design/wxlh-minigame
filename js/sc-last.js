@@ -710,7 +710,16 @@
   });
   CV.register('pickleader', function () {
     const S = Core.S;
-    const line = (D.IDLE_LINES || []).find((l) => l.id === leaderLine);
+    const line = (D.IDLE_LINES || []).find((l) => l.id === leaderLine) || {};
+    /* V9.6.101（换档审计抓到的）：`line` 可能找不到 —— leaderLine 是模块级变量，
+       读存档槽 / 导入存档 / 删档之后它可能还停在上一次的产线上，
+       而 `line.attrName` 没有保护 → **整页抛错**（Cannot read properties of undefined）。
+       这类"参数过期"的页一律优雅退场，别把人崩在空白页上。 */
+    if (!line.id) {
+      U.begin(); head('派遣领队');
+      U.hint('这条产线不存在（可能刚换过存档）—— 回上一页重新进一次就好。', 0);
+      return;
+    }
     const cur = (S.idle.lines || {})[leaderLine];
     const row = (Core.idleLines() || []).find((x) => x.line.id === leaderLine) || {};
     U.begin(); head('派遣领队');
