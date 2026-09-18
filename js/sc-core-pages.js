@@ -339,7 +339,9 @@
             { size: CV.FS.sm, align: 'center', color: mine ? rarColor(c.rarity) : CV.C.dim });
           CV.text(mine ? c.bloodline : c.rarity, x + cw / 2, y + 42 * CV.SCALE,
             { size: CV.FS.xs, align: 'center', color: CV.C.dim });
-          if (!mine) CV.text(c.rarity, x + cw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.dim });
+          /* V9.6.93（行距尺子查出来的）：未获得的格子原来把稀有度**画了两遍** ——
+             一条在 y+12（正好压在「？」上，两行只差 10px 就叠一起了），一条在 y+42。
+             删掉 y+12 那条：未获得的格子 = 「？」+ 稀有度两行，和已获得的两行版式一致。 */
         });
         U.y = y0 + Math.ceil(list.length / cols) * (ch + gap) - gap;
       });

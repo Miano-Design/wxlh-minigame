@@ -370,26 +370,47 @@
        现在照网页版：内容块高 = 按钮高（40），标题/奖励两行在这个高度里排。 */
     U.card(function () {
       const BH = U.BTN_SM * CV.SCALE, top = U.y;
+      /* V9.6.93（父亲大人："主线任务那个板块大字和小字贴一起了"）：
+         网页版这块是 `.t1` + 两条 `.t2`，行距按 CSS 精确算：
+           .t1  font-size 15 · line-height 1.35 → 行盒 20.25
+           .t2  font-size 11 · line-height 1.55 → 行盒 17.05，且 **margin-top: 0.25rem = 4px**
+         小游戏以前把三行写死在 top+10 / top+24 / top+39（推进只有 14、15），
+         比网页版少了 6px 一行 —— 所以"大字和小字贴在一起"。
+         现在照 CSS 直接算，行盒高度决定卡片高度（网页版是内容撑高，不是按钮撑高）。 */
+      const LH1 = CV.FS.f1 * 1.35;              // 20.25 标题行
+      const LH2 = CV.FS.sm * 1.55;              // 17.05 小字行
+      const LGAP = 4 * CV.SCALE;                // .t2 的 margin-top
+      const y1 = LH1 / 2;                       // 标题中线
+      const y2 = LH1 + LGAP + LH2 / 2;          // 完成条件中线
+      const y3 = LH1 + LGAP + LH2 + LGAP + LH2 / 2;   // 完成奖励中线
       if (q) {
         const label = q.done ? '领取奖励' : '去完成 ›';
         const bw = CV.measure(label, CV.FS.md) + 26 * CV.SCALE;
-        const tw = CV.measure('主线 · ' + q.q.name, CV.FS.f1, true);
         const tag = '第 ' + (qi + 1) + '/' + mq.length + ' 步';
-        const tagW = CV.measure(tag, CV.FS.xs) + 14 * CV.SCALE;
+        /* .tag：11px · line-height 1.4 + padding 1px 6px + border 1px → 盒高 19.4 */
+        const tagH = CV.FS.xs * 1.4 + 2 * CV.SCALE + 2 * CV.SCALE;
+        const tagW = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE + 2 * CV.SCALE;
         const textW = U.iw() - bw - 10 * CV.SCALE;
-        CV.text(CV.fit('主线 · ' + q.q.name, textW, CV.FS.f1, true), U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
-        CV.round(U.ix() + tw + 8 * CV.SCALE, top + 3 * CV.SCALE, tagW, 17 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
-        CV.text(tag, U.ix() + tw + 8 * CV.SCALE + tagW / 2, top + 11.5 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
+        /* 标题要给右边的步数标签**留位置**（网页版是 flex 行：标题 + tag 同排，
+           标题过长时自己换行）—— 原来按未截断的宽度量，长任务名会把标签顶出卡片。 */
+        const title = CV.fit('主线 · ' + q.q.name, textW - tagW - 6 * CV.SCALE, CV.FS.f1, true);
+        const tw = CV.measure(title, CV.FS.f1, true);
+        CV.text(title, U.ix(), top + y1, { size: CV.FS.f1, bold: true });
+        /* 标签和标题**同一中线**（.t1 是 align-items:center 的 flex 行） */
+        CV.round(U.ix() + tw + 6 * CV.SCALE, top + y1 - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
+        CV.text(tag, U.ix() + tw + 6 * CV.SCALE + tagW / 2, top + y1, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
         /* V9.6.72（父亲大人："通关条件这一行小字注释吧，要符合实际"）：
            desc 就是判定条件，原样写出来；check 和 desc 必须一致（网页版有审计规则⑥盯着）。 */
-        CV.text(CV.fit('完成条件：' + q.q.desc, textW, CV.FS.sm), U.ix(), top + 24 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + 39 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        U.btn(U.ix() + U.iw() - bw, top, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
+        CV.text(CV.fit('完成条件：' + q.q.desc, textW, CV.FS.sm), U.ix(), top + y2, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + y3, { size: CV.FS.sm, color: CV.C.dim });
+        /* 按钮跟整块内容**垂直居中**（.list-row 是 align-items:center），不是贴顶 */
+        U.btn(U.ix() + U.iw() - bw, top + (y3 + LH2 / 2 - BH) / 2, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
+        U.y = top + y3 + LH2 / 2 + LGAP;     // 内容撑高（= 20.25 + 4 + 17.05 + 4 + 17.05）
       } else {
-        CV.text('主线 · 已走完', U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true });
-        CV.text('挑战更高难度与深井', U.ix(), top + 29 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text('主线 · 已走完', U.ix(), top + y1, { size: CV.FS.f1, bold: true });
+        CV.text('挑战更高难度与深井', U.ix(), top + y2, { size: CV.FS.sm, color: CV.C.dim });
+        U.y = top + y2 + LH2 / 2;            // 两行版：20.25 + 4 + 17.05
       }
-      U.y = top + BH;
     });
 
     /* ③ 养成（网页版 growBlock）：一条线一个入口 + 未解锁的收成一行灰字 */
