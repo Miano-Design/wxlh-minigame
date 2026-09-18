@@ -45,7 +45,7 @@ global.wx = {
   .concat(fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)))
   .forEach((f) => { const p = path.join(JS, f); if (fs.existsSync(p)) require(p); });
 
-const CV = global.CV, Core = global.Core, D = global.DATA;
+const CV = global.CV, Core = global.Core, D = global.DATA, U = global.GameGlobal.U;
 CV.setup(global.wx.getWindowInfo());
 /* 底栏四个页签的处理器是在**真实入口 game.js** 里注册的，这里补上（否则会把 tab:* 误判成死键） */
 (CV.NAV_TABS || []).forEach((t) => { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
@@ -102,7 +102,29 @@ Object.keys(CV.panels || {}).forEach((page) => {
       console.log('⚠ 死键：' + page + ' 页的 ' + id + ' 没有处理器（看着能点、点了没反应）');
       return;
     }
-    try { CV.dispatch(id); }
+    try {
+      /* V9.6.104：**有处理器 ≠ 真的跑到了**。
+         上一轮那类 bug（点「去完成」被引导那道闸吃掉、页面没跳）就是"处理器在，
+         但派发时被拦下了"。这里在**正常状态**（没有弹窗、没有引导）下派发，
+         并盯住处理器到底有没有被调用 —— 被吃掉就报出来。 */
+      if (U && U.overlay) U.overlay = null;
+      if (U && U.coachDrop) U.coachDrop();
+      let ran = false;
+      const exact = CV.onAct[id];
+      const i0 = String(id).indexOf(':');
+      const pref0 = i0 > 0 ? String(id).slice(0, i0 + 1) + '*' : null;
+      const preFn = pref0 ? CV.onAct[pref0] : null;
+      const mark = function (fn) { return function () { ran = true; return fn.apply(this, arguments); }; };
+      if (exact) CV.onAct[id] = mark(exact);
+      if (preFn) CV.onAct[pref0] = mark(preFn);
+      CV.dispatch(id);
+      if (exact) CV.onAct[id] = exact;
+      if (preFn) CV.onAct[pref0] = preFn;
+      if (!ran) {
+        warn++;
+        console.log('⚠ 被闸门吃掉：' + page + ' 页的 ' + id + ' 有处理器，但派发时没跑到（正常状态下不该发生）');
+      }
+    }
     catch (e) {
       bad++;
       console.log('✗ ' + page + ' 页点 ' + id + ' 崩了：' + e.message);
