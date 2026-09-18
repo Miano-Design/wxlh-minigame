@@ -73,6 +73,7 @@ python3 -m http.server 8000
 # 逻辑层（跟网页版同一份，逐字节同步）
 node scripts/test_game.js          # 701 项：玩法 / 数值 / 存档 / 边界
 # 画布界面层（小游戏独有）
+node scripts/journey_audit.js      # 关键路径体检：开局/上阵/强化/招募/副本/挂机 + 23 个入口（真触摸，按“事”走）
 node scripts/page_smoke.js         # 51 页逐页真渲染（改文案/改数据崩页，第一条就抓住）
 node scripts/tap_audit.js          # 全界面点一遍：死键 / 被闸门吃掉 / 锚点区域吃点击
 node scripts/frame_audit.js        # 帧状态：漏还原 / 位移跑偏 / 底栏出画 / 窗口变化
