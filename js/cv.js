@@ -43,22 +43,43 @@
 
   /* ---------- 初始化：按真实窗口算尺寸（不再"375 设计 + 整体缩放"） ---------- */
   CV.setup = function (info) {
-    const pxW = info.windowWidth || 375;
-    const pxH = info.windowHeight || 812;
-    const dpr = info.pixelRatio || 1;
+    const canvas = wx.createCanvas();
+    CV.canvas = canvas;
+    CV.ctx = canvas.getContext('2d');
+    CV.relayout(info || {});
+    try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
+    return CV;
+  };
+
+  /* ---------- 按窗口尺寸重算布局（开机 + 每次窗口变化都走这里） ----------
+     V9.6.90（父亲大人："底部导航栏出画，刚开始不会，点几下就出画了"）：
+     以前尺寸只在开机算一次，而且 **dpr 缩放只 scale() 了一次** ——
+     只要主画布被平台重设过一次尺寸（微信在**窗口尺寸变化 / 键盘弹出 / 前后台切换**时会重设
+     主画布，重设会**清空整个 ctx 状态**，包括我们那次 scale），
+       ① 缩放没了 → 整块界面按 1/dpr 画，底栏整条跑到画面外；
+       ② CV.H 还是老值 → 底栏按老高度摆，窗口一变矮就出画。
+     现在：尺寸变化一律重算；并且**每帧都显式 setTransform**（见 CV.render），
+     外部谁把变换洗掉了都不影响我们。 */
+  CV.relayout = function (info) {
+    info = info || {};
+    const pxW = info.windowWidth || CV.pxW || 375;
+    const pxH = info.windowHeight || CV.pxH || 812;
+    const dpr = info.pixelRatio || CV.DPR || 1;
     const sa = info.safeArea || null;
     CV.safeTop = sa && sa.top ? sa.top : 0;
     CV.safeBottom = sa && sa.bottom != null ? Math.max(0, pxH - sa.bottom) : 0;
     CV.W = Math.min(520, pxW);            // 网页版 #app 的 max-width: 520
     CV.H = pxH;
     CV.DPR = dpr;
-    const canvas = wx.createCanvas();
-    canvas.width = Math.round(pxW * dpr);
-    canvas.height = Math.round(pxH * dpr);
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    CV.ctx = ctx;
     CV.pxW = pxW; CV.pxH = pxH;
+    const canvas = CV.canvas;
+    if (canvas) {
+      const bw = Math.round(pxW * dpr), bh = Math.round(pxH * dpr);
+      /* 只在真的变了时才赋值（赋值会清空 ctx 状态） */
+      if (canvas.width !== bw) canvas.width = bw;
+      if (canvas.height !== bh) canvas.height = bh;
+      try { CV.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); } catch (e) {}
+    }
     /* —— 令牌缩放：与网页版保持一致（父亲大人要求"网页版是唯一标准"）——
        V9.5.84：网页版把根字号从 clamp(14.5px, 3.85vw, 16px) 改成**固定 16px**，
        原因是 375 及以下的手机上根字号只有 14.5px，最小那档字号 11×0.906 = **9.97px**，
@@ -72,7 +93,6 @@
     CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k;
     CV.NAV_H = 62 * k;
     CV.NAV_BASE = 62 * k;      // 底栏基准高：战斗页会把它清成 0（整屏接管），离开时必须恢复
-    try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
     return CV;
   };
 
@@ -272,7 +292,14 @@
        现在非 chromeless 一律恢复成基准值。 */
     if (chromeless) { CV.TOP = CV.safeTop; CV.NAV_H = 0; }
     else { CV.NAV_H = CV.NAV_BASE || (62 * CV.SCALE); }
+    /* V9.6.90（父亲大人："底部导航栏出画，刚开始不会，点几下就出画了"）：
+       画布变换**每帧显式归位**，不再依赖开机那一次 scale()。
+       微信在窗口尺寸变化 / 键盘弹出 / 切前后台时会**重设主画布**，重设会清掉 ctx 的全部状态
+       （变换、裁剪、线宽…）。那时候界面就会按 1/dpr 画，底栏整条被推出画面 ——
+       而且"点几下才犯"（正好点了要弹键盘的输入框）。现在从根上不成立。 */
+    try { c.setTransform(CV.DPR, 0, 0, CV.DPR, 0, 0); } catch (e) {}
     c.save();
+    try {
     /* V9.6.10（父亲大人："整体画面笨重、没网页版精致"自审）：
        网页版 #app 是 `linear-gradient(180deg, --bg2, --bg)`（上略亮、下压暗），
        小游戏原来是一块平色 —— 平色在手机上会显得糊、重。照网页版铺一层竖向渐变。 */
@@ -285,17 +312,23 @@
     if (CV.top().name === 'battle') CV.battleHead((CV.top().opts && CV.top().opts.title) || '战斗');
     else if (!chromeless) CV.topbar();
     c.save();
-    c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
-    c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
-    CV.y = 0;
-    const fn = CV.panels[CV.top().name];
-    if (fn) fn(CV.top().opts);
-    /* V9.6.30：引导气泡集中在这里挂 —— 页面画完、CV.hits 已经齐了，查表就知道该给哪颗按钮做引导。 */
-    if (G.coachFor) G.coachFor(CV.top().name);
-    /* 内容总高：游标在通用件里（U.y），以前这里读的是 CV.y —— 那个变量在渲染时被归零后
-       再没人写过，于是 contentH 恒等于 20、maxScroll 恒为 0，**滚动等于没有**（V9.5.93 修）。 */
-    CV.contentH = ((G.U && G.U.y) || CV.y || 0) + 20;
-    c.restore();
+    /* 内容层再包一层 try/finally：任何一页画到一半抛错（改文案、改数据最容易犯），
+       也要把"裁剪 + 位移"还回去 —— 否则这一帧脏掉的坐标系会留在共享 ctx 上，
+       下一帧从脏坐标起画，越点越偏、底栏整条跑出画面（V9.6.90）。 */
+    try {
+      c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
+      c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
+      CV.y = 0;
+      const fn = CV.panels[CV.top().name];
+      if (fn) fn(CV.top().opts);
+      /* V9.6.30：引导气泡集中在这里挂 —— 页面画完、CV.hits 已经齐了，查表就知道该给哪颗按钮做引导。 */
+      if (G.coachFor) G.coachFor(CV.top().name);
+    } finally {
+      /* 内容总高：游标在通用件里（U.y），以前这里读的是 CV.y —— 那个变量在渲染时被归零后
+         再没人写过，于是 contentH 恒等于 20、maxScroll 恒为 0，**滚动等于没有**（V9.5.93 修）。 */
+      CV.contentH = ((G.U && G.U.y) || CV.y || 0) + 20;
+      c.restore();
+    }
     /* 内容画完才知道总高：把滚动量夹回合法范围（换页 / 状态变化后内容变短也要收回来）。
        V9.6.7（父亲大人："能一屏显示就一屏显示，不要还能上下拉一点的，很别扭"）：
        以前不管内容多高都额外加一段 CV.SP[1] 的下留白，于是**刚好铺满一屏**的页面
@@ -316,7 +349,10 @@
        既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */
     if (CV.pageOverlay) CV.pageOverlay();
     CV.drawToasts();
-    c.restore();
+    } finally {
+      /* 外层的还原也必须无条件执行（顶栏 / 吸顶条 / 覆盖层任何一处抛错都不能把坐标系留给下一帧） */
+      c.restore();
+    }
   };
 
   /* ---------- 顶栏（照网页版 #topbar：玩家行 + 货币行） ----------

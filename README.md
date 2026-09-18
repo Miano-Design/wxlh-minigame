@@ -70,8 +70,19 @@ python3 -m http.server 8000
 ## 测试
 
 ```bash
-node scripts/test_game.js   # 逻辑测试
-node scripts/test_ui.js     # 界面冒烟测试
+# 逻辑层（跟网页版同一份，逐字节同步）
+node scripts/test_game.js          # 694 项：玩法 / 数值 / 存档 / 边界
+# 画布界面层（小游戏独有）
+node scripts/page_smoke.js         # 51 页逐页真渲染（改文案/改数据崩页，第一条就抓住）
+node scripts/tap_audit.js          # 689 次点击：死键 + 交互崩溃
+node scripts/frame_audit.js        # 帧状态：漏还原 / 位移跑偏 / 底栏出画 / 窗口变化
+node scripts/battle_flow_audit.js  # 战斗页生命周期：防重入 / 多波无缝交接 / 结算离场
+node scripts/equip_render_audit.js # 该画的装备卡有没有真画出来（静默 bug）
+node scripts/canvas_audit.js       # canvas 界面与网页版口径一致性
+node scripts/coach_audit.js        # 引导表自洽
+node scripts/guide_audit.js        # 引导锚点 / 文案 / 数据项
+node scripts/cap_audit.js          # 上限与曲线
+node scripts/bloodline_audit.js    # 血统 → 战斗 / 阵营 / 装备 的整条下游链
 ```
 
 `test_game.js`（484 项）内含回归用例：免费招募 / SSR 券计入主线、十连按折扣价整笔结算、

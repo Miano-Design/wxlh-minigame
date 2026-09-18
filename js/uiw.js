@@ -338,17 +338,10 @@
     return h;
   };
 
-  /* ---------- 固定底部动作条（V9.5.54：按钮位置固定，不跟内容上下跳） ---------- */
-  U.actionBar = function (list) {
-    const gap = 10 * CV.SCALE, h = 44 * CV.SCALE;
-    const y = CV.H - CV.NAV_H - CV.safeBottom - h - 12 * CV.SCALE;
-    CV.ctx.fillStyle = CV.C.bg2;
-    CV.ctx.fillRect(0, y - 10 * CV.SCALE, CV.W, h + 22 * CV.SCALE);
-    const w = (U.cw() - gap * (list.length - 1)) / list.length;
-    list.forEach((b, i) => U.btn(U.pad() + i * (w + gap), y, w, h, b.label, b.style, b.id));
-    U.actionBottom = y;
-    return h;
-  };
+  /* V9.6.90：「固定底部动作条」U.actionBar 已删 —— 全仓没人调用（真正在用的两条底条
+     是"页面级覆盖层"：背包的批量分解条 CV.pageOverlay、招募的抽卡条），
+     而它按**屏幕坐标**算 y 却是在**内容层**里画的：谁哪天顺手用了它，
+     按钮就会整体下移一整个顶栏、贴着底栏甚至出画。留着就是一颗雷。 */
 
   /* ---------- 确认弹窗（网页版 confirmBox：居中、两个按钮） ---------- */
   U.confirm = function (title, text, onOk) {

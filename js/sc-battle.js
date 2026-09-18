@@ -67,6 +67,12 @@
     on: false, cfg: null, res: null, idx: 0, units: {}, log: [], floaters: [],
     speed: 1, timer: null, done: false, panel: null, energy: {}, tip: null,
     autoT: null, autoLeft: 0,
+    /* V9.6.90：防重入闸门**单独一个字段**。以前是拿 `B.on && B.res` 凑的 ——
+       看着能用，其实"波与波之间"正好也满足这两个条件，于是无缝交接那一瞬间
+       下一波会被自己挡掉（副本第 5 关起多波，第 2 波直接打不开）。
+       闸门现在只在这三处变：开打时立起 / 结算或撤离或离开战斗页时放下 /
+       无缝交接给下一波之前先放下。 */
+    busy: false,
   };
   const AUTO_NEXT_SEC = 8;         // 与网页版同一个值（AUTO_NEXT_SEC）
   let uidSeq = 0;
@@ -81,7 +87,7 @@
 
   function start(cfg) {
     clearTimer();
-    B.on = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
+    B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     B.speed = (Core.S.settings && Core.S.settings.speed) || 1;
     CV.battleSpeed = B.speed;
     B.title = cfg.title || '战斗';
@@ -226,7 +232,14 @@
       B.tip = B.panel.sub || '本波通过，继续推进…';
       const after = B.panel.after;
       B.panel = null;
-      B.timer = setTimeout(function () { B.tip = null; if (after) after(); }, 900);
+      B.timer = setTimeout(function () {
+        B.tip = null;
+        /* V9.6.90：**交接前先把闸门放下**。网页版是 overlay.remove()（= 放闸）在前、
+           afterWave() 在后；小游戏这版漏了，于是第 2 波 run() 被自己的防重入挡掉，
+           表现就是"第 5 关开始，第一波打完卡住，按啥都没用，只能撤离"。 */
+        B.busy = false;
+        if (after) after();
+      }, 900);
     }
     CV.render();
   }
@@ -508,13 +521,13 @@
   });
   CV.on('battle_quit', function () {
     U.confirm('撤离', '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。', function () {
-      clearTimer(); B.on = false; B.res = null; B.panel = null;
+      clearTimer(); B.on = false; B.res = null; B.panel = null; B.busy = false;
       const cfg = B.cfg; B.cfg = null;
       if (cfg && cfg.onQuit) cfg.onQuit(); else { CV.reset('dungeon'); }
     });
   });
   CV.on('battle_close', function () {
-    clearTimer(); B.on = false; B.res = null; B.panel = null;
+    clearTimer(); B.on = false; B.res = null; B.panel = null; B.busy = false;
     const cfg = B.cfg; B.cfg = null;
     if (cfg && cfg.onClose) cfg.onClose(); else CV.reset('dungeon');
   });
@@ -526,10 +539,10 @@
     state: B,
     /* V9.6.89（父亲大人报的"网页版斗法台能连点跳层"）：小游戏这边同一套结构，
        也补上防重入 —— 连点两下挑战只会开一场，而不是两场各自结算。 */
-    busy: function () { return !!(B.on && B.res); },
+    busy: function () { return !!B.busy; },
     /* 打一场：cfg = { title, allies, enemies, worldId, maxRounds, onEnd(win,res,hpLeft), onQuit, onClose } */
     run(cfg) { if (this.busy()) { CV.toast('战斗进行中…'); return false; } start(cfg); fight(G.Battle.run({ allies: cfg.allies, enemies: cfg.enemies, worldId: cfg.worldId, maxRounds: cfg.maxRounds, allyHitMod: (G.Battle.MECHANICS[cfg.worldId] || {}).allyHitMod || 0 })); },
     fight,
-    clear: function () { clearTimer(); B.on = false; B.res = null; B.panel = null; B.cfg = null; },
+    clear: function () { clearTimer(); B.on = false; B.res = null; B.panel = null; B.cfg = null; B.busy = false; },
   };
 })();

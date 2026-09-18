@@ -1,5 +1,6 @@
 /* 逻辑冒烟测试：node scripts/test_game.js */
 const fs = require('fs');
+const path = require('path');
 // 浏览器环境 shim
 const store = {};
 global.window = global;
@@ -15,8 +16,16 @@ const D = window.DATA, Core = window.Core, Battle = window.Battle, Dungeon = win
 let pass = 0, fail = 0;
 function t(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL:', name); } }
 const realRandom = Math.random;
-// 需要"固定出率"的用例用这个：把整段随机钉成同一个值，跑完必须还原
-function withRandom(v, fn) { Math.random = () => v; try { return fn(); } finally { Math.random = realRandom; } }
+// 需要"固定出率"的用例用这个：把整段随机钉成同一个值，跑完**还原成进来时的那个**（不是还原成裸 Math.random）
+function withRandom(v, fn) { const prev = Math.random; Math.random = () => v; try { return fn(); } finally { Math.random = prev; } }
+/* V9.6.90：整套用例默认跑在**一条固定随机数流**上 —— 同一份代码永远同一个结果。
+   起因：`治疗者必杀次数`那条用例偶发红过一次（暴击/闪避的骰子影响了能量节奏），
+   一把会自己抖的尺子比没有尺子更糟：红了不知道是代码坏了还是运气差。
+   想验真随机分布的用例照旧用 withRandom() 局部钉值，跑完会自动还原成这条流。 */
+{
+  let seed = 0x2f6e2b1;
+  Math.random = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+}
 
 // 1. 新游戏
 Core.newGame();
@@ -2674,6 +2683,53 @@ setParty(['C021']);
     }));
   t('血统套装的武器名不会串血统（科技=枪炮，不出现"镇魂铃"）',
     D.BLOODLINE_EQUIP_NAMES['科技'].weapon.every(x => /枪|炮|弩|刃/.test(x)));
+}
+
+/* ---- 连点检查（V9.6.89）：父亲大人报过"斗法台连点直接跳到第六台" ----
+   斗法台那一处是**战斗防重入**修的；这里把同一类风险（连点重复发奖 / 重复结算）
+   在纯逻辑层钉一遍：领取类第二次必须被挡，花费类第二次要么被挡要么照常扣。 */
+{
+  Core.newGame(); Core.setPlayerName('连点体检'); Core.choosePlayerBloodline('修真');
+  const cur = () => JSON.stringify(Core.S.cur);
+  const twice = (name, fn, watch) => {
+    const get = () => JSON.stringify(watch ? watch() : Core.S.cur);
+    const a0 = get(); const a = fn(); const a1 = get();
+    const b = fn(); const b1 = get();
+    const gain1 = a1 !== a0, gain2 = b1 !== a1;
+    t(name, !(gain1 && gain2), '第一次' + (gain1 ? '有变化' : '无') + ' / 第二次' + (gain2 ? '又发了一次 ✗' : '没有重复发'));
+  };
+  /* ① 挂机收益：银行空了第二次就不该再给 */
+  Core.S.idle.bankSec = 3600;
+  twice('挂机收益连点两次不会重复发奖', () => Core.claimIdle());
+  /* ② 每日任务（单条 + 一键） */
+  Core.ensureDaily();
+  D.DAILY_TASKS.forEach(x => { Core.S.tasks.daily[x.id] = x.target; });
+  twice('每日任务单条连点两次不会重复领', () => Core.claimTask(D.DAILY_TASKS[0].id));
+  twice('每日任务一键连点两次不会重复领', () => Core.claimAllTasks());
+  /* ③ 求签 / 登录奖励（都是"每天一次"） */
+  twice('求签连点两次不会重复给', () => Core.drawSign(), () => Core.S.sign);
+  twice('登录奖励连点两次不会重复给', () => Core.loginReward(), () => Core.S.login);
+  /* ④ 转生：第二次必须失败（等级已归零） */
+  Core.S.player.level = D.PLAYER_MAX_LV; Core.S.player.geneLock = D.GENE_LOCKS.length; Core.S.buildings.core = 40;
+  const r1 = Core.reincarnate(), r2 = Core.reincarnate();
+  t('转生连点两次：第二次被挡（不会白转两世）', r1.ok && !r2.ok, (r1.ok ? '第一次成功' : '第一次失败') + ' / ' + (r2.ok ? '第二次也成功 ✗' : '第二次被挡'));
+  /* ⑤ 战斗防重入的闸门必须真的在（源码级）
+     —— 网页版闸门是 `battleBusy`，小游戏是 `B.busy`；但**两边的规矩是同一条**：
+        ① 开打时立闸；② 全仓只有一处直接开战斗（其他入口都得走那道闸）。
+        这条测试在两个仓里都跑（小游戏的 test_game 是逐字节同步过去的），
+        所以口径必须写成"跟仓无关"，不能再写死某个文件名（踩过：写死 js/ui.js，小游戏直接崩）。 */
+  const jsDir = 'js';
+  let engineEntries = 0, gate = null;
+  fs.readdirSync(jsDir).filter((f) => /\.js$/.test(f)).forEach((f) => {
+    const src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+    engineEntries += (src.match(/\bBattle\.run\(/g) || []).length;      // 引擎入口（BattleUI.run 不算：中间没有点）
+    if (/let battleBusy = false;/.test(src) || /B\.busy = true/.test(src)) gate = f;
+  });
+  t('战斗防重入闸门在（开打时立起、结算/撤离时放下）', !!gate, gate ? gate : '全仓找不到闸门');
+  t('全仓只有一处直接开战斗（没有绕过闸门的入口）', engineEntries === 1, engineEntries + ' 处');
+  /* 闸门不许再拿别的状态"凑"出来 —— 小游戏曾经写成 `B.on && B.res`，
+     看着能用，其实波与波之间正好也满足，多波副本第 2 波被自己挡掉（V9.6.90 修）。 */
+  t('闸门是独立字段（不靠 B.on && B.res 凑）', !/return !!\(B\.on && B\.res\)/.test(gate ? fs.readFileSync(path.join(jsDir, gate), 'utf8') : ''));
 }
 
 /* ---- 血统套装：第 10 张图起 · 每张图 × 每支血统各一套 · 按世界计件 · 2/4/6 激活 ----

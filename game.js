@@ -27,7 +27,7 @@ require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → �
 
 const CV = globalThis.CV, Core = globalThis.Core;
 /* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
-globalThis.GAME_VER = '9.6.89';
+globalThis.GAME_VER = '9.6.90';
 const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
 /* 底栏四个页签 → 对应页面（网页版 #navbar） */
 CV.NAV_TABS.forEach(function (t) {
@@ -35,6 +35,32 @@ CV.NAV_TABS.forEach(function (t) {
 });
 CV.setup(info);
 CV.bindTouch();
+/* V9.6.90（父亲大人："底部导航栏出画，刚开始不会，点几下就出画了"）：
+   窗口尺寸是**会变的** —— 键盘弹出、横竖屏切换、分屏、切前后台都可能触发。
+   以前只在开机算一次布局，一变就按老尺寸画，底栏就掉到画面外。
+   现在窗口一变就重算布局 + 立刻重画一帧。 */
+if (wx.onWindowResize) {
+  wx.onWindowResize(function (res) {
+    let now = {};
+    try { now = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}; } catch (e) {}
+    const s = (res && res.size) || {};
+    relayoutNow(s.windowWidth || now.windowWidth, s.windowHeight || now.windowHeight, now);
+  });
+}
+/* 从后台回来（看广告、切出去再切回来）同样可能换了窗口尺寸，这里再对齐一次。 */
+if (wx.onShow) {
+  wx.onShow(function () {
+    let now = {};
+    try { now = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}; } catch (e) {}
+    relayoutNow(now.windowWidth, now.windowHeight, now);
+  });
+}
+function relayoutNow(w, h, now) {
+  if (!w || !h) return;
+  /* 尺寸没变就只重画一帧（重画本身也会把 dpr 矩阵设回去 —— 微信随时可能洗掉它） */
+  CV.relayout({ windowWidth: w, windowHeight: h, pixelRatio: now && now.pixelRatio, safeArea: now && now.safeArea });
+  CV.render();
+}
 /* 开机：没有存档 → 欢迎（网页版 main.js 的流程）；有存档 → 首页 */
 if (!Core.load()) { Core.newGame(); Core.ensureDaily && Core.ensureDaily(); CV.reset('welcome'); }
 else {
