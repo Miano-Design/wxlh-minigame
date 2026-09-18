@@ -275,6 +275,14 @@ console.log('\n=== 新手引导：真走一遍 ===');
       mark = '**讲的是别的事**：' + String(firstText || '(空)').slice(0, 18) + '…（这一步该讲：' + String(want).slice(0, 14) + '…）';
     } else { mark = '✓ ' + page; }
     console.log('  ' + String(n + 1).padStart(2) + '. ' + String(qNow.id).padEnd(11) + ' → ' + mark);
+    /* V9.6.105：有些步骤的判定就是"**打开过某个界面**"（q01 熟悉身体 = 打开主角卡）——
+       那种情况下「去完成」必须真的把那件事做了，否则玩家在「去完成 ↔ 界面」之间来回、
+       永远完不成（父亲大人："现在第一个主线任务都完成不了了"）。 */
+    const VISIT = { q01: function () { return (Core.S.stats.profileViews || 0) >= 1; } };
+    if (VISIT[qNow.id] && !VISIT[qNow.id]()) {
+      walkBad++;
+      console.log('     ↳ **这一步点完仍不算完成**（判定是"打开过界面"，但没走到真实入口动作）');
+    }
     U.coachDrop();
   }
   console.log('\n连续走了 ' + walked + ' 步 · 讲错/没讲 ' + walkBad + ' 步');

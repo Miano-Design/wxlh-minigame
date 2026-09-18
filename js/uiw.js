@@ -513,7 +513,10 @@
        不拦的话队列会**无限堆积**（每渲染一帧塞一条）。 */
     if (coachState && coachState.key === key) return;
     for (let i = 0; i < coachQueue.length; i++) if (coachQueue[i].key === key) return;
-    if (coachState) { if (opts.queue) coachQueue.push(item); return; }
+    if (coachState) {
+      if (opts.queue) coachQueue.push(item);
+      return;
+    }
     coachState = item;
   };
   U.coachSeen = function (key) { return !!(G.Core && G.Core.S && (G.Core.S.coachSeen || {})[key]); };
@@ -540,7 +543,20 @@
   /* V9.6.67：给"开场链"用的两颗 —— 看当前在讲哪一条 / 把插队的放下来（**不标已读**，
      它下次进那一页还会补讲）。开场链要一路走完，中途被别的引导插进来会挑错下一步。 */
   U.coachCurrent = function () { return coachState; };
-  U.coachDrop = function () { coachState = null; };
+  /* V9.6.105（自审抓到的）：**队列里排着的下一条要顶上来** ——
+     引导因为换页被丢弃时（bornPage 对不上），原来只把当前这条清掉，
+     队列里的下一条就永远不冒出来了（玩家感受："引导没了 / 卡住 / 走错乱"）。
+     这里统一成一个 promote：没有当前条时，把队列里第一条没看过的顶上来。 */
+  function promoteCoach() {
+    if (coachState) return;
+    const S = G.Core && G.Core.S;
+    while (coachQueue.length) {
+      const it = coachQueue.shift();
+      if (S && S.coachSeen && S.coachSeen[it.key]) continue;
+      coachState = it; return;
+    }
+  }
+  U.coachDrop = function () { coachState = null; promoteCoach(); };
   /* V9.6.102：玩家点「去完成」＝ 换一件事讲 —— 把当前这条和**排队等着的**一起清掉。
      只清当前那条（coachDrop）是不够的：上一条引导常常正排在队列里，
      换页之后它会接着冒出来，看着就像"引导讲的是上一件事"（父亲大人："任务引导走错乱了"）。 */
@@ -623,7 +639,10 @@
        （跑 onDone 会误触发"退回上一层"，把玩家拽到更乱的地方）。 */
     if (coachState.bornPage && coachState.bornPage !== ((CV.top() || {}).name)) {
       coachFunnel(coachState.key, 'miss');     // 换页了：这一步这次没讲成
-      coachState = null; return;
+      coachState = null;
+      promoteCoach();                          // V9.6.105：换页丢掉的这条之后，队列里的下一条要顶上来
+      if (coachState) { setTimeout(function () { CV.render(); }, 0); }
+      return;
     }
     /* V9.6.61（父亲大人拍板第 2 条：**做完才放行**）：
        带 waitFor 的引导，先问"这件事真做完了吗" —— 做完了就直接过、连提示都不留；

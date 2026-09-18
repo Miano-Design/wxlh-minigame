@@ -146,6 +146,20 @@
       CV.reset('bag');
       return;
     }
+    /* V9.6.105（父亲大人："现在第一个主线任务都完成不了了"）：
+       q01「熟悉身体」的判定是 `stats.profileViews >= 1`，而这个计数**只在
+       真实的 `open_protag`（点主页那张主角卡）里 +1**。
+       以前「去完成」是 `CV.reset('home'); CV.push('protag')` —— 只是"把人送到那一页"，
+       计数没动 → q01 永远不算完成 → 玩家在「去完成 ↔ 角色卡」之间来回出不来。
+       现在这一步直接执行**真实入口动作**（open_protag）：它会记 profileViews、
+       再把页面推到角色卡 —— 玩家点一次「去完成」这一步就真的完成了。
+       （其它步骤的判定都是"真做一个动作"，跳页没问题；q13 是升级血统，也算动作。） */
+    if (qid === 'q01') {
+      CV.cur = 'home';
+      CV.stack = [{ name: 'home', opts: {} }];     // 摆好"从首页出发"的栈，但**不渲染首页**
+      CV.dispatch('open_protag');                  // 真实入口动作：记 profileViews + 进角色卡
+      return;
+    }
     const dest = (G.questTarget && G.questTarget(qid)) || null;
     /* 战斗类主线步（在「残域」里）：直达对应世界的关卡页，由 world 页的引导指到那一关 */
     const WORLD_STEPS = { q01b: 1, q02: 1, q05: 1, q10: 1, q12: 1, q14: 1, q15: 1 };
