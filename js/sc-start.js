@@ -86,11 +86,18 @@
     Object.keys(D.BLOODLINES).forEach((id) => {
       const bl = D.BLOODLINES[id];
       U.card(function () {
-        U.h3(id, bl.desc);
+        /* V9.6.96（父亲大人报"选科技进去变修真"）：
+           这位用户的操作路径查不出代码问题（当前代码选科技就是科技，有端到端取证），
+           但这个页面的**手感**确实容易点错 —— 六张卡纵向排开要滚很远，而"觉醒"按钮
+           压在每张卡的**最底部**，紧挨着下一张卡的标题：手指一抖就点到隔壁那条血统了。
+           现在改成网页版 .card h3 .hbtn 那种排法：**按钮挪到卡片标题行右侧**（和血统名同一行），
+           并且**整张卡片都能点** —— 点哪张就是哪张，不用瞄准一颗小按钮。 */
+        const cardTop = U.y - CV.SP[2];        // 卡片外框上沿（U.card 的上下内边距 = SP[2]）
+        U.h3(id, bl.desc, { btn: { label: '觉醒', id: 'bl_pick:' + id } });
         U.kv('境界线', bl.realms.slice(0, 5).join(' → ') + (bl.realms.length > 5 ? ' → …' : ''));
-        U.hint('每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。', 6 * CV.SCALE);
-        U.space(CV.SP[2]);
-        U.btnRow([{ label: '觉醒 ' + id + ' 血统', style: 'gold', id: 'bl_pick:' + id }]);
+        U.hint(bl.role ? (bl.role + '。每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。')
+          : ('每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。'), 6 * CV.SCALE);
+        if (!U.dry) CV.hit('bl_pick:' + id, U.pad(), cardTop, U.cw(), U.y - cardTop);
       });
     });
   });
