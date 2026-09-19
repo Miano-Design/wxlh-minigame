@@ -452,16 +452,16 @@ setParty(['C021']);
 {
   Core.S.worlds.W01.stages.normal[0] = 3; // 确保已通关第1关
   Core.S.sweep = { date: Core.dailyDate(), count: 0 };
-  t('初始剩余60次', Core.sweepLeft() === 60);
-  const r1 = Dungeon.sweep('W01', 'normal', 1, 10);
-  t('扫荡10次成功', r1.ok && r1.count === 10 && Core.sweepLeft() === 50);
-  Core.S.sweep.count = 58;
+  /* V9.6.115（父亲大人）：每日扫荡上限 60 → **10**。断言跟着版本走。 */
+  t('初始剩余10次', Core.sweepLeft() === 10);
+  const r1 = Dungeon.sweep('W01', 'normal', 1, 8);
+  t('扫荡8次成功', r1.ok && r1.count === 8 && Core.sweepLeft() === 2);
   const r2 = Dungeon.sweep('W01', 'normal', 1, 10);
   t('超出上限只扫剩余2次', r2.ok && r2.count === 2 && r2.capped === true);
   const r3 = Dungeon.sweep('W01', 'normal', 1, 10);
   t('用完拒绝扫荡', !r3.ok);
   Core.S.sweep.date = '2000-01-01'; // 模拟跨天
-  t('跨天自动重置', Core.sweepLeft() === 60);
+  t('跨天自动重置', Core.sweepLeft() === 10);
   Core.S.sweep = { date: Core.dailyDate(), count: 0 };
 }
 

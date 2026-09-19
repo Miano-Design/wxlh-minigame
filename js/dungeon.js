@@ -199,16 +199,24 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
        而高级池 25% 出 SSR → 等于是每天白送 7 个 SSR，图鉴两周就满，招募这条线直接失去意义。
        现在：手打副本照旧掉券（打一关完整 12 层 ≈ 1.6 张普通券 + 1 张高级券，是"惊喜"的量级），
        扫荡只给材料 / 点数 / 结晶 —— 扫荡是"重复劳动"，惊喜不该从重复劳动里刷。 */
+    /* V9.6.115（父亲大人："现在招募券的掉落几率是否会太高了"）：**确实偏高**，已下调。
+       改前的实测（drop_table 那套算出来的）：反复刷第 12 关（守关 Boss）**每次 0.5 张圣契招募令**，
+       打 20 次 = 10 张 = 10 抽；高级池 SSR 25% → **20 次刷本 ≈ 2.5 个 SSR**。
+       这已经不是"探索的惊喜"，是把抽卡按次数发。而券是"商店不卖、只能玩法获得"的硬通货，
+       发多了招募这条线（以及圣洁晶石的消耗）就失去意义。
+       下调后（每次）：守关 Boss 0.18 / 精英 0.10 / 杂兵 0.08 / 地狱 Boss 额外限定券 0.12。
+       折算：刷第 12 关 20 次 ≈ 3.6 张圣契招募令 ≈ 0.9 个 SSR；一个世界 12 关全清 ≈
+       1.7 张普通券 + 0.4 张圣契令 —— 仍然比"一天白给"好得多，但回到了"每十几次给一次惊喜"的量级。 */
     if (!opts.noTicket) {
-      if (kind === 'boss' && Math.random() < Math.min(1, 0.50 * dropBoost)) {
+      if (kind === 'boss' && Math.random() < Math.min(1, 0.18 * dropBoost)) {
         if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
-      } else if (kind === 'elite' && Math.random() < Math.min(1, 0.28 * dropBoost)) {
+      } else if (kind === 'elite' && Math.random() < Math.min(1, 0.10 * dropBoost)) {
         if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
-      } else if (kind === 'combat' && Math.random() < Math.min(1, 0.18 * dropBoost)) {
+      } else if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) {
         if (Core.addItem('ticket_normal')) got.push({ k: 'item', v: 'ticket_normal', n: 1 });
       }
       // 地狱难度的 Boss 额外掉限定券（限定池是"定向池"，券最稀有）
-      if (diff === 'hell' && kind === 'boss' && Math.random() < 0.35) {
+      if (diff === 'hell' && kind === 'boss' && Math.random() < 0.12) {
         if (Core.addItem('ticket_lim')) got.push({ k: 'item', v: 'ticket_lim', n: 1 });
       }
     }

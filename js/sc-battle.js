@@ -67,8 +67,6 @@
     on: false, cfg: null, res: null, idx: 0, units: {}, log: [], floaters: [],
     speed: 1, timer: null, done: false, panel: null, energy: {}, tip: null,
     autoT: null, autoLeft: 0,
-    /* 设置里的"自动战斗"有没有开（每次开打时从存档读一次，见 start()） */
-    auto: false,
     /* V9.6.90：防重入闸门**单独一个字段**。以前是拿 `B.on && B.res` 凑的 ——
        看着能用，其实"波与波之间"正好也满足这两个条件，于是无缝交接那一瞬间
        下一波会被自己挡掉（副本第 5 关起多波，第 2 波直接打不开）。
@@ -76,7 +74,8 @@
        无缝交接给下一波之前先放下。 */
     busy: false,
   };
-  const AUTO_NEXT_SEC = 8;         // 与网页版同一个值（AUTO_NEXT_SEC）
+  /* V9.6.115（父亲大人）：结算自动进下一关的倒计时 8 秒 → **5 秒**（与网页版同一个值） */
+  const AUTO_NEXT_SEC = 5;
   let uidSeq = 0;
   const STATUS_TEXT = { poison: '中毒', burn: '燃烧', bleed: '流血', stun: '眩晕', freeze: '冰冻', weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '回复' };
 
@@ -97,11 +96,6 @@
     B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     B.speed = (Core.S.settings && Core.S.settings.speed) || 1;
     CV.battleSpeed = B.speed;
-    /* V9.6.114（父亲大人："现在的自动战斗开了没用"）：设置里那个开关**战斗页从来没读过** ——
-       它只在设置页翻了个 toast，进了战斗照样一帧一帧播，开了等于没开。
-       网页版是真的有效果的（`if (S.settings.autoBattle) skipped = true` → 直接结算）。
-       这里照同一条口径：进来先把开关记下来，step() 第一帧就直接进结算。 */
-    B.auto = !!(Core.S.settings && Core.S.settings.autoBattle);
     B.title = cfg.title || '战斗';
     CV.reset('battle', { title: B.title });
   }
@@ -116,9 +110,6 @@
 
   function step() {
     if (!B.on) return;
-    /* 自动战斗 = 直接出结果（"适合挂机刷本"）。finish() 自己会**补算剩余帧**，
-       所以血量、战斗日志、掉落、首通判定都和正常打完一模一样，只是不逐帧演。 */
-    if (B.auto) { finish(); return; }
     const f = B.res.frames[B.idx++];
     if (!f || f.type === 'end') { finish(); return; }
     applyFrame(f);
@@ -227,7 +218,11 @@
        然后自己接着打下一波 —— 副本要"一口气打到底"。 */
     /* 胜利且有"主按钮"时开自动倒计时（网页版：8 秒内不点就自动进下一关；可在设置里关掉） */
     if (B.panel && B.panel.acts && B.panel.acts.length && Core.S.settings && Core.S.settings.autoNext !== false) {
-      const ai = B.panel.acts.findIndex(function (a) { return a.primary; });
+      /* V9.6.115（自审抓到的第二个"开了没用"）：这里原来找的是 `a.primary`（布尔），
+         可小游戏的调用方（副本 / 深井）给的是 `style: 'primary'` —— 两边键名对不上，
+         `findIndex` 永远是 -1 → **"通关结算自动进下一关"的倒计时从来没启动过**。
+         现在两种写法都认（谁写哪种都不会再让它哑掉）。 */
+      const ai = B.panel.acts.findIndex(function (a) { return a.primary || a.style === 'primary'; });
       if (res.win && ai >= 0) {
         B.autoIdx = ai; B.autoLeft = AUTO_NEXT_SEC;
         if (B.autoT) clearInterval(B.autoT);

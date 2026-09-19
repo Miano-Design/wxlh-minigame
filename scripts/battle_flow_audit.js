@@ -78,7 +78,10 @@ try { Core.choosePlayerBloodline('修真'); } catch (e) {}
 
 const cfg = (extra) => Object.assign({
   title: '体检', allies: [], enemies: [], worldId: 'W01', maxRounds: 10,
-  onEnd() { return { actions: [{ label: '返回', id: 'battle_close', style: 'ghost' }] }; },
+  /* V9.6.115：这里原来写的是 `actions`（网页版的键名），小游戏的结算面板读的是 **acts** ——
+     键名不对 → 面板退回默认那颗「返回」（没有 primary）→ "结算自动进下一关的倒计时"
+     这条链路在尺子里根本没被走到。真调用方（sc-dungeon / sc-last）用的就是 acts。 */
+  onEnd() { return { acts: [{ label: '返回', id: 'battle_close', style: 'ghost' }] }; },
 }, extra || {});
 
 console.log('\n=== 战斗页生命周期审计 ===');
@@ -134,37 +137,44 @@ console.log('\n=== 战斗页生命周期审计 ===');
   await wait(60);
   t('撤离后没有战斗定时器还在跑（不白耗电、不偷偷重画）', liveTimers.size === 0,
     liveTimers.size ? liveTimers.size + ' 个定时器还活着' : '全清');
-  /* ⑤ 自动战斗（父亲大人："现在的自动战斗开了没用"）
-     真因：设置里那个开关**战斗页从来没读过** —— 只在设置页翻了个 toast，
-     进了战斗照样一帧一帧播。这里用一场"30 回合"的长战斗来量：
-     开着 → 进来就该结算；关着 → 这点时间绝不可能结算。 */
+  /* ⑤ 自动战斗**已经下线**（父亲大人 2026-09-19："把自动战斗的功能去掉吧"）：
+     这条尺子改成"防复活"——老存档里可能还留着 settings.autoBattle = true
+     （以前开过的玩家），它**不许再对战斗产生任何影响**：有残留值时照样逐帧打。 */
   {
     const many = [{ type: 'start', allies: [], enemies: [] }];
     for (let i = 0; i < 30; i++) many.push({ type: 'round', n: i + 1 });
     many.push({ type: 'end', win: true, rounds: 30 });
-    const autoCfg = (cb) => cfg({ onEnd() { cb(); return { acts: [{ label: '返回', id: 'battle_close' }] }; } });
+    const cbg = (cb) => cfg({ onEnd() { cb(); return { acts: [{ label: '返回', id: 'battle_close' }] }; } });
 
     G.Battle.run = function () { return { win: true, rounds: 30, frames: many }; };
+    /* 老存档的残留值：设成 true 也不该有任何"跳过战斗"的效果 */
     Core.S.settings.autoBattle = true;
     UI.clear();
-    let endedAuto = 0;
-    UI.run(autoCfg(() => { endedAuto++; }));
-    await wait(150);
-    t('⑤ 自动战斗开着：进战斗**直接出结果**（不等 30 回合播完）', endedAuto === 1,
-      '结算回调调用 ' + endedAuto + ' 次');
-    UI.clear();
-    await wait(80);
-
-    Core.S.settings.autoBattle = false;
-    let endedManual = 0;
-    UI.run(autoCfg(() => { endedManual++; }));
+    let ended = 0;
+    UI.run(cbg(() => { ended++; }));
     await wait(200);
-    t('⑤b 自动战斗关着：仍然逐帧播（这么短时间不该结算）', endedManual === 0,
-      '结算回调调用 ' + endedManual + ' 次');
+    t('⑤ 老存档残留的 autoBattle 不再能让战斗跳过（功能已下线）', ended === 0,
+      '结算回调调用 ' + ended + ' 次');
     UI.clear();
     await wait(80);
-    /* 复原：后面的用例（和别的脚本）都按"默认关"跑 */
-    Core.S.settings.autoBattle = false;
+    /* 源码级兜底：这两个文件里**不许再有活的 autoBattle 代码**（注释里提到可以，注释会被剥掉） */
+    const strip = (rel) => fs.readFileSync(path.join(JS, rel), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1 ');
+    const live = ['sc-battle.js', 'sc-last.js'].filter((f) => /autoBattle/.test(strip(f)));
+    t('⑤b 战斗页 / 设置页里已经没有「自动战斗」的活代码（只在注释里留了说明）',
+      live.length === 0, live.length ? live.join(' / ') + ' 里还有' : '两处都干净');
+    delete Core.S.settings.autoBattle;
+    /* ⑤c 结算「自动进下一关」的倒计时起点必须是 **5 秒**（父亲人：8 → 5）。
+       打一场一帧就赢的假战斗，结算面板起来之后立刻看倒计时的起手值。 */
+    UI.clear();
+    G.Battle.run = function () { return { win: true, rounds: 1, frames: [{ type: 'start', allies: [], enemies: [] }, { type: 'end', win: true, rounds: 1 }] }; };
+    UI.run(cfg({ onEnd() { return { acts: [{ label: '下一关', style: 'primary', id: 'battle_close' }] }; } }));
+    await wait(700);
+    const st5 = UI.state;
+    t('⑤c 结算自动进下一关的倒计时从 5 秒起', st5.autoIdx >= 0 && st5.autoLeft === 5,
+      'autoLeft = ' + st5.autoLeft + '（8 秒时代这里是 8）');
+    UI.clear();
+    await wait(60);
   }
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
      运行期这条不好造（假战斗只有一帧，特效早就自己停了）——所以补一条源码断言，

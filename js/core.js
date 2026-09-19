@@ -80,7 +80,9 @@ window.Core = (function () {
       beast: { owned: {}, active: null },                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
       stats: { battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0,
         taskClaims: 0, signDraws: 0 },   // V9.6.74：主线新步骤要用的两个计数（老档没有 → 一律 || 0 兜底）
-      settings: { speed: 1, autoSellN: false, autoSellR: false, sfx: true, autoBattle: false, autoNext: true },
+      /* V9.6.115（父亲大人）：自动战斗整条下线 —— 默认值里也不留这个键（老存里的残留值没人读了）。
+         autoNext 保留（结算 5 秒自动进下一关）。 */
+      settings: { speed: 1, autoSellN: false, autoSellR: false, sfx: true, autoNext: true },
       codex: { chars: [], equipsSeen: 0, claimed: [] },
       achievements: {},       // achId → true（已领取）
       presets: [null, null, null],   // 3 组编队预设（保存队伍成员）
