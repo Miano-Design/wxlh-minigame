@@ -3154,19 +3154,13 @@ window.Core = (function () {
       const r = { worldId, diff, stageIdx: stageIdx + 1 };
       return stageUnlocked(r.worldId, r.diff, r.stageIdx) ? r : null;
     }
-    const order = D.DIFFICULTY.map(d => d.id);
-    const di = order.indexOf(diff);
-    if (di >= 0 && di < order.length - 1 && worldCleared(worldId, diff)) {
-      const r = { worldId, diff: order[di + 1], stageIdx: 0 };
-      if (stageUnlocked(r.worldId, r.diff, 0)) return r;
-    }
-    const wi = D.WORLDS.findIndex(x => x.id === worldId);
-    if (wi >= 0 && wi < D.WORLDS.length - 1) {
-      const nw = D.WORLDS[wi + 1];
-      if (S.worlds[nw.id] && S.worlds[nw.id].unlocked && stageUnlocked(nw.id, 'normal', 0)) {
-        return { worldId: nw.id, diff: 'normal', stageIdx: 0 };
-      }
-    }
+    /* V9.6.116（父亲大人："每个世界推到第 12 关就不要有自动下一关了，只能返回，
+       由玩家自己选择打下一个世界还是同一世界的下一个难度"）：
+       **打完一个世界的第 12 关（守关 Boss）＝这一段路到头了**，别再替他做决定。
+       原来这里会自动接到"同世界的下一个难度"、再不然"下一个世界的第 1 关" ——
+       等于把"选哪个世界、哪个难度"这件大事替玩家拍了，他连自己解锁了什么都还没看清。
+       现在到了最后一关就返回 null：结算页只剩「返回」，玩家回世界列表自己挑。
+       （关卡 1~11 的"下一关"完全不受影响。） */
     return null;
   }
 

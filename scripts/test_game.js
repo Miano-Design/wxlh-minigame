@@ -465,6 +465,18 @@ setParty(['C021']);
   Core.S.sweep = { date: Core.dailyDate(), count: 0 };
 }
 
+// 27b. 世界最后一关不给"下一关"（V9.6.116 父亲大人："推到第 12 关就不要有自动下一关了"）
+{
+  Core.S.worlds.W01 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  Core.S.worlds.W02 = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  const mid = Core.nextStage('W01', 'normal', 10);
+  t('第 11 关照旧给「下一关」（第 12 关）', !!mid && mid.stageIdx === 11 && mid.worldId === 'W01');
+  t('第 12 关不给下一关（不自动跳难度 / 不自动跳下一个世界）',
+    Core.nextStage('W01', 'normal', 11) === null, JSON.stringify(Core.nextStage('W01', 'normal', 11)));
+  const h = Core.nextStage('W01', 'hard', 11);
+  t('困难难度第 12 关同样只让玩家自己选（不自动跨世界）', h === null, JSON.stringify(h));
+}
+
 // 28. 批量分解
 {
   const before = Core.S.cur.otherworld;

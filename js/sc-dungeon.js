@@ -259,10 +259,18 @@
     });
     if (comp && comp.firstClearReward) Object.keys(comp.firstClearReward).forEach((k) => rewards.push('首通 ' + curIcon(k) + '+' + comp.firstClearReward[k]));
     if (comp && comp.newUnlocks && comp.newUnlocks.length) comp.newUnlocks.forEach((n) => rewards.push('🔓 解锁【' + n + '】'));
-    /* 结算页直接给「再来一次 / 下一关」——不用回世界列表再点关，推图节奏不断 */
-    const nx = Core.nextStage(wid, df, si);
-    afterSettle = { worldId: wid, diff: df, stageIdx: si };
-    const acts = [{ label: '↻ 再来一次', style: 'ghost', id: 'dun_again' }];
+    /* 结算页直接给「再来一次 / 下一关」——不用回世界列表再点关，推图节奏不断。
+       V9.6.116（父亲大人："每个世界推到第 12 关就不要有自动下一关了，只能返回，
+       由玩家自己选择打下一个世界还是同一世界的下一个难度"）：
+       第 12 关（守关 Boss）打完 = 这张图走到头了 —— 这里只留「返回世界」，
+       连「再来一次」都不给（想重打可以从世界列表再点它）。
+       顺带一个好处：结算页没有主按钮，**"自动进下一关"的倒计时也就不会启动**。 */
+    const isWorldBoss = si >= 11;
+    const nx = isWorldBoss ? null : Core.nextStage(wid, df, si);
+    afterSettle = isWorldBoss ? null : { worldId: wid, diff: df, stageIdx: si };
+    const acts = isWorldBoss
+      ? [{ label: '‹ 返回世界', style: 'ghost', id: 'battle_close' }]
+      : [{ label: '↻ 再来一次', style: 'ghost', id: 'dun_again' }];
     if (nx) {
       const nw = D.WORLDS.find((x) => x.id === nx.worldId);
       afterSettle = { worldId: nx.worldId, diff: nx.diff, stageIdx: nx.stageIdx };

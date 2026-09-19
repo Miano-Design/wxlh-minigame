@@ -46,7 +46,7 @@ global.wx = {
   .concat(fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)))
   .forEach((f) => { const p = path.join(JS, f); if (fs.existsSync(p)) require(p); });
 
-const CV = global.CV, Core = global.Core, G = global.GameGlobal;
+const CV = global.CV, Core = global.Core, G = global.GameGlobal, D = global.DATA;
 CV.setup(global.wx.getWindowInfo());
 const UI = G.BattleUI;
 
@@ -175,6 +175,66 @@ console.log('\n=== 战斗页生命周期审计 ===');
       'autoLeft = ' + st5.autoLeft + '（8 秒时代这里是 8）');
     UI.clear();
     await wait(60);
+  }
+  /* ⑥ 世界守关（第 12 关）打完**不许再有"下一关"**
+     （父亲大人 2026-09-19："每个世界推到第 12 关就不要有自动下一关了，只能返回，
+      由玩家自己选择打下一个世界还是同一世界的下一难度"）
+     这条必须走**真副本流程**才能验：从残域页 → 世界页 → 点第 12 关 → 结算面板上有什么按钮。
+     顺带一个正面样本（第 11 关）确认"下一关没被一起砍掉"。 */
+  {
+    /* 这一段走真副本流程 —— 世界页上还挂着新手引导，而引导是"真模态"：
+       它会把 `CV.dispatch('stage:11')` 吃掉（那不是它指的那颗）。
+       这里只是**为了量结算按钮**，所以临时把引导系统摘掉（测完立刻装回去）。 */
+    const savedCoachFor = G.coachFor;
+    G.coachFor = function () {};
+    const setupWorld = () => {
+      Core.newGame(); Core.setPlayerName('守关体检'); Core.choosePlayerBloodline('修真');
+      (D.UNLOCKS || []).forEach(u => { Core.S.unlocks[u.id] = true; });
+      /* 第 1~12 关全部通关（这样第 12 关才点得动），第 2 个世界也解锁（便于看"会不会自动跳过去"） */
+      Core.S.worlds.W01 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+      Core.S.worlds.W02 = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+      Core.S.settings.autoNext = true;      // 自动进下一关是开着的 —— 更严格
+    };
+    /* 第 12 关是**多波**（杂兵→杂兵→守关），一波打完会自动接下一波 ——
+       结算面板要等所有波次走完才出现，所以这里要**轮询等**，不能固定 sleep。 */
+    const waitPanel = async (maxMs) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < (maxMs || 9000)) {
+        if (UI.state.panel) return UI.state.panel;
+        await wait(120);
+      }
+      return UI.state.panel;
+    };
+    const fightStage = async (idx) => {
+      UI.clear();
+      CV.reset('dungeon');
+      CV.dispatch('w:W01');            // 进世界页
+      CV.dispatch('stage:' + idx);     // 点那一关
+      return waitPanel(9000);
+    };
+
+    setupWorld();
+    const p12 = await fightStage(11);  // 第 12 关（守关 Boss）
+    const acts12 = (p12 && p12.acts) || [];
+    t('⑥ 打通第 12 关：结算页只剩「返回」（没有下一关 / 再来一次）',
+      acts12.length === 1 && /返回/.test(String(acts12[0].label)) && acts12[0].id === 'battle_close',
+      acts12.map(a => a.label).join(' / ') || '(没有按钮)');
+    t('⑥b 结算页没有主按钮 → "自动进下一关"的倒计时不会启动',
+      acts12.every(a => !a.primary && a.style !== 'primary'),
+      acts12.some(a => a.primary || a.style === 'primary') ? '**还有主按钮**' : '无主按钮 ✓');
+    t('⑥c 第 12 关不再自动接"下一个世界 / 下一个难度"（Core.nextStage 返回 null）',
+      Core.nextStage('W01', 'normal', 11) === null,
+      'nextStage(W01,normal,12关) = ' + JSON.stringify(Core.nextStage('W01', 'normal', 11)));
+
+    setupWorld();
+    const p11 = await fightStage(10);  // 第 11 关：正常流程必须**照旧**给下一关
+    const acts11 = (p11 && p11.acts) || [];
+    t('⑥d 第 11 关（普通关）照旧给「下一关」，没被一起砍掉',
+      acts11.some(a => a.id === 'dun_next'),
+      acts11.map(a => a.label).join(' / ') || '(没有按钮)');
+    UI.clear();
+    await wait(60);
+    G.coachFor = savedCoachFor;
   }
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
      运行期这条不好造（假战斗只有一帧，特效早就自己停了）——所以补一条源码断言，
