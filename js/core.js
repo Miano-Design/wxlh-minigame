@@ -1,7 +1,17 @@
 /* 《残域》核心逻辑：状态 / 存档 / 挂机 / 养成 / 经济 */
 window.Core = (function () {
   const D = window.DATA;
-  const SAVE_KEY = 'wxlh_save_v5';
+ const SAVE_KEY = 'wxlh_save_v5';
+  /* V9.6.113（父亲大人："以后上线小程序有别的玩家，总不能也让人删档重开吧"）：
+     存档的兼容规则写死在下面这几行 —— 上线之后**任何一次更新都不许要求玩家删档**：
+       · 存档里带自己认识的版本号（S.v）；
+       · 读档时**先按默认结构补齐缺的字段**（fillDefaults），再跑语义迁移（migrate）——
+         以后加新系统（新货币、新面板、新计数）不需要为每个字段写一行补丁；
+       · 老版本存档（v < 当前）一律走迁移，**不拒收**；
+       · 万一真读不出来（文件损坏 / 来自更高版本），先把原始内容**原样备份**再退出去，
+         绝不让玩家的一点进度被下一次存盘悄悄覆盖掉。 */
+  const SAVE_VER = 5;
+  const SAVE_BAK = SAVE_KEY + '_bak';       // 读档失败时的原样备份（含时间与原因）
   const SLOT_COUNT = 3;
   const slotKey = n => `${SAVE_KEY}_slot${n}`;
   let S = null;
@@ -52,6 +62,10 @@ window.Core = (function () {
       sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 求签（对标"SignItem"）：今天的签文与挂机加成
       worlds: {},           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
       worldFirstClear: {},  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
+      /* V9.6.113：新档一出生就带这个标记 —— "旧版把 C001 当主角占位"那段迁移只该对**很老的档**跑。
+         不给默认值的话会有个很脏的后果：新玩家正常抽到 C001（普通池 N 档 6 人之一），
+         下次开机 migrate 一跑就把他删了，等级和碎片一起没（玩家只会说"我的伙伴不见了"）。 */
+      c001Merged: true,
       corridor: { floor: 1, best: 0 },
       // 保底按池分开记账：高级 / 限定 各自算 SSR / UR / 当期 UP 的累计数
       recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '',
@@ -80,6 +94,9 @@ window.Core = (function () {
 
   let suppressSave = false;
   let saveFailed = false;
+  /* V9.6.113：这一次读进来的存档是不是"很老的那种"（判断必须看**原始数据**，
+     因为在 fillDefaults 补齐之后，"老档没有、新档才有"的字段就再也分不出来了）。 */
+  let legacyRaw = false;
   /* V9.6.92：**离线窗口只在结算过之后才允许被"存盘盖章"**。
      背景：save() 里那句 `S.idle.lastTs = Date.now()` 是有意行为（存盘 = 刚见过玩家），
      但它有个致命前提 —— 开机必须先 settleOffline 再存盘。
@@ -122,18 +139,49 @@ window.Core = (function () {
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   }
   function load() {
+    /* V9.6.113：读档分成"能读 / 读不出但保住"两条路，任何一条都不许毁数据 */
+    let raw = null;
+    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
+    if (!raw) return false;
+    let data = null;
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return false;
-      const data = JSON.parse(raw);
-      if (!data || data.v !== 5) return false;
-      S = Object.assign(defaultState(), data);
-      migrate();
-      /* 刚读进来的存档带着"上次见到玩家"的时间戳 —— 在 settleOffline 跑来认领它之前，
-         中途任何一次存盘都不许把它冲掉（V9.6.92，见 save() 与 offlineSettled 的说明）。 */
-      offlineSettled = false;
-      return true;
-    } catch (e) { return false; }
+      data = JSON.parse(raw);
+    } catch (e) { backupSave(raw, 'json'); return false; }
+    if (!data || typeof data !== 'object') { backupSave(raw, 'shape'); return false; }
+    const ver = Number(data.v || 0);
+    /* 来自**更高版本**的存档（玩家装过新版又回到旧版）：不覆盖、不删，原样备份后退出去 */
+    if (ver > SAVE_VER) { backupSave(raw, 'future-v' + ver); return false; }
+    legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
+    /* 缺字段自动补齐（新系统上线后老档也能直接读），再跑语义迁移（改名 / 换算 / 退款这类） */
+    S = fillDefaults(defaultState(), data);
+    S.v = SAVE_VER;
+    migrate();
+    /* 刚读进来的存档带着"上次见到玩家"的时间戳 —— 在 settleOffline 跑来认领它之前，
+       中途任何一次存盘都不许把它冲掉（V9.6.92，见 save() 与 offlineSettled 的说明）。 */
+    offlineSettled = false;
+    return true;
+  }
+  /* 读档失败时**先备份**：玩家的一点进度都不许因为一次更新凭空消失。
+     备份里连"什么时候、为什么读不出来"一起记，出了问题能追。 */
+  function backupSave(raw, why) {
+    try {
+      localStorage.setItem(SAVE_BAK, JSON.stringify({ at: Date.now(), why: why || 'unknown', raw: String(raw) }));
+    } catch (e) { /* 存不下也没关系，主存档还在原地没动 */ }
+  }
+  /* 按默认结构**递归**补齐：缺的字段给默认值，多出来的字段原样保留。
+     数组（背包槽、阵容、技能等级…）以存档里的为准，长度也不强行改 —— 交给 migrate 决定。 */
+  function fillDefaults(def, data) {
+    if (Array.isArray(def)) return Array.isArray(data) ? data : def.slice();
+    if (def && typeof def === 'object') {
+      const out = {};
+      const src = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+      Object.keys(def).forEach(function (k) {
+        out[k] = Object.prototype.hasOwnProperty.call(src, k) ? fillDefaults(def[k], src[k]) : def[k];
+      });
+      Object.keys(src).forEach(function (k) { if (!(k in out)) out[k] = src[k]; });   // 多出来的字段别丢
+      return out;
+    }
+    return (data === undefined) ? def : data;
   }
   // 上阵 5 格归一化：0/1 前排，2/3/4 后排；'@player' 一定在里面（主角必上阵）。
   // 老存档是 4 格且主角不占位，按他原来站的那一排把他插进去，其它人顺序不变。
@@ -279,7 +327,10 @@ window.Core = (function () {
     // ⚠️ 只跑一次：C001 是旧版"主角占位"，新版主角是独立实体。
     // 之前这段没有开关，**每次读档都会跑**——玩家只要抽到 C001（他很普通池里 N 档 6 人之一），
     // 下次开游戏角色就被删掉，花的货币不退（V9.2 修）。
-    if (S.chars && S.chars['C001'] && !S.c001Merged) {
+    /* V9.6.113：只对**真的很老**的档跑这段（既没有标记、也没有后来才有的系统）。
+       否则"新玩家抽到 C001 → 下次开机被删"这种事会一直发生。 */
+    const legacySave = legacyRaw || ((S.c001Merged === undefined) && !S.altPlayers && !S.fabao);
+    if (S.chars && S.chars['C001'] && legacySave) {
       // 转移 C001 装备到主角
       const old = (S.equipped && S.equipped['C001']) || {};
       const slots = S.equipped['@player'];
@@ -290,7 +341,8 @@ window.Core = (function () {
       S.c001Merged = true;
     }
     if (!S.c001Merged) {
-      if (S.party) S.party = S.party.map(id => (id === 'C001' ? null : id));
+      /* 只对老档动手（把占位的 C001 从阵容里摘掉）；现代档缺标记时，**只补标记、不动数据** */
+      if (legacySave && S.party) S.party = S.party.map(id => (id === 'C001' ? null : id));
       S.c001Merged = true;
     }
     // V8.3：上阵位从「4 格（主角不占位）」改成「5 格（前 2 后 3，主角占一格）」
@@ -418,8 +470,13 @@ window.Core = (function () {
   function importSave(json) {
     try {
       const data = JSON.parse(json);
-      if (!data || data.v !== 5) return { ok: false, msg: '存档版本不兼容' };
-      S = Object.assign(defaultState(), data);
+      if (!data || typeof data !== 'object') return { ok: false, msg: '存档文件损坏' };
+      /* V9.6.113：导入**自己老版本**导出的存档也要能进来（补齐字段 + 迁移），
+         只有"更高版本"的存档才拒收（那说明对方用的是更新的版本，导向后兼容）。 */
+      if (Number(data.v || 0) > SAVE_VER) return { ok: false, msg: '存档来自更新的版本，请先更新游戏' };
+      legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
+      S = fillDefaults(defaultState(), data);
+      S.v = SAVE_VER;
       migrate();     // 老版本导出的存档也要补字段（之前漏了这一步，导入老档会缺东西）
       save();
       return { ok: true };
@@ -431,8 +488,11 @@ window.Core = (function () {
       const raw = localStorage.getItem(slotKey(n));
       if (!raw) return false;
       const data = JSON.parse(raw);
-      if (data.v !== 5) return false;
-      S = Object.assign(defaultState(), data);
+      if (!data || typeof data !== 'object') return false;
+      if (Number(data.v || 0) > SAVE_VER) return false;      // 更高版本：不载入（也不覆盖）
+      legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
+      S = fillDefaults(defaultState(), data);
+      S.v = SAVE_VER;
       migrate();     // 同上：读存档槽也要走一遍迁移
       save();
       return true;

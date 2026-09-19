@@ -63,11 +63,14 @@
      不主动换页 —— 该进角色卡是玩家按①点进去的，进不去就一直等他。 */
   G.openingNext = function () {
     const S = Core.S; S.coachSeen = S.coachSeen || {};
+    /* V9.6.113：GM 里点「重跑新手引导」＝玩家主动要看一遍 ——
+       这一次不受下面那条"领过奖就作废"的规矩限制；整条走完自动把开关关掉。 */
+    if (S.tourForce && openingLeft() === 0) { S.tourForce = false; Core.save(); }
     /* V9.6.71（与网页版同一条判断）：只要玩家**已经领过任何一个主线奖励**，
        说明他已经在按主线玩了 —— 开场链剩下的步骤直接作废，不再中途冒出来打断他。 */
     try {
       const list = Core.mainQuestState();
-      if (list.some(function (x) { return x.claimed; })) {
+      if (!S.tourForce && list.some(function (x) { return x.claimed; })) {
         OPENING.forEach(function (st) { S.coachSeen[st.key] = true; });
         Core.save();
       }
