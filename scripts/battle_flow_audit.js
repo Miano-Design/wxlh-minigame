@@ -134,6 +134,38 @@ console.log('\n=== 战斗页生命周期审计 ===');
   await wait(60);
   t('撤离后没有战斗定时器还在跑（不白耗电、不偷偷重画）', liveTimers.size === 0,
     liveTimers.size ? liveTimers.size + ' 个定时器还活着' : '全清');
+  /* ⑤ 自动战斗（父亲大人："现在的自动战斗开了没用"）
+     真因：设置里那个开关**战斗页从来没读过** —— 只在设置页翻了个 toast，
+     进了战斗照样一帧一帧播。这里用一场"30 回合"的长战斗来量：
+     开着 → 进来就该结算；关着 → 这点时间绝不可能结算。 */
+  {
+    const many = [{ type: 'start', allies: [], enemies: [] }];
+    for (let i = 0; i < 30; i++) many.push({ type: 'round', n: i + 1 });
+    many.push({ type: 'end', win: true, rounds: 30 });
+    const autoCfg = (cb) => cfg({ onEnd() { cb(); return { acts: [{ label: '返回', id: 'battle_close' }] }; } });
+
+    G.Battle.run = function () { return { win: true, rounds: 30, frames: many }; };
+    Core.S.settings.autoBattle = true;
+    UI.clear();
+    let endedAuto = 0;
+    UI.run(autoCfg(() => { endedAuto++; }));
+    await wait(150);
+    t('⑤ 自动战斗开着：进战斗**直接出结果**（不等 30 回合播完）', endedAuto === 1,
+      '结算回调调用 ' + endedAuto + ' 次');
+    UI.clear();
+    await wait(80);
+
+    Core.S.settings.autoBattle = false;
+    let endedManual = 0;
+    UI.run(autoCfg(() => { endedManual++; }));
+    await wait(200);
+    t('⑤b 自动战斗关着：仍然逐帧播（这么短时间不该结算）', endedManual === 0,
+      '结算回调调用 ' + endedManual + ' 次');
+    UI.clear();
+    await wait(80);
+    /* 复原：后面的用例（和别的脚本）都按"默认关"跑 */
+    Core.S.settings.autoBattle = false;
+  }
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
      运行期这条不好造（假战斗只有一帧，特效早就自己停了）——所以补一条源码断言，
      免得以后有人把 clearTimer 里那行删回去。 */
