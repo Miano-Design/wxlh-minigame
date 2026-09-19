@@ -88,7 +88,7 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
   const css = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
   /* 画布侧的"出字口子"——全项目都从这几个口子出字，所以查它们就等于查了全项目 */
   const rules = [
-    ['卡片标题 h3 = 二级', /U\.h3 = function[\s\S]{0,900}?size: CV\.FS\.f1/.test(uiw)],
+    ['卡片标题 h3 = 二级', /U\.h3 = function[\s\S]{0,2200}?size: CV\.FS\.f1/.test(uiw)],
     ['标题右侧小字 .sub = 五级', /const subRight[\s\S]{0,400}?size: CV\.FS\.sm/.test(uiw)],
     ['注释 hint = 五级', /U\.hint = function[^\n]*CV\.FS\.sm/.test(uiw)],
     ['次要说明 note = 四级', /U\.note = function[^\n]*CV\.FS\.md/.test(uiw)],
@@ -164,6 +164,28 @@ console.log('\n=== ④ 具体的两处（父亲大人报的）===');
   t('技能：主角详情与伙伴详情**共用同一个组件**（不再各写一套排版）',
     /U\.skillRow\(/.test(protag) && /U\.skillRow\(/.test(roster),
     (/U\.skillRow\(/.test(protag) ? '主角✓' : '主角**没接**') + ' / ' + (/U\.skillRow\(/.test(roster) ? '伙伴✓' : '伙伴**没接**'));
+}
+
+console.log('\n=== ⑤ 标题行的间距 / 按钮大小 / 中线对齐（父亲大人：重置和下面的框贴得很近）===');
+{
+  const uiw = fs.readFileSync(path.join(JS, 'uiw.js'), 'utf8');
+  t('标题行高度 = max(标题行高, 按钮高) —— 按钮不再压到下面第一块',
+    /const rowH = opt\.btn \? Math\.max\(lh, btnH\) : lh/.test(uiw));
+  t('标题行下边距 10px（网页版 .card h3 margin-bottom）', /U\.y = top \+ rowH \+ 10 \* CV\.SCALE/.test(uiw));
+  t('标题 / 右侧小字 / 按钮共用同一条中线', /const cy = top \+ rowH \/ 2/.test(uiw));
+  t('按钮尺寸 = 网页版口径（.btn 44 / .btn.small 40 / .hbtn 34）',
+    CV && U.BTN_H === 44 && U.BTN_SM === 40 && U.BTN_TITLE === 34,
+    'BTN_H=' + U.BTN_H + ' BTN_SM=' + U.BTN_SM + ' BTN_TITLE=' + U.BTN_TITLE);
+  /* 真几何验算（纯算式，不渲染）：标题行按钮的底边到"下面第一块"的起点之间到底留了几像素 */
+  {
+    const lh = CV.FS.f1 * 1.3, btnH = U.BTN_TITLE * CV.SCALE;
+    const rowH = Math.max(lh, btnH);
+    const btnBottom = (rowH - btnH) / 2 + btnH;     // 按钮底边（相对标题行顶）
+    const nextTop = rowH + 10 * CV.SCALE;           // 下一块的起点（标题行 + 10px 下边距）
+    const gap = Math.round((nextTop - btnBottom) * 10) / 10;
+    t('量出来：标题行按钮底边到下面第一行 = 10px（原来只有 3.5px，看着就是贴脸）',
+      Math.abs(gap - 10 * CV.SCALE) < 0.6, '实测 ' + gap + 'px');
+  }
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

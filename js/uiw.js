@@ -47,7 +47,11 @@
      .btn.small = min-height 2.5rem(40)・padding 0 13・字号 12；.btn-row .btn 最小宽 5.375rem(86) 且**换行不截断**。 */
   /* V9.6.69（资料 §10：触控目标 ≥44×44 —— WCAG AAA / Apple HIG 同口径）：
      小按钮原来是 40（×SCALE≈1.04 也只有 41.6px），手机上容易点不准 → 抬到 44。 */
-  U.BTN_H = 46; U.BTN_SM = 44; U.BTN_MINW = 86;
+  /* V9.6.118（父亲大人："整体的间距、大小、对齐都检查一遍"）：按钮尺寸回到网页版的口径 ——
+     .btn min-height 2.75rem = 44px、.btn.small 2.5rem = 40px、标题行按钮 .hbtn 2.125rem = 34px。
+     原来画布写的是 46 / 44 —— 小按钮比网页版胖 4px，一屏里几十颗按钮都跟着胖，
+     行距和卡片高度全被顶起来（"看着笨重、间距不对劲"的来源之一）。 */
+  U.BTN_H = 44; U.BTN_SM = 40; U.BTN_TITLE = 34; U.BTN_MINW = 86;
   U.inCard = false;
   U.inPad = () => (U.inCard ? CV.SP[2] : 0);
   U.ix = () => U.pad() + U.inPad();
@@ -83,15 +87,22 @@
   U.h3 = function (title, sub, opt) {
     opt = opt || {};
     /* opt.btn = { label, id }：标题行右侧的小按钮（网页版 .card h3 .hbtn，和标题/小字同一中线） */
+    /* V9.6.118（父亲大人："技能的重置和下面加点的框还是贴的很近"）：
+       网页版的 .hbtn 是 **2.125rem = 34px** 高，而 h3 是 flex 行 —— 行高会被按钮撑到 34px，
+       再吃 10px 下边距，下面第一块才起步。画布这边原来只画了 26px 的按钮、
+       行高又按"标题行高 19.5px"算 —— 于是按钮比行高还高出 6.5px，
+       直接压到下面第一行面板上（截图里"重置"和第一颗 +1 贴在一起就是这么来的）。
+       现在：行高 = max(标题行高, 按钮高)，按钮居中在行内，再由下面 10px 收尾。 */
+    const bar = 3, gap = 7, lh = CV.FS.f1 * 1.3;
+    const btnH = U.BTN_TITLE * CV.SCALE;
+    const rowH = opt.btn ? Math.max(lh, btnH) : lh;
     if (opt.btn) {
       const bw = CV.measure(opt.btn.label, CV.FS.sm) + 20 * CV.SCALE;
-      const bh = 26 * CV.SCALE;
-      U.btn(U.ix() + U.iw() - bw, U.y - 6 * CV.SCALE, bw, bh, opt.btn.label, 'ghost', opt.btn.id);
+      U.btn(U.ix() + U.iw() - bw, U.y + (rowH - btnH) / 2, bw, btnH, opt.btn.label, 'ghost', opt.btn.id);
     }
-    const bar = 3, gap = 7, lh = CV.FS.f1 * 1.3;
     const top = U.y;
     draw(() => {
-      const cy = top + lh / 2;
+      const cy = top + rowH / 2;                     // 标题 / 小字 / 按钮共用这一条中线
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
       CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
@@ -101,8 +112,8 @@
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
     });
-    U.y = top + lh + 10 * CV.SCALE;                   // 标题下边距 10（.card h3 margin-bottom）
-    return lh + 10 * CV.SCALE;
+    U.y = top + rowH + 10 * CV.SCALE;                 // 标题下边距 10（.card h3 margin-bottom）
+    return rowH + 10 * CV.SCALE;
   };
 
   /* ---------- 键值行 .kv（左灰标签 / 右值，左右两端贴齐内容区） ---------- */
