@@ -43,7 +43,7 @@
         const cur = lv ? (k.rate * lv * 100) : 0;
         const next = cost === null ? cur : (k.rate * (lv + 1) * 100);
         const top = U.y, h = 56 * CV.SCALE;
-        CV.text(k.ico, U.ix(), top + h / 2, { size: 19 * CV.SCALE, align: 'left' });
+        CV.text(k.ico, U.ix(), top + h / 2, { size: CV.ICO * CV.SCALE, align: 'left' });
         const tx = U.ix() + 30 * CV.SCALE;
         const bw = 78 * CV.SCALE;
         const textW = U.iw() - 30 * CV.SCALE - bw - 8 * CV.SCALE;

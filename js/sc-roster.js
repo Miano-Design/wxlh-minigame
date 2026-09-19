@@ -216,13 +216,18 @@
       [ch.skills.s1, ch.skills.s2, ch.skills.ult].forEach(function (sk, i) {
         if (!sk) return;
         const lv = (c.skillLv || [0, 0, 0])[i];   // V9.5.82：技能从 0 级起
-        CV.text(CV.fit(['技能', '技能', '必杀'][i] + '·' + sk.name + '（Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i] + '）', U.iw(), CV.FS.lg, true), U.ix(), U.y + 8 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        U.y += 20 * CV.SCALE;
-        U.hint(sk.desc || '', 0);
-        U.space(CV.SP[1]);
-        U.btnRow([{ label: '+1', style: 'ghost', id: lv < 10 ? 'sk' + i : 'noop' }]);
-        U.space(CV.SP[2]);
+        /* V9.6.117（排版层级 + 间距，父亲大人："技能版面…间距又贴在一起"）：
+           这里原来是"名字挤在 20px 行高里 + 描述紧跟 + 一个整行大按钮"，
+           和主角详情那套完全不一样。现在两个页面**共用 U.skillRow**（＝网页版 .skill-row）。 */
+        U.skillRow({
+          name: ['技能', '技能', '必杀'][i] + '·' + sk.name,
+          tag: 'Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i],
+          desc: sk.desc || '',
+          btnId: lv < 10 ? 'sk' + i : 'noop',
+          last: false,
+        });
       });
+      U.y -= 8 * CV.SCALE;   // 最后一条不留行间距（和卡片底部对齐）
     });
 
     /* ⑥ 装备（照网页版 V9.5.41：卡片只写装备名 + 强化，点卡片看详情） */

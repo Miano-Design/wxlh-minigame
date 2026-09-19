@@ -30,7 +30,28 @@
     SCALE: 1,
     SP: [4, 10, 14, 18, 24],       // --sp1..--sp5
     RADIUS: 10, RADIUS_SM: 7,      // --radius / --radius-sm
-    FS: { xs: 11, sm: 11, md: 12, lg: 13, f1: 15, f2: 17 },   // --fs-xs..--fs-2
+    /* ===== 排版层级（V9.6.117 定稿，父亲大人："整体游戏得区分字体的层级，一级二级三级…）=====
+       全项目**只有这五级**，每一级只对应一个尺寸；任何"我就用 12.5 试试"的做法都是违例
+       （type_scale_audit 会当场报出来）。两边必须一一对应（网页版是 rem，画布是 px）：
+
+         一级 f2  17px  --fs-2   0.9375rem×…  页面标题（顶栏标题、结算大标题）
+         二级 f1  15px  --fs-1   0.9375rem    卡片标题 h3、列表行主标题 .t1、名字
+         三级 lg  13px  --fs-lg  0.8125rem    正文：正文说明、按钮 .btn、技能名 .sname、kv 行
+         四级 md  12px  --fs-md  0.75rem      次要说明：.note、小节标题、小按钮 .btn.small
+         五级 sm  11px  --fs-sm/xs 0.6875rem 注释：.hint、.sub、标签 tag、meta、时间
+
+       说明两点，都是**故意**的：
+         · xs 和 sm 是**同一级**（都是五级 11px）—— xs 是历史名字，留着是为了不动三百多处调用；
+           新代码一律用 sm。两者永远相等，audit 会盯着。
+         · 图标 / 大数字（战力、深井层数）不属于文字层级，走 CV.ICO / CV.DISP（见下），
+           它们是"图形元素"，不参与正文排版。 */
+    FS: { xs: 11, sm: 11, md: 12, lg: 13, f1: 15, f2: 17 },
+    /* 层级别名：新代码推荐写 t1..t5（一眼看出是第几级，不用猜 f1/f2 是大是小） */
+    TIER: { t1: 17, t2: 15, t3: 13, t4: 12, t5: 11 },
+    /* 非文字元素（图标 / 展示数字）**不属于排版层级**，但也不能随手写 19、22、30 ——
+       它们各有名字，改规格只改这里一处（type_scale_audit 会挡住裸数字）。 */
+    ICO: 19,                                    // 行首图标（网页版 .list-row 的 1.1875rem）
+    DISP: { d1: 20, d2: 24, d3: 30, d4: 40 },   // 展示数字：战力 20 / 关卡图标 24 / 胜负大字 30 / 深井层数 40
     FONT: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
     NAV_TABS: [
       { id: 'home', name: '灯阁', ico: '🏮' },
@@ -530,7 +551,7 @@
     CV.NAV_TABS.forEach((t, i) => {
       const cx = tabW * i + tabW / 2;
       const active = CV.top().name === t.id || (CV.top().name === 'home' && t.id === 'home');
-      CV.text(t.ico, cx, y + 22, { size: 19, align: 'center' });
+      CV.text(t.ico, cx, y + 22, { size: CV.ICO, align: 'center' });
       CV.text(t.name, cx, y + 42, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       if (active) {
         c.fillStyle = CV.C.gold;

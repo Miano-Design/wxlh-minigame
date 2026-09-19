@@ -139,6 +139,56 @@
   U.hint = function (text, gapTop, color) { return wrapBlock(text, CV.FS.sm, 1.7, color || CV.C.dim, gapTop); };
   U.note = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop, widthIn); };
 
+  /* ---------- 技能行 .skill-row（V9.6.117：主角详情 / 伙伴详情**共用这一个**）----------
+     网页版的规矩（css 里 .skill-row 那三条），画布照抄：
+       · 每条技能是**自己的一个面板**：panel 底 / 圆角 10 / 内边距 10 / 条与条之间 8px
+       · .sname 三级(13px)粗体 ＋ 紧跟一枚五级(11px)描边胶囊（Lv.N/M）＋ 可选 +1 按钮（同一中线）
+       · .sdesc 五级(11px)灰字，**距名字 3px**，行高 1.55
+     起因（父亲大人："技能的版面有问题，间距又又贴在一起的了"）：
+     原来两个页面各写一套（一个把名字/胶囊/描述直接铺在卡片上、行高只有 22px，
+     另一个把 +1 做成整行大按钮），胶囊和描述贴在一起、间距还和别处不一样。
+     现在只有这一份实现，层级和间距都跟着 .skill-row 走。 */
+  U.skillRow = function (o) {
+    o = o || {};
+    const PAD = 10 * CV.SCALE, GAP = 8 * CV.SCALE;
+    const name = String(o.name || '');
+    const nameH = CV.FS.lg * 1.35;
+    const bw = o.btnId === undefined ? 0 : 52 * CV.SCALE;
+    const tagW = o.tag ? (CV.measure(o.tag, CV.FS.sm) + 12 * CV.SCALE) : 0;
+    const tagH = o.tag ? (CV.FS.sm * 1.4 + 2 * CV.SCALE) : 0;
+    const descW = U.iw() - PAD * 2;
+    const descLines = o.desc ? CV.wrap(o.desc, descW, CV.FS.sm) : [];
+    const descH = descLines.length ? (3 * CV.SCALE + descLines.length * CV.FS.sm * 1.55) : 0;
+    const rowH = PAD * 2 + nameH + descH;
+    const top = U.y;
+    CV.round(U.ix(), top, U.iw(), rowH, 10 * CV.SCALE, CV.C.panel);
+    const cy = top + PAD + nameH / 2;
+    CV.ctx.save();
+    if (o.dim) CV.ctx.globalAlpha = 0.5;
+    CV.text(CV.fit(name, U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE, CV.FS.lg, true), U.ix() + PAD, cy,
+      { size: CV.FS.lg, bold: true, color: o.color || CV.C.text });
+    const nw = CV.measure(CV.fit(name, U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE, CV.FS.lg, true), CV.FS.lg, true);
+    if (o.tag) {
+      const tx = U.ix() + PAD + nw + 6 * CV.SCALE;
+      CV.round(tx, cy - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
+      CV.text(o.tag, tx + tagW / 2, cy, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
+    }
+    if (descLines.length) {
+      descLines.forEach(function (ln, k) {
+        CV.text(ln, U.ix() + PAD, top + PAD + nameH + 3 * CV.SCALE + CV.FS.sm * 1.55 * (k + 0.5),
+          { size: CV.FS.sm, color: CV.C.dim });
+      });
+    }
+    CV.ctx.restore();
+    /* 按钮在**面板里**、和名字同一条中线（不能像以前那样 top-10 悬到上一行去） */
+    if (o.btnId !== undefined) {
+      U.btn(U.ix() + U.iw() - PAD - bw, cy - U.BTN_SM * CV.SCALE / 2, bw, U.BTN_SM * CV.SCALE, o.btnLabel || '+1',
+        o.btnStyle || 'ghost', o.btnId);
+    }
+    U.y = top + rowH + (o.last ? 0 : GAP);
+    return rowH;
+  };
+
   /* ---------- 说明框 .event-desc（网页版：bg --panel / 圆角 10 / 内边距 12 / 13px 灰字 1.7 行高）
      开局契约、起名提示这类"成段说明"都用它，别再直接铺在卡片上。 ---------- */
   U.eventDesc = function (lines, gapIn) {
@@ -254,16 +304,27 @@
     const availW = U.iw() - (o.rightW || 0) - rightW - icoW - 12 * CV.SCALE;
     /* o.tag：标题行右侧跟着一枚小标（网页版 .list-row .t1 > .tag，金色描边胶囊） */
     const tagW = o.tag ? (CV.measure(o.tag, CV.FS.xs) + 14 * CV.SCALE) : 0;
-    const l1 = CV.wrap(o.t1, availW - tagW, CV.FS.f1);
+    /* V9.6.117（排版层级）：o.t1sub = 跟在标题后面的一段**五级**灰字
+       （网页版六维那行就是 `<span style="color:var(--dim);font-size:0.6875rem">` 内联在标题里）。
+       以前没有这个口子，只能把名字和解释拼成一个字符串整行画成**二级** —— 解释文字于是和名字一样大
+       （父亲大人："六维的解释文字太大了"）。 */
+    const subW = o.t1sub ? (CV.measure(' ' + o.t1sub, CV.FS.sm) + 4 * CV.SCALE) : 0;
+    const l1 = CV.wrap(o.t1, availW - tagW - subW, CV.FS.f1);
     const l2 = o.t2 ? CV.wrap(o.t2, availW, CV.FS.sm) : [];
     const h = Math.max(pad * 2 + l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0), 44 * CV.SCALE);
     const top = U.y;
     draw(() => {
       if (o.dim) CV.ctx.save(), CV.ctx.globalAlpha = 0.45;   /* 网页版已领取行 opacity:.45/.5 */
       const y0 = top + pad;
-      if (o.ico) CV.text(o.ico, U.ix() + 4, y0 + (l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0)) / 2, { size: 19 * CV.SCALE });
+      if (o.ico) CV.text(o.ico, U.ix() + 4, y0 + (l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0)) / 2, { size: CV.ICO * CV.SCALE });
       if (o.rightText) CV.text(o.rightText, U.ix() + U.iw(), y0 + (l1.length * t1) / 2, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       l1.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true }));
+      if (o.t1sub) {
+        /* 解释文字跟在**最后一行**标题后面（和网页版同一行同一个基线） */
+        const lastW = CV.measure(String(l1[l1.length - 1]), CV.FS.f1, true);
+        CV.text(o.t1sub, U.ix() + 4 + icoW + lastW + 6 * CV.SCALE, y0 + t1 * (l1.length - 0.5),
+          { size: CV.FS.sm, color: CV.C.dim });
+      }
       if (o.tag) {
         const tw = CV.measure(l1[l1.length - 1], CV.FS.f1, true), th = CV.FS.xs * 1.5;
         const tx = U.ix() + 4 + icoW + Math.min(tw, availW - tagW) + 6 * CV.SCALE, ty = y0 + t1 * (l1.length - 0.5) - th / 2;

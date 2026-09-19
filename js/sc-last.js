@@ -829,7 +829,7 @@
     U.card(function () {
       const top = U.y;
       CV.text('深井', CV.W / 2, top + 14 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
-      CV.text(String(floor), CV.W / 2, top + 52 * CV.SCALE, { size: 40 * CV.SCALE, bold: true, align: 'center', color: CV.C.gold });
+      CV.text(String(floor), CV.W / 2, top + 52 * CV.SCALE, { size: CV.DISP.d4 * CV.SCALE, bold: true, align: 'center', color: CV.C.gold });
       U.y = top + 100 * CV.SCALE;
     });
     U.card(function () {

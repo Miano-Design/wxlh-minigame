@@ -64,7 +64,7 @@
       const rowH = 62 * CV.SCALE;
       U.card(function () {
         const top = U.y;
-        CV.text(x.ico, U.ix(), top + rowH / 2 - 6 * CV.SCALE, { size: 22 * CV.SCALE, align: 'left' });
+        CV.text(x.ico, U.ix(), top + rowH / 2 - 6 * CV.SCALE, { size: CV.DISP.d2 * CV.SCALE, align: 'left' });
         const tx = U.ix() + 34 * CV.SCALE;
         CV.text(x.name, tx, top + 15 * CV.SCALE, { size: CV.FS.f1, bold: true });
         /* 未解锁的行：右边写「未解锁」，说明位置换成"怎么解锁"（网页版 growScreen 同口径） */

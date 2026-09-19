@@ -24,7 +24,7 @@
     CV.card(x, top, w, h);
     const box = 52 * CV.SCALE;
     CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, 12 * CV.SCALE, '#232c42', CV.C.line);
-    CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: 24, align: 'center' });
+    CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: CV.DISP.d2, align: 'center' });
     const tx = x + 12 * CV.SCALE + box + 12 * CV.SCALE;
     const tw = CV.measure(title, CV.FS.f1, true);
     CV.text(title, tx, top + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
@@ -35,7 +35,7 @@
     }
     CV.text(CV.fit(sub, w - (tx - x) - 30 * CV.SCALE, CV.FS.sm), tx, top + 46 * CV.SCALE,
       { size: CV.FS.sm, color: CV.C.dim });
-    CV.text('›', x + w - 14 * CV.SCALE, top + h / 2, { size: 16, color: CV.C.dim, align: 'right' });
+    CV.text('›', x + w - 14 * CV.SCALE, top + h / 2, { size: CV.FS.f1, color: CV.C.dim, align: 'right' });
     if (dim) CV.ctx.globalAlpha = 1;
     if (id) CV.hit(id, x, top, w, h);
     U.y = top + h + CV.SP[2];          // 网页版 .card 的 margin-bottom = sp3(14)
@@ -156,7 +156,9 @@
         CV.round(x, y, cw, cw, 10 * CV.SCALE, done ? '#1d2b22' : CV.C.panel2,
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '👹' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
-          { size: isBoss ? 16 : 14 * CV.SCALE, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
+          /* V9.6.117：原来写的是 `isBoss ? 16 : 14 * CV.SCALE` —— 两个分支一个乘了缩放一个没乘，
+             小屏/大屏下守关那格的字号会跑偏。现在两边都走 token（守关用展示级、普通关用二级）。 */
+          { size: (isBoss ? CV.DISP.d1 : CV.FS.f1) * CV.SCALE, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
         if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.ctx.globalAlpha = 1;
         if (unlocked) CV.hit('stage:' + i, x, y, cw, cw);

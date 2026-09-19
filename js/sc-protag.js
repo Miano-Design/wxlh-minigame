@@ -67,7 +67,7 @@
         tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text('铭刻 ' + (gl > 0 ? D.GENE_LOCKS[gl - 1].name : '未解锁') + ' · 六维待分 ' + (S.player.attrPoints || 0) + ' 点',
         tx, top + 52 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-      CV.text(fmt(Core.playerPower()), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: 20 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
+      CV.text(fmt(Core.playerPower()), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.DISP.d1 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
       CV.text('战力', U.ix() + U.iw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + h;
       /* EXP 进度条 + 挂机经验（网页版这两行就在头部卡里） */
@@ -85,7 +85,12 @@
       D.ATTR_META.forEach(function (a) {
         const n = (S.player.attrs && S.player.attrs[a.id]) || 0;
         const top = U.y;
-        U.listRow({ t1: a.name + '  ' + a.desc, t2: '已分配 ' + n + ' 点 → +' + n * D.ATTR_POINT_VALUE, rightW: 110 * CV.SCALE });
+        /* V9.6.117（排版层级，父亲大人："六维的解释文字太大了"）：
+           原来 `a.name + '  ' + a.desc` 拼成**一个字符串**交给 t1 —— 于是"每点 +20 生命"这类
+           解释和"肌肉"一样是二级（15px 粗体），整张卡看着又满又吵。
+           网页版这里本来就是「二级名字 + 内联五级灰字」（<span style="font-size:0.6875rem;color:var(--dim)">），
+           canvas 没有内联样式，所以给 listRow 加了 t1sub 这个口子来对齐它。 */
+        U.listRow({ t1: a.name, t1sub: a.desc, t2: '已分配 ' + n + ' 点 → +' + n * D.ATTR_POINT_VALUE, rightW: 110 * CV.SCALE });
         const bw = 52 * CV.SCALE, bw2 = 58 * CV.SCALE, gap = 6 * CV.SCALE;   // .btn.small：min-width 2.75rem
         const by = top + (U.y - top) / 2 - 20 * CV.SCALE;
         U.btn(U.ix() + U.iw() - bw - bw2 - gap, by, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', has ? 'attr:' + a.id + ':1' : '');
@@ -101,26 +106,30 @@
     U.card(function () {
       U.h3('⚡ ' + (S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'), '可用技能点 ' + (S.player.skillPoints || 0),
         { btn: { label: '↺ 重置', id: spentSkill > 0 ? 'pskill_reset' : '' } });
-      [P.s1, P.s2, P.ult].forEach(function (sk, i) {
-        if (!sk) return;
-        const lv = (S.player.skillLv || [0, 0, 0])[i];
-        const max = D.SKILL_MAX_BY_INDEX[i];
-        const top = U.y;
-        CV.text(['技能', '技能', '必杀'][i] + '·' + sk.name, U.ix(), top + 9 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        const nw = CV.measure(['技能', '技能', '必杀'][i] + '·' + sk.name, CV.FS.lg, true);
-        const tag = 'Lv.' + lv + '/' + max;
-        const tw = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE;
-        CV.round(U.ix() + nw + 6 * CV.SCALE, top + 1 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
-        CV.text(tag, U.ix() + nw + 6 * CV.SCALE + tw / 2, top + 9 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
-        const bw = 52 * CV.SCALE;
+      /* V9.6.117（排版层级 + 间距，父亲大人："技能的版面有问题，间距又贴在一起了"）：
+         照网页版 `.skill-row` 一比一重排 —— 每条技能是**自己的一个面板**：
+           · .skill-row：panel 底 / 圆角 10 / 内边距 10 / 条与条之间 8px
+           · .sname：三级（13px）粗体，右边跟 Lv. 标签（五级 11px 描边胶囊），+1 按钮贴行尾同一中线
+           · .sdesc：五级（11px）灰字，**距离名字 3px**，行高 1.55
+         以前这里把名字、胶囊、描述直接铺在卡片上、行高只有 22px：胶囊（17px）和描述几乎贴在一起，
+         +1 按钮还用 top-10 悬在上一行里 —— 这就是"贴在一起、排版有问题"的来源。 */
+      /* V9.6.117：改用**共用组件** U.skillRow（网页版 .skill-row 的画布实现）——
+         主角详情与伙伴详情从此是同一份排版，不会再"一个页面改了另一个没改"。 */
+      const skRows = [];
+      [P.s1, P.s2, P.ult].forEach(function (sk, i) { if (sk) skRows.push({ sk: sk, i: i }); });
+      skRows.forEach(function (r, n) {
+        const lv = (S.player.skillLv || [0, 0, 0])[r.i];
+        const max = D.SKILL_MAX_BY_INDEX[r.i];
         const canUp = (S.player.skillPoints || 0) > 0 && lv < max;
-        U.btn(U.ix() + U.iw() - bw, top - 10 * CV.SCALE, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', canUp ? 'pskill:' + i : '');
-        U.y = top + 22 * CV.SCALE;
-        U.hint(sk.desc || '', 0);
-        U.space(CV.SP[1]);
+        U.skillRow({
+          name: ['技能', '技能', '必杀'][r.i] + '·' + r.sk.name,
+          tag: 'Lv.' + lv + '/' + max,
+          desc: r.sk.desc || '',
+          btnId: canUp ? 'pskill:' + r.i : '',
+          last: false,
+        });
       });
-      U.hint('被动·' + P.passive.name, 2 * CV.SCALE);
-      U.hint(P.passive.desc || '', 0);
+      U.skillRow({ name: '被动·' + P.passive.name, desc: P.passive.desc || '', color: CV.C.text2, last: true });
     });
 
     /* ④ 装备（六槽，点格子看详情） */

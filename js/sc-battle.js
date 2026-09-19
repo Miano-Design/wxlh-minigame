@@ -276,7 +276,7 @@
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
     } else CV.ctx.fillStyle = '#232c42';
     u._cx = cx; u._top = y; u._av = av;   // 飘字要用：记住这一张卡画在哪
-    CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: small ? 16 : 18, bold: true, align: 'center' });
+    CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: small ? CV.FS.f1 : CV.DISP.d1, bold: true, align: 'center' });   // 头像首字：跟着层级 token 走（原来是裸 16/18）
     if (dead) CV.ctx.globalAlpha = 1;
     // 名字
     CV.text(CV.fit(u.name, w, CV.FS.sm), cx, y + av + 9 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'center' });
@@ -459,7 +459,7 @@
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
     // 大标题
     CV.text(res.win ? '胜 利' : '任务失败', cx, y + 26 * CV.SCALE,
-      { size: 30 * CV.SCALE, bold: true, align: 'center', color: res.win ? CV.C.gold : CV.C.accent });
+      { size: CV.DISP.d3 * CV.SCALE, bold: true, align: 'center', color: res.win ? CV.C.gold : CV.C.accent });
     y += 52 * CV.SCALE;
     // 回合 + 星级
     CV.text(res.rounds + ' 回合' + (p.sub ? ' · ' + p.sub : ''), cx, y + 8 * CV.SCALE,

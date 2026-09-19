@@ -198,7 +198,7 @@
         CV.ctx.setLineDash([5, 4]);
         CV.round(x, y, cw, cw, CV.RADIUS, null, CV.C.line2);
         CV.ctx.restore();
-        CV.text('＋', x + cw / 2, y + cw / 2, { size: 20 * CV.SCALE, align: 'center', color: CV.C.dim });
+        CV.text('＋', x + cw / 2, y + cw / 2, { size: CV.DISP.d1 * CV.SCALE, align: 'center', color: CV.C.dim });
         CV.hit(expandId, x, y, cw, cw);
         return;
       }
@@ -314,8 +314,8 @@
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     U.card(function () {
       const top = U.y;
-      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: 16 * CV.SCALE, bold: true });
-      CV.text('×' + n, U.ix() + U.iw(), top + 10 * CV.SCALE, { size: 15 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
+      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true });
+      CV.text('×' + n, U.ix() + U.iw(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
       U.y = top + 26 * CV.SCALE;
     });
     U.card(function () { U.h3('说明'); U.note(it.desc || '', 2 * CV.SCALE); });

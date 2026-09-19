@@ -51,7 +51,7 @@
       const bw = 52 * CV.SCALE;
       const top = U.y;
       CV.round(U.ix(), top, U.iw() - bw - gap, h, CV.RADIUS_SM, CV.C.panel, CV.C.line);
-      CV.text(CV.fit(NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, 15 * CV.SCALE), U.ix() + 12 * CV.SCALE, top + h / 2, { size: 15 * CV.SCALE });
+      CV.text(CV.fit(NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, CV.FS.f1 * CV.SCALE), U.ix() + 12 * CV.SCALE, top + h / 2, { size: CV.FS.f1 * CV.SCALE });
       CV.hit('name_type', U.ix(), top, U.iw() - bw - gap, h);
       U.btn(U.ix() + U.iw() - bw, top, bw, h, '🎲', 'ghost', 'name_roll');
       U.y = top + h;
