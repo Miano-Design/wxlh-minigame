@@ -164,16 +164,24 @@
     const PAD = 10 * CV.SCALE, GAP = 8 * CV.SCALE;
     const name = String(o.name || '');
     const nameH = CV.FS.lg * 1.35;
+    /* V9.6.119（父亲大人："这个加 1 的框明显偏上你没检查出来吗"）：
+       **同一个坑我在标题行修过、却在技能行漏了** —— 按钮高 40px，而这一行只按
+       "名字行高 17.5px"算高度、又拿 nameH/2 当中间线：按钮顶边 = 面板顶 − 1.25px，
+       直接**戳出面板外面**，看着就是"偏上"。
+       网页版不会这样：`.sname` 是 flex 行，放得下 .btn.small(2.5rem) 时这一行就长成 40px，
+       名字和按钮一起在 40px 里居中。现在照它来 —— 名字行高 = max(名字行高, 按钮高)。 */
+    const btnH = o.btnId === undefined ? 0 : U.BTN_SM * CV.SCALE;
+    const nameRowH = btnH ? Math.max(nameH, btnH) : nameH;
     const bw = o.btnId === undefined ? 0 : 52 * CV.SCALE;
     const tagW = o.tag ? (CV.measure(o.tag, CV.FS.sm) + 12 * CV.SCALE) : 0;
     const tagH = o.tag ? (CV.FS.sm * 1.4 + 2 * CV.SCALE) : 0;
     const descW = U.iw() - PAD * 2;
     const descLines = o.desc ? CV.wrap(o.desc, descW, CV.FS.sm) : [];
     const descH = descLines.length ? (3 * CV.SCALE + descLines.length * CV.FS.sm * 1.55) : 0;
-    const rowH = PAD * 2 + nameH + descH;
+    const rowH = PAD * 2 + nameRowH + descH;
     const top = U.y;
     CV.round(U.ix(), top, U.iw(), rowH, 10 * CV.SCALE, CV.C.panel);
-    const cy = top + PAD + nameH / 2;
+    const cy = top + PAD + nameRowH / 2;         // 名字 / 等级胶囊 / 按钮共用这一条中线
     CV.ctx.save();
     if (o.dim) CV.ctx.globalAlpha = 0.5;
     CV.text(CV.fit(name, U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE, CV.FS.lg, true), U.ix() + PAD, cy,
@@ -186,15 +194,17 @@
     }
     if (descLines.length) {
       descLines.forEach(function (ln, k) {
-        CV.text(ln, U.ix() + PAD, top + PAD + nameH + 3 * CV.SCALE + CV.FS.sm * 1.55 * (k + 0.5),
+        CV.text(ln, U.ix() + PAD, top + PAD + nameRowH + 3 * CV.SCALE + CV.FS.sm * 1.55 * (k + 0.5),
           { size: CV.FS.sm, color: CV.C.dim });
       });
     }
     CV.ctx.restore();
     /* 按钮在**面板里**、和名字同一条中线（不能像以前那样 top-10 悬到上一行去） */
     if (o.btnId !== undefined) {
-      U.btn(U.ix() + U.iw() - PAD - bw, cy - U.BTN_SM * CV.SCALE / 2, bw, U.BTN_SM * CV.SCALE, o.btnLabel || '+1',
-        o.btnStyle || 'ghost', o.btnId);
+      /* V9.6.119：不能点的时候必须画成**禁用态**（网页版 .btn[disabled]{opacity:.34;pointer-events:none}）——
+         以前传 id='' 只是"登记不上热区"，按钮看着照样是亮的、点了没反应，就是无效按键。 */
+      U.btn(U.ix() + U.iw() - PAD - bw, cy - btnH / 2, bw, btnH, o.btnLabel || '+1',
+        o.btnStyle || 'ghost', o.btnId, !!o.btnDis);
     }
     U.y = top + rowH + (o.last ? 0 : GAP);
     return rowH;

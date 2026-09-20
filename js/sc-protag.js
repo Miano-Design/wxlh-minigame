@@ -126,6 +126,7 @@
           tag: 'Lv.' + lv + '/' + max,
           desc: r.sk.desc || '',
           btnId: canUp ? 'pskill:' + r.i : '',
+          btnDis: !canUp,          // 没点数/满级 → 画成禁用态（不是"看着能点、点了没反应"）
           last: false,
         });
       });

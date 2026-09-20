@@ -223,7 +223,8 @@
           name: ['技能', '技能', '必杀'][i] + '·' + sk.name,
           tag: 'Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i],
           desc: sk.desc || '',
-          btnId: lv < 10 ? 'sk' + i : 'noop',
+          btnId: lv < 10 ? 'sk' + i : '',
+          btnDis: !(lv < 10),      // 满级 → 禁用态（原来绑的是 'noop'：看着能点、点了什么都不发生）
           last: false,
         });
       });

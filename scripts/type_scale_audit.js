@@ -156,11 +156,11 @@ console.log('\n=== ④ 具体的两处（父亲大人报的）===');
   const roster = fs.readFileSync(path.join(JS, 'sc-roster.js'), 'utf8');
   t('技能：行是独立面板（panel 底 + 圆角 10 + 内边距 10）',
     /U\.skillRow = function[\s\S]{0,1600}?CV\.round\(U\.ix\(\), top, U\.iw\(\), rowH, 10 \* CV\.SCALE, CV\.C\.panel\)/.test(uiwAll));
-  t('技能：行高按内容算（名字 + 3px + 描述行），不再写死 22px',
-    /const rowH = PAD \* 2 \+ nameH \+ descH/.test(uiwAll));
-  t('技能：描述距名字 3px（网页版 .sdesc margin-top:3px）', /nameH \+ 3 \* CV\.SCALE/.test(uiwAll));
-  t('技能：+1 按钮与名字同一中线（不再 top-10 悬到上一行）',
-    /cy - U\.BTN_SM \* CV\.SCALE \/ 2/.test(uiwAll));
+  t('技能：行高按内容算（名字行 + 3px + 描述行），不再写死 22px',
+    /const rowH = PAD \* 2 \+ nameRowH \+ descH/.test(uiwAll));
+  t('技能：描述距名字 3px（网页版 .sdesc margin-top:3px）', /nameRowH \+ 3 \* CV\.SCALE/.test(uiwAll));
+  t('技能：+1 按钮与名字同一中线（按钮高按 nameRowH 算）',
+    /cy - btnH \/ 2/.test(uiwAll));
   t('技能：主角详情与伙伴详情**共用同一个组件**（不再各写一套排版）',
     /U\.skillRow\(/.test(protag) && /U\.skillRow\(/.test(roster),
     (/U\.skillRow\(/.test(protag) ? '主角✓' : '主角**没接**') + ' / ' + (/U\.skillRow\(/.test(roster) ? '伙伴✓' : '伙伴**没接**'));
@@ -176,6 +176,26 @@ console.log('\n=== ⑤ 标题行的间距 / 按钮大小 / 中线对齐（父亲
   t('按钮尺寸 = 网页版口径（.btn 44 / .btn.small 40 / .hbtn 34）',
     CV && U.BTN_H === 44 && U.BTN_SM === 40 && U.BTN_TITLE === 34,
     'BTN_H=' + U.BTN_H + ' BTN_SM=' + U.BTN_SM + ' BTN_TITLE=' + U.BTN_TITLE);
+  /* V9.6.119（父亲大人："这个加 1 的框明显偏上你没检查出来吗"）：
+     **通用规矩：行内按钮必须完整落在它所在的那一行里**（不能戳出面板/行框）。
+     这一条同时管标题行（.hbtn）和技能行（.btn.small）—— 上次只查了标题行的"到下一行距离"，
+     没查"按钮有没有超出自己那一行"，所以技能行的偏上漏过去了。下面两条都是纯算式。 */
+  {
+    /* 技能行：名字行高 = max(名字行高, 按钮高)，按钮以它为中线 */
+    const nameH = CV.FS.lg * 1.35, btnH = U.BTN_SM * CV.SCALE, PAD = 10 * CV.SCALE;
+    const nameRowH = Math.max(nameH, btnH);
+    const btnTop = PAD + (nameRowH - btnH) / 2, btnBottom = btnTop + btnH;
+    t('技能行：按钮完整落在这一行内（顶边不低于内边距、底边不越过名字行）',
+      btnTop >= PAD - 0.01 && btnBottom <= PAD + nameRowH + 0.01,
+      '按钮 ' + Math.round(btnTop) + '~' + Math.round(btnBottom) + 'px（名字行 ' + Math.round(PAD) + '~' + Math.round(PAD + nameRowH) + 'px）');
+    t('技能行：名字 / 等级胶囊 / 按钮共用同一条中线', /const cy = top \+ PAD \+ nameRowH \/ 2/.test(uiw));
+    t('技能行：名字行高按 max(名字, 按钮) 算（和网页版 .sname flex 行同口径）',
+      /const nameRowH = btnH \? Math\.max\(nameH, btnH\) : nameH/.test(uiw));
+    t('技能行：不能点时画成禁用态（不是"看着能点、点了没反应"）',
+      /o\.btnStyle \|\| 'ghost', o\.btnId, !!o\.btnDis/.test(uiw)
+      && /btnDis: !canUp/.test(fs.readFileSync(path.join(JS, 'sc-protag.js'), 'utf8'))
+      && /btnDis: !\(lv < 10\)/.test(fs.readFileSync(path.join(JS, 'sc-roster.js'), 'utf8')));
+  }
   /* 真几何验算（纯算式，不渲染）：标题行按钮的底边到"下面第一块"的起点之间到底留了几像素 */
   {
     const lh = CV.FS.f1 * 1.3, btnH = U.BTN_TITLE * CV.SCALE;
