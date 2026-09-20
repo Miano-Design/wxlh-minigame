@@ -861,6 +861,10 @@ window.Core = (function () {
   function craftSerum(serumId, n = 1) {
     const sd = D.serumById[serumId];
     if (!sd) return { ok: false, msg: '没有这个配方' };
+    /* V9.6.138：`unlock` 从"写在数据里没人读"改成**真门槛** ——
+       配方按通关进度开（见 data.js 里 SERUMS 的注释）。已经炼出来的照常能用，
+       只挡"再炼"，所以老存档里存着的血清不会作废。 */
+    if (!serumUnlocked(sd)) return { ok: false, msg: `🔒 ${serumUnlockTip(sd)}` };
     // V9.5.86（边界压测）：n 传 null/NaN 时 Math.floor 会给出 NaN，后面的扣款会写成 NaN
     const want = Math.max(1, Math.floor(Number(n)) || 1);
     const haveMat = S.items[sd.mat] || 0;
@@ -876,6 +880,22 @@ window.Core = (function () {
     task('item1', can);
     save();
     return { ok: true, count: can, msg: `炼化「${sd.name}」×${can}` };
+  }
+  /* 配方解锁：unlock = 要通关到第几张图（普通 12 关全清才算） */
+  function serumUnlocked(sd) {
+    /* ⚠️ 不能写成 `(sd.unlock) || 1` —— unlock: 0 是"开局就能炼"的合法值，
+       而 0 是假值，会被 `|| 1` 悄悄改成"需要通关第 1 张图"（实测新号因此炼不出力量血清）。 */
+    const n = (sd && typeof sd.unlock === 'number') ? sd.unlock : 1;
+    if (n <= 0) return true;
+    const w = D.WORLDS[n - 1];
+    if (!w) return true;                       // 数据写超了就当没限制，别把人锁死
+    const st = S.worlds && S.worlds[w.id];
+    return !!(st && st.stages && st.stages.normal && st.stages.normal.every((x) => x > 0));
+  }
+  function serumUnlockTip(sd) {
+    const n = (sd && typeof sd.unlock === 'number') ? sd.unlock : 1;
+    const w = D.WORLDS[n - 1];
+    return w ? ('通关 ' + w.name + '·普通 后开放') : '';
   }
   // 使用：喂给某名角色（或主角 '@player'）
   function useSerum(charId, serumId, n = 1) {
@@ -3583,7 +3603,7 @@ window.Core = (function () {
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
     addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
-    craftSerum, useSerum, serumTaken, serumApplied,
+    craftSerum, useSerum, serumTaken, serumApplied, serumUnlocked, serumUnlockTip,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,
     effectivePlayerStats, playerPower, choosePlayerBloodline, upgradePlayerBloodline,

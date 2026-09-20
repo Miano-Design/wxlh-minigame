@@ -29,6 +29,15 @@
     D.SERUMS.forEach(function (s) {
       const itemId = D.SERUM_ITEM(s.id);
       const own = S.items[itemId] || 0;
+      /* V9.6.138：配方按通关进度开（一档开局、二档 W03 起、血统专属 W05~W09、高阶 W15~W30）。
+         没开的照样列出来并写清差哪张图，玩家才知道后面还有货 —— 跟网页版同一份口径。 */
+      if (!Core.serumUnlocked(s)) {
+        U.card(function () {
+          U.h3('🔒 ' + s.name);
+          U.hint(Core.serumUnlockTip(s), 2 * CV.SCALE);
+        });
+        return;
+      }
       const matName = (D.ITEMS[s.mat] || {}).name || s.mat;
       const haveMat = S.items[s.mat] || 0;
       const can = Math.min(Math.floor(haveMat / s.matN), Math.floor((S.cur.points || 0) / s.points));

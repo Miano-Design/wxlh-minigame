@@ -1302,7 +1302,13 @@ setParty(['C021']);
   t('炼化扣材料与点数', c1.ok && c1.count === 3 && Core.S.items.mat_t1 === 5
     && Core.S.cur.points === 5000 - D.SERUMS.find(x => x.id === 'sr_atk').points * 3);
   t('炼化产出血清道具', (Core.S.items['serum_sr_atk'] || 0) === 3);
+  /* ⚠️ 这一条原来只是"点了返回 false"，而 sr_spd 现在有通关门槛（W03）——
+     不先把 W03 打通的话，它是因为**没解锁**才 false，测不到"点数不足"这件事（假绿）。 */
+  Core.S.worlds.W01 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  Core.S.worlds.W02 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+  Core.S.worlds.W03 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
   t('点数不足时拒绝炼化', Core.craftSerum('sr_spd', 10).ok === false);
+
 
   const cid = D.characters[0].id;
   Core.addChar(cid);
@@ -1336,6 +1342,27 @@ setParty(['C021']);
   t('只是持有血清不影响战力', Core.power(cid) === p0);
   Core.useSerum(cid, 'sr_atk', 10);
   t('喂下血清后战力跟着涨', Core.power(cid) > p0);
+
+  /* V9.6.138：血清配方按通关进度开 —— `unlock` 这个字段以前**根本没人读**（写了没做）。
+     这一段放在血清用例的**最后**：它要 newGame 一个干净档，插在中间会把上面那些状态冲掉。 */
+  Core.newGame(); Core.setPlayerName('血清门槛');
+  Core.S.items.mat_t1 = 99; Core.S.items.mat_t2 = 99; Core.S.items.mat_t4 = 99;
+  Core.S.cur.points = 9999999;
+  t('unlock:0 的配方开局就能炼', Core.craftSerum('sr_atk', 1).ok);
+  t('没通关时二档配方炼不了，且说清差哪张图', (() => {
+    const r = Core.craftSerum('sr_spd', 1);
+    return !r.ok && r.msg.indexOf(D.WORLDS[2].name) >= 0;
+  })());
+  t('高阶配方要更晚的图（W15）', (() => {
+    const r = Core.craftSerum('sr2_atk', 1);
+    return !r.ok && r.msg.indexOf(D.WORLDS[14].name) >= 0;
+  })());
+  ['W01', 'W02', 'W03'].forEach(w => { Core.S.worlds[w] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } }; });
+  t('通关 W03 后二档配方开放', Core.craftSerum('sr_spd', 1).ok);
+  t('高阶仍然锁着（要 W15）', !Core.craftSerum('sr2_atk', 1).ok);
+  t('血清分成两档：一档 12 + 高阶 12', D.SERUMS.length === 24 && D.SERUMS.filter(s => s.id.indexOf('sr2_') === 0).length === 12);
+  t('高阶那一档单价更高、上限更低', D.SERUMS.filter(s => s.id.indexOf('sr2_') === 0)
+    .every(s2 => { const s1 = D.SERUMS.find(x => x.id === s2.id.replace('sr2_', 'sr_')); return !!s1 && s2.points > s1.points && s2.max < s1.max; }));
 }
 
 /* V9.5.75（父亲大人）：招募券只能是系统赠送，商店不卖 —— 这条规则锁死，

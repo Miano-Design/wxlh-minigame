@@ -752,19 +752,44 @@ window.DATA = (function () {
      每喂一支都能立刻看见数字变化（档案 G-13：文案与效果必须同源）。 */
   const SERUM_KEYS = { atkPct: '攻击', defPct: '防御', hpPct: '生命', spdPct: '速度', critPct: '暴击率', skillPct: '技能伤害', evaPct: '闪避' };
   const SERUMS = [
-    { id: 'sr_atk', ico: '💪',   name: '力量血清', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
-    { id: 'sr_def', ico: '🛡',   name: '护壁血清', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
-    { id: 'sr_hp', ico: '🧬',    name: '细胞血清', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 1 },
+    /* V9.6.138：`unlock` 这个字段**一直没被任何地方读过**（写了没做）—— 现在把它变成真的门槛。
+       口径：`unlock: 0` = 开局就能炼；`unlock: N` = 通关第 N 张图（普通 12 关全清）后开放。
+       前三种是开局线、不设门槛；通用二档从 W03 起，血统专属按血统从 W05 排到 W09 ——
+       一条线跟着进度一段段开，而不是开服就把 12 张配方摊在玩家面前。 */
+    { id: 'sr_atk', ico: '💪',   name: '力量血清', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
+    { id: 'sr_def', ico: '🛡',   name: '护壁血清', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
+    { id: 'sr_hp', ico: '🧬',    name: '细胞血清', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
     { id: 'sr_spd', ico: '⚡',   name: '神经血清', key: 'spdPct',   per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 900,  bloodline: null, unlock: 3 },
     { id: 'sr_crit', ico: '🎯',  name: '感知血清', key: 'critPct',  per: 0.005, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 3 },
     { id: 'sr_skill', ico: '🕊', name: '灵能血清', key: 'skillPct', per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 4 },
     // 血统专属（对标同类的"门派专属丹"）：只有对应血统能用，单次更强、上限更低
     { id: 'sr_bl_vampire', ico: '🩸',  name: '血族·饕餮血清', key: 'atkPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '血族',   unlock: 5 },
     { id: 'sr_bl_werewolf', ico: '🐺', name: '狼人·狂化血清', key: 'hpPct',    per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '狼人',   unlock: 5 },
-    { id: 'sr_bl_cultivator', ico: '🍀', name: '修真·灵根血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 5 },
-    { id: 'sr_bl_titan', ico: '🏔',    name: '泰坦·磐石血清', key: 'defPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '泰坦',   unlock: 6 },
-    { id: 'sr_bl_tech', ico: '⚙',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 6 },
-    { id: 'sr_bl_psychic', ico: '☯',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 7 },
+    { id: 'sr_bl_cultivator', ico: '🍀', name: '修真·灵根血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 6 },
+    { id: 'sr_bl_titan', ico: '🏔',    name: '泰坦·磐石血清', key: 'defPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '泰坦',   unlock: 7 },
+    { id: 'sr_bl_tech', ico: '⚙',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 8 },
+    { id: 'sr_bl_psychic', ico: '☯',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 9 },
+    /* ---- 高阶血清（V9.6.138 新增）----
+       起因（父亲大人定的原则）："各个功能都最好能跟着游戏进程一起发展，不然前期就满了，
+       放在那里很占位置、感觉没啥用。" 原来 12 种血清**约 8 天就全喂满**，之后这件功能
+       对剩下两三百天完全没用。现在每一种多一档"高阶"：单支更狠、上限更低、要更晚的图才开放。
+       一档是"日常慢慢喂"，二档是"中期开始攒"—— 一条线拆成两段，跟着进度走。 */
+    /* 图标用"同色系方块"这一套：一档是具象图标（💪🛡🧬…），二档是纯色块 ——
+       一眼就能分出"这是高阶那一种"，而且和已有的 75 个图标完全不撞
+       （icon_unique_audit 会核，重复了就报错）。 */
+    { id: 'sr2_atk', ico: '🟥', name: '力量血清·高阶', key: 'atkPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_def', ico: '🟦', name: '护壁血清·高阶', key: 'defPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_hp', ico: '🟩',  name: '细胞血清·高阶', key: 'hpPct',    per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_spd', ico: '🟨', name: '神经血清·高阶', key: 'spdPct',   per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 15000, bloodline: null, unlock: 18 },
+    { id: 'sr2_crit', ico: '🟪', name: '感知血清·高阶', key: 'critPct', per: 0.012, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 18 },
+    { id: 'sr2_skill', ico: '🟫', name: '灵能血清·高阶', key: 'skillPct', per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 20 },
+    /* 血统专属的高阶：只有对应血统能用，所以给得比通用更狠、也更贵 */
+    { id: 'sr2_bl_vampire', ico: '🔴', name: '血族·饕餮血清·高阶', key: 'atkPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '血族',   unlock: 22 },
+    { id: 'sr2_bl_werewolf', ico: '🟠', name: '狼人·狂化血清·高阶', key: 'hpPct',    per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '狼人',   unlock: 22 },
+    { id: 'sr2_bl_cultivator', ico: '🟡', name: '修真·灵根血清·高阶', key: 'skillPct', per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '修真', unlock: 24 },
+    { id: 'sr2_bl_titan', ico: '🟢', name: '泰坦·磐石血清·高阶', key: 'defPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 30000, bloodline: '泰坦',   unlock: 26 },
+    { id: 'sr2_bl_tech', ico: '🔵', name: '科技·超频血清·高阶', key: 'spdPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '科技',   unlock: 28 },
+    { id: 'sr2_bl_psychic', ico: '🟣', name: '念动·超感血清·高阶', key: 'evaPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '念动力', unlock: 30 },
   ];
   const serumById = {};
   SERUMS.forEach(s => {
@@ -772,7 +797,7 @@ window.DATA = (function () {
     // 文案从数据派生：改了效果，说明自动跟着变，不会各写一份
     const tag = s.bloodline ? `【${s.bloodline}专属】` : '';
     ITEMS['serum_' + s.id] = {
-      /* V9.6.127：每支血清一个图标（原来 12 支全落进按类型推的 💊，完全分不出） */
+      /* V9.6.127：每支血清一个图标（原来一档那 12 支全落进按类型推的 💊，完全分不出） */
       icon: s.ico,
       name: s.name,
       type: 'serum',
