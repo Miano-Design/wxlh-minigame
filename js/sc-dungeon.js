@@ -327,7 +327,9 @@
           run.wave++;
           Core.setPendingRun(run);
           return {
-            title: '本波通过', sub: '继续推进…', rewards: [], acts: [], seamless: true,
+            /* V9.6.123（父亲大人："波间那个继续推进的提示，看着像要点击；
+               换成第几波的弹幕，飘过去然后消失"）：文案给"即将开始的第 N 波"。 */
+            title: '本波通过', sub: '第 ' + Math.min(run.wave + 2, run.waves.length) + '/' + run.waves.length + ' 波', rewards: [], acts: [], seamless: true,
             after() { fightWave(); },
           };
         }

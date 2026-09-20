@@ -67,6 +67,7 @@
     on: false, cfg: null, res: null, idx: 0, units: {}, log: [], floaters: [],
     speed: 1, timer: null, done: false, panel: null, energy: {}, tip: null,
     autoT: null, autoLeft: 0,
+    tipAt: 0, tipT: null,        // 波次弹幕：起始时间 + 动画计时器（V9.6.123）
     /* V9.6.90：防重入闸门**单独一个字段**。以前是拿 `B.on && B.res` 凑的 ——
        看着能用，其实"波与波之间"正好也满足这两个条件，于是无缝交接那一瞬间
        下一波会被自己挡掉（副本第 5 关起多波，第 2 波直接打不开）。
@@ -87,6 +88,7 @@
        它还会以 18fps 重画最多 0.9 秒（白耗电、还会重画一个新页面）。
        撤离=离场，就该立刻全清。 */
     if (fxT) { clearInterval(fxT); fxT = null; }
+    if (B.tipT) { clearInterval(B.tipT); B.tipT = null; }   // V9.6.123：波次弹幕的动画计时器，离场一起清
   }
   function pushLog(line) { B.log.push(line); if (B.log.length > 60) B.log.shift(); }
   function nameOf(uid) { const u = B.units[uid]; return u ? u.name : ''; }
@@ -239,7 +241,17 @@
       }
     }
     if (B.panel.seamless) {
-      B.tip = B.panel.sub || '本波通过，继续推进…';
+      /* V9.6.123（父亲大人："波间那个提示看着像要点击 → 做成飘过去就消失的第几波弹幕"）：
+         文案来自调用方（"第 N/M 波"），这里只管**怎么出现**：
+         0.9 秒内往上飘 26px 并淡出，没有边框/底色，点不到（本来也不该点）。
+         动画靠一个 33ms 的小计时器重画（停就自己清掉，不白烧电）。 */
+      B.tip = B.panel.sub || '本波通过…';
+      B.tipAt = Date.now();
+      if (B.tipT) { clearInterval(B.tipT); B.tipT = null; }
+      B.tipT = setInterval(function () {
+        if (!B.tip) { clearInterval(B.tipT); B.tipT = null; return; }
+        CV.render();
+      }, 33);
       const after = B.panel.after;
       B.panel = null;
       B.timer = setTimeout(function () {
@@ -399,10 +411,13 @@
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
     CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
     if (B.tip) {
-      const w = Math.min(CV.W - 60 * CV.SCALE, CV.measure(B.tip, CV.FS.lg) + 36 * CV.SCALE);
-      const x = (CV.W - w) / 2, y = CV.H / 2 - 20 * CV.SCALE;
-      CV.round(x, y, w, 40 * CV.SCALE, 12 * CV.SCALE, 'rgba(13,18,32,.93)', CV.C.gold);
-      CV.text(B.tip, CV.W / 2, y + 20 * CV.SCALE, { size: CV.FS.lg, color: CV.C.gold, align: 'center' });
+      /* 波次弹幕：没有框、不加粗金 —— 只是"往上飘 26px 并淡出"的一行字，
+         和网页版 .b-wave-banner 同一个观感（0→1→0 的透明度曲线也一样）。 */
+      const k = Math.max(0, Math.min(1, (Date.now() - (B.tipAt || 0)) / 900));
+      const alpha = k < 0.22 ? (k / 0.22) : Math.max(0, 1 - (k - 0.22) / 0.78);
+      const dy = 10 * CV.SCALE * (1 - k) - 26 * CV.SCALE * k;
+      CV.text(B.tip, CV.W / 2, CV.H * 0.46 + dy,
+        { size: CV.FS.f1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
     }
   }
 

@@ -268,7 +268,9 @@
       /* 格子里只放**没穿在身上的**装备（网页版同口径：穿身上的不占格） */
       const worn = new Set();
       Object.keys(S.equipped).forEach((cid) => Object.values(S.equipped[cid] || {}).forEach((u) => { if (u) worn.add(u); }));
-      let list = Object.values(S.equips).filter((e) => !worn.has(e.uid));
+      /* V9.6.123（父亲大人："装备的排序方式要像伙伴那样"）：排序规则在 core.sortEquips 一处
+         （强化 → 品质 → 部位 → 名称），网页版同一条。 */
+      let list = Core.sortEquips(Object.values(S.equips).filter((e) => !worn.has(e.uid)));
       /* 两行分类的筛选（网页版 bagEquipList 同款规则） */
       if (eqSlot !== 'all') list = list.filter((e) => e.slot === eqSlot);
       if (eqCat === 'world') list = list.filter((e) => !!e.set);

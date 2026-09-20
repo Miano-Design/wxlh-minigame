@@ -477,6 +477,29 @@ setParty(['C021']);
   t('困难难度第 12 关同样只让玩家自己选（不自动跨世界）', h === null, JSON.stringify(h));
 }
 
+// 27c. 装备排序（V9.6.123 父亲大人："装备的排序方式要像伙伴那样"）
+{
+  Core.newGame();
+  Core.S.bag.eqCap = 999;
+  const mk = (uid, rarity, enhance, slot, name) => { Core.S.equips[uid] = { uid, rarity, enhance, slot, name, base: {}, affix: {} }; };
+  mk('a', 'SR',  5, 'weapon', '甲');
+  mk('b', 'SSR', 0, 'weapon', '乙');
+  mk('c', 'SR', 12, 'armor',  '丙');
+  mk('d', 'MYTH', 0, 'weapon', '丁');
+  mk('e', 'SR',  5, 'weapon', '戊');
+  mk('f', 'SR',  5, 'armor',  '己');
+  const order = Core.sortEquips(Object.values(Core.S.equips)).map(e => e.uid);
+  /* 规则（和伙伴同一形状：投资在前，稀有度在后）：强化 → 品质 → 部位 → 名称 */
+  t('装备排序①：强化等级最高排最前（+12）', order[0] === 'c', order.join('>'));
+  t('装备排序②：同为 +5 SR 时，武器排在胸甲前（部位固定序）',
+    order.slice(1, 4).join('') === 'aef', order.join('>'));
+  t('装备排序③：完全同级（+5 SR 武器）按名称稳定排出', order[1] === 'a' && order[2] === 'e', order.join('>'));
+  t('装备排序④：强化为 0 的一组里，神话排在史诗之前',
+    order[4] === 'd' && order[5] === 'b', order.join('>'));
+  t('装备排序⑤：神装（MYTH）不再被排到最后（品质表用 EQUIP_RARITIES）',
+    order.indexOf('d') < order.indexOf('b'), 'MYTH 位次 ' + order.indexOf('d') + ' / SSR 位次 ' + order.indexOf('b'));
+}
+
 // 28. 批量分解
 {
   const before = Core.S.cur.otherworld;

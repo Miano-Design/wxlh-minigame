@@ -36,6 +36,16 @@ const RULES = [
 ];
 
 /* 残域详情页的"三件套"——缺一个都算没复刻到位 */
+/* 战斗页：波间提示必须是"飘过就消失的一行字"，不能是金色描边小框
+   （V9.6.123 父亲大人："继续推进那个提示看着像要点击"） */
+const BATTLE_MUST = [
+  [/B\.tipAt/, '波次弹幕缺动画起点（tipAt）——应该是飘上去淡出，不是一直挂着'],
+  [/clearInterval\(B\.tipT\)/, '波次弹幕的动画计时器没在离场清理里清掉（会空转）'],
+];
+const BATTLE_FORBID = [
+  [/CV\.round\([^\n]*B\.tip[^\n]*CV\.C\.gold/, '波次提示不许画成金色描边框（看着像按钮）'],
+  [/'继续推进…'|继续推进/, '文案已改成"第 N/M 波"，不要再写"继续推进"'],
+];
 const DUNGEON_MUST = [
   [/U\.hint\('⚔ 精英关（更硬、掉得更好）· 👹 守关 Boss（打完开下一个世界）'/, '关卡格下面缺网页版那行图例（⚔/👹 的含义）'],
   [/isElite[\s\S]{0,200}?CV\.text\('⚔'/, '精英关注册不到 ⚔ 角标（网页版 .sc-mark）'],
@@ -51,6 +61,13 @@ files.forEach(f => {
   RULES.forEach(([re, why]) => {
     if (re.test(src)) { bad++; console.log(`  ✗ ${f}：命中 ${re} —— ${why}`); }
   });
+  /* 战斗页的波次弹幕：查必须有的（tipAt/清理）与不许有的（金框/旧文案） */
+  if (f === 'sc-battle.js') {
+    BATTLE_MUST.forEach(([re, why]) => { if (!re.test(src)) { bad++; console.log(`  ✗ ${f}：缺 ${why}`); } });
+    /* 源码里可能整段注释提到"继续推进"，先剥注释再查禁用项 */
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1 ');
+    BATTLE_FORBID.forEach(([re, why]) => { if (re.test(code)) { bad++; console.log(`  ✗ ${f}：命中 ${re} —— ${why}`); } });
+  }
   /* 残域详情页的"三件套"：只在 sc-dungeon.js 里查（缺一样就是没复刻到位） */
   if (f === 'sc-dungeon.js') {
     DUNGEON_MUST.forEach(([re, why]) => {

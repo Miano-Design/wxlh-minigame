@@ -1651,10 +1651,27 @@ window.Core = (function () {
     save();
     return { ok: true, msg: `已套用预设 ${idx + 1}` };
   }
+  /* 装备槽的固定顺序（排序的第三键用；别按拼音/注册顺序排，那样看着是乱的） */
+  const EQUIP_SLOT_ORDER = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
+  /* 背包里的装备排序（V9.6.123 父亲大人："装备的排序方式要像伙伴那样"）：
+     伙伴是 **上阵 → 等级 → 稀有度 → 星级**；装备按同一种"形状"来：
+       **强化等级（投资）→ 品质 → 部位（固定序）→ 名称**。
+     为什么强化在前：它和伙伴的"等级"一样，是玩家**自己练上去的**那条线，
+     先看到自己练过的，再按品质兜底 —— 比"只看品质"更符合"我练的在哪"。
+     ⚠️ 品质必须用 EQUIP_RARITIES（含 MYTH），不能用角色用的 RARITIES ——
+     用错表的话神装 indexOf 是 -1，会被排到最后（以前 inventoryEquips 就是这个毛病）。 */
+  function sortEquips(list) {
+    const R = D.EQUIP_RARITIES || D.RARITIES;
+    return (list || []).slice().sort((a, b) =>
+      (b.enhance || 0) - (a.enhance || 0)
+      || R.indexOf(b.rarity) - R.indexOf(a.rarity)
+      || EQUIP_SLOT_ORDER.indexOf(a.slot) - EQUIP_SLOT_ORDER.indexOf(b.slot)
+      || String(a.name || '').localeCompare(String(b.name || ''), 'zh'));
+  }
   function inventoryEquips() {
     const equippedUids = new Set();
     Object.values(S.equipped).forEach(slots => Object.values(slots).forEach(u => u && equippedUids.add(u)));
-    return Object.values(S.equips).sort((a, b) => D.RARITIES.indexOf(b.rarity) - D.RARITIES.indexOf(a.rarity) || b.enhance - a.enhance);
+    return sortEquips(Object.values(S.equips));
   }
 
   /* ================= 站位（前排 / 后排） =================
@@ -3408,7 +3425,7 @@ window.Core = (function () {
   return {
     get S() { return S; },
     save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
-    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap,
+    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
     addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
