@@ -252,9 +252,21 @@ console.log('\n=== 战斗页生命周期审计 ===');
     t('⑦b 网页版用 R.wave + 2（它的 ++ 在 afterWave 里，晚一拍）—— 两边公式天生差 1，别互抄',
       /第 \$\{Math\.min\(R\.wave \+ 2, R\.waves\.length\)\}\//.test(web), '网页版口径未变');
     const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
-    t('⑦c 波次卡是"空屏 + 一行第 N 波"：tip 期间不画战场', /if \(B\.tip\) \{ drawWaveCard\(\); return; \}/.test(bsrc));
-    t('⑦d 波次卡不再"飘过"（是淡入停留淡出，位移为 0）',
+    /* V9.6.128（父亲大人："波间的空屏只在上方的阵容区域中间显示就行，不要占用整个屏幕，
+       下面的战斗日志和撤离加速两个按钮不要跟着闪"）：
+       现在的规矩是"**只跳过阵容绘制**"——所以查两件事：
+         · 阵容那一段被 `if (!B.tip) { … }` 包住（卡在时不画单位）；
+         · 撤离/加速那两个按钮与战斗日志**在这个包裹之外**（照常画，不跟着闪）。 */
+    const wrapAt = bsrc.indexOf('if (!B.tip) {');
+    const cornerAt = bsrc.indexOf('battleCornerButtons(FIELD_BOTTOM');
+    t('⑦c 波次卡期间只跳过阵容绘制（阵容那段被 if (!B.tip) 包住）',
+      wrapAt > 0 && /if \(!B\.tip\) \{[\s\S]{0,40}V9\.6\.128/.test(bsrc));
+    t('⑦d 撤离/加速与战斗日志在包裹之外（不跟着闪）',
+      cornerAt > wrapAt && cornerAt > 0);
+    t('⑦e 波次卡不再"飘过"（淡入停留淡出，位移为 0）',
       /const alpha = k < 0\.18/.test(bsrc) && !/26 \* CV\.SCALE \* k/.test(bsrc));
+    t('⑦f 波次卡画在阵容区中间（用内容顶/日志上方那条复算中线）',
+      /const cTop = CV\.TOP \+ 8 \* CV\.SCALE/.test(bsrc) && /const cBottom = CV\.H - CV\.safeBottom - CV\.NAV_H - LOG_H2/.test(bsrc));
   }
 
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。

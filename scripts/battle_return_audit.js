@@ -134,6 +134,24 @@ console.log('\n=== 战斗"从哪来就回哪去" ===');
     t('④ 没给回调时，战斗页自己还原"从哪来"（' + before + '）', page() === before, '落在了 ' + page());
   }
 
+  /* ⑤ 结算页的按钮不许"功能重复"（父亲大人 2026-09-21："斗法台改后两个按钮的功能
+     不是一摸一样吗，那还有必要留着两个吗，你自己检查一下，其他的地方有没有类似的问题"）：
+     底部那颗「收下奖励并返回」已经会回到"从哪来"的页面 —— 于是 acts 里再挂一颗
+     "返回同一页"（arena_back / corridor_back 这类）就是同一件事吃两颗按钮。 */
+  {
+    const srcBattle = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    const dupIds = [];
+    [['副本', 'sc-dungeon.js'], ['深井', 'sc-last.js'], ['斗法台', 'sc-lines.js']].forEach(([who, f]) => {
+      const src = fs.readFileSync(path.join(JS, f), 'utf8');
+      /* 只查"结算返回类"的重复：把返回同一页的 id 和底部的 battle_close 放一起比 */
+      const returnsSamePage = /acts:\s*\[[^\]]*id:\s*'(arena_back|corridor_back)'/.exec(src);
+      if (returnsSamePage) dupIds.push(who + ' 还挂着 ' + returnsSamePage[1] + '（与底部那颗重复）');
+    });
+    t('⑤ 结算页不挂"和底部那颗做同一件事"的返回键（斗法台 / 深井）', dupIds.length === 0, dupIds.join('；') || '都没有');
+    t('⑤b 底部的「收下奖励并返回」仍然是"回从哪来"的那一颗（不是写死残域）',
+      /function backToSource\(kind\)/.test(srcBattle) && !/else \{ CV\.reset\('dungeon'\); \}/.test(srcBattle));
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   console.log('结论：' + (fail === 0 ? '每个战斗入口都回得去，结算按钮也都有反应 ✓' : '有 ' + fail + ' 处跳转错/无效按键 ✗') + '\n');
   process.exitCode = fail ? 1 : 0;

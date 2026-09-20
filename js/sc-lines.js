@@ -250,7 +250,11 @@
       onClose: function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); },   // V9.6.124：收下奖励后回斗法台（原来靠兜底 → 被送到残域）
       onEnd: function (win) {
         const r = Core.arenaSettle(win);
-        return { title: win ? '守擂成功' : '守擂失败', sub: r.msg || '', rewards: [], acts: [{ label: '返回斗法台', style: 'ghost', id: 'arena_back' }] };
+        /* V9.6.128（父亲大人："斗法台改后两个按钮的功能不是一摸一样吗，那还有必要留着两个吗"）：
+           补了 onClose 之后，底部那颗「收下奖励并返回」已经回斗法台了 ——
+           这里再挂一颗「返回斗法台」就是同一件事两颗按钮。**去掉**，只留底部那颗。
+           （失败时也一样：底部的文案会变成「返回」。） */
+        return { title: win ? '守擂成功' : '守擂失败', sub: r.msg || '', rewards: [], acts: [] };
       },
     });
   });

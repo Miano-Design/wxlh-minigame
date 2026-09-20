@@ -319,7 +319,12 @@
     if (!B.tip) return;
     const k = Math.max(0, Math.min(1, (Date.now() - (B.tipAt || 0)) / 1050));
     const alpha = k < 0.18 ? (k / 0.18) : (k > 0.72 ? Math.max(0, (1 - k) / 0.28) : 1);
-    CV.text(B.tip, CV.W / 2, CV.H * 0.46,
+    /* 画在**阵容区**的中间（V9.6.128）：上边界 = 内容顶，下边界 = 日志上方那条
+       —— 和 FIELD_TOP / FIELD_BOTTOM 同一套几何复算，保证字落在阵容区正中。 */
+    const cTop = CV.TOP + 8 * CV.SCALE;
+    const LOG_H2 = 92 * CV.SCALE;
+    const cBottom = CV.H - CV.safeBottom - CV.NAV_H - LOG_H2;
+    CV.text(B.tip, CV.W / 2, cTop + (cBottom - cTop) / 2,
       { size: CV.FS.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
   }
 
@@ -327,15 +332,18 @@
     U.begin();
     const res = B.res;
     if (!res) { U.card(function () { U.h3('战斗'); U.hint('没有进行中的战斗', 6 * CV.SCALE); }); return; }
-    /* V9.6.125（父亲大人："直接就是空屏然后写第几波，然后再进去战斗"）：
-       波次卡期间**战场整段不画** —— 只留深色底 + 居中一行「第 N 波」（在下面的 tip 分支里画）。
-       这样玩家一眼知道"换波了"，也不会再把提示误当成要点的按钮。 */
-    if (B.tip) { drawWaveCard(); return; }
+    /* V9.6.128（父亲大人："波间的空屏只在上方的阵容区域中间显示就行，不要占用整个屏幕，
+       下面的战斗日志和撤离加速两个按钮不要跟着闪"）：
+       波次卡**只在阵容区**里显示 —— 日志、撤离、加速（以及底栏）照常画，不再整屏 return。 */
     const units = Object.keys(B.units).map((k) => B.units[k]).filter((u) => u && u.side);
     const enemies = units.filter((u) => u.side === 'enemy');
     const allies = units.filter((u) => u.side === 'ally');
     const front = allies.filter((u) => u.position === 'front');
     const back = allies.filter((u) => u.position === 'back');
+    /* 波次卡：**只在阵容区**画一行「第 N 波」；日志与按钮不动（V9.6.128） */
+    if (B.tip) {
+      drawWaveCard();
+    }
     /* 战场区：**和网页版同一套规则**（V9.6.0 父亲大人两条意见一起改）——
          · "敌我离得好近"：小游戏原来从战场顶按固定行高往下堆，满编时三行挤在上半屏；
          · "我方前后排离得太远"：网页版原来用 space-evenly 把三行摊满整屏，前后排隔了 185px。
@@ -360,63 +368,66 @@
     const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
     const allyTop = enemyY + CARD_H + space * 2;
-    const rows = [
-      { list: enemies, y: enemyY, ally: false },
-      { list: front, y: allyTop, ally: true },
-      { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },
-    ];
-    /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
-       （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
-       画完立刻还原，热区不受影响。轻击 1.5px、暴击 3px，见 hitFx 里设的 B.shakePx。 */
-    const shaking = (B.shakeUntil || 0) > Date.now();
-    const shakePx = B.shakePx || 0;
-    const sx = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
-    const sy = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
-    CV.ctx.save();
-    CV.ctx.translate(sx, sy);
-    rows.forEach((row) => {
-      const list = row.list;
-      if (!list.length) return;
-      const n = Math.max(1, list.length);
-      const g = 8 * CV.SCALE;
-      const maxW = row.ally ? U.cw() * 0.24 : U.cw() * 0.3;
-      const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
-      const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
-      list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
-    });
-    /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
-       位置取自各卡刚才记下的 _cx/_top —— 所以先画完所有单位再画它。 */
-    (B.floaters || []).forEach(function (f) {
-      const u = B.units[f.uid];
-      if (!u || u._cx == null) return;
-      const p = Math.min(1, (Date.now() - f.t) / 900);
-      if (p >= 1) return;
-      const fy = u._top - 4 * CV.SCALE - 26 * CV.SCALE * p;
-      const alpha = 1 - p * p;
+    if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
+      const rows = [
+        { list: enemies, y: enemyY, ally: false },
+        { list: front, y: allyTop, ally: true },
+        { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },
+      ];
+      /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
+         （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
+         画完立刻还原，热区不受影响。轻击 1.5px、暴击 3px，见 hitFx 里设的 B.shakePx。 */
+      const shaking = (B.shakeUntil || 0) > Date.now();
+      const shakePx = B.shakePx || 0;
+      const sx = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
+      const sy = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
       CV.ctx.save();
-      CV.ctx.globalAlpha = alpha;
-      const size = 14 * CV.SCALE;
-      CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
-      CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
-      CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
-      CV.ctx.strokeText(f.text, u._cx, fy);
-      CV.ctx.fillStyle = f.color || CV.C.gold;
-      CV.ctx.fillText(f.text, u._cx, fy);
-      CV.ctx.restore();
-    });
-    /* 受击红闪：在头像外再描一圈（画在飘字之前，所以不会被盖） */
-    Object.keys(B.hitAt || {}).forEach(function (uid) {
-      const u = B.units[uid];
-      if (!u || u._cx == null) return;
-      const p = Math.max(0, 1 - (Date.now() - B.hitAt[uid]) / 300);
-      if (p <= 0) return;
-      CV.ctx.save();
-      CV.ctx.globalAlpha = 0.75 * p;
-      CV.ctx.strokeStyle = '#ff5a5a'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
-      if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
-      else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
-      CV.ctx.restore();
-    });
+      CV.ctx.translate(sx, sy);
+      rows.forEach((row) => {
+        const list = row.list;
+        if (!list.length) return;
+        const n = Math.max(1, list.length);
+        const g = 8 * CV.SCALE;
+        const maxW = row.ally ? U.cw() * 0.24 : U.cw() * 0.3;
+        const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
+        const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
+        list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
+      });
+      /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
+         位置取自各卡刚才记下的 _cx/_top —— 所以先画完所有单位再画它。 */
+      (B.floaters || []).forEach(function (f) {
+        const u = B.units[f.uid];
+        if (!u || u._cx == null) return;
+        const p = Math.min(1, (Date.now() - f.t) / 900);
+        if (p >= 1) return;
+        const fy = u._top - 4 * CV.SCALE - 26 * CV.SCALE * p;
+        const alpha = 1 - p * p;
+        CV.ctx.save();
+        CV.ctx.globalAlpha = alpha;
+        const size = 14 * CV.SCALE;
+        CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
+        CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
+        CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
+        CV.ctx.strokeText(f.text, u._cx, fy);
+        CV.ctx.fillStyle = f.color || CV.C.gold;
+        CV.ctx.fillText(f.text, u._cx, fy);
+        CV.ctx.restore();
+      });
+      /* 受击红闪：在头像外再描一圈（画在飘字之前，所以不会被盖） */
+      Object.keys(B.hitAt || {}).forEach(function (uid) {
+        const u = B.units[uid];
+        if (!u || u._cx == null) return;
+        const p = Math.max(0, 1 - (Date.now() - B.hitAt[uid]) / 300);
+        if (p <= 0) return;
+        CV.ctx.save();
+        CV.ctx.globalAlpha = 0.75 * p;
+        CV.ctx.strokeStyle = '#ff5a5a'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
+        if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
+        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
+        CV.ctx.restore();
+      });
+
+    }
     CV.ctx.restore();                       // 震屏结束：还原坐标系
 
     /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */

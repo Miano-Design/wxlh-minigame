@@ -27,13 +27,22 @@
     CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: CV.DISP.d2, align: 'center' });
     const tx = x + 12 * CV.SCALE + box + 12 * CV.SCALE;
     const tw = CV.measure(title, CV.FS.f1, true);
-    CV.text(title, tx, top + 24 * CV.SCALE, { size: CV.FS.f1, bold: true });
+    /* V9.6.127（父亲大人："世界名和进度的小字得作为一个整体，去居中对齐前面的图标；
+       你现在看文字是偏上的"）：
+       网页版是 flex + align-items:center，标题与小字**作为一个整体**自动居中；
+       画布这边原来把它们分别钉在 top+24 / top+46，整块的中心在 34 左右、而图标中心在 41 → 偏上 7px。
+       现在先算整块高度（标题行 + 2px + 小字行），再以**卡片中线**为中心上下摊开。 */
+    const T1 = CV.FS.f1 * 1.3, T2 = CV.FS.sm * 1.55;
+    const blockH = T1 + 2 * CV.SCALE + T2;
+    const blockTop = top + (h - blockH) / 2;
+    const titleCy = blockTop + T1 / 2;
+    CV.text(title, tx, titleCy, { size: CV.FS.f1, bold: true });
     if (tag) {
       const tagW = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE;
-      CV.round(tx + tw + 8 * CV.SCALE, top + 15 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, '#2f5b41');
-      CV.text(tag, tx + tw + 8 * CV.SCALE + tagW / 2, top + 24 * CV.SCALE, { size: CV.FS.xs, color: CV.C.green, align: 'center' });
+      CV.round(tx + tw + 8 * CV.SCALE, titleCy - 9 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, '#2f5b41');
+      CV.text(tag, tx + tw + 8 * CV.SCALE + tagW / 2, titleCy, { size: CV.FS.xs, color: CV.C.green, align: 'center' });
     }
-    CV.text(CV.fit(sub, w - (tx - x) - 30 * CV.SCALE, CV.FS.sm), tx, top + 46 * CV.SCALE,
+    CV.text(CV.fit(sub, w - (tx - x) - 30 * CV.SCALE, CV.FS.sm), tx, blockTop + T1 + 2 * CV.SCALE + T2 / 2,
       { size: CV.FS.sm, color: CV.C.dim });
     CV.text('›', x + w - 14 * CV.SCALE, top + h / 2, { size: CV.FS.f1, color: CV.C.dim, align: 'right' });
     if (dim) CV.ctx.globalAlpha = 1;
@@ -77,7 +86,7 @@
       const unlocked = true;
       const cleared = st.stages.normal.every((s) => s > 0);
       const prog = st.stages.normal.filter((s) => s > 0).length;
-      worldCard(ICON[w.theme] || '⚔', w.name,
+      worldCard(w.ico || ICON[w.theme] || '⚔', w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
         cleared ? '已通关' : '', 'w:' + w.id, false);
     });
@@ -108,7 +117,7 @@
     U.space(U.BTN_SM * CV.SCALE + CV.SP[2]);                       // 按钮下 14（.btn margin-bottom）
     // 世界卡
     U.card(function () {
-      U.h3(ICON[w.theme] + ' ' + w.name);
+      U.h3((w.ico || ICON[w.theme] || '⚔') + ' ' + w.name);   // V9.6.127：用世界自己的图标
       U.note(w.desc, 2 * CV.SCALE);                 // 网页版这一行是 0.75rem（12px）
       U.space(CV.SP[2]);                            // V9.6.122：网页版 .kv mt2 = 10（原来 4，太挤）
       U.kv('世界机制', w.mechanic, CV.C.accent);     // 整句照抄，别只留冒号前半截

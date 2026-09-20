@@ -867,7 +867,9 @@
         if (!win) {
           return {
             title: '止步于第 ' + floor + ' 层', sub: '',
-            rewards: [], acts: [{ label: '↻ 再挑第 ' + floor + ' 层', style: 'primary', id: 'corridor_fight' }, { label: '返回深井', style: 'ghost', id: 'corridor_back' }],
+            /* V9.6.128：只留"再挑一层"这颗（它做的事和底部那颗不同）；「返回深井」与底部
+               「收下奖励并返回」是同一件事 → 去掉重复的。 */
+            rewards: [], acts: [{ label: '↻ 再挑第 ' + floor + ' 层', style: 'primary', id: 'corridor_fight' }],
           };
         }
         const rw = D.corridorReward(floor);
@@ -882,7 +884,8 @@
           .concat(gotMark ? ['♜ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
         return {
           title: '第 ' + floor + ' 层通过', sub: '', rewards: rewards,
-          acts: [{ label: '› 继续第 ' + S.corridor.floor + ' 层', style: 'primary', id: 'corridor_fight' }, { label: '返回深井', style: 'ghost', id: 'corridor_back' }],
+          /* V9.6.128：同上 —— 「继续第 N 层」保留，「返回深井」交给底部那颗，别挂两颗一样的 */
+          acts: [{ label: '› 继续第 ' + S.corridor.floor + ' 层', style: 'primary', id: 'corridor_fight' }],
         };
       },
     });
