@@ -1086,13 +1086,33 @@ window.DATA = (function () {
     ch.skills = BLOODLINE_SKILLS[mapped];
     ch.faction = FACTION_FIX[ch.faction] || ch.faction;      // 阵营归一（老名字 → 新地名）
   });
-  const GENE_LOCKS = [
-    { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', cost: { bloodCrystal: 125 } },
-    { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 375 } },
-    { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 1000 } },
-    { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2500 } },
-    { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 6250 } },
-  ];
+  /* V9.6.130（父亲大人："铭刻加到 20 阶……各个功能都最好能跟着游戏进程一起发展，
+     不然前期就满了，这个功能就不用再点了，放在那里就很占位置"）：
+     5 阶 → 20 阶。规则：**每 2 个世界开 1 阶**（跟进度走，不会前期点满），
+     6 阶起每阶给"全属性 +0.8% → +0.5%"递减（15 阶合计约 +9.75%），
+     成本 6250 起每阶 ×1.15（第 20 阶约 5 万血统结晶）—— 长线但追得上。 */
+  const GENE_LOCK_NAMES = ['初醒', '强化', '突破', '超越', '完全解锁', '回响', '刻痕', '铭心', '贯脉',
+    '破妄', '凝神', '铸骨', '燃血', '登阶', '归元', '御虚', '承天', '弑神', '无相', '灯主'];
+  const GENE_LOCKS = (function () {
+    const first5 = [
+      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', cost: { bloodCrystal: 125 } },
+      { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 375 } },
+      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 1000 } },
+      { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2500 } },
+      { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 6250 } },
+    ];
+    const out = first5.slice();
+    for (let st = 6; st <= 20; st++) {
+      const worldIdx = Math.min(WORLDS.length - 1, st * 2 - 2);        // 6 阶→W10、20 阶→W36
+      const pct = (st <= 12 ? 0.8 : 0.5) + (st % 2 === 0 ? 0.1 : 0);   // 递减：0.9/0.6 交替 → 15 阶约 +9.75%
+      const cost = Math.round(6250 * Math.pow(1.15, st - 5) / 50) * 50;
+      out.push({ stage: st, name: GENE_LOCK_NAMES[st - 1] || ('铭刻 ' + st),
+        desc: '全队全属性+' + pct.toFixed(1) + '%', req: '通关 ' + WORLDS[worldIdx].name + '·普通',
+        cost: { bloodCrystal: cost }, allPct: pct / 100 });
+    }
+    return out;
+  })();
+  const GENE_LOCK_MAX = GENE_LOCKS.length;      // = 20
 
   /* ================= 转生阶梯 =================
      V9.6.76（长线模拟体检逼出来的改动）：原来的三道转生门**每一道都要"铭刻 5 阶"**，
@@ -1322,6 +1342,26 @@ window.DATA = (function () {
   /* ================= 坐骑（对标《道友修仙》的坐骑） =================
      法宝给"效果"，坐骑给"基础数值"：主角骑 1 匹，永久生效、随时能换。
      对标参考图角色页右侧那排按钮里的"坐骑"那一栏。 */
+  /* ================= 坐骑 / 法宝 的养成线（V9.6.130 父亲大人点头的方案）=================
+     原来这两条都是"买一件带上"就完了 —— 前期买完占位置、后面再也不点。
+     现在各自多一条等级线，材料/货币都能跟着进度花出去：
+       · 坐骑：喂养升级（1~上限），每级 **全属性 +0.4%**；上限由稀有度定（N10 / R12 / SR15 / UR20）
+       · 法宝：祭炼升级（1~15），每级把它**自己的效果**放大 5%（吸血 4% → 4.2% …）
+     成本跟着稀有度走（越高阶材料越好），保证"前期能喂、后期还有得喂"。 */
+  const MOUNT_MAX_LV = { N: 10, R: 12, SR: 15, UR: 20 };
+  const MOUNT_LV_PCT = 0.004;                       // 每级全属性 +0.4%
+  const MOUNT_FEED_MAT = { N: 'mat_t1', R: 'mat_t2', SR: 'mat_t3', UR: 'mat_t5' };
+  function mountFeedCost(m, lv) {                   // 第 lv → lv+1 级的花费
+    const mul = { N: 1, R: 1.4, SR: 2, UR: 3 }[m.rarity] || 1;
+    return { points: Math.round(3000 * mul * Math.pow(1.18, lv)), mat: MOUNT_FEED_MAT[m.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.12, lv))) };
+  }
+  const FABAO_MAX_LV = 15;
+  const FABAO_LV_PCT = 0.05;                        // 每级把效果放大 5%
+  const FABAO_REFINE_MAT = { R: 'mat_t2', SR: 'mat_t3', SSR: 'mat_t4', UR: 'mat_t5' };
+  function fabaoRefineCost(f, lv) {                 // 第 lv → lv+1 级的花费
+    const mul = { R: 1, SR: 1.6, SSR: 2.4, UR: 3.5 }[f.rarity] || 1;
+    return { otherworld: Math.round(180 * mul * Math.pow(1.16, lv)), mat: FABAO_REFINE_MAT[f.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.1, lv))) };
+  }
   const MOUNTS = [
     { id: 'mt01', name: '铁甲蜥', rarity: 'N',  cost: { points: 10000 },                                          pct: { hpPct: 0.04 },  desc: '生命 +4%' },
     { id: 'mt02', name: '疾风狼', rarity: 'N',  cost: { points: 10000 },                                          pct: { spdPct: 0.05 }, desc: '速度 +5%' },
@@ -2117,7 +2157,7 @@ window.DATA = (function () {
   }
 
   return {
-    ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS, SHARD_RARITIES,
+    ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS, SHARD_RARITIES, GENE_LOCK_MAX, MOUNT_MAX_LV, MOUNT_LV_PCT, mountFeedCost, FABAO_MAX_LV, FABAO_LV_PCT, fabaoRefineCost,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
     SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,

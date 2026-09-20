@@ -59,8 +59,11 @@ window.Core = (function () {
       charExp: 0,               // 伙伴经验池（V9.5.46）：所有伙伴共用这一份，升级从这里扣、重生返还回来
       garden: Array(4).fill(null),       // 药园（对标"洞府·药园"）：每块地 null 或 {kind, at}
       arena: { floor: 1, best: 1, date: '', used: 0 },   // 斗法台（对标"Arena"）
-      fabao: { own: [], on: null },      // 法宝（对标"FaBao"）：own = 已拥有，on = 主角佩戴的那件
-      mount: { own: [], on: null },      // 坐骑（对标"Horse"）：own = 已驯服，on = 当前乘骑的那匹
+      /* V9.6.130：法宝多一条"祭炼"等级线、坐骑多一条"喂养"等级线（父亲大人点头的方案）
+         lvMap = { id → 等级 }；0 级＝刚买到时的原始效果 */
+      fabao: { own: [], on: null, lvMap: {} },
+      fabaoLvMap: {},   // 兼容：祭炼等级也挂一份在这里（读档迁移用）
+      mount: { own: [], on: null, lvMap: {} },   // 坐骑（V9.6.130：lvMap = 喂养等级）
       sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 求签（对标"SignItem"）：今天的签文与挂机加成
       worlds: {},           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
       worldFirstClear: {},  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
@@ -2610,7 +2613,7 @@ window.Core = (function () {
     if (!S.fabao) S.fabao = { own: [], on: null };
     return {
       own: S.fabao.own.slice(), on: S.fabao.on,
-      list: D.FABAO.map(f => Object.assign({}, f, { owned: S.fabao.own.includes(f.id), active: S.fabao.on === f.id })),
+      list: D.FABAO.map(f => Object.assign({}, f, { owned: S.fabao.own.includes(f.id), active: S.fabao.on === f.id, lv: fabaoLv(f.id), maxLv: D.FABAO_MAX_LV })),
     };
   }
   function buyFabao(id) {
@@ -2639,11 +2642,63 @@ window.Core = (function () {
     save();
     return { ok: true, msg: id ? `已佩戴「${D.fabaoById(id).name}」` : '已摘下法宝' };
   }
+  /* ---------- 法宝祭炼 / 坐骑喂养（V9.6.130）----------
+     两条线的共同点：**买/驯服只是起点**，之后还要能一直往里投 —— 不然前期做完就成摆设。 */
+  function fabaoLv(id) { return (S.fabao && S.fabao.lvMap && S.fabao.lvMap[id]) || 0; }
+  function mountLv(id) { return (S.mount && S.mount.lvMap && S.mount.lvMap[id]) || 0; }
+  function refineFabao(id) {
+    const f = D.fabaoById(id);
+    if (!f) return { ok: false, msg: '没有这件法宝' };
+    if (!S.fabao || !S.fabao.own.includes(id)) return { ok: false, msg: '还没有这件法宝' };
+    const lv = fabaoLv(id);
+    if (lv >= D.FABAO_MAX_LV) return { ok: false, msg: '已经祭炼到顶（' + D.FABAO_MAX_LV + ' 级）' };
+    const c = D.fabaoRefineCost(f, lv);
+    if ((S.cur.otherworld || 0) < c.otherworld) return { ok: false, msg: `◆ 异界结晶不足（需要 ${c.otherworld}）` };
+    if ((S.items[c.mat] || 0) < c.matN) return { ok: false, msg: `${(D.ITEMS[c.mat] || {}).name || c.mat} 不足（需要 ${c.matN}）` };
+    addCur('otherworld', -c.otherworld);
+    addItem(c.mat, -c.matN);
+    if (!S.fabao.lvMap) S.fabao.lvMap = {};
+    S.fabao.lvMap[id] = lv + 1;
+    save();
+    return { ok: true, msg: `「${f.name}」祭炼到 ${lv + 1} 级（效果 +${Math.round((lv + 1) * D.FABAO_LV_PCT * 100)}%）` };
+  }
+  function feedMount(id) {
+    const m = D.mountById(id);
+    if (!m) return { ok: false, msg: '没有这匹坐骑' };
+    if (!S.mount || !S.mount.own.includes(id)) return { ok: false, msg: '还没有这匹坐骑' };
+    const lv = mountLv(id);
+    const max = D.MOUNT_MAX_LV[m.rarity] || 10;
+    if (lv >= max) return { ok: false, msg: `已经喂到顶（${max} 级，${m.rarity} 档上限）` };
+    const c = D.mountFeedCost(m, lv);
+    if ((S.cur.points || 0) < c.points) return { ok: false, msg: `◈ 点数不足（需要 ${c.points}）` };
+    if ((S.items[c.mat] || 0) < c.matN) return { ok: false, msg: `${(D.ITEMS[c.mat] || {}).name || c.mat} 不足（需要 ${c.matN}）` };
+    addCur('points', -c.points);
+    addItem(c.mat, -c.matN);
+    if (!S.mount.lvMap) S.mount.lvMap = {};
+    S.mount.lvMap[id] = lv + 1;
+    save();
+    return { ok: true, msg: `「${m.name}」喂养到 ${lv + 1} 级（全属性 +${((lv + 1) * D.MOUNT_LV_PCT * 100).toFixed(1)}%）` };
+  }
+  /* 法宝效果随祭炼等级放大：每级 +5% 的效果量 */
+  function fabaoEffMul(id) { return 1 + fabaoLv(id) * D.FABAO_LV_PCT; }
+  /* 坐骑：基础 pct + 等级给的"全属性"加成 */
+  function mountBonusPct(id) {
+    const m = D.mountById(id);
+    if (!m) return {};
+    const out = Object.assign({}, m.pct);
+    /* ⚠️ allPct 只有"血统加成"那条路会展开（见 effectiveStats 里的 bl.allPct）——
+       坐骑这条线必须在这里自己展开成四条百分比，否则喂养了却不涨属性（尺子当场抓到过）。 */
+    const add = mountLv(id) * D.MOUNT_LV_PCT;
+    if (add) ['atkPct', 'hpPct', 'defPct', 'spdPct'].forEach((k) => { out[k] = (out[k] || 0) + add; });
+    return out;
+  }
+
   // 法宝效果：数值类进 pct，战斗额外类进 extra（与转生天赋的额外字段同一处）
   function applyFabao(pct, extra) {
     const f = (S.fabao && S.fabao.on) ? D.fabaoById(S.fabao.on) : null;
     if (!f) return;
-    Object.entries(f.eff).forEach(([k, v]) => {
+    const mul = fabaoEffMul(f.id);          // V9.6.130：祭炼等级越高，效果越强
+    Object.entries(f.eff).forEach(([k, v0]) => { const v = v0 * mul;
       if (k === 'dmgReduce' || k === 'initEnergy') { extra[k] = (extra[k] || 0) + v; return; }
       pct[k] = (pct[k] || 0) + v;
     });
@@ -2657,7 +2712,7 @@ window.Core = (function () {
     if (!S.mount) S.mount = { own: [], on: null };
     return {
       own: S.mount.own.slice(), on: S.mount.on,
-      list: D.MOUNTS.map(m => Object.assign({}, m, { owned: S.mount.own.includes(m.id), active: S.mount.on === m.id })),
+      list: D.MOUNTS.map(m => Object.assign({}, m, { owned: S.mount.own.includes(m.id), active: S.mount.on === m.id, lv: mountLv(m.id), maxLv: D.MOUNT_MAX_LV[m.rarity] || 10 })),
     };
   }
   function buyMount(id) {
@@ -2694,7 +2749,8 @@ window.Core = (function () {
   function applyMount(pct) {
     const m = (S.mount && S.mount.on) ? D.mountById(S.mount.on) : null;
     if (!m) return;
-    Object.entries(m.pct).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+    const bonus = mountBonusPct(m.id);      // V9.6.130：喂养等级给的"全属性"也算进来
+    Object.entries(bonus).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
   }
 
   /* ================= 求签（对标《道友修仙》的求签） =================
@@ -3489,7 +3545,7 @@ window.Core = (function () {
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
     travelAccrue, travelTick, travelProgress, travelEverySec, pendingTravel, claimTravel, rollTravel, rewardTextOf,
     gardenState, plantGarden, harvestGarden, harvestAllGarden,
-    arenaState, arenaSettle, fabaoState, buyFabao, wearFabao,
+    arenaState, arenaSettle, fabaoState, buyFabao, wearFabao, refineFabao, fabaoLv, fabaoEffMul, feedMount, mountLv, mountBonusPct,
     mountState, buyMount, wearMount, applyMount,
     signState, drawSign, signIdleMult,
     unlockWorld, worldCleared, stageComplete, stageUnlocked,

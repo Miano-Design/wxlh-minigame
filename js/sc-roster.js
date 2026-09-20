@@ -197,7 +197,13 @@
 
     /* ③ 星级（碎片升星） */
     U.card(function () {
-      U.h3('⭐ 星级', c.star + ' / ' + maxStar + ' · ' + ch.rarity + ' 通用碎片 ' + Core.shardPoolOf(ch.rarity));
+      /* V9.6.130（父亲大人："我现在的 UR 升星级还是统一只需 6 碎片啊"）：
+         原来是"星级 x / 6"——那个 6 是**星级上限**，不是碎片数，很容易看错。
+         现在把三件事分行写清：当前星级 / 升下一星要多少碎片 / 池子里有多少。 */
+      U.h3('⭐ 星级', Core.charName(id) + ' · ' + ch.rarity + ' 档');
+      U.kv('当前星级', c.star + ' / ' + maxStar + ' ★');
+      U.kv('升下一星需要', c.star >= maxStar ? '已满星' : (D.STAR_COST[c.star] + ' 碎片'), CV.C.gold);
+      U.kv(ch.rarity + ' 通用碎片池', String(Core.shardPoolOf(ch.rarity)));
       U.btnRow([{ label: c.star >= maxStar ? '已满星' : '升星', style: 'ghost', id: c.star >= maxStar ? 'noop' : 'starup' }]);
     });
 

@@ -355,7 +355,17 @@
   CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
   /* 换页时把"页面级覆盖层"清掉 —— 否则结算层会跟着下一页一起被画出来（V9.6.1 修） */
-  CV.reset = function (name, opts) { CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.grabCfg = null; CV.dropGrab(); CV.render(); };
+  /* ---------- 滚动位置记忆（V9.6.130 父亲大人："滑到中间点开一个伙伴，一退出来就回滚，
+     还得再翻半天去找他"）----------
+     规矩：**进入子页（push）时记住当前页的滚动位置；返回（pop）时恢复上一层的位置**；
+     而**换标签/重进（reset）仍然从头看**（这是父亲大人认可的行为）。
+     一处修，所有列表页一起受益（执灯者 / 背包 / 任务 / 世界列表 / 各商店…）。 */
+  CV.scrollMemo = {};
+  CV.reset = function (name, opts) {
+    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.grabCfg = null; CV.dropGrab();
+    CV.scrollMemo[name] = 0;                 // 换标签＝从头看，把这一页的记忆清掉
+    CV.render();
+  };
   /* ---------- 长按抓起 · 拖动换位（V9.6.111） ----------
      父亲大人："小游戏队伍拖拽换位不了。"——以前这件事**根本没做**：
      sc-party 里写着"长按拖动在 canvas 上代价大，改成点格子选伙伴"，
@@ -370,8 +380,18 @@
   CV.grabCfg = null;
   CV.dropGrab = function () { CV.grab = null; };
 
-  CV.push = function (name, opts) { CV.stack.push({ name, opts: opts || {} }); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render(); };
-  CV.pop = function () { if (CV.stack.length > 1) CV.stack.pop(); CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render(); };
+  CV.push = function (name, opts) {
+    CV.scrollMemo[(CV.top() || {}).name] = CV.scroll || 0;    // 记住"从哪来、看到哪了"
+    CV.stack.push({ name, opts: opts || {} });
+    CV.scroll = CV.scrollMemo[name] || 0;                    // 这一页自己也有记忆（比如从详情再进详情）
+    CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
+  };
+  CV.pop = function () {
+    CV.scrollMemo[(CV.top() || {}).name] = CV.scroll || 0;   // 离开这一页：记住它看到哪
+    if (CV.stack.length > 1) CV.stack.pop();
+    CV.scroll = CV.scrollMemo[(CV.top() || {}).name] || 0;   // 回到上一层：**恢复它原来看到的位置**
+    CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
+  };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
      中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
      那一次首页渲染会把首页自己那条引导（"主线每一步做完都能领奖励"）登记下来，

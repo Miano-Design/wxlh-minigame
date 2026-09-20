@@ -226,6 +226,41 @@ t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
     })(), '满星合计 ' + [3, 4, 5, 6].map((n) => D.STAR_COST.slice(1, n).reduce((a, b) => a + b, 0)).join(' / '));
 }
 
+// 10f. 三条"跟着进度走"的养成线（V9.6.130 父亲大人点头的方案）
+{
+  /* ⚠️ 这一块**不能 Core.newGame()** —— 后面「存档往返」那条用例依赖前面建立的 C021（踩过一次） */
+  t('铭刻扩到 20 阶（不再前期就点满）', D.GENE_LOCKS.length === 20 && D.GENE_LOCK_MAX === 20,
+    '共 ' + D.GENE_LOCKS.length + ' 阶 · 第 20 阶「' + D.GENE_LOCKS[19].name + '」需 ' + D.GENE_LOCKS[19].cost.bloodCrystal + ' 血统结晶');
+  t('铭刻后 15 阶都带"全属性"加成（跟进度长）',
+    D.GENE_LOCKS.slice(5).every((g) => /全属性\+/.test(g.desc)), D.GENE_LOCKS[5].desc + ' … ' + D.GENE_LOCKS[19].desc);
+
+  /* 坐骑：驯服只是起点，喂养能一直投 */
+  Core.addCur('points', 10000000);
+  Core.addItem('mat_t1', 5000);
+  const buy = Core.buyMount('mt01');
+  t('坐骑能驯服', buy.ok, buy.msg || '');
+  const p0 = Core.effectivePlayerStats().hp;
+  const f1 = Core.feedMount('mt01');
+  const p1 = Core.effectivePlayerStats().hp;
+  t('坐骑喂养：等级 +1 且**属性真的涨了**', f1.ok && Core.mountLv('mt01') === 1 && p1 > p0,
+    (f1.msg || '') + ' · 生命 ' + p0 + ' → ' + p1);
+  t('坐骑上限按稀有度（N 档 10 级）', D.MOUNT_MAX_LV.N === 10 && D.MOUNT_MAX_LV.UR === 20,
+    JSON.stringify(D.MOUNT_MAX_LV));
+
+  /* 法宝：买到之后能祭炼，效果随等级放大 */
+  Core.addCur('points', 100000);
+  Core.addCur('otherworld', 100000);
+  Core.addItem('mat_t2', 5000);
+  Core.buyFabao('fb01');
+  Core.wearFabao('fb01');
+  const e0 = Core.effectivePlayerStats().lifesteal || 0;
+  const r1 = Core.refineFabao('fb01');
+  const e1 = Core.effectivePlayerStats().lifesteal || 0;
+  t('法宝祭炼：等级 +1 且**效果真的放大**', r1.ok && Core.fabaoLv('fb01') === 1 && e1 > e0,
+    (r1.msg || '') + ' · 吸血 ' + (e0 * 100).toFixed(1) + '% → ' + (e1 * 100).toFixed(1) + '%');
+  t('法宝祭炼上限 15 级', D.FABAO_MAX_LV === 15, '上限 ' + D.FABAO_MAX_LV);
+}
+
 // 11. 存档往返
 const json = Core.exportSave();
 t('导入', Core.importSave(json).ok);

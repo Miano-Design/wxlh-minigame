@@ -99,8 +99,16 @@
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
             '◈ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
         } else {
-          U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+          const by2 = top + (h - U.BTN_SM * CV.SCALE) / 2;
+          U.btn(U.ix() + U.iw() - bw, by2, bw, U.BTN_SM * CV.SCALE,
             wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', wearing ? '' : 'fabao_wear:' + f.id);
+          /* V9.6.130：法宝多一条"祭炼"线（每级把效果放大 5%，上限 15 级） */
+          {
+            const lv = Core.fabaoLv(f.id), mx = D.FABAO_MAX_LV;
+            U.btn(U.ix() + U.iw() - bw * 2 - 6 * CV.SCALE, by2, bw, U.BTN_SM * CV.SCALE,
+              lv >= mx ? '祭炼满' : ('祭炼 ' + lv + '→' + (lv + 1)), lv >= mx ? 'ghost' : 'gold',
+              lv >= mx ? '' : 'fabao_refine:' + f.id);
+          }
         }
         U.y = top + h;
       });
@@ -144,9 +152,19 @@
           + (m.cost.mat ? (' + ' + ((D.ITEMS[m.cost.mat] || {}).name || m.cost.mat) + '×' + m.cost.matN) : '');
         CV.text(CV.fit(m.desc + (own ? '' : ' · 驯服需要 ' + costTxt), U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.sm),
           tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        if (!own) U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE, '驯服', 'ghost', 'mount_buy:' + m.id);
-        else U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          riding ? '乘骑中' : '乘骑', riding ? 'primary' : 'ghost', riding ? '' : 'mount_wear:' + m.id);
+        const by = top + (h - U.BTN_SM * CV.SCALE) / 2;
+        if (!own) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '驯服', 'ghost', 'mount_buy:' + m.id);
+        else {
+          /* V9.6.130：坐骑多一条喂养线（每级全属性 +0.4%，上限按稀有度）——
+             买了就完事的话，后期这条功能就成摆设（父亲大人："各个功能都要跟着进度发展"）。 */
+          const lv = Core.mountLv(m.id), mx = D.MOUNT_MAX_LV[m.rarity] || 10;
+          const c = D.mountFeedCost(m, lv);
+          U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE,
+            riding ? '乘骑中' : '乘骑', riding ? 'primary' : 'ghost', riding ? '' : 'mount_wear:' + m.id);
+          U.btn(U.ix() + U.iw() - bw * 2 - 6 * CV.SCALE, by, bw, U.BTN_SM * CV.SCALE,
+            lv >= mx ? ('Lv.' + lv + ' 满') : ('喂养 Lv.' + lv + '→' + (lv + 1)), lv >= mx ? 'ghost' : 'gold',
+            lv >= mx ? '' : 'mount_feed:' + m.id);
+        }
         U.y = top + h;
       });
     });
@@ -258,6 +276,17 @@
       },
     });
   });
+  CV.on('mount_feed:*', function (id) {
+    const r = Core.feedMount(id);
+    CV.toast(r.msg || '喂过了');
+    CV.render();
+  });
+  CV.on('fabao_refine:*', function (id) {
+    const r = Core.refineFabao(id);
+    CV.toast(r.msg || '祭炼过了');
+    CV.render();
+  });
+
   CV.on('arena_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); });
 
   /* ---------- 求签 ---------- */
