@@ -287,9 +287,10 @@
     const isWorldBoss = si >= 11;
     const nx = isWorldBoss ? null : Core.nextStage(wid, df, si);
     afterSettle = isWorldBoss ? null : { worldId: wid, diff: df, stageIdx: si };
-    const acts = isWorldBoss
-      ? [{ label: '‹ 返回世界', style: 'ghost', id: 'battle_close' }]
-      : [{ label: '↻ 再来一次', style: 'ghost', id: 'dun_again' }];
+    /* V9.6.128（父亲大人："副本那边我还没试过，还是功能重复的按钮，你再查查"）：
+       守关 Boss 那场原来挂了一颗「返回世界」—— 底部那颗「收下奖励并返回」做的就是这件事
+       （onClose → CV.reset('world')），两颗按钮同一个功能 → 去掉，只留底部那颗。 */
+    const acts = isWorldBoss ? [] : [{ label: '↻ 再来一次', style: 'ghost', id: 'dun_again' }];
     if (nx) {
       const nw = D.WORLDS.find((x) => x.id === nx.worldId);
       afterSettle = { worldId: nx.worldId, diff: nx.diff, stageIdx: nx.stageIdx };

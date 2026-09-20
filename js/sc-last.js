@@ -557,6 +557,23 @@
       G.wx.showKeyboard({ defaultValue: '', maxLength: 12, multiple: false, confirmType: 'done', fail: function () { CV.toast('键盘没打开，再点一次'); } });
     } catch (e) { CV.toast('键盘没打开，再点一次'); }
   });
+  /* GM：一键补测试道具（V9.6.129） */
+  CV.on('gm_eggs', function () {
+    Core.addItem(D.BEAST_EGG_ITEM || 'beast_egg', 200);   // 兽魂石（孵化用）
+    CV.toast('兽魂石 +200');
+    CV.render();
+  });
+  CV.on('gm_mats', function () {
+    ['mat_t1', 'mat_t2', 'mat_t3', 'mat_t4', 'mat_t5'].forEach(function (k) { Core.addItem(k, 200); });
+    CV.toast('各档强化材料 +200');
+    CV.render();
+  });
+  CV.on('gm_exps', function () {
+    ['exp_s', 'exp_m', 'exp_l', 'exp_xl', 'exp_xxl'].forEach(function (k) { Core.addItem(k, 50); });
+    CV.toast('各档经验模块 +50');
+    CV.render();
+  });
+
   CV.on('reset_coach', function () {
     Core.S.coachSeen = {};
     /* V9.6.113（父亲大人："每次修改能不删档才能更新吗"）：**保留进度**重跑新手引导。
@@ -613,6 +630,14 @@
       U.btnRow([
         { label: '🔓 全解锁', style: 'ghost', id: 'gm_unlock' },
         { label: '🌍 全世界解锁', style: 'ghost', id: 'gm_worlds' },
+      ]);
+      U.space(CV.SP[1]);
+      /* V9.6.129（父亲大人："GM 面板里没有给我蛋，我测试不了"）：
+         伴生体 / 强化 / 经验这几条线都要靠道具才测得了，一键补齐。 */
+      U.btnRow([
+        { label: '🥚 兽魂石 ×200', style: 'ghost', id: 'gm_eggs' },
+        { label: '🧱 各档材料 ×200', style: 'ghost', id: 'gm_mats' },
+        { label: '📘 各档经验 ×50', style: 'ghost', id: 'gm_exps' },
       ]);
     });
     U.card(function () {
@@ -850,6 +875,10 @@
     U.btnRow([{ label: '🏪 深井商店（♜ ' + fmt(S.cur.corridor || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
   });
   CV.on('corridor_fight', function () {
+    /* V9.6.128（父亲大人："深井的自动下一关倒数和点击都无效，点完提示战斗进行中"）：
+       结算页上点"继续第 N 层"时，上一场的 busy 闸门还立着 → BattleUI.run 被自己的防重入挡掉。
+       副本那两颗（dun_again / dun_next）一直有 `BattleUI.clear()`，深井漏了 —— 补上。 */
+    if (G.BattleUI && G.BattleUI.clear) G.BattleUI.clear();
     const S = Core.S;
     const floor = S.corridor.floor;
     const spec = D.corridorEnemy(floor);

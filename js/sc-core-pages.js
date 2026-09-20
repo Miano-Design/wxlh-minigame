@@ -223,16 +223,45 @@
       if (!st.list.length) { U.hint('还没有伴生体，去孵化一只', 4 * CV.SCALE); return; }
       st.list.forEach(function (b) {
         const active = st.active === b.id;
-        row2(b.name, (b.elem || '') + ' · ' + (b.desc || ''), active ? '随行中' : '点一下随行', active ? CV.C.green : CV.C.dim);
-        CV.hit('beast_on:' + b.id, U.ix(), U.y - 52 * CV.SCALE, U.iw(), 52 * CV.SCALE);
+        /* V9.6.129（父亲大人："伴生体的界面里面的文字被省略了"）：
+           原来第二行走 row2 → **单行 fit 截断**，描述全被砍成"…"。
+           现在自己画两行：名字一行 + 描述**折行到两行**（rowH 跟着算），不再省略。 */
+        const PADX = 0, w = U.iw();
+        const nameH = CV.FS.lg * 1.35, dH = CV.FS.sm * 1.55;
+        const lines = CV.wrap((b.elem ? D.ELEMENT_ICON[b.elem] + ' ' + b.elem + ' · ' : '') + (b.desc || ''), w * 0.72, CV.FS.sm, 2);
+        const rh = 6 * CV.SCALE + nameH + 3 * CV.SCALE + lines.length * dH + 6 * CV.SCALE;
+        const top = U.y;
+        CV.text(CV.fit(b.name, w * 0.62, CV.FS.lg, true), U.ix() + PADX, top + 6 * CV.SCALE + nameH / 2, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(active ? '随行中' : '点一下随行', w * 0.34, CV.FS.sm), U.ix() + w, top + 6 * CV.SCALE + nameH / 2,
+          { size: CV.FS.sm, color: active ? CV.C.green : CV.C.dim, align: 'right' });
+        lines.forEach(function (ln, k) {
+          CV.text(ln, U.ix() + PADX, top + 6 * CV.SCALE + nameH + 3 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.sm, color: CV.C.dim });
+        });
+        CV.hit('beast_on:' + b.id, U.ix(), top, w, rh);
+        U.y = top + rh;
       });
     });
     U.card(function () {
       U.h3('五行相克');
+      /* V9.6.129（父亲大人："又有五行相克、又有各世界的属性，这一块我没太懂"）：
+         原来把**36 个世界各自的属性**铺了一大行 —— 那是"数据罗列"，不是"机制说明"。
+         现在只说清三件事：怎么相克 / 克制有什么好处 / 你现在打的那张图是什么属性。 */
       U.hint('⚔️金 克 🌿木　🌿木 克 ⛰️土　💧水 克 🔥火　🔥火 克 ⚔️金　⛰️土 克 💧水', 2 * CV.SCALE);
       /* V9.6.21 自审：`D.worldElementIcon` 不存在（外面 ? : 兜住了，图标一直是空的）
          正确写法是 ELEMENT_ICON[worldElement(id)]。 */
-      U.hint('各世界的属性：' + D.WORLDS.map((w) => w.name.slice(0, 2) + (D.ELEMENT_ICON[D.worldElement(w.id)] || '')).join(' · '), 4 * CV.SCALE);
+      /* 每张图有自己的五行：随行伴生体若**克制**这张图 → 全队伤害 +15%；被克则 −8%。
+         只显示"你现在这张图"，不再罗列 36 张。 */
+      {
+        const wid = (Core.boxSourceWorld ? Core.boxSourceWorld() : null) || 'W01';   // 当前进度那张图
+        const we = D.worldElement(wid);
+        const mine = st.activeBeast && st.activeBeast.elem;
+        const bonus = mine ? (D.ELEMENT_COUNTER[mine] === we ? '克制 +' + Math.round(D.ELEMENT_BONUS * 100) + '% 伤害'
+          : (D.ELEMENT_COUNTER[we] === mine ? '被克 −' + Math.round(D.ELEMENT_PENALTY * 100) + '% 伤害' : '无克制关系')) : '（先带一只随行才有效果）';
+        U.hint('随行伴生体的五行 × **这张图的属性** 才算克制：克制 +' + Math.round(D.ELEMENT_BONUS * 100) + '% 伤害，被克 −' + Math.round(D.ELEMENT_PENALTY * 100) + '% 伤害。', 4 * CV.SCALE);
+        U.hint('当前进度「' + ((D.WORLDS.find((x) => x.id === wid) || {}).name || wid) + '」是' + (D.ELEMENT_ICON[we] || '') + we +
+          ' · 你的随行是' + (mine ? (D.ELEMENT_ICON[mine] || '') + mine + ' → ' + bonus : '（无）'), 2 * CV.SCALE,
+          mine ? (D.ELEMENT_COUNTER[mine] === we ? CV.C.green : CV.C.dim) : CV.C.dim);
+      }
     });
   });
   CV.on('beast_hatch1', function () {

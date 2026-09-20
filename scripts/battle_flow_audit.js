@@ -219,10 +219,16 @@ console.log('\n=== 战斗页生命周期审计 ===');
     setupWorld();
     const p12 = await fightStage(11);  // 第 12 关（守关 Boss）
     const acts12 = (p12 && p12.acts) || [];
-    t('⑥ 打通第 12 关：结算页只剩「返回」（没有下一关 / 再来一次）',
-      acts12.length === 1 && /返回/.test(String(acts12[0].label)) && acts12[0].id === 'battle_close',
-      acts12.map(a => a.label).join(' / ') || '(没有按钮)');
-    t('⑥b 结算页没有主按钮 → "自动进下一关"的倒计时不会启动',
+    /* V9.6.128：守关 Boss 那场**不再挂任何 act** —— 底部的「收下奖励并返回」已经会回世界页，
+       再挂一颗「返回世界」就是同一件事两颗按钮（父亲大人："还是功能重复的按钮，你再查查"）。 */
+    t('⑥ 打通第 12 关：结算页没有"下一关 / 再来一次 / 重复的返回"（只剩底部那颗）',
+      acts12.length === 0 && !acts12.some(a => a.id === 'dun_next' || a.id === 'dun_again'),
+      acts12.map(a => a.label).join(' / ') || '（只有底部那颗「收下奖励并返回」）');
+    CV.dispatch('battle_close');
+    await wait(80);
+    t('⑥b 底部那颗「收下奖励并返回」把玩家送回世界页',
+      ((CV.top() || {}).name || '?') === 'world', '落在了 ' + (((CV.top() || {}).name) || '?'));
+    t('⑥c 结算页没有主按钮 → "自动进下一关"的倒计时不会启动',
       acts12.every(a => !a.primary && a.style !== 'primary'),
       acts12.some(a => a.primary || a.style === 'primary') ? '**还有主按钮**' : '无主按钮 ✓');
     t('⑥c 第 12 关不再自动接"下一个世界 / 下一个难度"（Core.nextStage 返回 null）',

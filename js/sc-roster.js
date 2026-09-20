@@ -158,7 +158,8 @@
       CV.text(CV.fit(nm(id), U.iw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
       CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, ls: -1 });
       CV.text(ch.bloodline + '血统 · ' + ch.faction, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-      CV.text('Lv.' + c.lv + ' · 碎片 ' + c.shards + ' · 血统 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+      /* V9.6.129：显示**该稀有度的通用碎片**（不再是他一个人攒的） */
+      CV.text('Lv.' + c.lv + ' · ' + ch.rarity + ' 碎片 ' + Core.shardPoolOf(ch.rarity) + ' · 血统 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
       CV.text('战力', U.ix() + U.iw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + h;
@@ -196,7 +197,7 @@
 
     /* ③ 星级（碎片升星） */
     U.card(function () {
-      U.h3('⭐ 星级', c.star + ' / ' + maxStar + ' · 碎片 ' + c.shards);
+      U.h3('⭐ 星级', c.star + ' / ' + maxStar + ' · ' + ch.rarity + ' 通用碎片 ' + Core.shardPoolOf(ch.rarity));
       U.btnRow([{ label: c.star >= maxStar ? '已满星' : '升星', style: 'ghost', id: c.star >= maxStar ? 'noop' : 'starup' }]);
     });
 

@@ -41,7 +41,9 @@ window.Core = (function () {
       // V9.2：背包分三池（道具 / 材料 / 装备），各 50 格起、各自扩容
       bag: { itemCap: 50, itemExpands: 0, matCap: 50, matExpands: 0, eqCap: 50, eqExpands: 0 },
       cur: { points: 0, story: 0, otherworld: 0, holy: 0, skillChip: 0, bloodCrystal: 0, corridor: 0, rp: 0 },
-      chars: {},            // id → {lv, exp, star, shards, skillLv:[1,1,1], bloodlineLv}
+      chars: {},            // id → {lv, exp, star, skillLv:[1,1,1], bloodlineLv}
+      /* V9.6.129：碎片改成**按稀有度的公共池**（抽到谁都进同一个池子，不再各攒各的） */
+      shardPool: { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 },
       // 上阵 5 格（固定前 2 后 3）：0/1 前排，2/3/4 后排。
       // '@player' 就是主角本人——主角必上阵，所以他也占其中一格，站位能拖到前排也能拖到后排。
       party: ['@player', null, null, null, null],
@@ -212,6 +214,21 @@ window.Core = (function () {
     if (typeof S.charExp !== 'number') S.charExp = 0;
     // 老档：把每个人身上攒的零散经验并进共享池（不丢东西）
     Object.values(S.chars || {}).forEach(c => { if (c && c.exp) { S.charExp += c.exp; c.exp = 0; } });
+    /* V9.6.129：碎片从"每人各攒"改成"按稀有度公共池" —— 老存档把各人身上的碎片**原样并入**池子，
+       一点不丢；跑过一次就把标记写上（S.shardPoolMerged），不再重复累加。 */
+    if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
+    if (!S.shardPoolMerged) {
+      let moved = 0;
+      Object.keys(S.chars || {}).forEach(function (id) {
+        const c = S.chars[id]; const base = D.charById[id];
+        if (!c || !base) return;
+        const n = Math.max(0, Math.floor(c.shards || 0));
+        if (n) { S.shardPool[base.rarity] = (S.shardPool[base.rarity] || 0) + n; moved += n; }
+        c.shards = 0;
+      });
+      S.shardPoolMerged = true;
+      if (moved) save();
+    }
     S.garden = Object.assign(Array(def.garden.length).fill(null), S.garden || {});
     S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
     S.fabao = Object.assign({ own: [], on: null }, S.fabao || {});
@@ -690,8 +707,8 @@ window.Core = (function () {
     const base = D.charById[id];
     if (!base) return { isNew: false };
     if (S.chars[id]) {
-      const gain = D.DUP_SHARDS[base.rarity];
-      S.chars[id].shards += gain;
+      const gain = (typeof D.DUP_SHARDS === 'number') ? D.DUP_SHARDS : (D.DUP_SHARDS[base.rarity] || 10);   // V9.6.129：统一 10 碎片
+      addShardsToPool(id, gain);
       return { isNew: false, shards: gain };
     }
     S.chars[id] = { lv: 0, exp: 0, star: 1, shards: 0, skillLv: [0, 0, 0], bloodlineLv: 0 };   // 伙伴也从 0 级起
@@ -700,8 +717,8 @@ window.Core = (function () {
     return { isNew: true };
   }
   function addShards(id, n) {
-    if (S.chars[id]) S.chars[id].shards += n;
-    else { addChar(id); S.chars[id].shards += n; }
+    if (!S.chars[id]) addChar(id);
+    addShardsToPool(id, n);
   }
   function levelCost(charId) {
     const c = S.chars[charId];
@@ -869,6 +886,19 @@ window.Core = (function () {
     const kn = D.SERUM_KEYS[sd.key] || sd.key;
     return { ok: true, count: use, msg: `${sd.name} ×${use}：${kn} 永久 +${(sd.per * use * 100).toFixed(1)}%` };
   }
+  /* ---------- 伙伴碎片：按稀有度通用（V9.6.129） ---------- */
+  function shardPoolOf(rarity) { return (S.shardPool && S.shardPool[rarity]) || 0; }
+  function addShardPool(rarity, n) {
+    if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
+    if (!(rarity in S.shardPool)) S.shardPool[rarity] = 0;
+    S.shardPool[rarity] = Math.max(0, S.shardPool[rarity] + n);
+    return S.shardPool[rarity];
+  }
+  /* 给某个伙伴加碎片 = 加进**他那档**的公共池（抽到重复角色、商店买碎片、悬赏都走这里） */
+  function addShardsToPool(charId, n) {
+    const base = D.charById[charId];
+    return addShardPool(base ? base.rarity : 'N', n);
+  }
   function starUp(charId) {
     const c = S.chars[charId];
     const base = D.charById[charId];
@@ -876,8 +906,10 @@ window.Core = (function () {
     const maxStar = D.RARITY_MAXSTAR[base.rarity];
     if (c.star >= maxStar) return { ok: false, msg: '已达最高星级' };
     const need = D.STAR_COST[c.star];
-    if (c.shards < need) return { ok: false, msg: `碎片不足（${c.shards}/${need}）` };
-    c.shards -= need;
+    /* V9.6.129：碎片从**该稀有度的公共池**扣（同稀有度通用） */
+    const pool = shardPoolOf(base.rarity);
+    if (pool < need) return { ok: false, msg: `碎片不足（${base.rarity} 通用碎片 ${pool}/${need}）` };
+    addShardPool(base.rarity, -need);
     c.star++;
     save();
     return { ok: true, msg: `升到 ${c.star}★` };
@@ -1466,7 +1498,11 @@ window.Core = (function () {
       const w = { atkPct: 1200, hpPct: 500, defPct: 900, skillPct: 1000, critPct: 1500, critDmg: 600, spdPct: 900, evaPct: 700, resPct: 300, lifesteal: 800 }[k] || 200;
       s += v * w;
     });
-    return s;
+    /* V9.6.129（父亲大人："装备评分还能显示到小数点后好几位，不要有小数点，直接显示到个位数"）：
+       评分是"基础值 × 权重 + 百分比词条折算"算出来的浮点数，**在这里取整** ——
+       排序、背包格子、详情页、一键最优装备用的是同一个数，所以在源头取整一处就全干净了
+       （原来只有个别地方忘了取整，就会露出 1523.4700000000003 这种）。 */
+    return Math.round(s);
   }
   /* 一键最优装备（V9.5.91 父亲大人重做）
      旧版规则是"把全队**未锁定**的装备全脱下来回池子、再重新分配"——两个毛病：
@@ -3430,7 +3466,7 @@ window.Core = (function () {
   return {
     get S() { return S; },
     save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
-    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
+    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore, shardPoolOf, addShardPool, addShardsToPool,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
     addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,

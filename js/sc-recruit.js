@@ -139,7 +139,8 @@
       CV.text(String(r.name || '?').slice(0, 1), acx, acTop + AV / 2, { size: AV * 0.44, bold: true, align: 'center', color: col });
       const nameCy = acTop + AV + AVGAP + NAME_H / 2;
       CV.text(CV.fit(r.name, cw - PAD * 2, CV.FS.lg, true), acx, nameCy, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text(r.isNew ? 'NEW' : ('碎片+' + (r.shards || 0)), acx, nameCy + NAME_H / 2 + 2 * CV.SCALE + META_H / 2,
+      /* V9.6.129：重复抽到进的是**该稀有度的通用池**，标注清楚（省得玩家以为还是各攒各的） */
+      CV.text(r.isNew ? 'NEW' : (r.rarity + '碎片+' + (r.shards || 0)), acx, nameCy + NAME_H / 2 + 2 * CV.SCALE + META_H / 2,
         { size: CV.FS.sm, align: 'center', color: r.isNew ? CV.C.green : CV.C.dim });
     });
     U.y = y0 + Math.ceil(res.length / cols) * (ch + gap);

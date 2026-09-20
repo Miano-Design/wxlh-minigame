@@ -20,8 +20,17 @@ window.DATA = (function () {
   const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff4d6d', MYTH: '#ffd76a' };
   const STAR_MULT = [1, 1.10, 1.22, 1.36, 1.52, 1.70];
   const RARITY_MAXSTAR = { N: 3, R: 4, SR: 5, SSR: 6, UR: 6 };
-  const STAR_COST = [0, 50, 100, 180, 300, 500];            // 1→2…5→6 所需碎片
-  const DUP_SHARDS = { N: 20, R: 40, SR: 80, SSR: 160, UR: 320 };
+  /* V9.6.129（父亲大人两条一起定）：
+     ① "伙伴的碎片在相同稀有度是通用的" → 碎片按**稀有度公共池**存（抽到谁都不浪费）；
+     ② "重复到统一给 10 碎片" → DUP_SHARDS 不再按稀有度给不同数，统一 10。
+     于是升星成本必须**按 10 的尺度重排**（原来那套是按 N20…UR320 定的，现在会变成几百次重复）：
+     口径 = "满一个伙伴大致等于该稀有度重复抽到多少次"：
+       N 60(=6 次) / R 130(=13 次) / SR 240(=24 次) / SSR·UR 400(=40 次)。
+     低稀有度快点满（前期练手），顶级要攒一阵子（长线目标）—— 又因为同档通用，
+     这 40 次不管抽到哪个 SSR 都算数。 */
+  const STAR_COST = [0, 20, 40, 70, 110, 160];              // 1→2…5→6 所需碎片（满星合计：N 60 / R 130 / SR 240 / SSR·UR 400）
+  const DUP_SHARDS = 10;                                    // 重复抽到任何稀有度都只给 10 碎片（统一）
+  const SHARD_RARITIES = ['N', 'R', 'SR', 'SSR', 'UR'];      // 碎片池按这五档分
   /* V9.6.86（父亲大人："阵营里的科技和血统里的科技重名，改。")：
      阵营「科技」改名「机械」—— 血统里已经有一支叫科技（射手），两边重名玩家分不清。
      ⚠ 历史包袱：数据里还有 17 个角色写着「支援」阵营，而 FACTIONS 只有四个 ——
@@ -2108,7 +2117,7 @@ window.DATA = (function () {
   }
 
   return {
-    ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS,
+    ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS, SHARD_RARITIES,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
     SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,

@@ -71,8 +71,24 @@ Core.addCur('points', 1000000);
 const lvBefore = c.lv;
 const up = Core.levelUp('C021', 10);
 t('升级生效', up.ok && Core.S.chars['C021'].lv > lvBefore);
-Core.S.chars['C021'].shards = 200;
-t('升星', Core.starUp('C021').ok && Core.S.chars['C021'].star === 2);
+/* V9.6.129：碎片改成"按稀有度公共池"（父亲大人："相同稀有度是通用的"）——
+   这里改成往池子里加，顺带把"通用"这条规矩本身也断言一遍。 */
+const C021_RAR = D.charById['C021'].rarity;
+Core.addShardPool(C021_RAR, 200);
+t('升星（碎片从稀有度公共池扣）', Core.starUp('C021').ok && Core.S.chars['C021'].star === 2);
+{
+  /* 同稀有度通用：给 C021 加碎片，同档的另一名伙伴也能拿去升星 */
+  const sameRar = Object.keys(D.charById).filter((id) => D.charById[id].rarity === C021_RAR && id !== 'C021');
+  const other = sameRar[0];
+  Core.addChar(other);
+  Core.addShardsToPool(other, 500);
+  const pool = Core.shardPoolOf(C021_RAR);
+  const before = Core.S.chars[other].star;
+  Core.S.chars[other].star = 1;
+  const r = Core.starUp(other);
+  t('同稀有度碎片通用（抽到谁都不浪费）', r.ok && Core.S.chars[other].star === 2,
+    other + ' 用 ' + C021_RAR + ' 池（' + pool + '）升到 ' + Core.S.chars[other].star + '★');
+}
 Core.addCur('skillChip', 500);
 t('技能升级', Core.skillUp('C021', 0).ok);
 Core.addCur('bloodCrystal', 10000);
@@ -198,6 +214,17 @@ t('领取主线', Core.claimQuest('q01').ok);
 Core.S.idle.bankSec = 3600;
 const gains = Core.claimIdle();
 t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
+
+// 10e. 碎片：按稀有度通用 + 重复统一 10 碎片（V9.6.129 父亲大人）
+{
+  t('重复抽到统一给 10 碎片（不再按稀有度给 20/40/80/160/320）',
+    D.DUP_SHARDS === 10, 'DUP_SHARDS = ' + JSON.stringify(D.DUP_SHARDS));
+  t('升星成本按 10 的尺度重排（满星合计 N60 / R130 / SR240 / SSR·UR400）',
+    (function () {
+      const sum = (n) => D.STAR_COST.slice(1, n).reduce((a, b) => a + b, 0);
+      return sum(3) === 60 && sum(4) === 130 && sum(5) === 240 && sum(6) === 400;
+    })(), '满星合计 ' + [3, 4, 5, 6].map((n) => D.STAR_COST.slice(1, n).reduce((a, b) => a + b, 0)).join(' / '));
+}
 
 // 11. 存档往返
 const json = Core.exportSave();
@@ -494,6 +521,10 @@ setParty(['C021']);
     'SR ' + Core.equipScore(b) + ' < SSR ' + Core.equipScore(c));
   t('装备评分③：同款装备，强化过比分更高', Core.equipScore(d) > Core.equipScore(c),
     '+0 ' + Core.equipScore(c) + ' < +10 ' + Core.equipScore(d));
+  /* V9.6.129：评分必须是**整数**（父亲大人："不要有小数点，直接显示到个位数"） */
+  t('装备评分是整数（不会露出小数）',
+    [a, b, c, d].every((e) => Number.isInteger(Core.equipScore(e))),
+    [a, b, c, d].map((e) => Core.equipScore(e)).join(' / '));
   const order = Core.sortEquips(Object.values(Core.S.equips)).map(e => e.uid);
   t('装备排序：就是按评分从高到低', order.join('') === 'dcba', order.join(' > ') + '（分 ' +
     Core.sortEquips(Object.values(Core.S.equips)).map(e => Core.equipScore(e)).join(' > ') + '）');

@@ -495,7 +495,7 @@
     const chipsH = rewards.length ? chipLayout(rewards).height : 0;
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
-    if (acts.length) total += 44 * CV.SCALE + 12 * CV.SCALE;
+    if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
     // 大标题
@@ -510,22 +510,24 @@
       drawChips(rewards, cx, y);
       y += chipsH + 10 * CV.SCALE;
     }
-    // 动作按钮（最多两个并排，和网页版 .btn-row 一致）
-    if (acts.length) {
-      /* V9.6.8：宽度按文字比例分（网页版 .btn-row 是 flex:1 1 auto + min-width 86）——
-         等分的话「下一关（菌毯巢穴 3/12）」这种长标签会被挤成两行、还可能压到旁边的按钮。
-         这里借 U.btnRow 的分宽逻辑，结束后把 U.y 还原（结算层是覆盖层，不参与页面排版）。 */
-      const keepY = U.y, keepInCard = U.inCard;
-      U.inCard = false; U.y = y;
-      const rowH = U.btnRow(acts.map(function (a, i) {
-        const auto = (B.autoLeft > 0 && i === B.autoIdx);
-        return { label: auto ? (a.label + '  ' + B.autoLeft + 's') : a.label, style: a.style || 'ghost', id: a.id };
-      }));
-      U.y = keepY; U.inCard = keepInCard;
-      y += rowH + 12 * CV.SCALE;
-    }
-    // 收起奖励并返回（网页版最后一个按钮）
-    U.btn(cx - 100 * CV.SCALE, y, 200 * CV.SCALE, 44 * CV.SCALE,
+    /* V9.6.128（父亲大人："把继续下一关的按钮放上面，收下奖励并返回放下面，
+       上下排列、长度一致不就好了"）：
+       动作按钮**上下排列、整宽、与底部那颗等长** —— 不再左右并排。
+       这样"自动在左、深井跑右"这种不一致从排版上就不存在了；顺序也固定：
+       先"接着打"（继续/下一关），最后才是"收下奖励并返回"。 */
+    const BW = Math.min(320 * CV.SCALE, U.iw());
+    const BH = 44 * CV.SCALE;
+    U.inCard = false;
+    acts.forEach(function (a, i) {
+      const auto = (B.autoLeft > 0 && i === B.autoIdx);
+      U.y = y;
+      U.btn(cx - BW / 2, y, BW, BH,
+        auto ? (a.label + '  ' + B.autoLeft + 's') : a.label, a.style || 'ghost', a.id);
+      y += BH + 10 * CV.SCALE;
+    });
+    // 最后一行：收起奖励并返回（与上面每一颗**同宽**）
+    U.y = y;
+    U.btn(cx - BW / 2, y, BW, BH,
       res.win ? (acts.length ? '收下奖励并返回' : '收下奖励') : '返回', acts.length ? 'ghost' : 'primary', 'battle_close');
     CV.hitMode = 'content';
     CV.pageOverlay = prevOverlay;

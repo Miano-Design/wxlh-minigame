@@ -152,6 +152,23 @@ console.log('\n=== 战斗"从哪来就回哪去" ===');
       /function backToSource\(kind\)/.test(srcBattle) && !/else \{ CV\.reset\('dungeon'\); \}/.test(srcBattle));
   }
 
+  /* ⑥ 结算按钮的排法（父亲大人 2026-09-21）：
+     "把继续下一关的按钮放上面，收下奖励并返回放下面，上下排列、长度一致" +
+     "深井的自动下一关倒数和点击都无效，点完提示战斗进行中"（真因：进战斗前没清 busy 闸门）。 */
+  {
+    const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    t('⑥ 结算按钮上下排列、统一宽度（不再左右并排）',
+      /const BW = Math\.min\(320 \* CV\.SCALE, U\.iw\(\)\)/.test(bsrc)
+      && /acts\.forEach\(function \(a, i\) \{[\s\S]{0,220}?U\.btn\(cx - BW \/ 2, y, BW, BH/.test(bsrc)
+      && /U\.btn\(cx - BW \/ 2, y, BW, BH,[\s\S]{0,120}?'battle_close'\)/.test(bsrc));
+    const last = fs.readFileSync(path.join(JS, 'sc-last.js'), 'utf8');
+    t('⑥b 深井"继续第 N 层"进战斗前会先清掉上一场的闸门（不再报"战斗进行中"）',
+      /CV\.on\('corridor_fight'[\s\S]{0,400}?G\.BattleUI\.clear\(\)/.test(last));
+    const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+    t('⑥c 网页版同样是上下排列（.result-actions-col + 等宽按钮）',
+      /result-actions-col/.test(web) && /data-close>/.test(web));
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   console.log('结论：' + (fail === 0 ? '每个战斗入口都回得去，结算按钮也都有反应 ✓' : '有 ' + fail + ' 处跳转错/无效按键 ✗') + '\n');
   process.exitCode = fail ? 1 : 0;
