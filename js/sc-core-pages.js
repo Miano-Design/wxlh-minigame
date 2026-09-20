@@ -64,19 +64,28 @@
     });
     const can = !au.maxed && au.cost &&
       (Core.S.cur.holy || 0) >= au.cost.holy && (Core.S.cur.otherworld || 0) >= au.cost.otherworld;
+    /* V9.6.133：权限 20 级 → 每一级跟着进度解锁，所以界面上必须写清"还差哪张图"，
+       否则玩家只看到一个灰按钮，不知道缺什么。 */
+    const nextLv = au.lv + 1;
+    const reqText = au.maxed ? '' : (((D.AUTHORITY[nextLv - 1] || {}).req) || '');
+    const reqMet = au.maxed ? true : Core.authorityReqMet(nextLv);
     U.card(function () {
-      U.h3('下一级 · Lv.' + (au.lv + 1), au.nextDesc || '已满级');
+      U.h3('下一级 · Lv.' + nextLv, au.nextDesc || '已满级');
       if (au.cost) {
+        U.kv('解锁条件', reqMet ? '✓ ' + reqText : reqText, reqMet ? CV.C.green : CV.C.dim);
         U.kv('✦ 圣洁晶石', (Core.S.cur.holy || 0) + ' / ' + au.cost.holy, (Core.S.cur.holy || 0) >= au.cost.holy ? CV.C.green : CV.C.dim);
         U.kv('◆ 异界结晶', (Core.S.cur.otherworld || 0) + ' / ' + au.cost.otherworld, (Core.S.cur.otherworld || 0) >= au.cost.otherworld ? CV.C.green : CV.C.dim);
         U.space(CV.SP[1]);
-        U.btnRow([{ label: '⚡ 提升灯阁权限', style: 'primary', id: can ? 'auth_up' : '' }]);
+        U.btnRow([{ label: '⚡ 提升灯阁权限', style: 'primary', id: (can && reqMet) ? 'auth_up' : '' }]);
       }
     });
     U.card(function () {
       U.h3('权限一览（' + au.max + ' 级）');
       au.rows.forEach(function (a) {
-        row2('Lv.' + a.lv, a.desc, a.lv <= au.lv ? '已生效' : '', a.lv <= au.lv ? CV.C.green : CV.C.dim);
+        const got = a.lv <= au.lv;
+        const ok = got || Core.authorityReqMet(a.lv);
+        row2('Lv.' + a.lv, a.desc + (got ? '' : ' · ' + (ok ? '✓ 已解锁' : '🔒 ' + a.req)),
+          got ? '已生效' : '', got ? CV.C.green : CV.C.dim);
       });
     });
   });
@@ -208,7 +217,7 @@
     const st = Core.beastState();
     U.begin(); head('伴生体');
     U.card(function () {
-      U.h3('伴生体', '我的伴生体（' + st.count + ' / ' + D.BEASTS.length + '）');
+      U.h3('伴生体', '已收集 ' + st.count + ' / ' + D.BEASTS.length);
       U.note('伴生体是第二条养成线：上阵 1 只，给全队加属性 + 五行克制。孵化花兽魂石，重复获得转兽魂，兽魂用来升阶。兽魂石从副本 Boss（必掉 1~3 颗）和精英怪出。', 2 * CV.SCALE);
       U.space(CV.SP[1]);
       U.kv('当前随行', st.activeBeast ? st.activeBeast.name : '还没有随行伴生体', CV.C.gold);
@@ -219,37 +228,37 @@
         { label: '孵 10 只（🥚' + st.eggCost * 10 + '）', style: 'gold', id: st.eggs >= st.eggCost * 10 ? 'beast_hatch10' : '' },
       ]);
     });
-    if (lastHatch.length) {
-      U.card(function () {
-        U.h3('🎉 最近孵出', lastHatch.length + ' 只');
-        lastHatch.slice(0, 6).forEach(function (h) {
-          U.kv((D.ELEMENT_ICON[h.elem] || '') + h.name + '（' + h.rarity + (h.elem ? '·' + h.elem : '') + '）', '', CV.C.gold);
-        });
-        if (lastHatch.length > 6) U.hint('还有 ' + (lastHatch.length - 6) + ' 只，下面的列表里都能看到', 2 * CV.SCALE);
-      });
-    }
     U.card(function () {
       U.h3('我的伴生体', st.count + ' / ' + D.BEASTS.length);
       if (!st.list.length) { U.hint('还没有伴生体，去孵化一只', 4 * CV.SCALE); return; }
-      st.list.forEach(function (b) {
-        const active = st.active === b.id;
+      /* ⚠️ V9.6.133 修（父亲大人："我的伴生体完全没显示"）——
+         这里原来把**列表条目**当成了伴生体数据：条目是 {id, b, lv, soul, active, pct, maxLv}，
+         伴生体本体在 `b` 里面。于是 b.name / b.elem / b.desc 全是 undefined，
+         fit()/wrap() 拿到 undefined 就什么都不画 —— 整块列表只剩「随行中」三个字。 */
+      st.list.forEach(function (x) {
+        const b = x.b;
+        const active = x.active;
         /* V9.6.129（父亲大人："伴生体的界面里面的文字被省略了"）：
            原来第二行走 row2 → **单行 fit 截断**，描述全被砍成"…"。
            现在自己画两行：名字一行 + 描述**折行到两行**（rowH 跟着算），不再省略。 */
-        const PADX = 0, w = U.iw();
+        const tx = U.ix() + 34 * CV.SCALE;          // 稀有度占左边一小列（和法宝 / 坐骑同一套版式）
+        const textW = U.iw() - 34 * CV.SCALE;
         const nameH = CV.FS.lg * 1.35, dH = CV.FS.sm * 1.55;
-        const lines = CV.wrap((b.elem ? D.ELEMENT_ICON[b.elem] + ' ' + b.elem + ' · ' : '') + (b.desc || ''), w * 0.72, CV.FS.sm, 2);
+        const nameW = textW - CV.measure('点一下随行', CV.FS.sm) - 8 * CV.SCALE;
+        const lines = CV.wrap((b.elem ? D.ELEMENT_ICON[b.elem] + ' ' + b.elem + ' · ' : '') + (D.beastDesc(b) || ''), textW, CV.FS.sm, 2);
         const rh = 6 * CV.SCALE + nameH + 3 * CV.SCALE + lines.length * dH + 6 * CV.SCALE;
         const top = U.y;
-        CV.text(CV.fit(b.name, w * 0.62, CV.FS.lg, true), U.ix() + PADX, top + 6 * CV.SCALE + nameH / 2, { size: CV.FS.lg, bold: true });
-        CV.text(CV.fit(active ? '随行中' : '点一下随行', w * 0.34, CV.FS.sm), U.ix() + w, top + 6 * CV.SCALE + nameH / 2,
+        CV.text(b.rarity || 'N', U.ix(), top + 6 * CV.SCALE + nameH / 2, { size: CV.FS.sm, bold: true, color: rarColor(b.rarity) });
+        CV.text(CV.fit(b.name + '  Lv.' + x.lv + '/' + D.BEAST_MAX_LV, nameW, CV.FS.lg, true),
+          tx, top + 6 * CV.SCALE + nameH / 2, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(active ? '随行中' : '点一下随行', U.iw() * 0.32, CV.FS.sm), U.ix() + U.iw(), top + 6 * CV.SCALE + nameH / 2,
           { size: CV.FS.sm, color: active ? CV.C.green : CV.C.dim, align: 'right' });
         lines.forEach(function (ln, k) {
-          CV.text(ln, U.ix() + PADX, top + 6 * CV.SCALE + nameH + 3 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.sm, color: CV.C.dim });
+          CV.text(ln, tx, top + 6 * CV.SCALE + nameH + 3 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.sm, color: CV.C.dim });
         });
         /* 点名字那一列 → 二级详情；右边那半 → 随行/收回（V9.6.132） */
-        CV.hit('beast_detail:' + b.id, U.ix(), top, w * 0.62, rh);
-        CV.hit('beast_on:' + b.id, U.ix() + w * 0.62, top, w * 0.38, rh);
+        CV.hit('beast_detail:' + x.id, U.ix(), top, U.iw() * 0.68, rh);
+        CV.hit('beast_on:' + x.id, U.ix() + U.iw() * 0.68, top, U.iw() * 0.32, rh);
         U.y = top + rh;
       });
     });
@@ -278,18 +287,17 @@
   });
   /* V9.6.132（父亲大人："伴生体孵完蛋后没有看到伴生体的名字"）：
      Core.hatchBeast 一直**返回了**孵出谁，但界面只 toast 一句"孵化 N 只"——名字全丢了。
-     现在把这一批记下来，回到这一页时在最上面摆一张"最近孵出"的卡（名字 + 稀有度 + 五行）。 */
-  let lastHatch = [];
+     V9.6.133（父亲大人："最近孵出可以不要"）：改名卡撤掉，只在 toast 里**把名字念全**
+     （最多念 3 个），剩下靠下面「我的伴生体」列表自己看 —— 同一批信息不占两处。 */
   function hatchThen(n) {
     const r = Core.hatchBeast(n);
     if (r && r.got && r.got.length) {
-      lastHatch = r.got.map(function (g) {
+      const names = r.got.slice(0, 3).map(function (g) {
         const b = D.beastById(g.id) || {};
-        return { name: b.name || g.id, rarity: b.rarity || 'N', elem: b.elem || '' };
+        return b.name || g.id;
       });
-      const first = lastHatch[0];
-      CV.toast('孵出「' + first.name + '」' + (lastHatch.length > 1 ? ' 等 ' + lastHatch.length + ' 只' : '') +
-        '（' + first.rarity + (first.elem ? '·' + first.elem : '') + '）');
+      CV.toast('孵出「' + names.join('、') + '」' +
+        (r.got.length > names.length ? ' 等 ' + r.got.length + ' 只' : ''));
     } else {
       CV.toast((r && r.msg) || '孵化失败');
     }

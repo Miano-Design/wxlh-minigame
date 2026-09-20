@@ -2344,9 +2344,22 @@ window.Core = (function () {
       rows: D.AUTHORITY,
     };
   }
+  /* 权限等级的解锁判定：D.authorityReq(lv) 给出"通关 XX·普通"，
+     这里对照玩家的世界进度（普通难度 12 关全清才算通关那张图）。 */
+  function authorityReqMet(lv) {
+    try {
+      const idx = Math.min(D.WORLDS.length - 1, Math.max(0, Math.ceil(lv * 1.8) - 1));
+      const wid = D.WORLDS[idx].id;
+      const w = S.worlds[wid];
+      return !!(w && w.stages && w.stages.normal && w.stages.normal[11] > 0);
+    } catch (e) { return true; }   // 判定出错就放行，别卡住玩家
+  }
   function upgradeAuthority() {
     const lv = S.auth || 0;
     if (lv >= D.AUTHORITY_MAX) return { ok: false, msg: '灯阁权限已满级' };
+    /* V9.6.133：权限 20 级 → 每一级都要**跟着进度**解锁（通关第 N 张图），不再一次点到顶 */
+    const req = D.authorityReq ? D.authorityReq(lv + 1) : '';
+    if (req && !authorityReqMet(lv + 1)) return { ok: false, msg: '还没解锁：' + req };
     const cost = D.authorityCost(lv);
     if (!canAfford(cost)) return { ok: false, msg: `材料不足：需要 ${cost.holy} 圣洁晶石 + ${cost.otherworld} 异界结晶` };
     spend(cost);
@@ -3543,7 +3556,7 @@ window.Core = (function () {
     recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
     idleRates, idleBaseRates, idleLines, idleLineBonus, setIdleLeader, idleMatItem, grantIdleMat,
     settleOffline, onlineTick, idleBankGains, claimIdle, addPlayerExp, offlineCapHours, offlineEfficiency, idleFull,
-    upgradeBuilding, authority, authorityInfo, upgradeAuthority,
+    upgradeBuilding, authority, authorityInfo, upgradeAuthority, authorityReqMet,
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
     travelAccrue, travelTick, travelProgress, travelEverySec, pendingTravel, claimTravel, rollTravel, rewardTextOf,

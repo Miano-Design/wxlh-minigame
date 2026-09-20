@@ -648,6 +648,20 @@
     CV.render();
   };
   U.coachCount = function () { return (coachState ? 1 : 0) + coachQueue.length; };
+  /* V9.6.133：这一颗**注释里承诺过、实际没写**（V9.6.35 的说明白纸黑字写着
+     "U.coachSkipAll() 给「跳过整条」"，但全文只有那一句注释，没有实现）。
+     现在补上：把当前这条 + 队列里剩下的**全部标成已读**并清空 ——
+     给"体检脚本 / 跳过整段教学"用。注意它只清"已经登记进来"的，
+     后面新页面自己登记的引导照旧会弹（这是对的，别指望它一次关掉全局）。 */
+  U.coachSkipAll = function () {
+    const S = G.Core && G.Core.S;
+    if (!S) return 0;
+    S.coachSeen = S.coachSeen || {};
+    let n = 0;
+    if (coachState) { S.coachSeen[coachState.key] = true; coachState = null; n++; }
+    while (coachQueue.length) { const it = coachQueue.shift(); if (it && it.key) { S.coachSeen[it.key] = true; n++; } }
+    return n;
+  };
   U.coachActive = function () { return !!coachState; };   // 触摸层用它挡滚动（引导期间不许滑屏）
   /* V9.6.67：给"开场链"用的两颗 —— 看当前在讲哪一条 / 把插队的放下来（**不标已读**，
      它下次进那一页还会补讲）。开场链要一路走完，中途被别的引导插进来会挑错下一步。 */

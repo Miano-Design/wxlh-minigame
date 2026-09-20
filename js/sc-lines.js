@@ -2,7 +2,9 @@
    ------------------------------------------------------------------------------
    · 秘术阁 kejiModal   ：头部卡（已修 x/1505 级 + 结晶余额）+ 每条线一行（图标 / 名字 / Lv / 当前→下一级 / 升1级）
    · 法宝   fabaoModal  ：头部卡（已得 x/20 + 当前佩戴）+ 每件（品质 / 名称 / 效果 / 价格 / 购买或佩戴）
+                        └ fabao_detail：二级页（当前效果 / 祭炼 / 佩戴），V9.6.133 起祭炼搬出列表
    · 坐骑   mountModal  ：头部卡（已驯服 x/7 + 当前乘骑）+ 每匹（品质 / 名称 / 效果 / 驯服价 / 驯服或乘骑）
+                        └ mount_detail：二级页（基础效果 / 喂养加成 / 合计效果 / 喂养 / 乘骑）
    · 药园   gardenModal ：头部卡（x/4 块在用）+ 每块地（第 N 块 / 空地或作物 / 可种说明 / 播种或收获）+ 一键收成熟
    · 斗法台 arenaModal  ：头部卡（第 N 台 + 今日剩余 + 本台奖励）+ 挑战按钮 + 本台守擂者
    · 求签   signModal   ：头部卡（摇一签 / 今日已求 + 累计）+ 五档签文（档位 / 签文 / 奖励 / 权重）
@@ -14,6 +16,25 @@
   const fmt = G.fmt || ((n) => String(n));
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
+  /* 法宝 / 坐骑的二级详情页要记住"在看哪一件"（和伴生体 beastDetailId 同一个套路） */
+  let fabaoDetailId = null, mountDetailId = null;
+
+  /* 法宝 / 坐骑的养成线（祭炼 / 喂养）V9.6.133 起搬到**二级界面**。
+     起因（父亲大人）：「法宝和坐骑做的养成系统挡到数值了，点名字进去看详细信息以及养成」——
+     原来一行里挤两个按钮，名字和效果都没地方站。现在列表行只留一个按钮。 */
+  const GEAR_EFF_LABEL = {
+    atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率',
+    critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '减伤',
+    dmgReduce: '减伤', lifesteal: '吸血', spiritPct: '精神', initEnergy: '开场能量',
+  };
+  /* 百分比留一位小数 —— 祭炼一级 +5%，4% 会点出 4.2% 这种数，取整就看不出差别了 */
+  function gearEffText(o) {
+    const parts = Object.keys(o || {}).map(function (k) {
+      const t = GEAR_EFF_LABEL[k] || k;
+      return (k === 'initEnergy') ? (t + ' +' + Math.round(o[k])) : (t + ' +' + (Math.round(o[k] * 1000) / 10) + '%');
+    });
+    return parts.length ? parts.join(' · ') : '—';
+  }
 
   /* 顶部返回条（二级页统一样式） */
   function head(title) {
@@ -86,12 +107,15 @@
       D.FABAO.forEach(function (f) {
         const own = st.own.indexOf(f.id) >= 0;
         const wearing = st.on === f.id;
+        const lv = Core.fabaoLv(f.id);
         const top = U.y, h = 52 * CV.SCALE;
         CV.text(f.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(f.rarity) });
         const tx = U.ix() + 40 * CV.SCALE;
         const bw = 84 * CV.SCALE;
-        CV.text(CV.fit(f.name, U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text(CV.fit(f.desc, U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.sm), tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        const textW = U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE;
+        CV.text(CV.fit(f.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(f.desc + (own ? ' · 祭炼 ' + lv + '/' + D.FABAO_MAX_LV : ''), textW, CV.FS.sm),
+          tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         if (!own) {
           /* V9.6.112：法宝改扣 **◈ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
              最便宜也要 1000，新号根本买不起，主线"获得 1 件法宝"永远完不成。 */
@@ -99,16 +123,10 @@
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
             '◈ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
         } else {
-          const by2 = top + (h - U.BTN_SM * CV.SCALE) / 2;
-          U.btn(U.ix() + U.iw() - bw, by2, bw, U.BTN_SM * CV.SCALE,
+          U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
             wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', wearing ? '' : 'fabao_wear:' + f.id);
-          /* V9.6.130：法宝多一条"祭炼"线（每级把效果放大 5%，上限 15 级） */
-          {
-            const lv = Core.fabaoLv(f.id), mx = D.FABAO_MAX_LV;
-            U.btn(U.ix() + U.iw() - bw * 2 - 6 * CV.SCALE, by2, bw, U.BTN_SM * CV.SCALE,
-              lv >= mx ? '祭炼满' : ('祭炼 ' + lv + '→' + (lv + 1)), lv >= mx ? 'ghost' : 'gold',
-              lv >= mx ? '' : 'fabao_refine:' + f.id);
-          }
+          /* V9.6.133：祭炼搬进二级页，这里只留一个"点名字进详情"的整块热区 */
+          CV.hit('fabao_detail:' + f.id, U.ix(), top, U.iw() - bw - 6 * CV.SCALE, h);
         }
         U.y = top + h;
       });
@@ -127,6 +145,56 @@
     });
   });
 
+  /* ---------- 法宝详情（二级）：当前效果 / 祭炼 / 佩戴 ---------- */
+  CV.register('fabao_detail', function () {
+    const f = D.fabaoById(fabaoDetailId) || null;
+    const S = Core.S;
+    U.begin(); head('法宝详情');
+    if (!f || (S.fabao.own || []).indexOf(f.id) < 0) {
+      U.card(function () { U.h3('法宝详情'); U.hint('这件法宝不在了（可能刚换过存档）', 4 * CV.SCALE); });
+      return;
+    }
+    const lv = Core.fabaoLv(f.id), mx = D.FABAO_MAX_LV, maxed = lv >= mx;
+    const wearing = S.fabao.on === f.id;
+    const mul = Core.fabaoEffMul(f.id);
+    const eff = {}; Object.keys(f.eff).forEach(function (k) { eff[k] = f.eff[k] * mul; });
+    U.card(function () {
+      U.h3(f.name, f.rarity + ' · 祭炼 ' + lv + ' / ' + mx);
+      U.kv('基础效果', f.desc);
+      U.kv('当前效果', gearEffText(eff), CV.C.gold);
+      U.kv('状态', wearing ? '佩戴中' : '未佩戴', wearing ? CV.C.gold : CV.C.dim);
+    });
+    U.card(function () {
+      U.h3('祭炼');
+      U.note('每级把这条效果放大约 ' + Math.round(D.FABAO_LV_PCT * 100) + '%；祭炼满 = ×' + (1 + mx * D.FABAO_LV_PCT).toFixed(2), 2 * CV.SCALE);
+      if (maxed) { U.hint('已经祭炼到顶。', 4 * CV.SCALE); return; }
+      const c = D.fabaoRefineCost(f, lv);
+      const haveMat = S.items[c.mat] || 0, haveOw = S.cur.otherworld || 0;
+      U.kv((D.ITEMS[c.mat] || {}).name || c.mat, haveMat + ' / ' + c.matN, haveMat >= c.matN ? CV.C.green : CV.C.dim);
+      U.kv('◆ 异界结晶', haveOw + ' / ' + c.otherworld, haveOw >= c.otherworld ? CV.C.green : CV.C.dim);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '🔥 祭炼到 Lv.' + (lv + 1), style: 'gold',
+        id: (haveMat >= c.matN && haveOw >= c.otherworld) ? 'fabao_refine_now' : '' }]);
+    });
+    U.card(function () {
+      U.h3('佩戴');
+      U.hint('主角同时只带 1 件，随时能换。', 4 * CV.SCALE);
+      U.btnRow([{ label: wearing ? '摘下' : '佩戴这件', style: wearing ? 'ghost' : 'primary', id: 'fabao_wear_now' }]);
+    });
+  });
+  CV.on('fabao_detail:*', function (id) { fabaoDetailId = id; CV.push('fabao_detail'); });
+  CV.on('fabao_refine_now', function () {
+    const r = Core.refineFabao(fabaoDetailId);
+    CV.toast(r.msg || '祭炼过了');
+    CV.render();
+  });
+  CV.on('fabao_wear_now', function () {
+    const on = Core.S.fabao.on === fabaoDetailId;
+    const r = Core.wearFabao(on ? null : fabaoDetailId);
+    CV.toast(r.msg || (on ? '已摘下' : '已佩戴'));
+    CV.render();
+  });
+
   /* ---------- 坐骑 ---------- */
   CV.register('mount', function () {
     const st = Core.mountState();
@@ -142,28 +210,25 @@
       D.MOUNTS.forEach(function (m) {
         const own = st.own.indexOf(m.id) >= 0;
         const riding = st.on === m.id;
+        const lv = Core.mountLv(m.id), mx = D.MOUNT_MAX_LV[m.rarity] || 10;
         const top = U.y, h = 52 * CV.SCALE;
         CV.text(m.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(m.rarity) });
         const tx = U.ix() + 40 * CV.SCALE;
         const bw = 84 * CV.SCALE;
-        CV.text(CV.fit(m.name, U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        const textW = U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE;
+        CV.text(CV.fit(m.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         const costTxt = Object.keys(m.cost).filter((k) => k !== 'mat' && k !== 'matN')
           .map((k) => curIcon(k) + fmt(m.cost[k])).join(' + ')
           + (m.cost.mat ? (' + ' + ((D.ITEMS[m.cost.mat] || {}).name || m.cost.mat) + '×' + m.cost.matN) : '');
-        CV.text(CV.fit(m.desc + (own ? '' : ' · 驯服需要 ' + costTxt), U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE, CV.FS.sm),
+        CV.text(CV.fit(m.desc + (own ? (' · 喂养 ' + lv + '/' + mx) : (' · 驯服需要 ' + costTxt)), textW, CV.FS.sm),
           tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         const by = top + (h - U.BTN_SM * CV.SCALE) / 2;
         if (!own) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '驯服', 'ghost', 'mount_buy:' + m.id);
         else {
-          /* V9.6.130：坐骑多一条喂养线（每级全属性 +0.4%，上限按稀有度）——
-             买了就完事的话，后期这条功能就成摆设（父亲大人："各个功能都要跟着进度发展"）。 */
-          const lv = Core.mountLv(m.id), mx = D.MOUNT_MAX_LV[m.rarity] || 10;
-          const c = D.mountFeedCost(m, lv);
+          /* V9.6.133：喂养搬进二级页（原来两个按钮把名字和效果挤没了） */
           U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE,
             riding ? '乘骑中' : '乘骑', riding ? 'primary' : 'ghost', riding ? '' : 'mount_wear:' + m.id);
-          U.btn(U.ix() + U.iw() - bw * 2 - 6 * CV.SCALE, by, bw, U.BTN_SM * CV.SCALE,
-            lv >= mx ? ('Lv.' + lv + ' 满') : ('喂养 Lv.' + lv + '→' + (lv + 1)), lv >= mx ? 'ghost' : 'gold',
-            lv >= mx ? '' : 'mount_feed:' + m.id);
+          CV.hit('mount_detail:' + m.id, U.ix(), top, U.iw() - bw - 6 * CV.SCALE, h);
         }
         U.y = top + h;
       });
@@ -180,6 +245,57 @@
       CV.toast(r.msg || '已乘骑');
       CV.render();
     });
+  });
+
+  /* ---------- 坐骑详情（二级）：基础效果 / 喂养加成 / 合计效果 / 喂养线 ---------- */
+  CV.register('mount_detail', function () {
+    const m = D.mountById(mountDetailId) || null;
+    const S = Core.S;
+    U.begin(); head('坐骑详情');
+    if (!m || (S.mount.own || []).indexOf(m.id) < 0) {
+      U.card(function () { U.h3('坐骑详情'); U.hint('这匹坐骑不在了（可能刚换过存档）', 4 * CV.SCALE); });
+      return;
+    }
+    const lv = Core.mountLv(m.id), mx = D.MOUNT_MAX_LV[m.rarity] || 10, maxed = lv >= mx;
+    const riding = S.mount.on === m.id;
+    const add = lv * D.MOUNT_LV_PCT;
+    const total = Core.mountBonusPct(m.id);
+    U.card(function () {
+      U.h3(m.name, m.rarity + ' · 喂养 ' + lv + ' / ' + mx);
+      U.kv('基础效果', m.desc);
+      U.kv('喂养加成', '全属性 +' + (add * 100).toFixed(1) + '%（每级 +' + (D.MOUNT_LV_PCT * 100).toFixed(1) + '%）', CV.C.gold);
+      U.kv('合计效果', gearEffText(total), CV.C.green);
+      U.kv('状态', riding ? '乘骑中' : '未乘骑', riding ? CV.C.gold : CV.C.dim);
+    });
+    U.card(function () {
+      U.h3('喂养');
+      U.note('全队通用、伙伴也吃。上限按稀有度定：N 10 · R 12 · SR 15 · UR 20 级。', 2 * CV.SCALE);
+      if (maxed) { U.hint('已经喂到顶。', 4 * CV.SCALE); return; }
+      const c = D.mountFeedCost(m, lv);
+      const haveMat = S.items[c.mat] || 0, havePt = S.cur.points || 0;
+      U.kv((D.ITEMS[c.mat] || {}).name || c.mat, haveMat + ' / ' + c.matN, haveMat >= c.matN ? CV.C.green : CV.C.dim);
+      U.kv('◈ 点数', havePt + ' / ' + c.points, havePt >= c.points ? CV.C.green : CV.C.dim);
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '🍖 喂养到 Lv.' + (lv + 1), style: 'gold',
+        id: (haveMat >= c.matN && havePt >= c.points) ? 'mount_feed_now' : '' }]);
+    });
+    U.card(function () {
+      U.h3('乘骑');
+      U.hint('同时只骑 1 匹，随时能换。', 4 * CV.SCALE);
+      U.btnRow([{ label: riding ? '下坐骑' : '乘骑这匹', style: riding ? 'ghost' : 'primary', id: 'mount_ride_now' }]);
+    });
+  });
+  CV.on('mount_detail:*', function (id) { mountDetailId = id; CV.push('mount_detail'); });
+  CV.on('mount_feed_now', function () {
+    const r = Core.feedMount(mountDetailId);
+    CV.toast(r.msg || '喂养不了');
+    CV.render();
+  });
+  CV.on('mount_ride_now', function () {
+    const riding = Core.S.mount.on === mountDetailId;
+    const r = Core.wearMount(riding ? null : mountDetailId);
+    CV.toast(r.msg || (riding ? '已下坐骑' : '已乘骑'));
+    CV.render();
   });
 
   /* ---------- 药园 ---------- */
@@ -281,17 +397,6 @@
       },
     });
   });
-  CV.on('mount_feed:*', function (id) {
-    const r = Core.feedMount(id);
-    CV.toast(r.msg || '喂过了');
-    CV.render();
-  });
-  CV.on('fabao_refine:*', function (id) {
-    const r = Core.refineFabao(id);
-    CV.toast(r.msg || '祭炼过了');
-    CV.render();
-  });
-
   CV.on('arena_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); });
 
   /* ---------- 求签 ---------- */

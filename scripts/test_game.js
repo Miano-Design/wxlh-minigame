@@ -1657,6 +1657,22 @@ setParty(['C021']);
   // 材料不足时失败
   t('高级货币不足时升不了', Core.upgradeAuthority().ok === false);
 
+  /* V9.6.133：权限 20 级 → 每一级都跟着进度解锁（通关第 ceil(N×1.8) 张图）。
+     先验证"没进度就点不动"，再补上进度验证整条线能走完。 */
+  const c1pre = D.authorityCost(0);
+  Core.addCur('holy', c1pre.holy); Core.addCur('otherworld', c1pre.otherworld);
+  const holyBefore = Core.S.cur.holy, owBefore = Core.S.cur.otherworld;
+  const blocked = Core.upgradeAuthority();
+  t('没通关第一张图时，材料够了也点不动', blocked.ok === false && /还没解锁/.test(blocked.msg));
+  t('拦下来时说的是缺哪张图', blocked.msg.indexOf(D.authorityReq(1)) >= 0);
+  t('拦下来时不扣材料', Core.S.cur.holy === holyBefore && Core.S.cur.otherworld === owBefore);
+  t('权限等级不变', Core.S.auth === 0);
+
+  // 补进度：开通全部世界并打满普通 12 关（权限要求最高到第 36 张图）
+  D.WORLDS.forEach(w => {
+    Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(2), hell: Array(12).fill(0) } };
+  });
+
   // 给足材料升到 1 级
   const c1 = D.authorityCost(0);
   const holy0 = Core.S.cur.holy, ow0 = Core.S.cur.otherworld;
@@ -1673,10 +1689,22 @@ setParty(['C021']);
   t('每日扫荡次数随权限提高', Core.sweepCap() === sweep0 + D.AUTHORITY_PER_LV.sweep);
   t('扫荡剩余次数跟着新上限走', Core.S.sweep = { date: Core.dailyDate(), count: 0 }, Core.sweepLeft() === Core.sweepCap());
 
-  // 升到 10 级：满级 + 全属性
-  for (let i = 3; i < 10; i++) { const cc = D.authorityCost(i); Core.addCur('holy', cc.holy); Core.addCur('otherworld', cc.otherworld); Core.upgradeAuthority(); }
-  t('升到满级 10 级', Core.S.auth === D.AUTHORITY_MAX);
-  t('满级给全属性加成', Core.authority().allPct === D.AUTHORITY_PER_LV.allPct);
+  // V9.6.133：2/7 级才给离线上限，扩到 20 级之后这两个档位**原地不动**
+  t('权限满级扩到 20 级', D.AUTHORITY_MAX === 20);
+  t('离线上限档位还是 2/7 级（满配 12h 的账没被冲掉）',
+    Math.abs(D.authorityBonus(20).capHours - 1) < 1e-9 && Math.abs(D.authorityBonus(20).sweep - 8) < 1e-9);
+  t('权限说明每一级都写了解锁要求', D.AUTHORITY.every(a => a.req && a.req.length > 0));
+  t('解锁要求随等级往后推（第 1 级最早、第 20 级最晚）',
+    D.AUTHORITY[0].req !== D.AUTHORITY[19].req && D.AUTHORITY[19].req.indexOf('灯阁王座') >= 0);
+  t('成本单调递增、没有跳档',
+    Array.from({ length: 20 }, (_, i) => D.authorityCost(i).holy)
+      .every((v, i, a) => i === 0 || (v > a[i - 1] && v < a[i - 1] * 1.4)));
+
+  // 升到 20 级：满级 + 全属性
+  for (let i = 3; i < D.AUTHORITY_MAX; i++) { const cc = D.authorityCost(i); Core.addCur('holy', cc.holy); Core.addCur('otherworld', cc.otherworld); Core.upgradeAuthority(); }
+  t('升到满级 20 级', Core.S.auth === D.AUTHORITY_MAX);
+  // 全属性档位是 10/15/20 级，满级累计 3 档
+  t('满级给全属性加成（10/15/20 三档累计 15%）', Math.abs(Core.authority().allPct - 3 * D.AUTHORITY_PER_LV.allPct) < 1e-9);
   t('满级后离线效率提高', Core.offlineEfficiency() > 0.85 + 1e-9);
   t('满级后离线上限提高', Core.offlineCapHours() > cap0);
   t('满级后不能再升', Core.upgradeAuthority().ok === false);

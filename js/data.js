@@ -1105,7 +1105,9 @@ window.DATA = (function () {
     for (let st = 6; st <= 20; st++) {
       const worldIdx = Math.min(WORLDS.length - 1, st * 2 - 2);        // 6 阶→W10、20 阶→W36
       const pct = (st <= 12 ? 0.8 : 0.5) + (st % 2 === 0 ? 0.1 : 0);   // 递减：0.9/0.6 交替 → 15 阶约 +9.75%
-      const cost = Math.round(6250 * Math.pow(1.15, st - 5) / 50) * 50;
+      /* V9.6.133：cap_audit 报「6~20 阶按 ×1.15 递增，点满要 14.8 年」→ 曲线放平。
+         按"血统结晶的日收入 × 一年"倒推，整条线压到约 320 天，跟其它养成线同量级。 */
+      const cost = Math.round((500 + (st - 6) * 30) / 10) * 10;
       out.push({ stage: st, name: GENE_LOCK_NAMES[st - 1] || ('铭刻 ' + st),
         desc: '全队全属性+' + pct.toFixed(1) + '%', req: '通关 ' + WORLDS[worldIdx].name + '·普通',
         cost: { bloodCrystal: cost }, allPct: pct / 100 });
@@ -1396,44 +1398,63 @@ window.DATA = (function () {
   // 也就是说：高级货币不只有"抽卡"一个出口，还有一条"投入之后一劳永逸"的长线。
   // 我们的高级货币（✦ 圣洁晶石 / ◆ 异界结晶）原本只能抽卡和买箱子，缺的正是这条长线，所以补上。
   // 每级都是永久效果，不退款、不重置，转生也保留（它是"灯阁对自己的授权"，不是角色的属性）。
-  const AUTHORITY_MAX = 10;
-  const authorityCost = lv => ({
-    holy: Math.round(60 * Math.pow(1.38, lv)),
-    otherworld: Math.round(40 * Math.pow(1.38, lv)),
-  });
-  const AUTHORITY = [
-    { lv: 1,  desc: '挂机产出 +6%、挂机经验 +4%' },
-    { lv: 2,  desc: '离线上限 +0.5 小时' },
-    { lv: 3,  desc: '每日扫荡次数 +4' },
-    { lv: 4,  desc: '挂机产出再 +6%（累计 +12%）' },
-    { lv: 5,  desc: '离线效率 +5%（累计 +5%）' },
-    { lv: 6,  desc: '挂机经验再 +4%（累计 +8%）' },
-    { lv: 7,  desc: '离线上限再 +0.5 小时（累计 +1h）' },
-    { lv: 8,  desc: '每日扫荡再 +4（累计 +8）' },
-    { lv: 9,  desc: '挂机产出再 +6%（累计 +18%）' },
-    { lv: 10, desc: '全队全属性 +5%、离线效率 +5%（累计 +10%）' },
+  /* V9.6.133：灯阁权限 10 → **20 级**。
+     父亲大人的原话是"各个功能都最好能跟着游戏进程一起发展，不然前期就满了，
+     放在那里很占位置、感觉没啥用" —— 所以扩级的同时必须配三道约束，缺一条就变味：
+       ① **跟着进度开**：每 2 个世界开 1 级（Lv.N 要通关第 ceil(N×1.8) 张图的普通难度），
+          前期点不满，中后期才有得点；
+       ② **离线上限那两个档位原地不动**（还是 2/7 级各 +0.5h）——
+          铭刻 4h + 权限 1h + 医疗室 1h + 基础 6h = 满配 12h，这条账不能被扩级冲掉；
+       ③ **整条线的总价不许翻倍**：20 级的总成本要跟同期的长线（铭刻 20 阶 / 五座建筑 50 级）
+          落在同一量级，否则扩容＝把一条能走完的线变成走不完的线。
+
+     成本曲线（cap_audit 口径 = 每天 20 圣洁晶石）：原来的 ×1.38 曲线在 20 级上会累到
+     5.5 万圣洁晶石、约 6.4 年 —— 尺子直接判 ⚠ 遥不可及。这里把公比降到 ×1.16，
+     第 1 级 60、第 10 级 265、第 20 级 1007，**20 级总计约 6,900 ≈ 346 天**，
+     与铭刻（322 天）、建筑（311 天）同量级。 */
+  const AUTHORITY_MAX = 20;
+  const authorityCost = lv => {
+    const base = 60 * Math.pow(1.16, lv);
+    return { holy: Math.round(base), otherworld: Math.round(base * 0.67) };
+  };
+  /* 每级解锁要通关哪张图（界面上直接写出来，别让玩家对着灰按钮猜） */
+  const authorityReq = lv => {
+    if (lv <= 0) return '';
+    const idx = Math.min(WORLDS.length - 1, Math.max(0, Math.ceil(lv * 1.8) - 1));
+    return '通关 ' + WORLDS[idx].name + '·普通';
+  };
+  const AUTHORITY_DESC = [
+    '挂机产出 +6%、挂机经验 +4%', '离线上限 +0.5 小时', '每日扫荡次数 +4',
+    '挂机产出再 +6%（累计 +12%）', '离线效率 +5%（累计 +5%）', '挂机经验再 +4%（累计 +8%）',
+    '离线上限再 +0.5 小时（累计 +1h）', '每日扫荡再 +4（累计 +8）', '挂机产出再 +6%（累计 +18%）',
+    '全队全属性 +5%、离线效率 +5%（累计 +10%）',
+    '挂机经验再 +4%（累计 +12%）', '每日扫荡再 +4（累计 +12）', '挂机产出再 +6%（累计 +24%）',
+    '离线效率 +5%（累计 +15%）', '全队全属性再 +5%（累计 +10%）', '挂机经验再 +4%（累计 +16%）',
+    '挂机产出再 +6%（累计 +30%）', '每日扫荡再 +4（累计 +16）', '离线效率 +5%（累计 +20%）',
+    '全队全属性再 +5%（累计 +15%）',
   ];
-  // 权限加成（按当前等级线性累加，界面与实装共用这一份数据，避免"写了没做"）
-  /* capHours 这一步 0.5：2/7 级各一次，满级正好 +1 小时。
-     离线上限的三条来源是配好的——铭刻 5 阶 +4h · 灯阁权限 +1h · 医疗室 50 级 +1h，
-     加起来正好 +6 小时（基础 6h → 满配 12h），既不会提前封顶也不会差一截。 */
+  /* 每级的说明 + 解锁要求（界面与实装共用这一份，避免"写了没做"） */
+  const AUTHORITY = AUTHORITY_DESC.map((desc, i) => ({
+    lv: i + 1, desc, req: authorityReq(i + 1),
+  }));
+  // 权限加成：按"哪些等级属于哪条效果"累加，界面与实装共用这一份数据
   const AUTHORITY_PER_LV = { idlePct: 0.06, expPct: 0.04, capHours: 0.5, sweep: 4, offlinePct: 0.05, allPct: 0.05 };
+  const AUTHORITY_STEPS = {
+    idlePct: [1, 4, 9, 13, 17],
+    expPct: [1, 6, 11, 16],
+    capHours: [2, 7],                       // ← 不动：满配 12h 的账靠它
+    sweep: [3, 8],                          // ← 不动：每日扫荡基础 10 + 权限最多 +8
+    offlinePct: [5, 10, 14, 19],
+    allPct: [10, 15, 20],
+  };
   const authorityBonus = lv => {
     lv = Math.max(0, Math.min(AUTHORITY_MAX, lv | 0));
-    // 1/4/9 级给挂机产出，2/7 级给离线上限，3/8 级给扫荡次数，5/10 级给离线效率，10 级额外给全属性
-    const idleSteps = [1, 4, 9].filter(x => lv >= x).length;
-    const capSteps = [2, 7].filter(x => lv >= x).length;
-    const sweepSteps = [3, 8].filter(x => lv >= x).length;
-    const offSteps = [5, 10].filter(x => lv >= x).length;
-    const expSteps = [1, 6].filter(x => lv >= x).length;
-    return {
-      idlePct: idleSteps * AUTHORITY_PER_LV.idlePct,
-      expPct: expSteps * AUTHORITY_PER_LV.expPct,
-      capHours: capSteps * AUTHORITY_PER_LV.capHours,
-      sweep: sweepSteps * AUTHORITY_PER_LV.sweep,
-      offlinePct: offSteps * AUTHORITY_PER_LV.offlinePct,
-      allPct: lv >= 10 ? AUTHORITY_PER_LV.allPct : 0,
-    };
+    const out = {};
+    Object.keys(AUTHORITY_PER_LV).forEach(k => {
+      const steps = AUTHORITY_STEPS[k] || [];
+      out[k] = steps.filter(x => lv >= x).length * AUTHORITY_PER_LV[k];
+    });
+    return out;
   };
 
   /* ================= 招募 ================= */
@@ -2184,7 +2205,7 @@ window.DATA = (function () {
     SIGNS, rollSign,
     RECRUIT_POOLS, PITY, PITY_UP, recruitUpChar, recruitUpNext, upTimeLeft, weekIndex,
     FORMATIONS, pityText,
-    AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV,
+    AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV, authorityReq,
     IDLE_LINES, IDLE_LINE_ATTR_DIV, IDLE_MAT_PER_MIN,
     makeBounties, BOUNTY_REV, REALMS, REALM_PCT, REALM_TIERS, REALM_MAJORS, REALM_STAGE_COUNT, realmName, realmChain,
     ELEMENTS, ELEMENT_ICON, ELEMENT_COUNTER, ELEMENT_BONUS, ELEMENT_PENALTY, worldElement,
