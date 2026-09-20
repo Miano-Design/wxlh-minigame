@@ -89,9 +89,9 @@ t('升星（碎片从稀有度公共池扣）', Core.starUp('C021').ok && Core.S
   t('同稀有度碎片通用（抽到谁都不浪费）', r.ok && Core.S.chars[other].star === 2,
     other + ' 用 ' + C021_RAR + ' 池（' + pool + '）升到 ' + Core.S.chars[other].star + '★');
 }
-Core.addCur('skillChip', 500);
+Core.addCur("otherworld", 5000);          // V9.6.134：技能芯片已并入异界结晶（×3.5）
 t('技能升级', Core.skillUp('C021', 0).ok);
-Core.addCur('bloodCrystal', 10000);
+Core.addCur('otherworld', 280000);          // V9.6.134：血统结晶已并入异界结晶（×28）
 t('血统强化未解锁时被拒', Core.bloodlineUpgrade('C021').ok === false);
 Core.S.unlocks.bloodline = true;   // 血统强化是通关 潜影窟·第1关 之后才开的线
 t('血统升级', Core.bloodlineUpgrade('C021').ok);
@@ -230,7 +230,7 @@ t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
 {
   /* ⚠️ 这一块**不能 Core.newGame()** —— 后面「存档往返」那条用例依赖前面建立的 C021（踩过一次） */
   t('铭刻扩到 20 阶（不再前期就点满）', D.GENE_LOCKS.length === 20 && D.GENE_LOCK_MAX === 20,
-    '共 ' + D.GENE_LOCKS.length + ' 阶 · 第 20 阶「' + D.GENE_LOCKS[19].name + '」需 ' + D.GENE_LOCKS[19].cost.bloodCrystal + ' 血统结晶');
+    '共 ' + D.GENE_LOCKS.length + ' 阶 · 第 20 阶「' + D.GENE_LOCKS[19].name + '」需 ' + D.GENE_LOCKS[19].cost.otherworld + ' 异界结晶');
   t('铭刻后 15 阶都带"全属性"加成（跟进度长）',
     D.GENE_LOCKS.slice(5).every((g) => /全属性\+/.test(g.desc)), D.GENE_LOCKS[5].desc + ' … ' + D.GENE_LOCKS[19].desc);
 
@@ -304,7 +304,7 @@ setParty(['C021']);
   const after = Core.effectivePlayerStats();
   t('主角随玩家等级成长', after.atk > before.atk && after.hp > before.hp);
   t('主角血统选择（开局必经，不受解锁限制）', Core.choosePlayerBloodline('狼人').ok);
-  Core.addCur('bloodCrystal', 10000); Core.addCur('points', 1000000);
+  Core.addCur('otherworld', 280000); Core.addCur('points', 1000000);
   t('主角血统升级', Core.upgradePlayerBloodline().ok && Core.S.player.bloodlineLv === 1);
   t('血统不可更改', !Core.choosePlayerBloodline('科技').ok);   // V9.6.86：原来用的「魔法」血统已删，那是假通过
   const eq6 = Core.grantEquip('W01', 'SR', 'head');
@@ -706,7 +706,7 @@ setParty(['C021']);
   t('伙伴技能上限与主角一致', (() => {
     Core.newGame(); Core.setPlayerName('上限4');
     Core.addChar('C021');
-    Core.S.cur.skillChip = 999999;
+    Core.S.cur.otherworld = 9999999;
     let n = 0;
     while (Core.skillUp('C021', 0).ok && n < 50) n++;
     return Core.S.chars.C021.skillLv[0] === D.SKILL_MAX;
@@ -791,7 +791,7 @@ setParty(['C021']);
   while (Core.allocateSkill(0).ok && guard++ < 100) { /* 点满技能1 */ }
   guard = 0; while (Core.allocateSkill(1).ok && guard++ < 100) { /* 技能2 */ }
   guard = 0; while (Core.allocateSkill(2).ok && guard++ < 100) { /* 必杀 */ }
-  Core.S.player.geneLock = 5; Core.S.buildings.core = 30; Core.S.cur.bloodCrystal = 99999;
+  Core.S.player.geneLock = 5; Core.S.buildings.core = 30; Core.S.cur.otherworld = 9999999;
   Core.addChar('C021'); Core.S.chars.C021.lv = 40;
   Core.S.cur.points = 66666;
   const before = { skills: Core.S.player.skillLv.join('/'), char: Core.S.chars.C021.lv, points: Core.S.cur.points };
@@ -919,9 +919,9 @@ setParty(['C021']);
     return Core.S.player.exp === before && finite();
   })());
   t('skillUp 索引越界时安全拒绝（不会把芯片写成 NaN）', (() => {
-    const before = Core.S.cur.skillChip;
+    const before = Core.S.cur.otherworld;
     const r1 = Core.skillUp('C021', -1), r2 = Core.skillUp('C021', 9), r3 = Core.skillUp('C021', null);
-    return !r1.ok && !r2.ok && !r3.ok && Core.S.cur.skillChip === before && finite();
+    return !r1.ok && !r2.ok && !r3.ok && Core.S.cur.otherworld === before && finite();
   })());
   t('craftSerum 数量传 null / NaN 时安全处理', (() => {
     Core.S.items.mat_t1 = 20; Core.S.cur.points = 5000;
@@ -1341,7 +1341,8 @@ setParty(['C021']);
   t('普通池不出 SSR/UR', !P.normal.rates.SSR && !P.normal.rates.UR);
   t('高级池最低 SR', !P.advanced.rates.N && !P.advanced.rates.R && !!P.advanced.rates.SR);
   // V9.5.73：普通单抽 5000 → 500（父亲大人：5000 抽一次太肉了）；十连按 9 次单抽的价
-  t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.holy === 100 && P.limited.cost.otherworld === 60);
+  // V9.6.134：货币 8 → 4，限定池的"异界结晶"价格 ×1.55（池子并入技能芯片 / 血统结晶 / 深井徽记）
+  t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.holy === 100 && P.limited.cost.otherworld === 90);
   t('十连价 = 9 次单抽（不会出现十连比单抽贵几十倍）', P.normal.ten.points === P.normal.cost.points * 9);
 
   Core.newGame(); Core.setPlayerName('招募');
@@ -2568,7 +2569,7 @@ setParty(['C021']);
 {
   const snap = () => {
     const S = Core.S, o = {};
-    ['points', 'otherworld', 'bloodCrystal', 'holy', 'corridor', 'skillChip', 'story', 'rp'].forEach(k => { o[k] = Math.round(S.cur[k] || 0); });
+    ['points', 'otherworld', 'holy', 'rp'].forEach(k => { o[k] = Math.round(S.cur[k] || 0); });
     o.__items = Object.values(S.items || {}).reduce((a, b) => a + b, 0);
     o.__floor = S.corridor.floor; o.__lv = S.player.level;
     return o;
@@ -2618,7 +2619,7 @@ setParty(['C021']);
   D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
   Core.newGame(); Core.setPlayerName('报价'); Core.choosePlayerBloodline('修真');
   D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
-  Core.addCur('points', 10000000); Core.addCur('otherworld', 1000000); Core.addCur('bloodCrystal', 1000000);
+  Core.addCur('points', 10000000); Core.addCur('otherworld', 1000000);
   Core.S.bag.eqCap = 300;
   Core.S.buildings.workshop = 40; Core.S.buildings.geneLab = 40;      // 两条折扣线都拉满
   const uid = Core.grantEquip('W01', 'UR', null).equip.uid;
@@ -2646,20 +2647,20 @@ setParty(['C021']);
   /* 血统：报价含折扣，实扣一致 */
   {
     const q = Core.bloodlineQuote('@player');
-    const b0 = Core.S.cur.bloodCrystal, p0 = Core.S.cur.points;
+    const b0 = Core.S.cur.otherworld, p0 = Core.S.cur.points;
     Core.upgradePlayerBloodline();
     t('主角血统：报价 == 实扣（含血统实验室折扣）',
-      q.bloodCrystal === b0 - Core.S.cur.bloodCrystal && q.points === p0 - Core.S.cur.points,
-      `报价 ❥${q.bloodCrystal}/◈${q.points}`);
+      q.otherworld === b0 - Core.S.cur.otherworld && q.points === p0 - Core.S.cur.points,
+      `报价 ◆${q.otherworld}/◉${q.points}`);
     t('血统报价确实打了折（实验室 40 级 = -40%）', q.discount === 0.4);
   }
   {
     Core.addChar('C021'); Core.S.chars.C021.bloodlineLv = 10;
     const q = Core.bloodlineQuote('C021');
-    const b0 = Core.S.cur.bloodCrystal, p0 = Core.S.cur.points;
+    const b0 = Core.S.cur.otherworld, p0 = Core.S.cur.points;
     Core.bloodlineUpgrade('C021');
     t('伙伴血统：报价 == 实扣（含折扣）',
-      q.bloodCrystal === b0 - Core.S.cur.bloodCrystal && q.points === p0 - Core.S.cur.points);
+      q.otherworld === b0 - Core.S.cur.otherworld && q.points === p0 - Core.S.cur.points);
   }
 }
 
@@ -2823,9 +2824,9 @@ setParty(['C021']);
   const before = Core.buyShopItem('otherworld', idx);
   t('没通关第 20 个世界时买不到神装箱', !before.ok, before.msg || '');
   D.WORLDS.slice(0, 20).forEach(w => { Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } }; });
-  Core.addCur('otherworld', 25000);
+  Core.addCur('otherworld', 39000);           // V9.6.134：异界结晶价格 ×1.55（25000 → 39000）
   const after = Core.buyShopItem('otherworld', idx);
-  t('通关第 20 个世界后能买到（价格 25000 异界结晶）', after.ok, after.msg || '');
+  t('通关第 20 个世界后能买到（价格 39000 异界结晶）', after.ok, after.msg || '');
   Core.S.bag.eqCap = 5000;
   Core.addItem('box_myth', 600);
   let my = 0, ur = 0, other = 0;

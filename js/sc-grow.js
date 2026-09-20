@@ -23,7 +23,7 @@
     const kejiLv = D.KEJI.reduce((s, k) => s + Core.kejiLv(k.id), 0);
     const rows = [
       { act: 'open_buildings', unlock: 'buildings', ico: '🏗', name: '基地建设', cur: 'Lv.' + bLv + ' / ' + Object.keys(S.buildings).length * 50,
-        desc: '花 ◈ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
+        desc: '花 ◉ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
       { act: 'open_authority', unlock: 'buildings', ico: '🔑', name: '灯阁权限', cur: 'Lv.' + au.lv + ' / ' + au.max,
         desc: '花 ✦ 圣洁晶石 + ◆ 异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
       { act: 'open_sect', unlock: null, ico: '🏯', name: '灯阁评级', cur: 'Lv.' + Core.sectInfo().lv + ' / ' + D.SECT_MAX,
@@ -33,12 +33,12 @@
       { act: 'open_fabao', unlock: null, ico: '🔮', name: '法宝', cur: '已得 ' + Core.fabaoState().own.length + ' / ' + D.FABAO.length + ' 件',
         desc: '装备给数值、法宝给效果（吸血 / 开场能量 / 减伤），主角同时带 1 件，花 ◆ 异界结晶买' },
       { act: 'open_garden', unlock: null, ico: '🌱', name: '药园', cur: Core.gardenState().filter((p) => p.plot).length + ' / ' + D.GARDEN_PLOTS + ' 块在用',
-        desc: '花 ◈ 点数种灵田，到点收强化材料，另有几率出稀有物；离线也计时' },
+        desc: '花 ◉ 点数种灵田，到点收强化材料，另有几率出稀有物；离线也计时' },
       { act: 'open_arena', unlock: null, ico: '🥋', name: '斗法台',
         cur: '第 ' + Core.arenaState().floor + ' 台 · 剩 ' + Core.arenaState().left + ' 次',
         desc: '每天 ' + D.ARENA_DAILY + ' 次镜像擂台，守擂者按你的战力换算，赢一场升一台拿结晶与徽记' },
       { act: 'open_mount', unlock: null, ico: '🐎', name: '坐骑', cur: '已驯服 ' + Core.mountState().own.length + ' / ' + D.MOUNTS.length + ' 匹',
-        desc: '花 ◈ 点数 + 材料驯服，全队（含伙伴）永久加数值；同时只骑 1 匹，随时换' },
+        desc: '花 ◉ 点数 + 材料驯服，全队（含伙伴）永久加数值；同时只骑 1 匹，随时换' },
       { act: 'open_sign', unlock: null, ico: '🎋', name: '求签',
         cur: Core.signState().canDraw ? '今日还没求签' : ('今日【' + Core.signState().tier + '】'),
         desc: '每天免费摇一签，签文给当天的挂机加成 + 一笔硬通货，隔天自动失效' },

@@ -190,7 +190,7 @@
       ]);
       U.space(CV.SP[1]);
       /* V9.6.90：与网页版同一句（网页版还带一句"经验模块在背包里用，直接进这个池子"） */
-      U.hint(cost ? '升下一级需要 ' + fmt(cost.exp) + ' 伙伴经验 + ◈ ' + fmt(cost.points)
+      U.hint(cost ? '升下一级需要 ' + fmt(cost.exp) + ' 伙伴经验 + ◉ ' + fmt(cost.points)
         + ' · 经验模块在背包里用，直接进这个池子'
         : '已满级', 4 * CV.SCALE);
     });
@@ -212,14 +212,14 @@
     U.card(function () {
       U.h3('🩸 ' + ch.bloodline + '血统', 'Lv.' + c.bloodlineLv + ' / ' + D.BLOODLINE_MAX);
       U.btnRow([{
-        label: blCost ? '血统升级（❥ ' + blCost.bloodCrystal + ' + ◈ ' + fmt(blCost.points) + '）' : '已满级',
+        label: blCost ? '血统升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
         style: 'ghost', id: blCost ? 'blup' : 'noop',
       }]);
     });
 
     /* ⑤ 技能（芯片升级） */
     U.card(function () {
-      U.h3('⚡ 技能', '芯片 ▣ ' + fmt(S.cur.skillChip || 0));
+      U.h3('⚡ 技能', '◆ 异界结晶 ' + fmt(S.cur.otherworld || 0));
       [ch.skills.s1, ch.skills.s2, ch.skills.ult].forEach(function (sk, i) {
         if (!sk) return;
         const lv = (c.skillLv || [0, 0, 0])[i];   // V9.5.82：技能从 0 级起

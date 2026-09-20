@@ -510,10 +510,10 @@
     const fmt = G.fmt || ((n) => String(n));
     const dur = G.formatDuration ? G.formatDuration(g.seconds) : (g.seconds + ' 秒');
     const chips = [];
-    chips.push('◈ +' + fmt(g.gains.points));
+    chips.push('◉ +' + fmt(g.gains.points));
     chips.push('EXP +' + fmt(g.gains.exp));
     if (g.gains.otherworld) chips.push('◆ +' + g.gains.otherworld);
-    if (g.gains.story) chips.push('❖ +' + g.gains.story);
+    
     if (g.gains.matCount && g.gains.matItem) {
       const it = (D.ITEMS || {})[g.gains.matItem];
       chips.push('⚙️ ' + ((it && it.name) || g.gains.matItem) + '×' + g.gains.matCount);

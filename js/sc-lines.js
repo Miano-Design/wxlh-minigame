@@ -117,11 +117,11 @@
         CV.text(CV.fit(f.desc + (own ? ' · 祭炼 ' + lv + '/' + D.FABAO_MAX_LV : ''), textW, CV.FS.sm),
           tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         if (!own) {
-          /* V9.6.112：法宝改扣 **◈ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
+          /* V9.6.112：法宝改扣 **◉ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
              最便宜也要 1000，新号根本买不起，主线"获得 1 件法宝"永远完不成。 */
           const can = (Core.S.cur.points || 0) >= f.cost;
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-            '◈ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
+            '◉ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
         } else {
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
             wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', wearing ? '' : 'fabao_wear:' + f.id);
@@ -203,7 +203,7 @@
     head('坐骑');
     U.card(function () {
       U.h3('坐骑', '已驯服 ' + st.own.length + ' / ' + D.MOUNTS.length + ' 匹');
-      U.note('全队通用，伙伴也吃。同时只骑 1 匹，随时能换；花 ◈ 点数 + 强化材料驯服，高阶坐骑额外花 ◆ 异界结晶。', 2 * CV.SCALE);
+      U.note('全队通用，伙伴也吃。同时只骑 1 匹，随时能换；花 ◉ 点数 + 强化材料驯服，高阶坐骑额外花 ◆ 异界结晶。', 2 * CV.SCALE);
       U.kv('当前乘骑', on ? (on.name + '（' + on.desc + '）') : '未乘骑', CV.C.gold);
     });
     U.card(function () {
@@ -274,7 +274,7 @@
       const c = D.mountFeedCost(m, lv);
       const haveMat = S.items[c.mat] || 0, havePt = S.cur.points || 0;
       U.kv((D.ITEMS[c.mat] || {}).name || c.mat, haveMat + ' / ' + c.matN, haveMat >= c.matN ? CV.C.green : CV.C.dim);
-      U.kv('◈ 点数', havePt + ' / ' + c.points, havePt >= c.points ? CV.C.green : CV.C.dim);
+      U.kv('◉ 点数', havePt + ' / ' + c.points, havePt >= c.points ? CV.C.green : CV.C.dim);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '🍖 喂养到 Lv.' + (lv + 1), style: 'gold',
         id: (haveMat >= c.matN && havePt >= c.points) ? 'mount_feed_now' : '' }]);
@@ -319,10 +319,10 @@
           : (ready ? '已成熟，可以收了' : ('生长中 · 还需 ' + (G.formatDuration ? G.formatDuration(Math.ceil(p.leftMs / 1000)) : '')));
         CV.text(CV.fit(state, textW, CV.FS.sm), U.ix(), top + 32 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
         /* V9.6.131（父亲大人："药园种植的消耗你也没写，我不知道是机制改了还是怎么"）：
-           机制没改（播种照旧扣 ◈ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
+           机制没改（播种照旧扣 ◉ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
            现在把"种这一块要花多少"写回描述里，货币图标取货币表（不是手写符号）。 */
         const seed = D.GARDEN[i] || {};
-        const ptIcon = ((D.CURRENCIES || []).find((c) => c.id === 'points') || {}).icon || '◈ ';
+        const ptIcon = ((D.CURRENCIES || []).find((c) => c.id === 'points') || {}).icon || '◉ ';
         const desc = !p.plot
           ? ('可种「' + seed.name + '」：' + ptIcon + fmt(seed.points) + ' · ' + (seed.desc || ''))
           : ('收 ' + (seed.desc || ''));
@@ -361,9 +361,9 @@
     head('斗法台');
     U.card(function () {
       U.h3('斗法台', '第 ' + st.floor + ' 台');   // V9.6.24：斗法台也是一直往上打，去掉历史最高
-      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶 + ♜ 深井徽记，输了退一台。', 2 * CV.SCALE);
+      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶 + ◆ 异界结晶，输了退一台。', 2 * CV.SCALE);
       U.kv('今日剩余', st.left + ' / ' + st.cap);
-      U.kv('本台奖励', '◆ ' + fmt(st.reward.otherworld) + ' · ♜ ' + st.reward.corridor, CV.C.gold);
+      U.kv('本台奖励', '◆ ' + fmt(st.reward.otherworld), CV.C.gold);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '挑战第 ' + st.floor + ' 台', style: 'primary', id: st.left > 0 ? 'arena_fight' : '' }]);
     });

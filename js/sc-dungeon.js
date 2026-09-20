@@ -268,7 +268,7 @@
     const stars = 1 + (anyDead ? 0 : 1) + (res.rounds <= 20 ? 1 : 0);
     const comp = Core.stageComplete(wid, df, si, stars);
     Core.clearPendingRun();
-    /* 奖励胶囊文案照网页版 rewardChips()：货币带图标（◈/◆/❖/▣…）、装备带品质色前缀、道具带 🎒 */
+    /* 奖励胶囊文案照网页版 rewardChips()：货币带图标（◉/◆/❖/▣…）、装备带品质色前缀、道具带 🎒 */
     const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
     const rewards = (g.got || []).map((x) => {
       if (x.k === 'equip') return '🗡 ' + x.v.name;

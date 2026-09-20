@@ -206,14 +206,20 @@ t('⑥ 首页点「收取奖励」有反应', !!Core.S.idle && (Core.S.idle.bank
 {
   const entries = ['open_grow', 'open_sect', 'open_keji', 'open_fabao', 'open_garden', 'open_arena', 'open_mount',
     'open_refine', 'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
-    'open_bounty', 'open_tasks', 'open_sign', 'open_shop', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings', 'open_currency'];
+    'open_bounty', 'open_tasks', 'open_sign', 'open_shop', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings'];
+  /* V9.6.134：顶栏那四颗货币胶囊现在**每一颗都能点**（点了开货币图鉴），
+     所以这里改成验「四颗 currency 热区都在、且都能打开图鉴」——
+     原来只验一颗 `open_currency`（那颗「▤ 全部货币」已经撤了）。 */
+  ['points', 'otherworld', 'holy', 'rp'].forEach((id) => { if (entries.indexOf('__cur__' + id) < 0) entries.push('__cur__' + id); });
   const bad = [];
   entries.forEach((id) => {
     fresh(false);
     /* 首页可能正挂着一条强制引导（页面级/解锁指引）——按设计它会拦别的点击，
        所以先像玩家那样把它过掉，再点入口。 */
     if (U.coachActive()) runCoachChain(8);
-    if (!tapId(id)) { bad.push(id + '(首页没有这颗热区)'); return; }
+    /* `__cur__<币种>` = 顶栏那一排的四颗货币胶囊（V9.6.134 起四颗都能点） */
+    const hit = id.indexOf('__cur__') === 0 ? ('cur:' + id.slice(7)) : id;
+    if (!tapId(hit)) { bad.push(id + '(首页没有这颗热区)'); return; }
     const pg = page();
     if (pg === 'home') { bad.push(id + '(点了没换页)'); return; }
     if (!coachEscapable()) { bad.push(id + ' → ' + pg + '(引导锁死、无法脱身)'); }

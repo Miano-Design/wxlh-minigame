@@ -100,7 +100,7 @@
     const S = Core.S;
     U.begin(); head('基地建设');
     U.card(function () {
-      U.h3('基地建设', '全部消耗 ◈ 点数');
+      U.h3('基地建设', '全部消耗 ◉ 点数');
       D.BUILDINGS.forEach(function (b) {
         const lv = S.buildings[b.id] || 0;
         const cost = D.buildingCost(b.id, lv);
@@ -111,7 +111,7 @@
         CV.text(CV.fit(b.desc, textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         const can = (S.cur.points || 0) >= cost && lv < 50;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          lv >= 50 ? '已满级' : ('升级（◈ ' + fmt(cost) + '）'), 'ghost', can ? 'bup:' + b.id : '');
+          lv >= 50 ? '已满级' : ('升级（◉ ' + fmt(cost) + '）'), 'ghost', can ? 'bup:' + b.id : '');
         U.y = top + h;
       });
     });
@@ -145,7 +145,7 @@
         U.h3('下一阶 · ' + (st.nextName || '—'), '成功率 ' + Math.round(nx.rate * 100) + '%');
         U.kv('等级要求', 'Lv.' + nx.lv + '（当前 Lv.' + Core.S.player.level + '）', Core.S.player.level >= nx.lv ? CV.C.green : CV.C.dim);
         U.kv('渡劫材料', ((D.ITEMS[st.matItem] || {}).name || st.matItem) + ' ' + st.haveMat + ' / ' + st.matN);
-        U.kv('点数', '◈ ' + fmt(st.points));
+        U.kv('点数', '◉ ' + fmt(st.points));
         U.space(CV.SP[1]);
         U.btnRow([{ label: '⚡ 渡劫（成功率 ' + Math.round(nx.rate * 100) + '%）', style: 'primary', id: 'realm_try' }]);
         U.hint('失败也扣材料与点数（等级不掉）', 4 * CV.SCALE);

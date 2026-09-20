@@ -9,6 +9,8 @@
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
   const fmt = G.fmt || ((n) => String(n));
   const pad = () => U.pad();
+  /* 从顶栏点某颗货币胶囊进来时记住是哪一种（给货币图鉴那张卡加个"你刚点的是这个"） */
+  let currencyFocusId = null;
 
   /* 指标题行用（网页版那些页是 showPanel 的标题，这边统一用返回键 + 居中标题那一行） */
   function head(title) {
@@ -65,10 +67,13 @@
   CV.register('currency', function () {
     const S = Core.S;
     U.begin(); head('货币图鉴');
-    U.hint('每种货币只干一件事。拿不准该花哪个，就看下面这张表——「用途」写的是它能买什么，「来源」写的是去哪刷。', 0);
+    U.hint('货币只有四种，按层级分：日常花 ◉、养成长线花 ◆、抽卡花 ✦、转生花 ♾。拿不准就看下面这张表。', 0);
     U.space(CV.SP[1]);
     D.CURRENCIES.forEach(function (c) {
       const info = D.CURRENCY_INFO[c.id] || {};
+      /* 从顶栏某颗胶囊点进来时，那一张卡加一道同色描边（网页版 currencyModal(focusId) 同款），
+         这样"我刚点的是哪个"一眼看得出来。 */
+      if (currencyFocusId === c.id) U.note('← 你刚点的是这一种', 2 * CV.SCALE);
       U.card(function () {
         U.h3(c.icon + ' ' + c.name, '持有 ' + fmt(S.cur[c.id] || 0));
         /* 网页版这两个标签是 <b style="color:var(--gold)">用途</b> —— 加粗是为了让"用途/来源"两层一眼分开 */
@@ -78,6 +83,9 @@
     });
   });
   CV.on('open_currency', function () { CV.push('currency'); });
+  /* V9.6.134：顶栏那四颗货币胶囊现在**都能点**，点了直接开货币图鉴（和网页版一致）。
+     原来只有最后一颗「▤ 全部货币」能点，玩家点任意一颗货币都没反应。 */
+  CV.on('cur:*', function (id) { currencyFocusId = id; CV.push('currency'); });
   CV.on('open_guide', function () { CV.push('guide'); });
 
   /* ---------- 游历奇遇（网页版 travelModal） ---------- */

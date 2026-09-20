@@ -51,8 +51,8 @@
         });
         U.y = top + nameLh + 4 * CV.SCALE;
         U.hint(String(((D.ITEMS[itemId] || {}).desc) || '').replace(/^【[^】]*】/, ''), 0, lw);
-        U.hint('配方：' + matName + ' ×' + s.matN + ' + ◈ ' + fmt(s.points)
-          + '　（现有 ' + matName + ' ' + haveMat + ' · ◈ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, lw);
+        U.hint('配方：' + matName + ' ×' + s.matN + ' + ◉ ' + fmt(s.points)
+          + '　（现有 ' + matName + ' ' + haveMat + ' · ◉ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, lw);
         const ownTop = U.y + 4 * CV.SCALE;
         U.draw(function () {
           CV.text('已有血清 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8,
@@ -688,7 +688,7 @@
   CV.on('gm_go:*', function (k) { CV.reset(k); });
   CV.on('gm_funnel_reset', function () { Core.S.coachStats = {}; Core.save(); CV.toast('引导漏斗统计已清空'); CV.render(); });
   /* V9.6.77（父亲大人："GM 后门的货币都改成给我 9 亿，现在给的太少了"）：
-     与网页版同一口径 —— 读 D.CURRENCIES，一次把每种货币（含转生点 ♾、深井徽记 ♜）拉满 9 亿。
+     与网页版同一口径 —— 读 D.CURRENCIES，一次把每种货币（含转生点 ♾）拉满 9 亿。
      以前是四个按钮各发一种、还都没给转生点，测转生天赋得来回点。 */
   CV.on('gm_all', function () {
     (D.CURRENCIES || []).forEach(function (c) { Core.addCur(c.id, 900000000); });
@@ -892,11 +892,12 @@
       U.kv('攻击', fmt(e.atk));
       U.kv('防御', fmt(e.def));
       U.space(CV.SP[1]);
-      U.kv('通关奖励', '◈ ' + fmt(rw.points) + ' · ❖ ' + rw.story + ' · ♜ ' + rw.corridor + (rw.bloodCrystal ? (' · ❥ ' + rw.bloodCrystal) : ''), CV.C.gold);
+      // V9.6.134：货币 8 → 4（故事点并入点数、深井徽记与血统结晶并入异界结晶）
+      U.kv('通关奖励', '◉ ' + fmt(rw.points) + ' · ◆ ' + rw.otherworld, CV.C.gold);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '⚔️ 挑战本层', style: 'primary', id: 'corridor_fight' }]);
     });
-    U.btnRow([{ label: '🏪 深井商店（♜ ' + fmt(S.cur.corridor || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
+    U.btnRow([{ label: '🏪 深井商店（◆ ' + fmt(S.cur.otherworld || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
   });
   CV.on('corridor_fight', function () {
     /* V9.6.128（父亲大人："深井的自动下一关倒数和点击都无效，点完提示战斗进行中"）：
@@ -926,14 +927,12 @@
           };
         }
         const rw = D.corridorReward(floor);
-        Core.addCur('points', rw.points); Core.addCur('story', rw.story); Core.addCur('corridor', rw.corridor);
-        if (rw.bloodCrystal) Core.addCur('bloodCrystal', rw.bloodCrystal);
+        Core.addCur('points', rw.points); Core.addCur('otherworld', rw.otherworld || 0);
         const gotMark = floor % D.CORRIDOR_MARK_STEP === 0;
         S.corridor.best = Math.max(S.corridor.best, floor);
         S.corridor.floor = floor + 1;
         Core.save();
-        const rewards = ['◈+' + fmt(rw.points), '❖+' + rw.story, '♜+' + rw.corridor]
-          .concat(rw.bloodCrystal ? ['❥+' + rw.bloodCrystal] : [])
+        const rewards = ['◉+' + fmt(rw.points), '◆+' + rw.otherworld]
           .concat(gotMark ? ['♜ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
         return {
           title: '第 ' + floor + ' 层通过', sub: '', rewards: rewards,

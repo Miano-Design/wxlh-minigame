@@ -122,17 +122,29 @@ window.DATA = (function () {
   // 每次 +10 格，所以价格曲线比"一次 +50"平缓得多（第一条 1500 点，约挂机 2 小时）
   function bagExpandCost(expands) { return Math.round(1500 * Math.pow(1.3, expands)); }
 
+  /* ================= 货币（V9.6.134：8 种 → 4 种） =================
+     父亲大人：「货币类型的图标也很相近，要么你减少货币类型，要么图标要有差异化」
+     →「要不砍成 4 种？这样刚好顶部标签那里放得下」。
+
+     4 种 = **四个层级**，一层的所有事只用这一种货币，玩家不用记"这个东西花哪个"：
+       ◉ 点数      日常层：软货币。升级建筑 / 普通招募 / 市集 / 坐骑 / 药园 / 法宝购买。
+                   （吸收原「故事点」——它只有故事商店一个出口，属于重复设计）
+       ◆ 异界结晶  养成层：装备强化、秘术阁、法宝祭炼、限定招募，以及**技能 / 血统 / 铭刻**
+                   三条成长线。（吸收原「技能芯片」与「血统结晶」——它们都只是"养成材料"）
+                   （深井商店也改收它：那家店卖的全是养成件，跟同一条线放一起才讲得通）
+       ✦ 圣洁晶石  高级层：高级招募（SR 起抽）与灯阁权限。日产量最稀（约 20~110/天），
+                   所以它才是真正的"贵"——这条线不动。
+       ♾ 转生点    转生层：只在转生时结算，只给转生天赋加点。跟任何日常都不通用。
+
+     图标后面统一带一个空格（父亲大人要求）：图标跟数字贴在一起看不清，
+     写进图标本身，全站拼字符串的地方就都自动空一格了。
+     形状也重新拉开：原来 ◈（点数）和 ◆（异界结晶）都是"菱形"，小字号下几乎分不清；
+     现在点数改成 ◉（铜钱：外圈 + 方孔），四种形状互不相似，颜色也互不相近。 */
   const CURRENCIES = [
-    /* 图标后面统一带一个空格（父亲大人要求）：图标跟数字贴在一起看不清，
-       写进图标本身，全站拼字符串的地方就都自动空一格了。 */
-    { id: 'points',     name: '点数',     icon: '◈ ', color: '#ffd76a' },
-    { id: 'story',      name: '故事点',   icon: '❖ ', color: '#7ee0a3' },
+    { id: 'points',     name: '点数',     icon: '◉ ', color: '#ffd76a' },
     { id: 'otherworld', name: '异界结晶', icon: '◆ ', color: '#6ec6ff' },
     { id: 'holy',       name: '圣洁晶石', icon: '✦ ', color: '#ff9ecb' },
-    { id: 'skillChip',  name: '技能芯片', icon: '▣ ', color: '#c5a3ff' },
-    { id: 'bloodCrystal', name: '血统结晶', icon: '❥ ', color: '#ff6b6b' },
-    { id: 'corridor',   name: '深井徽记', icon: '♜ ', color: '#8be9e9' },
-    { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#ffe08a' },
+    { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#7ee0a3' },
   ];
 
   /* ================= 角色 ================= */
@@ -419,9 +431,9 @@ window.DATA = (function () {
     { id: 'hell',   name: '地狱', mult: 3.2, rewardMult: 2.5 },
   ];
   const FIRST_CLEAR = { // 世界首通奖励
-    normal: { holy: 100, story: 500, otherworld: 200, skillChip: 100 },
-    hard:   { holy: 150, story: 800, otherworld: 400, skillChip: 200 },
-    hell:   { holy: 250, story: 1200, otherworld: 800, skillChip: 400 },
+    normal: { holy: 100, points: 500, otherworld: 300 },
+    hard:   { holy: 150, points: 800, otherworld: 600 },
+    hell:   { holy: 250, points: 1200, otherworld: 1200 },
   };
 
   /* ================= 装备 ================= */
@@ -699,14 +711,14 @@ window.DATA = (function () {
     /* V9.5.75（父亲大人）：招募券**不再上架**，只能靠玩法拿——
        "白抽一次"是奖励，能用钱买就失去意义了；顺带也彻底消灭了 V9.5.74 那类"券价 vs 单抽价"的比价问题。 */
     // V9.5.76：扫荡已经不掉券了，来源文案得跟上（不然玩家会去扫荡里找）
-    ticket_normal: { icon: '🎫', name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◈ 点数）', src: '手动打副本掉落、每日任务全清、限时悬赏、登录奖励（商店不卖，扫荡也不掉）' },
+    ticket_normal: { icon: '🎫', name: '引灯招募券', type: 'ticket', where: 'recruit', pool: 'normal', use: '在「招募伙伴」点普通池招募时自动先用它', desc: '普通招募 1 次（没券时会自动改花 ◉ 点数）', src: '手动打副本掉落、每日任务全清、限时悬赏、登录奖励（商店不卖，扫荡也不掉）' },
     ticket_adv:    { icon: '🎋', name: '圣契招募令', type: 'ticket', where: 'recruit', pool: 'advanced', use: '在「招募伙伴」点高级池招募时自动先用它', desc: '高级招募 1 次（没券时会自动改花 ✦ 圣洁晶石）', src: '精英 / 守关 Boss 掉落、限时悬赏、每周任务、登录奖励、游历奇遇（商店不卖）' },
     ticket_lim:    { icon: '🎴', name: '异界征召令', type: 'ticket', where: 'recruit', pool: 'limited', use: '在「招募伙伴」点限定池招募时自动先用它', desc: '限定招募 1 次（没券时会自动改花 ◆ 异界结晶）', src: '地狱难度守关 Boss、周常全清、高阶悬赏、登录奖励、游历奇遇（商店不卖）' },
     /* V9.5.66（父亲大人）：探索用消耗品整块删掉。
        起因是副本药剂条撤掉之后，这 9 种东西（治疗剂 ×4、强化剂 ×5）既没有自然的用武之地，
        又占着商店货架和掉落位。与其到处补入口，不如整条线砍掉——战斗改成"一波接一波、
        只看阵容和养成"，补给不再是玩法的一部分。
-       老存档里已经买到的，migrate() 会按原价退回 ◈ 点数（见 RETIRED_ITEMS）。 */
+       老存档里已经买到的，migrate() 会按原价退回 ◉ 点数（见 RETIRED_ITEMS）。 */
     exp_s: { icon: '📘', name: '初级经验模块', type: 'exp', where: 'character', exp: 500, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +500', src: '灯阁市集、副本战斗掉落、每日任务' },
     exp_m: { icon: '📕', name: '中级经验模块', type: 'exp', where: 'character', exp: 2000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +2,000', src: '灯阁市集、副本战斗掉落、每日/周常奖励' },
     exp_l: { icon: '📖', name: '高级经验模块', type: 'exp', where: 'character', exp: 10000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +10,000', src: '灯阁市集（通关 W04 后解锁）、精英/Boss 掉落、周常奖励' },
@@ -775,23 +787,23 @@ window.DATA = (function () {
 
   /* ================= 货币图鉴 ================= */
   const CURRENCY_INFO = {
-    points:       { use: '强化装备、普通招募、背包扩容、灯阁市集、建筑升级、药园播种、驯服坐骑', gain: '挂机、副本战斗、扫荡、任务、分解装备外的主要产出' },
-    story:        { use: '故事商店（伙伴碎片、材料、装备箱）', gain: '挂机每30分钟、通关奖励、每日/每周任务' },
-    otherworld:   { use: '装备强化、异界商店（高阶装备箱）、限定招募（定向出当期 UP）、灯阁权限投资、秘术阁、法宝、高阶坐骑', gain: '分解装备、副本战斗、扫荡、悬赏、斗法台' },
-    holy:         { use: '高级招募（SR 起抽、50 抽保底 SSR、优先给还没有的伙伴）、灯阁权限投资', gain: '主线任务、通关奖励、登录奖励、限时悬赏' },
-    skillChip:    { use: '伙伴技能升级', gain: '副本战斗、扫荡、灯阁市集兑换' },
-    bloodCrystal: { use: '血统选择与升级（主角与伙伴）', gain: 'Boss战、困难/地狱难度、深井' },
-    corridor:     { use: '深井商店（稀有道具）', gain: '深井层数奖励、斗法台守擂成功' },
-    rp:           { use: '转生天赋加点（永久属性）', gain: '转生时按当时的进度结算' },
+    points:     { use: '日常全都用它——建筑升级、普通招募、灯阁市集、故事商店、药园播种、驯服坐骑、法宝购买、背包扩容',
+                  gain: '挂机、副本战斗、扫荡、任务、通关奖励、深井、斗法台' },
+    otherworld: { use: '一切"养成"都用它——装备强化、秘术阁、法宝祭炼、限定招募，以及技能升级、血统升级、铭刻、深井商店',
+                  gain: '分解装备、副本战斗、扫荡、Boss 战、悬赏、斗法台、深井' },
+    holy:       { use: '高级招募（SR 起抽、50 抽保底 SSR、优先给还没有的伙伴）、灯阁权限投资',
+                  gain: '主线任务、通关奖励、登录奖励、限时悬赏（产量最稀，别乱花）' },
+    rp:         { use: '转生天赋加点（永久属性，任何日常都不通用）',
+                  gain: '转生时按当时的进度结算' },
   };
 
   /* ================= 图鉴收集奖励 ================= */
   const CODEX_REWARDS = [
     { n: 5,  reward: { points: 5000, holy: 100 } },
-    { n: 10, reward: { points: 12000, holy: 200, skillChip: 100 } },
-    { n: 20, reward: { points: 30000, holy: 400, bloodCrystal: 100 } },
+    { n: 10, reward: { points: 12000, holy: 200, otherworld: 100 } },
+    { n: 20, reward: { points: 30000, holy: 400, otherworld: 100 } },
     { n: 30, reward: { points: 60000, holy: 800, otherworld: 300 } },
-    { n: 40, reward: { points: 120000, holy: 1500, bloodCrystal: 300 } },
+    { n: 40, reward: { points: 120000, holy: 1500, otherworld: 300 } },
   ];
 
   /* ================= 玩法指南（设置页 ❓ 入口） ================= */
@@ -835,8 +847,10 @@ window.DATA = (function () {
       '懒得一件件配装？在角色 / 伙伴详情的装备栏里点「⚡ 一键最优装备」：它只从**没穿在任何人身上**的装备里挑最好的，不会把别人身上的扒下来。队伍页有 3 组编队预设。',
     ] },
     { id: 'currency', title: '④ 八种货币怎么花', body: [
-      '每种货币只干一件事，记不住就点顶栏那一排货币里的「▤ 全部货币」看完整图鉴（用途 + 主要来源）。',
-      '最常用的三种：◈ 点数（强化 / 招募 / 建筑 / 商店）、✦ 圣洁晶石（抽卡 / 灯阁权限）、◆ 异界结晶（强化 / 异界商店 / 灯阁权限）。',
+      // V9.6.134：顶栏那颗「▤ 全部货币」撤了（货币只剩四种，四种全在顶栏）→ 说明跟着改
+      '每种货币只干一件事，而且**按层级分**：日常花 ◉、养成长线花 ◆、抽卡花 ✦、转生花 ♾。',
+      '记不住就点顶栏任意一颗货币，能看到完整图鉴（用途 + 主要来源）。',
+      '最常用的三种：◉ 点数（强化 / 招募 / 建筑 / 商店）、✦ 圣洁晶石（抽卡 / 灯阁权限）、◆ 异界结晶（强化 / 异界商店 / 灯阁权限）。',
       '高级货币除了抽卡，还有一条长线出口——「🔑 灯阁权限」（见第 ⑪ 章）：投进去就永久生效，转生也不清空。',
     ] },
     { id: 'gene', title: '⑤ 血统与铭刻', body: [
@@ -863,7 +877,7 @@ window.DATA = (function () {
       '懒得一项项点？点首页最下面「挂机」那块里的「收取奖励」：挂机、任务、周常、成就、图鉴里所有已经达成、躺着等点的奖励，一次全收。',
     ] },
     { id: 'recruit', title: '⑧ 三张招募池，花的是三种钱', body: [
-      '普通招募（◈ 点数）：日常池，只出 N / R / SR，重复伙伴转碎片。花的是挂机能刷的点数，定位是攒碎片升星。',
+      '普通招募（◉ 点数）：日常池，只出 N / R / SR，重复伙伴转碎片。花的是挂机能刷的点数，定位是攒碎片升星。',
       '高级招募（✦ 圣洁晶石）：主力池，SR 起抽，50 抽内必出 SSR、100 抽内必出 UR，而且优先给「你还没有的伙伴」——缺图鉴就抽它。',
       '限定招募（◆ 异界结晶）：定向池，本期只出「当期 UP」所属阵营的伙伴，SSR 里一半是当期 UP，50 抽内必出当期 UP。想要某个特定的人，就盯着它抽。',
       '保底三个池分开关账：高级池和限定池各自数自己的 SSR / UR / UP 次数，换池不会清零，也不会串。',
@@ -887,7 +901,7 @@ window.DATA = (function () {
     ] },
     { id: 'authority', title: '⑪ 灯阁权限：高级货币的长线出路', body: [
       '对标别人的"洞府"：花 ✦ 圣洁晶石 + ◆ 异界结晶向灯阁换**永久授权**，10 级，投入一次永久生效，转生也不清空。',
-      '和「基地建设」分工不同——建筑花的是挂机就能刷的 ◈ 点数，逐级堆到 50 级；灯阁权限花的是稀缺的高级货币，所以给的多是"倍率"：挂机产出、挂机经验、离线上限、离线效率、每日扫荡次数。',
+      '和「基地建设」分工不同——建筑花的是挂机就能刷的 ◉ 点数，逐级堆到 50 级；灯阁权限花的是稀缺的高级货币，所以给的多是"倍率"：挂机产出、挂机经验、离线上限、离线效率、每日扫荡次数。',
       '满 10 级额外给全队全属性 +5%，是这条线的收尾奖励。',
       '入口：首页「养成」那一组里的「灯阁权限」（「👥 执灯者 → 🌱 成长」子页里也有同一项）。',
     ] },
@@ -924,7 +938,7 @@ window.DATA = (function () {
     ] },
     { id: 'garden', title: '⑯ 药园 · 斗法台 · 法宝', body: [
       '这三条是照着别人的「洞府药园 / 斗法 / 法宝」补的，都不占队伍位置、不用操作，是"等着收菜"型的成长线。',
-      '**药园**：4 块地，花 ◈ 点数种下灵田，等时间到收强化材料（上品/极品还会额外掉装备箱）。种下去就能去干别的，回来点「一键全收」一次收完——这是点数除了强化、招募之外的第三个出口，也是强化材料不用死刷副本的一条路。',
+      '**药园**：4 块地，花 ◉ 点数种下灵田，等时间到收强化材料（上品/极品还会额外掉装备箱）。种下去就能去干别的，回来点「一键全收」一次收完——这是点数除了强化、招募之外的第三个出口，也是强化材料不用死刷副本的一条路。',
       '**斗法台**：单机没有真 PVP，所以做成"镜像擂台"——守擂者按你自己的队伍战力换算，台数越高越强。每天 5 次，赢了升一台拿 ◆ 异界结晶 + ♜ 深井徽记，输了退一台（保底第 1 台，永远不会卡死）。推图推不动的时候，这里是最稳的异界结晶来源。',
       '**法宝**：装备给的是数值，法宝给的是「效果」——吸血、开场能量、减伤、闪避这类平时很难堆的东西。花 ◆ 异界结晶买，主角带 1 件，买了自动戴上，随时能换、能摘。它和装备、血统、铭刻互不冲突，是主角的第四条成长线。',
       '入口：首页「养成」那一组的「药园」「斗法台」「法宝」，点名字就是完整面板。',
@@ -932,7 +946,7 @@ window.DATA = (function () {
     { id: 'mount', title: '⑰ 坐骑与求签', body: [
       '**坐骑**和法宝是"一硬一软"的两条主角线：法宝给效果（吸血 / 开场能量 / 减伤），坐骑给**基础数值**（攻击 / 生命 / 防御 / 速度）。',
       '坐骑有一处和法宝不一样：**它是全队加成，伙伴也吃**。所以资源紧的时候先买坐骑，收益比只加主角一人的东西更划算。',
-      '驯服坐骑要 ◈ 点数 + 强化材料，高阶坐骑另加 ◆ 异界结晶——这是点数、材料、结晶三条资源同时有出口的地方，也是背包里囤的材料不会变废的原因。',
+      '驯服坐骑要 ◉ 点数 + 强化材料，高阶坐骑另加 ◆ 异界结晶——这是点数、材料、结晶三条资源同时有出口的地方，也是背包里囤的材料不会变废的原因。',
       '同时只骑 1 匹，随时能换；换一匹数字立刻变，不用重练。',
       '**求签**是每天上线第一件事：摇一签看今天的手气。签文分大吉 / 上吉 / 中吉 / 小吉 / 末吉五档，给**当天的挂机加成**（+6% ~ +30%）和一笔硬通货。',
       '签文只算当天，隔天自动失效，所以"今天上线先求一签再挂机"是最划算的顺序。摇之前面板上就写着五档各多少概率，不用猜。',
@@ -1020,7 +1034,9 @@ window.DATA = (function () {
 
   const BLOODLINE_MAX = 50;   // V9.5.73（父亲大人）：血统满级 30 → 50
   // V9.5.70：整体压慢 ×1.5（结晶 10+5lv → 15+8lv；点数 2000×(lv+1) → 3000×(lv+1)）
-  const bloodlineCost = lv => ({ bloodCrystal: 15 + lv * 8, points: 3000 * (lv + 1) });
+  /* V9.6.134：血统结晶并入异界结晶 → 价格 ×28（血统结晶日收入 65，异界结晶池 1804，
+     65×28 ≈ 1820 ≈ 池收入），"点满要几天"跟合并前一样。 */
+  const bloodlineCost = lv => ({ otherworld: 420 + lv * 224, points: 3000 * (lv + 1) });
 
   /* ================= 主角血统技能（觉醒后技能栏替换） ================= */
   // 结构与普通角色技能一致，战斗引擎直接可用
@@ -1095,22 +1111,27 @@ window.DATA = (function () {
     '破妄', '凝神', '铸骨', '燃血', '登阶', '归元', '御虚', '承天', '弑神', '无相', '灯主'];
   const GENE_LOCKS = (function () {
     const first5 = [
-      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', cost: { bloodCrystal: 125 } },
-      { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', cost: { bloodCrystal: 375 } },
-      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', cost: { bloodCrystal: 1000 } },
-      { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', cost: { bloodCrystal: 2500 } },
-      { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', cost: { bloodCrystal: 6250 } },
+      /* V9.6.134：把要求写成**结构化的字段**（w = 要通关的世界、lv = 要到的等级），
+         `req` 只留给人看。以前 core.geneLockInfo 读的是两个写死的 5 元数组 ——
+         于是 9.6.130 把铭刻扩到 20 阶之后，第 6 阶以后**永远点不动**（改一半的典型）。 */
+      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 3500 } },
+      { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', w: 'W03', lv: 20, cost: { otherworld: 10500 } },
+      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', w: 'W06', lv: 40, cost: { otherworld: 28000 } },
+      { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 70000 } },
+      { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', w: 'W12', lv: 80, cost: { otherworld: 175000 } },
     ];
     const out = first5.slice();
     for (let st = 6; st <= 20; st++) {
       const worldIdx = Math.min(WORLDS.length - 1, st * 2 - 2);        // 6 阶→W10、20 阶→W36
       const pct = (st <= 12 ? 0.8 : 0.5) + (st % 2 === 0 ? 0.1 : 0);   // 递减：0.9/0.6 交替 → 15 阶约 +9.75%
       /* V9.6.133：cap_audit 报「6~20 阶按 ×1.15 递增，点满要 14.8 年」→ 曲线放平。
-         按"血统结晶的日收入 × 一年"倒推，整条线压到约 320 天，跟其它养成线同量级。 */
-      const cost = Math.round((500 + (st - 6) * 30) / 10) * 10;
+         按"血统结晶的日收入 × 一年"倒推，整条线压到约 320 天，跟其它养成线同量级。
+         V9.6.134：血统结晶并入异界结晶 → 整条线 ×28（同 bloodlineCost 的口径）。 */
+      const cost = Math.round((500 + (st - 6) * 30) * 28 / 100) * 100;
       out.push({ stage: st, name: GENE_LOCK_NAMES[st - 1] || ('铭刻 ' + st),
         desc: '全队全属性+' + pct.toFixed(1) + '%', req: '通关 ' + WORLDS[worldIdx].name + '·普通',
-        cost: { bloodCrystal: cost }, allPct: pct / 100 });
+        w: WORLDS[worldIdx].id, lv: 0,
+        cost: { otherworld: cost }, allPct: pct / 100 });
     }
     return out;
   })();
@@ -1218,7 +1239,8 @@ window.DATA = (function () {
   ];
   const kejiById = id => KEJI.find(k => k.id === id) || null;
   // V9.5.70：整体压慢 ×1.25（这里统一乘，不用逐条改 42 条线的基础值）
-  const KEJI_COST_MULT = 1.25;
+  /* V9.6.134：异界结晶价格 ×1.55（并入技能芯片 / 血统结晶 / 深井徽记之后池子变大） */
+  const KEJI_COST_MULT = 1.25 * 1.55;
   const kejiCost = (k, lv) => Math.round((k.base + k.step * lv) * KEJI_COST_MULT);
 
   /* ================= 挂机游历奇遇（对标《道友修仙》的 YouLi · 601 条） =================
@@ -1228,14 +1250,14 @@ window.DATA = (function () {
      effect 的键与 applyRewardObj 完全一致，不再另造一套规格。 */
   const TRAVELS = [
     { id: 'tv01', ico: '🍃', name: '灵草偶得',   w: 16, desc: '挂机路上顺手采到一株灵草。', effect: { points: 800, item: 'mat_t1' } },
-    { id: 'tv02', ico: '💧', name: '灵泉洗髓',   w: 12, desc: '一口灵泉，喝下去浑身通透。', effect: { story: 20 } },
-    { id: 'tv03', ico: '📜', name: '残卷觅迹',   w: 10, desc: '捡到半卷功法残篇，勉强化进了修为里。', effect: { points: 2000, skillChip: 5 } },
+    { id: 'tv02', ico: '💧', name: '灵泉洗髓',   w: 12, desc: '一口灵泉，喝下去浑身通透。', effect: { points: 20 } },
+    { id: 'tv03', ico: '📜', name: '残卷觅迹',   w: 10, desc: '捡到半卷功法残篇，勉强化进了修为里。', effect: { points: 2000, otherworld: 5 } },
     { id: 'tv04', ico: '🕳', name: '秘境裂隙',   w: 8,  desc: '空间裂开一道缝，里面的东西被你捞了出来。', effect: { otherworld: 40 } },
     { id: 'tv05', ico: '🦴', name: '妖兽伏击',   w: 9,  desc: '一头低阶妖兽扑上来，被你随手拍死。', effect: { points: 1200, item: 'mat_t2' } },
     { id: 'tv06', ico: '🧙', name: '前辈指点',   w: 7,  desc: '一位路过的老修士指点了两句，胜过苦修数日。', effect: { holy: 30 } },
     { id: 'tv07', ico: '💎', name: '晶石矿脉',   w: 5,  desc: '山壁里露出半截晶石矿脉。', effect: { otherworld: 90 } },
     { id: 'tv08', ico: '📦', name: '遗落行囊',   w: 9,  desc: '不知哪位同行者丢下的行囊。', effect: { item: 'exp_s' } },
-    { id: 'tv09', ico: '🔥', name: '心魔考验',   w: 6,  desc: '心魔翻涌，你稳住了道心。', effect: { points: 3000, bloodCrystal: 10 } },
+    { id: 'tv09', ico: '🔥', name: '心魔考验',   w: 6,  desc: '心魔翻涌，你稳住了道心。', effect: { points: 3000, otherworld: 10 } },
     { id: 'tv10', ico: '🐣', name: '兽魂残响',   w: 5,  desc: '一声兽鸣，你从残响里凝出一枚兽魂石。', effect: { item: 'beast_egg' } },
     { id: 'tv11', ico: '🌟', name: '天降机缘',   w: 3,  desc: '天光落下来，这一趟收获格外丰厚。', effect: { points: 8000, holy: 80, otherworld: 120 } },
     { id: 'tv12', ico: '🧧', name: '同道馈赠',   w: 6,  desc: '一位同门托人捎来份礼。', effect: { item: 'ticket_adv' } },
@@ -1249,11 +1271,11 @@ window.DATA = (function () {
     { id: 'tv18', ico: '🏚', name: '废屋搜查',   w: 8,  desc: '一间塌了半边的屋子，柜子还没被人翻过。', effect: { points: 1100, item: 'exp_s' } },
     { id: 'tv19', ico: '🧭', name: '指路罗盘',   w: 7,  desc: '捡到一只还能转的罗盘，顺手记住了几条矿脉走向。', effect: { points: 2200, item: 'mat_t2' } },
     { id: 'tv20', ico: '🪨', name: '灵石碎块',   w: 7,  desc: '山体裂缝里嵌着几块灵石碎块。', effect: { otherworld: 60 } },
-    { id: 'tv21', ico: '🧙‍♂️', name: '隐士论道', w: 6,  desc: '一位隐士与你论了半日道。', effect: { points: 2600, skillChip: 8 } },
+    { id: 'tv21', ico: '🧙‍♂️', name: '隐士论道', w: 6,  desc: '一位隐士与你论了半日道。', effect: { points: 2600, otherworld: 8 } },
     { id: 'tv22', ico: '🌸', name: '花丛小憩',   w: 6,  desc: '在花丛里睡了一觉，醒来神清气爽。', effect: { points: 500, holy: 15 } },
     { id: 'tv23', ico: '🗡', name: '古战场拾遗', w: 5,  desc: '古战场上还能捡到没锈透的家伙。', effect: { item: 'mat_t3' } },
     { id: 'tv24', ico: '🧊', name: '寒潭淬体',   w: 5,  desc: '跳进寒潭泡了一炷香，皮肉更结实了。', effect: { points: 3200 } },
-    { id: 'tv25', ico: '📕', name: '藏经残页',   w: 4,  desc: '藏经阁流出来的一页残纸。', effect: { skillChip: 30 } },
+    { id: 'tv25', ico: '📕', name: '藏经残页',   w: 4,  desc: '藏经阁流出来的一页残纸。', effect: { otherworld: 30 } },
     { id: 'tv26', ico: '💠', name: '异宝微光',   w: 4,  desc: '土里透出一点微光，挖出来是块异宝碎料。', effect: { otherworld: 140 } },
     { id: 'tv27', ico: '🕊', name: '白鹤引路',   w: 4,  desc: '一只白鹤在前面慢慢飞，把你带到了一处福地。', effect: { holy: 60, points: 2000 } },
     { id: 'tv28', ico: '⚗️', name: '遗落丹炉', w: 3,  desc: '一尊没坏的丹炉，炉底还留着丹药。', effect: { item: 'exp_m' } },
@@ -1261,12 +1283,12 @@ window.DATA = (function () {
     { id: 'tv30', ico: '🐺', name: '狼群围猎',   w: 3,  desc: '一群野狼围上来，被你反过来打了牙祭。', effect: { item: 'beast_egg', points: 1200 } },
     { id: 'tv31', ico: '🌠', name: '流星夜观',   w: 3,  desc: '一场流星雨，你对着星光把修为理顺了。', effect: { points: 6600, holy: 40 } },
     { id: 'tv32', ico: '🏯', name: '旧宗门遗址', w: 3,  desc: '一座废弃宗门，库房里还留着东西。', effect: { item: 'box_sr', points: 2400 } },
-    { id: 'tv33', ico: '🧿', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { bloodCrystal: 30, points: 1800 } },
+    { id: 'tv33', ico: '🧿', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { otherworld: 30, points: 1800 } },
     { id: 'tv34', ico: '🪶', name: '仙禽遗羽',   w: 2,  desc: '一根仙禽落羽，轻得像没有重量。', effect: { otherworld: 200, holy: 50 } },
     { id: 'tv35', ico: '🗝', name: '无名钥匙',   w: 2,  desc: '一把没有锁孔的钥匙，你收进了怀里。', effect: { item: 'ticket_lim' } },
     { id: 'tv36', ico: '🎣', name: '潭底钓宝',   w: 2,  desc: '潭底钓上来一个沉甸甸的箱子。', effect: { item: 'box_ssr', points: 3000 } },
     { id: 'tv37', ico: '🏔', name: '云顶吐纳',   w: 2,  desc: '在云顶吐纳一场，灵气灌顶。', effect: { holy: 120, points: 4000 } },
-    { id: 'tv38', ico: '🧬', name: '血玉现世',   w: 2,  desc: '地里渗出一块血玉，握在手里发烫。', effect: { bloodCrystal: 80 } },
+    { id: 'tv38', ico: '🧬', name: '血玉现世',   w: 2,  desc: '地里渗出一块血玉，握在手里发烫。', effect: { otherworld: 80 } },
     { id: 'tv39', ico: '🌕', name: '月华灌体',   w: 1,  desc: '月华落下来，把你整个人洗了一遍。', effect: { holy: 200, otherworld: 260, points: 6000 } },
     { id: 'tv40', ico: '🎇', name: '大道显化',   w: 1,  desc: '你眼前晃过一线大道，抓不住，但确实抓到了一把东西。', effect: { item: 'box_ur', holy: 300 } },
   ];
@@ -1279,7 +1301,7 @@ window.DATA = (function () {
 
   /* ================= 药园（对标《道友修仙》洞府里的"药园"） =================
      它的药园是"种下去、等时间、回来收"的挂机副线，产的是炼丹用料。
-     我们做成 4 块地：花 ◈ 点数播种 → 到点成熟 → 收获得强化材料，另有几率出稀有物。
+     我们做成 4 块地：花 ◉ 点数播种 → 到点成熟 → 收获得强化材料，另有几率出稀有物。
      产量按"强化时用点数替代材料"的价（MAT_SUBSTITUTE_POINTS）算，**每块地收货价值约等于投入的 1.2 倍**：
      种地若是比直接买还亏，就等于给玩家挖坑（2026-09-15 体检时发现旧产量只有投入的 1 成~5 成，已调高）。 */
   const GARDEN_PLOTS = 4;
@@ -1296,7 +1318,9 @@ window.DATA = (function () {
   const ARENA_DAILY = 5;
   function arenaReward(floor) {
     const m = Math.pow(1.14, floor - 1);
-    return { otherworld: Math.round(20 * m), corridor: Math.max(1, Math.round(floor * 0.6)) };
+    /* V9.6.134：深井徽记并入异界结晶 —— 两个键并成一个。
+       ⚠️ 不能写成 `{ otherworld: a, otherworld: b }`：同键后者覆盖前者，会静默丢掉一份奖励。 */
+    return { otherworld: Math.round(20 * m) + Math.max(1, Math.round(floor * 0.6)) };
   }
   // 守擂者：用参考战力反推，保证"永远打得动、也永远有压力"
   function arenaEnemy(floor, refPower) {
@@ -1362,16 +1386,17 @@ window.DATA = (function () {
   const FABAO_REFINE_MAT = { R: 'mat_t2', SR: 'mat_t3', SSR: 'mat_t4', UR: 'mat_t5' };
   function fabaoRefineCost(f, lv) {                 // 第 lv → lv+1 级的花费
     const mul = { R: 1, SR: 1.6, SSR: 2.4, UR: 3.5 }[f.rarity] || 1;
-    return { otherworld: Math.round(180 * mul * Math.pow(1.16, lv)), mat: FABAO_REFINE_MAT[f.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.1, lv))) };
+    // V9.6.134：异界结晶价格 ×1.55（同 KEJI / 增强化）
+    return { otherworld: Math.round(280 * mul * Math.pow(1.16, lv)), mat: FABAO_REFINE_MAT[f.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.1, lv))) };
   }
   const MOUNTS = [
     { id: 'mt01', name: '铁甲蜥', rarity: 'N',  cost: { points: 10000 },                                          pct: { hpPct: 0.04 },  desc: '生命 +4%' },
     { id: 'mt02', name: '疾风狼', rarity: 'N',  cost: { points: 10000 },                                          pct: { spdPct: 0.05 }, desc: '速度 +5%' },
     { id: 'mt03', name: '玄铁犀', rarity: 'R',  cost: { points: 50000, mat: 'mat_t2', matN: 20 },                 pct: { defPct: 0.08 },  desc: '防御 +8%' },
     { id: 'mt04', name: '赤焰虎', rarity: 'R',  cost: { points: 50000, mat: 'mat_t2', matN: 20 },                 pct: { atkPct: 0.08 },  desc: '攻击 +8%' },
-    { id: 'mt05', name: '幽影豹', rarity: 'SR', cost: { points: 150000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { spdPct: 0.10, critPct: 0.03 }, desc: '速度 +10%、暴击率 +3%' },
-    { id: 'mt06', name: '雷麟兽', rarity: 'SR', cost: { points: 150000, otherworld: 800, mat: 'mat_t3', matN: 15 }, pct: { atkPct: 0.10, skillPct: 0.08 }, desc: '攻击 +10%、技能伤害 +8%' },
-    { id: 'mt07', name: '太古龙鲸', rarity: 'UR', cost: { points: 375000, otherworld: 6000, mat: 'mat_t5', matN: 10 }, pct: { atkPct: 0.12, hpPct: 0.12, defPct: 0.12, spdPct: 0.12 }, desc: '全属性 +12%' },
+    { id: 'mt05', name: '幽影豹', rarity: 'SR', cost: { points: 150000, otherworld: 1240, mat: 'mat_t3', matN: 15 }, pct: { spdPct: 0.10, critPct: 0.03 }, desc: '速度 +10%、暴击率 +3%' },
+    { id: 'mt06', name: '雷麟兽', rarity: 'SR', cost: { points: 150000, otherworld: 1240, mat: 'mat_t3', matN: 15 }, pct: { atkPct: 0.10, skillPct: 0.08 }, desc: '攻击 +10%、技能伤害 +8%' },
+    { id: 'mt07', name: '太古龙鲸', rarity: 'UR', cost: { points: 375000, otherworld: 9300, mat: 'mat_t5', matN: 10 }, pct: { atkPct: 0.12, hpPct: 0.12, defPct: 0.12, spdPct: 0.12 }, desc: '全属性 +12%' },
   ];
   const mountById = id => MOUNTS.find(m => m.id === id) || null;
   const MOUNT_PCT_NAME = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率', skillPct: '技能伤害' };
@@ -1380,10 +1405,10 @@ window.DATA = (function () {
      每天免费摇一次签，签文分五档（大吉→末吉），给当日的挂机加成 + 一点硬通货。
      它解决的问题是"每天上线第一件事点哪里"——先求一签，再看今天要干嘛。 */
   const SIGNS = [
-    { id: 'sg1', tier: '大吉', weight: 4,   text: '紫气东来，今日诸事皆宜。',   gain: { holy: 60, otherworld: 120, bloodCrystal: 6 },  idlePct: 0.30, days: 1 },
-    { id: 'sg2', tier: '上吉', weight: 10,  text: '云开见月，所行皆顺。',       gain: { holy: 40, otherworld: 80, bloodCrystal: 4 },   idlePct: 0.22, days: 1 },
-    { id: 'sg3', tier: '中吉', weight: 22,  text: '平顺之日，稳中有进。',       gain: { holy: 25, otherworld: 50, bloodCrystal: 2 },   idlePct: 0.15, days: 1 },
-    { id: 'sg4', tier: '小吉', weight: 30,  text: '小有收获，宜守不宜攻。',     gain: { holy: 15, otherworld: 30, bloodCrystal: 1 },   idlePct: 0.10, days: 1 },
+    { id: 'sg1', tier: '大吉', weight: 4,   text: '紫气东来，今日诸事皆宜。',   gain: { holy: 60, otherworld: 126 },  idlePct: 0.30, days: 1 },
+    { id: 'sg2', tier: '上吉', weight: 10,  text: '云开见月，所行皆顺。',       gain: { holy: 40, otherworld: 84 },   idlePct: 0.22, days: 1 },
+    { id: 'sg3', tier: '中吉', weight: 22,  text: '平顺之日，稳中有进。',       gain: { holy: 25, otherworld: 52 },   idlePct: 0.15, days: 1 },
+    { id: 'sg4', tier: '小吉', weight: 30,  text: '小有收获，宜守不宜攻。',     gain: { holy: 15, otherworld: 31 },   idlePct: 0.10, days: 1 },
     { id: 'sg5', tier: '末吉', weight: 34,  text: '谋事在人，今日宜稳扎稳打。', gain: { holy: 8,  otherworld: 15 },                    idlePct: 0.06, days: 1 },
   ];
   function rollSign() {
@@ -1487,7 +1512,8 @@ window.DATA = (function () {
     limited: {
       name: '限定招募', short: '限定', currency: 'otherworld',
       rates: { SR: 0.62, SSR: 0.33, UR: 0.05 },
-      cost: { otherworld: 60 }, ten: { otherworld: 540 },
+      // V9.6.134：异界结晶价格 ×1.55（池子并入技能芯片 / 血统结晶 / 深井徽记）
+      cost: { otherworld: 90 }, ten: { otherworld: 810 },
       ticket: 'ticket_lim',
       desc: '定向池：本期只出「当期 UP」所属阵营的伙伴，SSR 里一半是当期 UP，50 抽内必出当期 UP。有「异界征召令」时先扣券。',
       tag: '定向 UP',
@@ -1579,7 +1605,7 @@ window.DATA = (function () {
     // 3) 强化：按已强化次数往上加
     const enhTarget = Math.max(10, Math.floor(((S.stats && S.stats.enhances) || 0) / 10) * 10 + 10);
     push('enhance', { n: enhTarget }, '强化达人', `累计强化装备 ${enhTarget} 次`, 24,
-      { otherworld: 200 + enhTarget * 10, holy: 400, item: 'ticket_adv' });
+      { otherworld: 310 + enhTarget * 15, holy: 400, item: 'ticket_adv' });
     // 4) 剩下一个位置按进度挑：图鉴 / 深井 / 伴生体 / 境界
     const owned = Object.keys(S.chars || {}).length;
     const ssrN = Object.keys(S.chars || {}).filter(id => {
@@ -1591,16 +1617,16 @@ window.DATA = (function () {
     const realm = (S.player && S.player.realm) || 0;
     if (best < 10) {
       push('corridor', { n: 10 }, '深井初探', '深井到达第 10 层', 36,
-        { holy: 1200, bloodCrystal: 30 });
+        { holy: 1200, otherworld: 30 });
     } else if (ssrN < 3) {
       push('ssr', { n: 3 }, '强者如林', '拥有 3 名 SSR 及以上伙伴', 36,
-        { holy: 1500, bloodCrystal: 40 });
+        { holy: 1500, otherworld: 40 });
     } else if (beasts < 3) {
       push('beast', { n: 3 }, '兽栏初成', '孵化 3 只伴生体', 36,
         { holy: 1000, points: 60000 });
     } else if (realm < 1) {
       push('realm', { n: 1 }, '初渡天劫', '完成第一次渡劫（突破到炼气）', 36,
-        { holy: 1200, bloodCrystal: 30 });
+        { holy: 1200, otherworld: 30 });
     } else {
       const next = Math.min(60, owned + 3);
       push('chars', { n: next }, '广纳英才', `拥有 ${next} 名伙伴`, 36,
@@ -1724,18 +1750,20 @@ window.DATA = (function () {
       { item: 'mat_t1', name: '基础金属×10', price: 300, count: 10, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 6000, count: 5, stock: -1, req: { world: 'W04' } },
       { item: 'mat_t5', name: '灯阁残片×3', price: 15000, count: 3, stock: -1, req: { world: 'W06' } },
-      { currencyGain: { skillChip: 10 }, name: '技能芯片×10', price: 2000, stock: -1 },
+      { currencyGain: { otherworld: 10 }, name: '技能芯片×10', price: 2000, stock: -1 },
       { item: 'box_r', name: '随机R装备', price: 5000, stock: -1 },
       { item: 'box_sr', name: '随机SR装备', price: 30000, stock: -1 },
     ] },
     otherworld: { name: '异界商店', currency: 'otherworld', items: [
-      { item: 'box_sr', name: 'SR装备箱', price: 100, stock: -1 },
-      { item: 'box_ssr', name: 'SSR装备箱', price: 500, stock: -1 },
-      { item: 'box_ur', name: 'UR装备箱', price: 2000, stock: -1 },
+      /* V9.6.134：异界结晶价格 ×1.55（它并入技能芯片 / 血统结晶 / 深井徽记之后，
+         这条线的日收入从 1161 涨到 1804 → 价格跟着涨，攒一件要几天还是那几天）。 */
+      { item: 'box_sr', name: 'SR装备箱', price: 155, stock: -1 },
+      { item: 'box_ssr', name: 'SSR装备箱', price: 775, stock: -1 },
+      { item: 'box_ur', name: 'UR装备箱', price: 3100, stock: -1 },
       /* V9.6.79：神话的唯一购买入口 —— **通关第 20 个世界**才上架，而且买的还是"箱"。
          定价按后期收入量过：后期异界结晶约 3400/天，25000 ≈ 一周多一点 ——
          是一件值得攒的东西，又不是随手就买（一箱 15% 出神话，凑一套要攒很久）。 */
-      { item: 'box_myth', name: '血统神装箱', price: 25000, stock: -1, req: { world: 'W20' } },
+      { item: 'box_myth', name: '血统神装箱', price: 39000, stock: -1, req: { world: 'W20' } },
       { item: 'mat_t2', name: '强化合金×10', price: 50, count: 10, stock: -1 },
       { item: 'mat_t3', name: '异界合金×5', price: 100, count: 5, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 300, count: 5, stock: -1, req: { world: 'W04' } },
@@ -1743,27 +1771,29 @@ window.DATA = (function () {
       { item: 'exp_l', name: '高级经验模块', price: 150, stock: -1, req: { world: 'W04' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 4200, stock: -1, req: { world: 'W15' } },
     ] },
-    story: { name: '故事商店', currency: 'story', items: [
-      { shardRandom: 'R', shardCount: 10, name: '随机R伙伴碎片×10', price: 100, stock: -1 },
-      { shardRandom: 'SR', shardCount: 10, name: '随机SR伙伴碎片×10', price: 300, stock: -1 },
-      { item: 'box_sr', name: '世界装备箱', price: 200, stock: -1 },
-      { item: 'mat_t1', name: '世界材料×50', price: 50, count: 50, stock: -1 },
-      { item: 'exp_m', name: '中级经验模块×2', price: 150, count: 2, stock: -1 },
-      { currencyGain: { skillChip: 100 }, name: '技能芯片×100', price: 200, stock: -1 },
-      { currencyGain: { holy: 10 }, name: '圣洁晶石×10', price: 500, stock: 1 },
+    /* V9.6.134：故事点并入点数 → 这家店改收 ◉，价格 ×71
+       （故事点日收入 706，点数池 50418，706×71 ≈ 50126 ≈ 池收入）。
+       这样"攒一件要几天"跟合并前一模一样，只是币种换成了日常就能攒到的点数。 */
+    story: { name: '故事商店', currency: 'points', items: [
+      { shardRandom: 'R', shardCount: 10, name: '随机R伙伴碎片×10', price: 7100, stock: -1 },
+      { shardRandom: 'SR', shardCount: 10, name: '随机SR伙伴碎片×10', price: 21300, stock: -1 },
+      { item: 'box_sr', name: '世界装备箱', price: 14200, stock: -1 },
+      { item: 'mat_t1', name: '世界材料×50', price: 3550, count: 50, stock: -1 },
+      { item: 'exp_m', name: '中级经验模块×2', price: 10650, count: 2, stock: -1 },
+      { currencyGain: { otherworld: 100 }, name: '异界结晶×100', price: 14200, stock: -1 },
+      { currencyGain: { holy: 10 }, name: '圣洁晶石×10', price: 35500, stock: 1 },
     ] },
-    corridor: { name: '深井商店', currency: 'corridor', items: [
-      { shardRandom: 'SR', shardCount: 10, name: 'SR伙伴碎片×10', price: 100, stock: -1 },
-      { shardRandom: 'SSR', shardCount: 5, name: 'SSR伙伴碎片×5', price: 300, stock: -1 },
-      { currencyGain: { skillChip: 100 }, name: '技能芯片×100', price: 150, stock: -1 },
-      // V9.5.65（策划体检留档）：这条价一度想从 200 降到 100，原因是"铭刻要 8200 结晶"。
-      // 但血统结晶真正的大来源是可反复扫荡的守关 Boss（约 300/天），深井商店只是补充渠道，
-      // 降到 100 反而会把深井徽记这条线掏空（徽记日产量才 30~60）→ 维持 200。
-      { currencyGain: { bloodCrystal: 100 }, name: '血统结晶×100', price: 200, stock: -1 },
-      { item: 'exp_xl', name: '超级经验模块', price: 120, stock: -1 },
-      { item: 'mat_t5', name: '灯阁残片×5', price: 150, count: 5, stock: -1 },
-      { item: 'box_ssr', name: 'SSR装备箱', price: 500, stock: -1 },
-      { item: 'box_ur', name: 'UR装备箱', price: 1500, stock: -1 },
+    /* V9.6.134：深井徽记并入异界结晶 → 这家店改收 ◆，价格 ×30
+       （徽记日收入 60，异界结晶池 1804，60×30 = 1800 ≈ 池收入）。
+       它卖的全是养成件（碎片 / 强化材料 / 装备箱 / 结晶），跟异界结晶这条线本就是一回事。 */
+    corridor: { name: '深井商店', currency: 'otherworld', items: [
+      { shardRandom: 'SR', shardCount: 10, name: 'SR伙伴碎片×10', price: 3000, stock: -1 },
+      { shardRandom: 'SSR', shardCount: 5, name: 'SSR伙伴碎片×5', price: 9000, stock: -1 },
+      { currencyGain: { otherworld: 100 }, name: '异界结晶×100', price: 4500, stock: -1 },
+      { item: 'exp_xl', name: '超级经验模块', price: 3600, stock: -1 },
+      { item: 'mat_t5', name: '灯阁残片×5', price: 4500, count: 5, stock: -1 },
+      { item: 'box_ssr', name: 'SSR装备箱', price: 15000, stock: -1 },
+      { item: 'box_ur', name: 'UR装备箱', price: 45000, stock: -1 },
     ] },
   };
 
@@ -1773,19 +1803,19 @@ window.DATA = (function () {
     { id: 'idle1',    name: '领取挂机收益 1 次', target: 1, reward: { points: 800 } },
     { id: 'enhance1', name: '强化装备 1 次', target: 1, reward: { otherworld: 30 } },
     { id: 'recruit1', name: '招募 1 次', target: 1, reward: { holy: 20 } },
-    { id: 'dungeon1', name: '完成 1 次副本', target: 1, reward: { story: 100 } },
+    { id: 'dungeon1', name: '完成 1 次副本', target: 1, reward: { points: 100 } },
     { id: 'item1',    name: '使用 1 个道具', target: 1, reward: { points: 500 } },
     { id: 'sign1',    name: '求签 1 次', target: 1, reward: { points: 600 } },
     { id: 'arena1',   name: '斗法台守擂 1 次', target: 1, reward: { otherworld: 40 } },
   ];
-  const DAILY_ALL_REWARD = { points: 5000, skillChip: 50, holy: 20, item: 'ticket_normal' };
+  const DAILY_ALL_REWARD = { points: 5000, otherworld: 50, holy: 20, item: 'ticket_normal' };
   // 周常任务：与每日任务共用同一套进度来源（战斗/强化/副本/招募/道具/挂机），按自然周重置
   const WEEKLY_TASKS = [
     { id: 'w_battle',  name: '本周战斗 100 次', target: 100, src: 'battle', reward: { points: 8000, holy: 60 } },
-    { id: 'w_run',     name: '本周通关 10 次副本', target: 10,  src: 'dungeon', reward: { points: 10000, skillChip: 150 } },
+    { id: 'w_run',     name: '本周通关 10 次副本', target: 10,  src: 'dungeon', reward: { points: 10000, otherworld: 150 } },
     { id: 'w_enhance', name: '本周强化 20 次装备', target: 20,  src: 'enhance', reward: { otherworld: 300, points: 6000 } },
     { id: 'w_recruit', name: '本周招募 10 次', target: 10,      src: 'recruit', reward: { holy: 120, item: 'ticket_adv' } },
-    { id: 'w_idle',    name: '本周领取挂机收益 7 次', target: 7, src: 'idle', reward: { story: 600, points: 5000 } },
+    { id: 'w_idle',    name: '本周领取挂机收益 7 次', target: 7, src: 'idle', reward: { points: 5600 } },
   ];
   const WEEKLY_ALL_REWARD = { holy: 300, otherworld: 800, item: ['exp_xl', 'ticket_lim'] };
   // 成就：长线目标，覆盖战斗 / 养成 / 收集 / 挑战四条线
@@ -1793,20 +1823,20 @@ window.DATA = (function () {
     { id: 'a_battle100', cat: '战斗', name: '百战之躯', desc: '累计战斗 100 场', check: S => S.stats.battles >= 100, reward: { points: 8000 } },
     { id: 'a_battle1000', cat: '战斗', name: '千锤百炼', desc: '累计战斗 1000 场', check: S => S.stats.battles >= 1000, reward: { points: 60000, holy: 200 } },
     { id: 'a_boss10', cat: '战斗', name: '屠龙者', desc: '击杀 10 次守关 Boss', check: S => S.stats.bosses >= 10, reward: { otherworld: 200 } },
-    { id: 'a_boss50', cat: '战斗', name: 'Boss 猎人', desc: '击杀 50 次守关 Boss', check: S => S.stats.bosses >= 50, reward: { holy: 300, bloodCrystal: 200 } },
+    { id: 'a_boss50', cat: '战斗', name: 'Boss 猎人', desc: '击杀 50 次守关 Boss', check: S => S.stats.bosses >= 50, reward: { holy: 300, otherworld: 200 } },
     { id: 'a_hell1', cat: '战斗', name: '地狱归来', desc: '通关任意关卡的地狱难度', check: S => Object.values(S.worlds).some(w => w.stages.hell.some(s => s > 0)), reward: { holy: 200, otherworld: 300 } },
     { id: 'a_run50', cat: '战斗', name: '残域老手', desc: '累计通关 50 次副本关卡', check: S => S.stats.runs >= 50, reward: { points: 30000 } },
     { id: 'a_lv100', cat: '养成', name: '登峰造极', desc: '玩家等级达到 Lv.100', check: S => S.player.level >= 100, reward: { holy: 500, otherworld: 500 } },
-    { id: 'a_gene5', cat: '养成', name: '完全解锁', desc: '铭刻解锁到 5 阶', check: S => S.player.geneLock >= 5, reward: { holy: 500, bloodCrystal: 500 } },
+    { id: 'a_gene5', cat: '养成', name: '完全解锁', desc: '铭刻解锁到 5 阶', check: S => S.player.geneLock >= 5, reward: { holy: 500, otherworld: 500 } },
     { id: 'a_enh50', cat: '养成', name: '铁匠', desc: '累计强化 50 次装备', check: S => S.stats.enhances >= 50, reward: { points: 20000, otherworld: 200 } },
     { id: 'a_enh20', cat: '养成', name: '完美强化', desc: '拥有一件 +20 装备', check: S => Object.values(S.equips).some(e => e.enhance >= 20), reward: { holy: 300, otherworld: 500 } },
     { id: 'a_char10', cat: '收集', name: '小队成形', desc: '拥有 10 名伙伴', check: S => Object.keys(S.chars).length >= 10, reward: { points: 15000 } },
     { id: 'a_char30', cat: '收集', name: '大型队伍', desc: '拥有 30 名伙伴', check: S => Object.keys(S.chars).length >= 30, reward: { holy: 400, points: 40000 } },
     { id: 'a_ssr1', cat: '收集', name: '命运相遇', desc: '获得第 1 名 SSR 伙伴', check: S => Object.keys(S.chars).some(id => (charById[id] || {}).rarity === 'SSR'), reward: { holy: 200 } },
-    { id: 'a_ur1', cat: '收集', name: '超越者', desc: '获得第 1 名 UR 伙伴', check: S => Object.keys(S.chars).some(id => (charById[id] || {}).rarity === 'UR'), reward: { holy: 500, bloodCrystal: 300 } },
+    { id: 'a_ur1', cat: '收集', name: '超越者', desc: '获得第 1 名 UR 伙伴', check: S => Object.keys(S.chars).some(id => (charById[id] || {}).rarity === 'UR'), reward: { holy: 500, otherworld: 300 } },
     { id: 'a_world3', cat: '挑战', name: '走出巢穴', desc: '通关 3 个世界的普通难度', check: S => WORLDS.filter(w => S.worlds[w.id] && S.worlds[w.id].stages.normal.every(s => s > 0)).length >= 3, reward: { holy: 300 } },
-    { id: 'a_floor50', cat: '挑战', name: '深井 50 层', desc: '深井历史最高 50 层', check: S => S.corridor.best >= 50, reward: { corridor: 100, points: 20000 } },
-    { id: 'a_floor100', cat: '挑战', name: '深井 100 层', desc: '深井历史最高 100 层', check: S => S.corridor.best >= 100, reward: { corridor: 300, holy: 400 } },
+    { id: 'a_floor50', cat: '挑战', name: '深井 50 层', desc: '深井历史最高 50 层', check: S => S.corridor.best >= 50, reward: { otherworld: 100, points: 20000 } },
+    { id: 'a_floor100', cat: '挑战', name: '深井 100 层', desc: '深井历史最高 100 层', check: S => S.corridor.best >= 100, reward: { otherworld: 300, holy: 400 } },
     /* V9.5.87（十五度自审）：这条原本写"深井历史最高 200 层"——**这辈子到不了**。
        实测量过：把每条养成线都点满的账号（Lv.100 · 5 星 · 满血统/技能/铭刻5/境界36/秘术1505/建筑250 ·
        本档装备 · 深井印记按上限 +45%），用真实战斗引擎打深井，天花板当时在第 130~134 层；
@@ -1814,13 +1844,13 @@ window.DATA = (function () {
        差距只会越拉越大。做成人拿不到的成就＝死内容，所以改成"再往前啃一段"的真实目标。
        V9.6.77 复量（世界扩到 36 张 + 血统神装之后）：天花板 **149 层**（spec_audit 现在现场量，
        不再写死数字）。120 层仍然是"要啃一段、但啃得到"的位置，所以这条不动。 */
-    { id: 'a_floor120', cat: '挑战', name: '深井守望者', desc: '深井历史最高 120 层', check: S => S.corridor.best >= 120, reward: { corridor: 800, holy: 800 } },
-    { id: 'a_reincarn', cat: '挑战', name: '转生不止', desc: '完成 1 次转生', check: S => S.player.reincarnations >= 1, reward: { holy: 300, bloodCrystal: 300 } },
+    { id: 'a_floor120', cat: '挑战', name: '深井守望者', desc: '深井历史最高 120 层', check: S => S.corridor.best >= 120, reward: { otherworld: 800, holy: 800 } },
+    { id: 'a_reincarn', cat: '挑战', name: '转生不止', desc: '完成 1 次转生', check: S => S.player.reincarnations >= 1, reward: { holy: 300, otherworld: 300 } },
     { id: 'a_codex20', cat: '收集', name: '图鉴过半', desc: '图鉴收集 20 名伙伴', check: S => S.codex.chars.length >= 20, reward: { points: 30000, holy: 200 } },
   ];
   const LOGIN_REWARDS = [
     { holy: 100, item: 'ticket_normal' }, { points: 10000, item: 'ticket_normal' },
-    { skillChip: 100, item: 'ticket_adv' }, { otherworld: 200 },
+    { otherworld: 100, item: "ticket_adv" }, { otherworld: 200 },
     { holy: 200, item: 'ticket_adv' }, { item: 'box_ssr' },
     { ssrTicket: true, item: 'ticket_lim' },
   ];
@@ -1856,7 +1886,7 @@ window.DATA = (function () {
   };
 
   /* V9.5.66（父亲大人）：被删掉的探索消耗品，只为**老存档退款**保留一张价目表。
-     玩家当时是真花 ◈ 点数买的，直接删档等于凭空吞掉他一笔钱，所以加载老档时按原价退回。
+     玩家当时是真花 ◉ 点数买的，直接删档等于凭空吞掉他一笔钱，所以加载老档时按原价退回。
      新档不会有这些东西（ITEMS 里已经没有它们了）。 */
   const RETIRED_ITEMS = {
     heal_s: 500, heal_m: 1200, heal_l: 3000, buff_muscle: 1500, buff_nerve: 1500,
@@ -1899,7 +1929,7 @@ window.DATA = (function () {
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[0] > 0 },
     { id: 'q03', name: '第一位同伴', desc: '招募 1 次伙伴', reward: { points: 2000 },
       check: S => S.stats.recruits >= 1 },
-    { id: 'q04', name: '并肩作战', desc: '让 1 名伙伴上阵', reward: { story: 50 },
+    { id: 'q04', name: '并肩作战', desc: '让 1 名伙伴上阵', reward: { points: 50 },
       check: S => S.party.filter(id => id && id !== '@player').length >= 1 },
     /* 一条顶原来的三条：打通第 4 关，顺便把 兑换/强化/基地/任务 全解锁 */
     /* V9.6.112（真流程审计抓到的死结）：强化一次要 点数 + **异界结晶 ◆**（见 enhanceCost），
@@ -1921,7 +1951,7 @@ window.DATA = (function () {
       check: S => (S.fabao && S.fabao.own || []).length >= 1 },
     { id: 'q_garden', name: '药园', desc: '在药园种 1 次地', reward: { points: 1500 },
       check: S => (S.garden || []).some(p => p) },
-    { id: 'q_sign', name: '求签', desc: '求 1 次签', reward: { story: 50 },
+    { id: 'q_sign', name: '求签', desc: '求 1 次签', reward: { points: 50 },
       check: S => (S.stats.signDraws || 0) >= 1 },
     { id: 'q_arena', name: '斗法台', desc: '打赢 1 场斗法台', reward: { otherworld: 50 },
       check: S => S.arena && S.arena.best >= 2 },       // best 从 1 起，≥2 就是赢过一场
@@ -1934,11 +1964,11 @@ window.DATA = (function () {
     { id: 'q_bounty', name: '限时悬赏', desc: '领 1 次悬赏奖励', reward: { points: 2000 },
       check: S => Object.keys((S.bounty && S.bounty.claimed) || {}).length >= 1 },
     /* ---- 里程碑：世界守关 / 深井 / 血统 / 境界 / 转生 ---- */
-    { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, bloodCrystal: 100 }, unlock: 'geneLock,corridor',
+    { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, otherworld: 100 }, unlock: 'geneLock,corridor',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
-    { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { story: 100 },
+    { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { points: 100 },
       check: S => S.corridor.floor >= 2 },
-    { id: 'q12', name: '新的恐怖', desc: '通关 潜影窟·第1关', reward: { bloodCrystal: 50 }, unlock: 'bloodline',
+    { id: 'q12', name: '新的恐怖', desc: '通关 潜影窟·第1关', reward: { otherworld: 50 }, unlock: 'bloodline',
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[0] > 0 },
     { id: 'q13', name: '血脉觉醒', desc: '升级 1 次血统（主角或伙伴）', reward: { points: 5000 },
       check: S => S.player.bloodlineLv >= 1 || Object.values(S.chars).some(c => c.bloodlineLv >= 1) },
@@ -2067,11 +2097,12 @@ window.DATA = (function () {
   const CORRIDOR_MARK_STEP = 10, CORRIDOR_MARK_CAP = 30, CORRIDOR_MARK_PCT = 0.015;
   const corridorMarks = best => Math.min(CORRIDOR_MARK_CAP, Math.floor((best || 0) / CORRIDOR_MARK_STEP));
   const corridorMarkBonus = best => corridorMarks(best) * CORRIDOR_MARK_PCT;
+  /* V9.6.134：货币 8 → 4 —— 原「深井徽记」与「血统结晶」都并入异界结晶。
+     ⚠️ 这里原来是三个键（点数 / 徽记 / 血统结晶），合并后前两个会**同键**，
+     写成 `{ points: a, points: b }` 后者盖前者、静默丢一份奖励，所以显式加起来。 */
   const corridorReward = floor => ({
-    points: Math.round(100 * Math.pow(1.04, Math.floor(floor / 10))),
-    story: 5,
-    corridor: floor % 10 === 0 ? 3 : 1,
-    bloodCrystal: floor % 50 === 0 ? 50 : 0,
+    points: Math.round(100 * Math.pow(1.04, Math.floor(floor / 10))) + 5,
+    otherworld: (floor % 10 === 0 ? 3 : 1) + (floor % 50 === 0 ? 50 : 0),
   });
 
   /* ================= 掉落稀有度 ================= */

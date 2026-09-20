@@ -40,7 +40,8 @@ window.Core = (function () {
       altPlayers: [],         // 新建的主角（体验不同血统），与当前主角可切换
       // V9.2：背包分三池（道具 / 材料 / 装备），各 50 格起、各自扩容
       bag: { itemCap: 50, itemExpands: 0, matCap: 50, matExpands: 0, eqCap: 50, eqExpands: 0 },
-      cur: { points: 0, story: 0, otherworld: 0, holy: 0, skillChip: 0, bloodCrystal: 0, corridor: 0, rp: 0 },
+      // V9.6.134：货币 8 → 4（见 data.js 顶部的四层说明）
+      cur: { points: 0, otherworld: 0, holy: 0, rp: 0 },
       chars: {},            // id → {lv, exp, star, skillLv:[1,1,1], bloodlineLv}
       /* V9.6.129：碎片改成**按稀有度的公共池**（抽到谁都进同一个池子，不再各攒各的） */
       shardPool: { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 },
@@ -220,6 +221,21 @@ window.Core = (function () {
     /* V9.6.129：碎片从"每人各攒"改成"按稀有度公共池" —— 老存档把各人身上的碎片**原样并入**池子，
        一点不丢；跑过一次就把标记写上（S.shardPoolMerged），不再重复累加。 */
     if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
+    /* V9.6.134：货币 8 → 4 —— 老存档手里的旧币**折算并入新币，一点不丢**。
+       折算率取"这个池子的日收入 ÷ 旧币的日收入"（跟价格那边的系数同源），所以
+       玩家攒了"能买几件东西"的购买力在合并前后是一样的，不是随手给个数。
+       跑过一次就写标记，不再重复累加。 */
+    if (!S.curMerged4) {
+      const c = S.cur || (S.cur = {});
+      const n = (k) => Math.max(0, Math.floor(c[k] || 0));
+      // 故事点 → 点数（点数池 50418/天 ÷ 故事点 706/天 ≈ 71）
+      if (c.story) { c.points = (c.points || 0) + n('story') * 71; delete c.story; }
+      // 技能芯片 ×3.5、血统结晶 ×28、深井徽记 ×30 → 异界结晶（异界结晶池 1804/天）
+      const addOw = n('skillChip') * 3.5 + n('bloodCrystal') * 28 + n('corridor') * 30;
+      if (addOw) c.otherworld = (c.otherworld || 0) + Math.round(addOw);
+      delete c.skillChip; delete c.bloodCrystal; delete c.corridor;
+      S.curMerged4 = true;
+    }
     if (!S.shardPoolMerged) {
       let moved = 0;
       Object.keys(S.chars || {}).forEach(function (id) {
@@ -278,7 +294,7 @@ window.Core = (function () {
     S.sweep.bonus = S.sweep.bonus || 0;
     /* V9.5.66（父亲大人）：探索消耗品整条线删掉（ITEMS 里已经没有它们了）。
        老存档背包 / 待领箱里可能还躺着几个——不清理的话，背包会画出一格名字是 undefined 的空格子，
-       点进去还会报错。这里按**当时商店里的原价**退回 ◈ 点数（玩家是真买的，不能凭空吞掉）。
+       点进去还会报错。这里按**当时商店里的原价**退回 ◉ 点数（玩家是真买的，不能凭空吞掉）。
        退款天然只做一次：清掉之后存档里就没有这些 id 了，下次读档退不到东西。 */
     const retired = D.RETIRED_ITEMS || {};
     let retiredRefund = 0;
@@ -925,7 +941,10 @@ window.Core = (function () {
      所以改成公式：第 lv 级（0 基）要 10 × 1.16^lv 个芯片。
        满一条 35 级 ≈ 1.1 万芯片 ≈ 3 天（芯片日收入约 2400~4400）
        一个伙伴三条点满 ≈ 3.3 万芯片 ≈ 7~14 天 —— 和其它养成线的量级一致。 */
-  const SKILL_CHIP_BASE = 10, SKILL_CHIP_GROW = 1.16;
+  /* V9.6.134：技能芯片并入异界结晶 → 价格 ×3.5
+     （芯片日收入 518，异界结晶池 1804，518×3.5 = 1813 ≈ 池收入）——
+     "满一条技能要几天"跟合并前一样，只是改从异界结晶里扣。 */
+  const SKILL_CHIP_BASE = 35, SKILL_CHIP_GROW = 1.16;
   const SKILL_CHIP_COST = Array.from({ length: D.SKILL_MAX }, (_, lv) => Math.round(SKILL_CHIP_BASE * Math.pow(SKILL_CHIP_GROW, lv)));
   function skillUp(charId, idx) {
     const c = S.chars[charId];
@@ -937,8 +956,8 @@ window.Core = (function () {
     const lv = c.skillLv[si];
     if (lv >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
     const cost = SKILL_CHIP_COST[lv];      // 技能从 0 级起，价目表也跟着 0 起
-    if (S.cur.skillChip < cost) return { ok: false, msg: `技能芯片不足（${S.cur.skillChip}/${cost}）` };
-    S.cur.skillChip -= cost;
+    if (S.cur.otherworld < cost) return { ok: false, msg: `异界结晶不足（${S.cur.otherworld}/${cost}）` };
+    S.cur.otherworld -= cost;
     c.skillLv[idx]++;
     save();
     return { ok: true, msg: `技能升到 Lv.${c.skillLv[idx]}` };
@@ -947,12 +966,12 @@ window.Core = (function () {
   /* ================= 血统 / 铭刻 ================= */
   /* V9.5.89（十七度自审）：血统升级的"报价"收成一份 ——
      界面原来读 D.bloodlineCost()（毛价），而真正升级时会打血统实验室的折扣（最高 -40%）：
-     按钮写着"❥ 120 + ◈ 3000"、实际只扣 1800。玩家看到一个虚高的价钱就不敢点了。
+     按钮写着"❥ 120 + ◉ 3000"、实际只扣 1800。玩家看到一个虚高的价钱就不敢点了。
      charId 传 '@player' 或伙伴 id；返回 null 表示已经没得升。 */
   function bloodlineQuote(charId) {
     const discount = Math.min(0.4, S.buildings.geneLab * 0.01);
     const apply = (cost) => ({
-      bloodCrystal: Math.ceil(cost.bloodCrystal * (1 - discount)),
+      otherworld: Math.ceil((cost.otherworld || 0) * (1 - discount)),
       points: Math.ceil(cost.points * (1 - discount)),
       discount,
     });
@@ -971,30 +990,36 @@ window.Core = (function () {
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
     if (c.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
     const q = bloodlineQuote(charId);            // 与界面同一份报价（已含血统实验室折扣）
-    const cost = { bloodCrystal: q.bloodCrystal, points: q.points };
-    if (!spend(cost)) return { ok: false, msg: '血统结晶或点数不足' };
+    const cost = { otherworld: q.otherworld, points: q.points };
+    if (!spend(cost)) return { ok: false, msg: '异界结晶或点数不足' };
     c.bloodlineLv++;
     save();
     return { ok: true, msg: `${base.bloodline}血统 Lv.${c.bloodlineLv}` };
   }
   function geneLockInfo() {
     const cur = S.player.geneLock;
-    if (cur >= 5) return { max: true };
+    /* V9.6.134：上限从写死的 5 改成**读数据表**。9.6.130 把铭刻扩到 20 阶，
+       但这里还写着 `cur >= 5` 就是满级、后面两个要求的数组也只有 5 个元素 ——
+       结果第 6 阶以后永远点不动（玩家看得到 20 行，第 6 行起全锁死）。
+       现在要求直接读 GENE_LOCKS 里的 w（世界）与 lv（等级）字段，加多少阶都不用再改这里。 */
+    if (cur >= D.GENE_LOCKS.length) return { max: true };
     const next = D.GENE_LOCKS[cur];
     const reqs = [];
-    const worldReq = ['W01', 'W03', 'W06', 'W09', 'W12'][cur];
-    const lvReq = [1, 20, 40, 60, 80][cur];
-    const cleared = S.worlds[worldReq] && S.worlds[worldReq].stages.normal.every(s => s > 0);
-    if (!cleared) reqs.push(`通关${D.WORLDS.find(w => w.id === worldReq).name}·普通`);
+    const worldReq = next.w;
+    const lvReq = next.lv || 0;
+    const w = D.WORLDS.find(x => x.id === worldReq);
+    const cleared = !worldReq || (S.worlds[worldReq] && S.worlds[worldReq].stages.normal.every(s => s > 0));
+    if (!cleared && w) reqs.push(`通关${w.name}·普通`);
     if (S.player.level < lvReq) reqs.push(`玩家等级达到 Lv.${lvReq}`);
-    if (S.cur.bloodCrystal < next.cost.bloodCrystal) reqs.push(`血统结晶 ${S.cur.bloodCrystal}/${next.cost.bloodCrystal}`);
+    const need = next.cost.otherworld || 0;
+    if ((S.cur.otherworld || 0) < need) reqs.push(`异界结晶 ${S.cur.otherworld || 0}/${need}`);
     return { max: false, next, can: reqs.length === 0, reqs };
   }
   function geneLockUnlock() {
     const info = geneLockInfo();
     if (info.max) return { ok: false, msg: '铭刻已完全解锁' };
     if (!info.can) return { ok: false, msg: info.reqs.join('；') };
-    S.cur.bloodCrystal -= info.next.cost.bloodCrystal;
+    S.cur.otherworld -= info.next.cost.otherworld;
     S.player.geneLock++;
     save();
     return { ok: true, msg: `铭刻 ${info.next.name} 已解锁！` };
@@ -1199,8 +1224,8 @@ window.Core = (function () {
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
     if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
     const q = bloodlineQuote('@player');         // 与界面同一份报价（已含血统实验室折扣）
-    const cost = { bloodCrystal: q.bloodCrystal, points: q.points };
-    if (!spend(cost)) return { ok: false, msg: '血统结晶或点数不足' };
+    const cost = { otherworld: q.otherworld, points: q.points };
+    if (!spend(cost)) return { ok: false, msg: "异界结晶或点数不足" };
     S.player.bloodlineLv++;
     save();
     return { ok: true, msg: `血统 Lv.${S.player.bloodlineLv}` };
@@ -1329,14 +1354,14 @@ window.Core = (function () {
   }
 
   // 扩容分三种：kind = 'item'（道具）| 'mat'（材料）| 'eq'（装备），三条曲线各自独立。
-  // 每次 +10 格，价格从 ◈ 1500 起、每扩一次 ×1.3。
+  // 每次 +10 格，价格从 ◉ 1500 起、每扩一次 ×1.3。
   function buyBagCap(kind) {
     const k = ['eq', 'mat'].includes(kind) ? kind : 'item';
     const expandsKey = k + 'Expands';
     const capKey = k + 'Cap';
     const label = { eq: '装备', mat: '材料', item: '道具' }[k];
     const cost = D.bagExpandCost(S.bag[expandsKey] || 0);
-    if (!spend({ points: cost })) return { ok: false, msg: `点数不足（需 ◈ ${cost}）` };
+    if (!spend({ points: cost })) return { ok: false, msg: `点数不足（需 ◉ ${cost}）` };
     S.bag[expandsKey] = (S.bag[expandsKey] || 0) + 1;
     S.bag[capKey] += D.BAG_EXPAND_SIZE;
     save();
@@ -1591,7 +1616,7 @@ window.Core = (function () {
   }
   /* V9.5.89（十七度自审）：**报价**和**实扣**必须是同一份数据。
      原来界面只显示 enhanceCost（点数 + 结晶），而 enhance() 在没材料时还要把代用点数加进点数、
-     有材料时还要吃掉一块材料 —— 实测：无材料时按钮写 ◈200 实扣 ◈400，+12 那一档写 1640 实扣 4640；
+     有材料时还要吃掉一块材料 —— 实测：无材料时按钮写 ◉200 实扣 ◉400，+12 那一档写 1640 实扣 4640；
      有材料时按钮上一个字都没提"要消耗一块材料"。玩家按的不是他看到的那个价。
      现在界面和扣款都读这一个 quote，结构上不允许再分叉。 */
   function enhanceQuote(uid) {
@@ -1633,10 +1658,10 @@ window.Core = (function () {
          原来不管差点数还是差异界结晶都写"点数不足" —— 玩家兜里 2 万点数、
          只差 2 个 ◆，屏幕上却说"点数不足"，只会当成 bug 或者以为自己看错了。 */
       const short = [];
-      if ((S.cur.points || 0) < q.points) short.push('点数 ◈' + q.points);
+      if ((S.cur.points || 0) < q.points) short.push('点数 ◉' + q.points);
       if ((S.cur.otherworld || 0) < q.otherworld) short.push('异界结晶 ◆' + q.otherworld);
       const lack = short.length ? short.join(' + ') : '材料';
-      return { ok: false, msg: q.matHave ? (`不够 ${lack}`) : (`不够 ${lack}（无${q.itemName}，需额外代用 ◈ ${q.substitute}）`) };
+      return { ok: false, msg: q.matHave ? (`不够 ${lack}`) : (`不够 ${lack}（无${q.itemName}，需额外代用 ◉ ${q.substitute}）`) };
     }
     if (q.matHave) {
       S.items[q.itemId]--;
@@ -2018,7 +2043,6 @@ window.Core = (function () {
       // 旧值配合 80×Lv^1.32 的经验表，纯挂机到 Lv.20 要 33 小时；现在约 13 小时。
       expPerMin: (10 + lv * 0.7) * (1 + S.buildings.training * 0.03 + au.expPct + kb.expPct) * graceExpMult(),
       otherworldPer10Min: 1 + Math.floor(lv / 50),
-      storyPer30Min: 1,
     };
   }
   /* ================= 挂机分工 ================= */
@@ -2057,7 +2081,6 @@ window.Core = (function () {
       pointsPerMin: base.pointsPerMin + c.points,
       expPerMin: base.expPerMin + c.exp,
       otherworldPer10Min: base.otherworldPer10Min + c.otherworld,
-      storyPer30Min: base.storyPer30Min,
       matPerMin: c.matPerMin,
       lineBonuses: c.bonuses,
     };
@@ -2119,7 +2142,6 @@ window.Core = (function () {
       points: Math.round(r.pointsPerMin * mins),
       exp: Math.round(r.expPerMin * mins),
       otherworld: Math.floor(elapsedSec / 600) * r.otherworldPer10Min,
-      story: Math.floor(elapsedSec / 1800) * r.storyPer30Min,
       mat: Math.floor((r.matPerMin || 0) * mins),
     };
     /* ⚠️ 离线收益必须**在这里**入账。
@@ -2128,7 +2150,6 @@ window.Core = (function () {
        玩家白等一场。现在改成：核心负责入账，UI 只负责显示，弹不弹窗与拿不拿到彻底分开（V9.5 修）。 */
     addCur('points', gains.points);
     addCur('otherworld', gains.otherworld);
-    addCur('story', gains.story);
     addPlayerExp(gains.exp);
     const matOut = grantIdleMat(gains.mat);
     if (matOut && matOut.count > 0) { gains.matItem = matOut.item; gains.matCount = matOut.count; gains.mat = matOut.count; }
@@ -2158,7 +2179,6 @@ window.Core = (function () {
       points: Math.floor(r.pointsPerMin * mins),
       exp: Math.floor(r.expPerMin * mins),
       otherworld: Math.floor(Math.floor(S.idle.bankSec / 600) * r.otherworldPer10Min),
-      story: Math.floor(S.idle.bankSec / 1800) * r.storyPer30Min,
       mat: Math.floor((r.matPerMin || 0) * mins),
       seconds: S.idle.bankSec,
     };
@@ -2182,7 +2202,6 @@ window.Core = (function () {
     const g = idleBankGains();
     addCur('points', g.points);
     addCur('otherworld', g.otherworld);
-    addCur('story', g.story);
     addPlayerExp(g.exp);
     /* V9.5.79（自审·长线模拟）：**在线挂机也要产评级经验**。
        以前只有 settleOffline（离线结算）里那一行会加，而玩法指南写的是"挂机每分钟 +1.2"——
@@ -2532,7 +2551,8 @@ window.Core = (function () {
   // 把效果对象写成一行可读文字（说明由效果派生，不另写一套文案）
   function rewardTextOf(eff) {
     const parts = [];
-    const curKeys = ['points', 'story', 'otherworld', 'holy', 'skillChip', 'bloodCrystal', 'corridor', 'rp'];
+    // V9.6.134：货币 8 → 4
+    const curKeys = ['points', 'otherworld', 'holy', 'rp'];
     curKeys.forEach(k => { if (eff[k]) parts.push(`${curMeta(k).icon}${eff[k]}`); });
     if (eff.item) [].concat(eff.item).forEach(id => parts.push(`${(D.ITEMS[id] || {}).name || id}×1`));
     return parts.join(' · ') || '空手而归';
@@ -2553,7 +2573,7 @@ window.Core = (function () {
     const g = D.GARDEN.find(x => x.id === gardenId);
     if (!g) return { ok: false, msg: '没有这种灵田' };
     if (S.garden[idx]) return { ok: false, msg: '这块地还种着东西' };
-    if (!canAfford({ points: g.points })) return { ok: false, msg: `◈ 点数不足（需要 ${fmtNum(g.points)}）` };
+    if (!canAfford({ points: g.points })) return { ok: false, msg: `◉ 点数不足（需要 ${fmtNum(g.points)}）` };
     spend({ points: g.points });
     S.garden[idx] = { id: g.id, at: Date.now() + g.sec * 1000 };
     save();
@@ -2614,7 +2634,7 @@ window.Core = (function () {
       Object.entries(rw).forEach(([k, v]) => addCur(k, v));
       S.arena.floor++;
       S.arena.best = Math.max(S.arena.best, S.arena.floor);
-      msg = `守擂成功！升到第 ${S.arena.floor} 台 · ◆ ${rw.otherworld} · ♜ ${rw.corridor}`;
+      msg = `守擂成功！升到第  台 · ◆ `;
     } else {
       S.arena.floor = Math.max(1, S.arena.floor - 1);
       msg = '守擂失败，退一台再来（次数照常消耗）';
@@ -2641,10 +2661,10 @@ window.Core = (function () {
        而新号打完整个世界才拿 200 ◆，主线却把"获得 1 件法宝"排在**第 4 关刚开完**的时候：
        界面上按钮全是灰的（买不起就不登记热区），引导指不到任何东西，这一步永远完不成，
        后面整条主线陪着一起卡。
-       改回**◈ 点数**（这也是引导文案一直在写的口径：「法宝：花 ◈ 点数买一件」）——
-       ◈ 是前期就充裕的货币，价格量级（1000~15000）本来就是按点数定的。
+       改回**◉ 点数**（这也是引导文案一直在写的口径：「法宝：花 ◉ 点数买一件」）——
+       ◉ 是前期就充裕的货币，价格量级（1000~15000）本来就是按点数定的。
        秘术阁继续扣 ◆（13 起）——那条线是真正的 ◆ 消耗口。 */
-    if ((S.cur.points || 0) < f.cost) return { ok: false, msg: `◈ 点数不足（需要 ${f.cost}）` };
+    if ((S.cur.points || 0) < f.cost) return { ok: false, msg: `◉ 点数不足（需要 ${f.cost}）` };
     addCur('points', -f.cost);
     S.fabao.own.push(id);
     if (!S.fabao.on) S.fabao.on = id;
@@ -2686,7 +2706,7 @@ window.Core = (function () {
     const max = D.MOUNT_MAX_LV[m.rarity] || 10;
     if (lv >= max) return { ok: false, msg: `已经喂到顶（${max} 级，${m.rarity} 档上限）` };
     const c = D.mountFeedCost(m, lv);
-    if ((S.cur.points || 0) < c.points) return { ok: false, msg: `◈ 点数不足（需要 ${c.points}）` };
+    if ((S.cur.points || 0) < c.points) return { ok: false, msg: `◉ 点数不足（需要 ${c.points}）` };
     if ((S.items[c.mat] || 0) < c.matN) return { ok: false, msg: `${(D.ITEMS[c.mat] || {}).name || c.mat} 不足（需要 ${c.matN}）` };
     addCur('points', -c.points);
     addItem(c.mat, -c.matN);
@@ -3472,7 +3492,7 @@ window.Core = (function () {
     if (st.haveMat < st.matN) {
       return { ok: false, msg: `渡劫材料不足：需要 ${D.ITEMS[st.matItem].name} ×${st.matN}（现有 ${st.haveMat}）` };
     }
-    if (!canAfford({ points: st.points })) return { ok: false, msg: `点数不足：需要 ◈ ${fmtNum(st.points)}` };
+    if (!canAfford({ points: st.points })) return { ok: false, msg: `点数不足：需要 ◉ ${fmtNum(st.points)}` };
     // 先扣消耗：失败也扣，这是"天道不收白食"；但等级不掉，所以永远有下一次
     S.items[st.matItem] -= st.matN;
     if (S.items[st.matItem] <= 0) delete S.items[st.matItem];

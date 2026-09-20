@@ -171,7 +171,7 @@
         U.hint(S.player.bloodline + '：' + (D.BLOODLINES[S.player.bloodline] || {}).desc, 2 * CV.SCALE);
         U.space(CV.SP[1]);
         if (blCost) {
-          U.btnRow([{ label: '血统升级（❥ ' + blCost.bloodCrystal + ' + ◈ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
+          U.btnRow([{ label: '血统升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
         } else {
           U.hint('已满级', 2 * CV.SCALE);
         }

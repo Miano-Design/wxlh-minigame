@@ -81,6 +81,8 @@ if (process.argv[2] === '--case') {
     return {
       v: 5, createdAt: Date.now() - 86400000,
       player: { name: '老玩家', level: 37, exp: 120, bloodline: '修真', bloodlineLv: 3, attrPoints: 5, attrs: { muscle: 2, immune: 1, cell: 0, nerve: 0, intelligence: 0, spirit: 0 }, skillPoints: 3, skillLv: [2, 1, 0], row: 'back' },
+      /* V9.6.134：这份老档刻意保留**旧版 8 种货币**（含已下架的 故事点 / 技能芯片 /
+         血统结晶 / 深井徽记）—— 迁移必须把它们按系数折进新币，一点不丢。 */
       cur: { points: 54321, holy: 88, otherworld: 7, story: 401, skillChip: 12, bloodCrystal: 20, corridor: 0, rp: 3 },
       chars: { C002: { lv: 41, star: 3, shards: 5, skillLv: [2, 2, 2], bloodlineLv: 1 } },
       party: ['@player', 'C002', null, null, null],
@@ -144,7 +146,19 @@ if (process.argv[2] === '--case') {
   if (!loaded) { process.exit(0); }
   /* 进度一点不丢 */
   say(S.player.level === 37 && S.player.name === '老玩家', '主角等级/名字没变', 'Lv.' + S.player.level + ' ' + S.player.name);
-  say(S.cur.points === 54321, '货币没变', '◈' + S.cur.points);
+  /* V9.6.134：货币 8 → 4 —— 老档的「故事点 401」并进点数（×71）、
+     「技能芯片 12 ×3.5 + 血统结晶 20 ×28 + 深井徽记 0 ×30」并进异界结晶。
+     这里不是"数字不许变"，而是**折算规则必须对得上、且旧键要清干净**：
+       points      = 54321 + 401×71 = 82792
+       otherworld  = 7 + round(12×3.5 + 20×28 + 0×30) = 7 + 602 = 609
+     旧的四个键必须一个都不剩（留着就是"改一半"）。 */
+  const expPoints = 54321 + 401 * 71;
+  const expOw = 7 + Math.round(12 * 3.5 + 20 * 28 + 0 * 30);
+  say(S.cur.points === expPoints, '老档的故事点折进了点数（×71，一点没丢）', '◉' + S.cur.points + '（应为 ' + expPoints + '）');
+  say(S.cur.otherworld === expOw, '老档的技能芯片/血统结晶/深井徽记折进了异界结晶', '◆' + S.cur.otherworld + '（应为 ' + expOw + '）');
+  say(['story', 'skillChip', 'bloodCrystal', 'corridor'].every(k => !(k in S.cur)),
+    '四个旧货币键全清干净了（没留"半新半旧"的档）', Object.keys(S.cur).join(','));
+  say(S.cur.holy === 88 && S.cur.rp === 3, '没被合并的两种货币原样保留', '✦' + S.cur.holy + ' ♾' + S.cur.rp);
   const who = S.chars.C002 || S.chars.C001;
   say(!!who && who.lv === 41, '伙伴等级没变（没被迁移逻辑顺手删掉）', who ? 'Lv.' + who.lv : '(没了)');
   say(S.worlds.W01.stages.normal[2] === 2, '关卡进度没变');
@@ -171,7 +185,9 @@ if (process.argv[2] === '--case') {
   /* 再存一次再读一次：来回一趟不丢东西 */
   Core.save();
   const again = Core.load();
-  say(again === true && Core.S.player.level === 37 && Core.S.cur.points === 54321, '存盘再读一遍，进度依旧');
+  /* 存盘再读一遍：折算**只能发生一次**，第二次读档不许再加一遍（那就是白送货币） */
+  say(again === true && Core.S.player.level === 37 && Core.S.cur.points === expPoints && Core.S.cur.otherworld === expOw,
+    '存盘再读一遍，进度依旧、折算也没重复跑', '◉' + Core.S.cur.points + ' ◆' + Core.S.cur.otherworld);
   if (loaded && !bad.length) out('__ALL_OK__');
   process.exit(0);
 }

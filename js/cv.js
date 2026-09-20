@@ -527,37 +527,39 @@
       CV.text(CV.fit(gt, ROW_RIGHT - (PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE), CV.FS.sm), PAD + nw + 10 * CV.SCALE + lw + 10 * CV.SCALE, ny,
         { size: CV.FS.sm, color: CV.C.accent });
     }
-    /* 货币行：三个主力货币 + 全部货币（图标 + 数值，胶囊 40 高） */
+    /* 货币行（V9.6.134，父亲大人：「要不砍成 4 种？这样刚好顶部标签那里放得下」）：
+       货币只剩四种 → **四种全放**，不再藏哪一种，一眼看完自己有什么。
+       原来那颗「▤ 全部货币」一并去掉：点**任意**货币胶囊本来就会打开货币图鉴
+       （含全部四种的用途与来源），那颗按钮跟它同一个功能，留着只是占位置。 */
     const cur = (S && S.cur) || {};
     const fmt = G.fmt || ((n) => String(n));
-    const main = (D ? D.CURRENCIES : []).filter((x) => ['points', 'holy', 'otherworld'].indexOf(x.id) >= 0);
+    const main = (D ? D.CURRENCIES : []).slice();
     let x = PAD;
     const cy = top + ROW_H + BAR_TOP;
     const chip = function (label, icon, color, dim, dashed) {
       const w = 11 * CV.SCALE + CV.measure(icon, CV.FS.md) + 5 * CV.SCALE + CV.measure(label, CV.FS.md) + 11 * CV.SCALE;
-      const ww = Math.max(40 * CV.SCALE, w);
+      /* 四颗要挤在一行里：给一个上限（每颗不超过四分之一宽），
+         数值太长（比如 1000.0万）就缩字号，别让第四颗掉出画面。 */
+      const ww = Math.min(Math.max(40 * CV.SCALE, w), (CV.W - PAD * 2 - 18 * CV.SCALE) / 4);
       CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.C.panel, dashed ? CV.C.line2 : CV.C.line);
-      if (dashed) {                                   // .cur-chip.more：虚线边框
-        CV.ctx.save();
-        CV.ctx.strokeStyle = CV.C.line2; CV.ctx.setLineDash([4, 3]); CV.ctx.lineWidth = 1;
-        CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, null, CV.C.line2);
-        CV.ctx.restore();
-      }
       let tx = x + 11 * CV.SCALE;
+      /* V9.6.134：图标也用货币表里的**专属色**（以前统一是白字，四种币看着一模一样） */
       if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: color || CV.C.text }); tx += CV.measure(icon, CV.FS.md) + 5 * CV.SCALE; }
-      CV.text(label, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: dim ? CV.C.dim : CV.C.text, bold: true });
+      const room = ww - (tx - x) - 8 * CV.SCALE;
+      const numSize = CV.measure(label, CV.FS.md) <= room ? CV.FS.md : CV.FS.sm;
+      CV.text(CV.fit(label, room, numSize, true), tx, cy + CHIP_H / 2, { size: numSize, color: dim ? CV.C.dim : CV.C.text, bold: true });
       x += ww + 6 * CV.SCALE;
       return ww;
     };
-    main.forEach((cc) => { chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false); });
-    /* V9.6.7（父亲大人："看着像按钮、点了没反应"）：这颗胶囊以前**完全没登记热区**，
-       点了什么都不发生。网页版它是开「货币图鉴」的入口，这里补上。 */
-    if (x + 40 * CV.SCALE < CV.W - PAD) {
-      const w = chip('全部货币', '▤', null, true, true);
-      CV.hitMode = 'screen';
-      CV.hit('open_currency', x - w - 6 * CV.SCALE, cy, w, CHIP_H);
-      CV.hitMode = 'content';
-    }
+    /* 每一颗胶囊都登记热区 → 点它打开货币图鉴（V9.6.7 补的那条规矩，
+       现在从"只有最后一颗能点"扩到"四颗都能点"）。 */
+    CV.hitMode = 'screen';
+    main.forEach((cc) => {
+      const x0 = x;
+      const w = chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false);
+      CV.hit('cur:' + cc.id, x0, cy, w, CHIP_H);
+    });
+    CV.hitMode = 'content';
   };
 
   /* ---------- 底栏（照网页版 #navbar：四格，选中金色） ---------- */

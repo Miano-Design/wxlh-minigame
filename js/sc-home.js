@@ -219,11 +219,11 @@
     q_tasks:   { page: 'tasks',     s: ['task_claim:*', 'tasktab:daily'],
                  t: '做完的任务在这页点「领取」收下 —— 日常任务在「日常」标签里。' },
     q_keji:    { page: 'keji',      s: ['keji_up:*'],      t: '秘术阁：每条点一下按 ◆ 异界结晶升级、立刻永久生效。先挑一条主修的堆。' },
-    q_fabao:   { page: 'fabao',     s: ['fabao_buy:*'],    t: '法宝：花 ◈ 点数买一件，「带上」它。给的是效果（吸血 / 开场能量 / 减伤），不是数值。' },
+    q_fabao:   { page: 'fabao',     s: ['fabao_buy:*'],    t: '法宝：花 ◉ 点数买一件，「带上」它。给的是效果（吸血 / 开场能量 / 减伤），不是数值。' },
     q_garden:  { page: 'garden',    s: ['garden_plant:*'], t: '药园：空地上种一次，过一段时间回来收（不收就一直长着）。' },
     q_sign:    { page: 'sign',      s: ['sign_draw'],      t: '求签：每天免费摇一次，签文给当天的挂机加成 + 一点硬通货。' },
-    q_arena:   { page: 'arena',     s: ['arena_fight'],    t: '斗法台：每天 5 次，赢了升一台拿 ◆ + ♜，输了退一台。' },
-    q_mount:   { page: 'mount',     s: ['mount_buy:*'],    t: '坐骑：花 ◈ 点数驯服一匹，「乘骑」它给全队加属性。' },
+    q_arena:   { page: 'arena',     s: ['arena_fight'],    t: '斗法台：每天 5 次，赢了升一台拿 ◆ 异界结晶，输了退一台。' },
+    q_mount:   { page: 'mount',     s: ['mount_buy:*'],    t: '坐骑：花 ◉ 点数驯服一匹，「乘骑」它给全队加属性。' },
     q_realm:   { page: 'realm',     s: ['realm_try'],      t: '境界渡劫：攒够材料就突破一小阶，全属性永久上涨；失败只扣材料、等级不掉。' },
     q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：重置等级与世界进度换永久天赋点（条件逐次抬高，第 1 次 Lv.100 + 铭刻 2 阶 + 灯芯 Lv.20）。' },
     /* V9.6.75（父亲大人："你安排"）：再补两条每天都会碰的系统 —— 挂机分工 / 限时悬赏 */
@@ -267,10 +267,10 @@
     /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
        每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
     ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
-    ['fabao',    ['fabao_buy:*'],     '法宝：花 ◈ 点数买，「带上」一个。它给的是**效果**（吸血 / 开场能量 / 减伤），不是数值。'],
+    ['fabao',    ['fabao_buy:*'],     '法宝：花 ◉ 点数买，「带上」一个。它给的是**效果**（吸血 / 开场能量 / 减伤），不是数值。'],
     ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性；养成线里最省事的一条。'],
     ['garden',   ['garden_plant:*'],  '药园：空地上种，过一段时间回来收 —— 不收就一直长着，别忘了。'],
-    ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ + ♜，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
+    ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ 异界结晶，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
     ['sign',     ['sign_draw'],       '求签：每天免费摇一次，签文给**当天**的挂机加成 + 一点硬通货。'],
     ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼血清，血清喂给伙伴是**永久**加成（每人每种有上限）。'],
     ['bounty',   ['bounty_claim:*'],  '限时悬赏：到点作废、达成才有奖励；四条全部结束后可以开新一期。'],
@@ -639,11 +639,11 @@
       const lh = 28 * CV.SCALE, top = U.y;
       const dim = CV.C.dim, txt = CV.C.dim;             // V9.5.28：这一块全部灰字
       const GAP = CV.SP[2];                             // .idle-line gap: var(--sp2)
-      /* 行 1：【挂机】 + ◈x.x/分 + （EXP…/离线…/上限…） */
+      /* 行 1：【挂机】 + ◉x.x/分 + （EXP…/离线…/上限…） */
       let x = U.ix();
       CV.text('【挂机】', x, top + lh / 2, { size: CV.FS.md, color: dim });
       x += CV.measure('【挂机】', CV.FS.md) + GAP;
-      const v1 = '◈ ' + r0.pointsPerMin.toFixed(1) + '/分';
+      const v1 = '◉ ' + r0.pointsPerMin.toFixed(1) + '/分';
       CV.text(v1, x, top + lh / 2, { size: CV.FS.md, color: txt });
       x += CV.measure(v1, CV.FS.md) + GAP;
       const s1 = 'EXP ' + r0.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h';
@@ -658,8 +658,8 @@
       CV.text(durTxt, x2, y2 + lh / 2, { size: CV.FS.md, color: txt });
       /* 行 3：【待领】**单开一行**（父亲大人：窄屏就不会被挤断行了） */
       const y3 = top + lh * 2;
-      const gainTxt = '◈ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
-        + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '') + (bank.story ? ' · ❖ ' + bank.story : '');
+      const gainTxt = '◉ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
+        + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '');
       let x3 = U.ix();
       CV.text('【待领】', x3, y3 + lh / 2, { size: CV.FS.md, color: dim });
       x3 += CV.measure('【待领】', CV.FS.md) + GAP;

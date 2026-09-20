@@ -41,12 +41,11 @@ const boss = window.Dungeon.battleRewards(WORLD, 'normal', 12, 'boss');
 const arena = D.arenaReward(Math.max(1, Math.round(LV / 2)));
 const day = {
   points: r.pointsPerMin * 1440 + boss.points * sweep * 0.5,
-  story: 1440 / 30 + boss.story * sweep * 0.5,
+  /* V9.6.134：货币 8 → 4 —— 原「故事点」并入点数，原「技能芯片 / 血统结晶 / 深井徽记」
+     并入异界结晶。`battleRewards` / `arenaReward` 返回的对象**已经**是合并后的口径，
+     所以这里不能再按老键名去取（取不到就是 NaN，整个体检会失真）。 */
   otherworld: r.otherworldPer10Min * 144 + boss.otherworld * sweep * 0.5 + arena.otherworld * D.ARENA_DAILY,
   holy: 20,
-  skillChip: boss.skillChip * sweep * 0.5,
-  bloodCrystal: boss.bloodCrystal * sweep * 0.5 + 30,
-  corridor: LV / 2 + arena.corridor * D.ARENA_DAILY,
   exp: r.expPerMin * 1440 * 1.5 + boss.exp * sweep * 0.5,      // 主角经验：挂机（含闭关领队）+ 副本
   charExp: boss.exp * sweep,                                   // 伙伴经验池：副本/扫荡那一份
   sectExp: D.SECT_EXP.perMin * 1440 + (D.SECT_EXP.normal + D.SECT_EXP.win) * sweep * 0.5,
@@ -93,22 +92,27 @@ const skillNeed = SKILL_CAPS.reduce((a, b) => a + b, 0);   // 0 基：上限值�
 
 /* ---- ② 伙伴（一名） ---- */
 row('伙伴等级', `Lv.${D.PLAYER_MAX_LV}`, { charExp: expAll, points: D.LEVEL_POINTS.reduce((a, b) => a + b, 0) });
-row('伙伴技能 3 条', SKILL_CAPS.join('/'), { skillChip: Core.SKILL_CHIP_COST.reduce((a, b) => a + b, 0) * 3 });
+row('伙伴技能 3 条', SKILL_CAPS.join('/'), { otherworld: Core.SKILL_CHIP_COST.reduce((a, b) => a + b, 0) * 3 });
 {
   let bc = 0, pt = 0;
-  for (let lv = 0; lv < D.BLOODLINE_MAX; lv++) { const c = D.bloodlineCost(lv); bc += c.bloodCrystal; pt += c.points; }
-  row('伙伴血统', `Lv.${D.BLOODLINE_MAX}`, { bloodCrystal: bc, points: pt });
-  row('主角血统', `Lv.${D.BLOODLINE_MAX}`, { bloodCrystal: bc, points: pt });
+  for (let lv = 0; lv < D.BLOODLINE_MAX; lv++) { const c = D.bloodlineCost(lv); bc += c.otherworld; pt += c.points; }
+  row('伙伴血统', `Lv.${D.BLOODLINE_MAX}`, { otherworld: bc, points: pt });
+  row('主角血统', `Lv.${D.BLOODLINE_MAX}`, { otherworld: bc, points: pt });
 }
 row('血清全喂满', `${D.SERUMS.length} 种`, { points: D.SERUMS.reduce((s, x) => s + x.max * x.points, 0) });
 
 /* ---- ③ 主角长线 ---- */
 row('境界', `${D.REALMS.length} 阶`, { points: Math.round(D.REALMS.reduce((a, x) => a + x.cost.points, 0) / 0.75) });
-row('铭刻', `${D.GENE_LOCKS.length} 阶`, { bloodCrystal: D.GENE_LOCKS.reduce((a, g) => a + g.cost.bloodCrystal, 0) });
+row('铭刻', `${D.GENE_LOCKS.length} 阶`, { otherworld: D.GENE_LOCKS.reduce((a, g) => a + g.cost.otherworld, 0) });
 row('灯阁权限', `Lv.${D.AUTHORITY_MAX}`, (function () { const o = { holy: 0, otherworld: 0 }; for (let lv = 0; lv < D.AUTHORITY_MAX; lv++) { const c = D.authorityCost(lv); o.holy += c.holy; o.otherworld += c.otherworld; } return o; })());
 row('建筑 5 座', '各 50 级', (function () { const o = { points: 0 }; D.BUILDINGS.forEach(b => { for (let lv = 1; lv <= 50; lv++) o.points += D.buildingCost(b.id, lv); }); return o; })());
 row('秘术阁', `${D.KEJI.reduce((s, k) => s + k.max, 0)} 级`, (function () { const o = { otherworld: 0 }; D.KEJI.forEach(k => { for (let lv = 1; lv <= k.max; lv++) o.otherworld += D.kejiCost(k, lv); }); return o; })());
-row('法宝', `${D.FABAO.length} 件`, { otherworld: D.FABAO.reduce((a, f) => a + (f.cost || 0), 0) });
+/* V9.6.134 顺手修：这一行原来把**购买价（点数）**当成异界结晶去除以异界结晶的日收入，
+   于是"法宝点满要几天"一直被算大了十几倍（尺子自己有 bug，比数值偏了更坑）。
+   现在按真实口径：购买花 ◉ 点数、祭炼花 ◆ 异界结晶，两条分开算。 */
+row('法宝', `${D.FABAO.length} 件`, Object.assign(
+  { points: D.FABAO.reduce((a, f) => a + (f.cost || 0), 0) },
+  { otherworld: D.FABAO.reduce((a, f) => { let s = 0; for (let lv = 0; lv < D.FABAO_MAX_LV; lv++) s += D.fabaoRefineCost(f, lv).otherworld; return a + s; }, 0) }));
 row('坐骑', `${D.MOUNTS.length} 匹`, { points: D.MOUNTS.reduce((a, m) => a + ((m.cost && m.cost.points) || 0), 0) });
 {
   let cum = 0;
@@ -117,7 +121,7 @@ row('坐骑', `${D.MOUNTS.length} 匹`, { points: D.MOUNTS.reduce((a, m) => a + 
 }
 
 console.log(`=== 上限联动体检（样例存档：玩家 Lv.${LV} · 进度 W${String(TIER).padStart(2, '0')}）===`);
-console.log('  日收入（估）：' + ['points', 'otherworld', 'holy', 'skillChip', 'bloodCrystal', 'exp', 'charExp', 'sectExp'].map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
+console.log('  日收入（估）：' + ['points', 'otherworld', 'holy', 'exp', 'charExp', 'sectExp'].map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
 console.log('');
 rows.forEach(x => console.log(x));
 

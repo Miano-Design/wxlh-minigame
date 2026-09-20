@@ -6,7 +6,7 @@
      ③ 格子区：标题行「道具格 5 / 50」+ 5 列网格（格子正方形、缝 6、圆角 10）
         · 已占格：物品名（13px 粗体，最多两行、居中在"数量以上"那块）+ 数量（12px 金色粗体，贴底 8）
         · 空格：一个空框
-        · 最后一格：「＋」虚线框 —— 点了先问"是否支付 ◈x 扩容"
+        · 最后一格：「＋」虚线框 —— 点了先问"是否支付 ◉x 扩容"
      ④ 装备栏：格子里只放**没穿在身上的**装备（名字带稀有度色 + 强化等级），标题行右侧有「批量分解」
      ⑤ 道具详情：点道具开二级页（名字+数量 / 说明 / 在哪用 / 去哪弄 / 使用类按钮 / 返回）
 */
@@ -298,7 +298,7 @@
     const filtering = view === 'equip' && (eqCat !== 'all' || eqSlot !== 'all');
     if (!filtering) while (cells.length < cap) cells.push({ empty: true });
     /* V9.6.4（父亲大人："背包的扩容格也没了"）：格子补满 cap 个之后，**必须再补最后一格**
-       —— 网页版是"第 cap+1 格：灰色虚线框 + ＋"，点了问"是否支付 ◈x 扩容"。
+       —— 网页版是"第 cap+1 格：灰色虚线框 + ＋"，点了问"是否支付 ◉x 扩容"。
        上一版排格子的循环只补了空格，把这一格漏掉了（grid() 里画 add 格的分支一直没被触发）。 */
     cells.push({ add: true });
     U.card(function () {
@@ -451,9 +451,9 @@
     else if (set) mkSetCard('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
     U.card(function () {
       U.h3('强化', '+' + eq.enhance + '/20');
-      U.kv('强化材料', q.matHave ? (q.itemName + ' ×1（现有 ' + q.matOwned + '）') : ('无' + q.itemName + ' → 用 ◈ ' + fmt(q.substitute) + ' 代用'));
+      U.kv('强化材料', q.matHave ? (q.itemName + ' ×1（现有 ' + q.matOwned + '）') : ('无' + q.itemName + ' → 用 ◉ ' + fmt(q.substitute) + ' 代用'));
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '强化（◈ ' + fmt(q.points) + ' + ◆ ' + q.otherworld + ' · ' + Math.round(q.rate * 100) + '%）', style: 'ghost', id: q.maxed ? '' : 'eq_enh' }]);
+      U.btnRow([{ label: '强化（◉ ' + fmt(q.points) + ' + ◆ ' + q.otherworld + ' · ' + Math.round(q.rate * 100) + '%）', style: 'ghost', id: q.maxed ? '' : 'eq_enh' }]);
     });
     U.card(function () {
       U.h3('操作');
@@ -507,7 +507,7 @@
     const key = POOLS[kind === 'eq' ? 'equip' : kind].expKey;
     const cost = D.bagExpandCost(Core.S.bag[key] || 0);
     const label = { eq: '装备', mat: '材料', item: '道具' }[kind];
-    U.confirm('扩容', '是否支付 ◈ ' + fmt(cost) + '，把' + label + '格再加 ' + D.BAG_EXPAND_SIZE + ' 格？', function () {
+    U.confirm('扩容', '是否支付 ◉ ' + fmt(cost) + '，把' + label + '格再加 ' + D.BAG_EXPAND_SIZE + ' 格？', function () {
       const r = Core.buyBagCap(kind);
       CV.toast(r.msg || '已扩容');
       CV.render();

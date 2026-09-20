@@ -84,18 +84,21 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
   function battleRewards(worldId, diff, stage, kind) {
     const tier = D.WORLDS.findIndex(x => x.id === worldId) + 1;
     const rm = rewardMult(diff) * (1 + (stage - 1) * 0.08);
-    const base = { points: 0, exp: 0, story: 0, otherworld: 0, skillChip: 0, bloodCrystal: 0, equipChance: 0 };
+    const base = { points: 0, exp: 0, otherworld: 0, equipChance: 0 };
     if (kind === 'boss') {
       base.points = Math.round((500 + tier * 150) * rm);
       base.exp = Math.round((300 + tier * 80) * rm);
-      base.story = Math.round(50 * rm);
-      base.otherworld = Math.round(30 * rm);
-      base.skillChip = 50 + tier * 8;
+      /* V9.6.134：货币 8 → 4 —— 原「故事点」并入点数，原「技能芯片 / 血统结晶」并入异界结晶。
+         产出**数值不动**，只换币种：这样每一条养成线"攒够要几天"跟合并前完全一样
+         （价格那边已经按同一个池子的日收入等比放大过）。 */
+      base.points += Math.round(50 * rm);                       // 原 故事点
+      base.otherworld = Math.round(30 * rm)                     // 原 异界结晶
+        + (50 + tier * 8)                                       // 原 技能芯片
+        + (diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5);    // 原 血统结晶
       /* V9.5.65（策划体检留档）：一度想把这行从 5/15/30 翻倍，理由是"铭刻 5 阶要 8200 枚结晶"。
          补上"扫荡"这一环后实测发现守关 Boss 是**可反复扫荡**的稳定来源：
          每天 60 次扫荡 ≈ 300 枚/天，铭刻全解锁约 27 天、单伙伴血统满 8 天，供给本来就够。
          所以维持原值——不要凭半张表去改经济。 */
-      base.bloodCrystal = diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5;
       base.equipChance = 1;
       /* V9.6.78：这里原来写 `equipMin`（守关至少 SR/SSR）——那是**旧掉落表**的产物。
          现在"这一段图的守关至少出什么档"写在 data.js 的 DROP_BLOCKS.bossMin 里，
@@ -112,13 +115,13 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     } else if (kind === 'elite') {
       base.points = Math.round((80 + tier * 40) * rm * 2.5);
       base.exp = Math.round((60 + tier * 20) * rm * 2.5);
-      base.story = Math.random() < 0.5 ? Math.round(15 * rm) : 0;
-      base.skillChip = 15 + tier * 2;
+      base.points += Math.random() < 0.5 ? Math.round(15 * rm) : 0;   // 原 故事点
+      base.otherworld += 15 + tier * 2;                               // 原 技能芯片
       base.equipChance = 0.55;
     } else {
       base.points = Math.round((80 + tier * 40) * rm);
       base.exp = Math.round((60 + tier * 20) * rm);
-      base.skillChip = 5 + tier;
+      base.otherworld += 5 + tier;                                    // 原 技能芯片
       base.equipChance = 0.15;
     }
     return base;
@@ -133,10 +136,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     const got = [];
     const Core = window.Core;
     if (r.points) { Core.addCur('points', r.points); got.push({ k: 'points', v: r.points }); }
-    if (r.story) { Core.addCur('story', r.story); got.push({ k: 'story', v: r.story }); }
     if (r.otherworld) { Core.addCur('otherworld', r.otherworld); got.push({ k: 'otherworld', v: r.otherworld }); }
-    if (r.skillChip) { Core.addCur('skillChip', r.skillChip); got.push({ k: 'skillChip', v: r.skillChip }); }
-    if (r.bloodCrystal) { Core.addCur('bloodCrystal', r.bloodCrystal); got.push({ k: 'bloodCrystal', v: r.bloodCrystal }); }
     // 天赋「灯阁恩赐」的掉落加成：装备掉落率、材料掉落率、宝箱补给率统一按比例提高
     const dropBoost = Core.graceDropMult ? Core.graceDropMult() : 1;
     /* 首通保底（V9.6.6 父亲大人）：开局不再白送一套 R 装备，改成"前面几关自己打出来"。
