@@ -241,7 +241,7 @@
             t: '这一关打完就通关整个潜影窟了 —— 点第 12 关（守关 Boss）。' },
     q15:  { page: 'world', s: function () { return [nextStageAnchor('W03'), 'stage_grid']; },
             t: '最后这个世界「怨声旧宅」的守关 Boss —— 点第 12 关。打之前先把挂机收益收掉、装备拉满。' },
-    q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗血统结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
+    q13:  { page: 'protag',  s: ['pblup'], t: '血统升级消耗异界结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
   };
   /* V9.6.99（"点去完成把我送到别的界面、弹窗内容还不对"）：
      每一步该去哪一页、指哪一颗，**这张表就是唯一出处**。
@@ -263,7 +263,7 @@
     ['world', function () { return [nextStageAnchor('W01')]; },
       '点这一关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。', 'tut_q01b'],
     ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。', TOPIC_KEY.recruit],
-    ['protag', ['pblup'], '血统升级消耗血统结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
+    ['protag', ['pblup'], '血统升级消耗异界结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
     /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
        每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
     ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
@@ -381,8 +381,8 @@
     buildings:{ page: 'buildings', s: ['bup:*'], t: '基地建设：五栋建筑每升一级都是永久加成，花的是挂机就能刷的点数。' },
     tasks:    { page: 'tasks',    s: ['tasktab:main'], t: '任务解锁了：主线 / 日常 / 周常 / 成就四个标签，做完记得回来领。' },
     corridor: { page: 'corridor', s: ['corridor_fight'], t: '深井解锁了：一直往上打、没有重置，每 10 层给一枚印记加成。' },
-    bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗血统结晶 + 点数，每级全属性都涨。' },
-    geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是血统结晶。' },
+    bloodline:{ page: 'protag',   s: ['pblup'], t: '血统解锁了：升级消耗异界结晶 + 点数，每级全属性都涨。' },
+    geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是异界结晶。' },
     beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
     reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
   };

@@ -47,7 +47,7 @@
         desc: '36 小阶，每阶全属性永久 +1.4%；失败只扣材料，等级不掉' },
       { act: 'open_genelock', unlock: 'geneLock', ico: '🧬', name: '铭刻',
         cur: S.player.geneLock > 0 ? (S.player.geneLock + ' 阶 · ' + gl.name) : '未解锁',
-        desc: '五阶全队加成，靠通关进度 + 玩家等级 + 血统结晶解锁' },
+        desc: '20 阶全队加成，靠通关进度 + 玩家等级 + 异界结晶解锁' },
       { act: 'open_beast', unlock: 'beast', ico: '🐾', name: '伴生体',
         cur: beasts ? ('已孵化 ' + beasts + ' 只') : '还没孵化',
         desc: '第二条养成线：随行 1 只给全队加成，带对五行进本全队伤害 +15%' },
