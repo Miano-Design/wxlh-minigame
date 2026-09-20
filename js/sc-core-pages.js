@@ -7,6 +7,7 @@
 */
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
+  let beastDetailId = null;      // 正在看哪一只伴生体（V9.6.132）
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
   const fmt = G.fmt || ((n) => String(n));
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
@@ -218,6 +219,15 @@
         { label: '孵 10 只（🥚' + st.eggCost * 10 + '）', style: 'gold', id: st.eggs >= st.eggCost * 10 ? 'beast_hatch10' : '' },
       ]);
     });
+    if (lastHatch.length) {
+      U.card(function () {
+        U.h3('🎉 最近孵出', lastHatch.length + ' 只');
+        lastHatch.slice(0, 6).forEach(function (h) {
+          U.kv((D.ELEMENT_ICON[h.elem] || '') + h.name + '（' + h.rarity + (h.elem ? '·' + h.elem : '') + '）', '', CV.C.gold);
+        });
+        if (lastHatch.length > 6) U.hint('还有 ' + (lastHatch.length - 6) + ' 只，下面的列表里都能看到', 2 * CV.SCALE);
+      });
+    }
     U.card(function () {
       U.h3('我的伴生体', st.count + ' / ' + D.BEASTS.length);
       if (!st.list.length) { U.hint('还没有伴生体，去孵化一只', 4 * CV.SCALE); return; }
@@ -237,7 +247,9 @@
         lines.forEach(function (ln, k) {
           CV.text(ln, U.ix() + PADX, top + 6 * CV.SCALE + nameH + 3 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.sm, color: CV.C.dim });
         });
-        CV.hit('beast_on:' + b.id, U.ix(), top, w, rh);
+        /* 点名字那一列 → 二级详情；右边那半 → 随行/收回（V9.6.132） */
+        CV.hit('beast_detail:' + b.id, U.ix(), top, w * 0.62, rh);
+        CV.hit('beast_on:' + b.id, U.ix() + w * 0.62, top, w * 0.38, rh);
         U.y = top + rh;
       });
     });
@@ -264,19 +276,79 @@
       }
     });
   });
-  CV.on('beast_hatch1', function () {
-    const r = Core.hatchBeast(1);
-    CV.toast(r.msg || ('孵化 ' + (r.count || 1) + ' 只'));
+  /* V9.6.132（父亲大人："伴生体孵完蛋后没有看到伴生体的名字"）：
+     Core.hatchBeast 一直**返回了**孵出谁，但界面只 toast 一句"孵化 N 只"——名字全丢了。
+     现在把这一批记下来，回到这一页时在最上面摆一张"最近孵出"的卡（名字 + 稀有度 + 五行）。 */
+  let lastHatch = [];
+  function hatchThen(n) {
+    const r = Core.hatchBeast(n);
+    if (r && r.got && r.got.length) {
+      lastHatch = r.got.map(function (g) {
+        const b = D.beastById(g.id) || {};
+        return { name: b.name || g.id, rarity: b.rarity || 'N', elem: b.elem || '' };
+      });
+      const first = lastHatch[0];
+      CV.toast('孵出「' + first.name + '」' + (lastHatch.length > 1 ? ' 等 ' + lastHatch.length + ' 只' : '') +
+        '（' + first.rarity + (first.elem ? '·' + first.elem : '') + '）');
+    } else {
+      CV.toast((r && r.msg) || '孵化失败');
+    }
     CV.render();
-  });
-  CV.on('beast_hatch10', function () {
-    const r = Core.hatchBeast(10);
-    CV.toast(r.msg || ('孵化 ' + (r.count || 0) + ' 只'));
-    CV.render();
-  });
+  }
+  CV.on('beast_hatch1', function () { hatchThen(1); });
+  CV.on('beast_hatch10', function () { hatchThen(10); });
   CV.on('beast_on:*', function (id) {
     const r = Core.setActiveBeast(id);
     CV.toast(r.msg || '已随行');
+    CV.render();
+  });
+
+  /* ---------- 伴生体详情（V9.6.132 父亲大人："没有对应的养成系统"）----------
+     原来这一页只有"12 个上限 + 选择随行" —— 兽魂 / 升阶 / 五行加成对比全看不到。
+     这一页把 core 里已经有的东西**摆出来**：等级、兽魂进度、升阶（消耗兽魂）、随行加成。 */
+  CV.register('beast_detail', function () {
+    const bd = D.beastById(beastDetailId) || null;
+    const owned = (Core.S.beast.owned || {})[beastDetailId] || null;
+    U.begin();
+    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
+    CV.text('伴生体详情', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    if (!bd || !owned) { U.card(function () { U.h3('伴生体详情'); U.hint('这只伴生体不在了（可能刚换过存档）', 4 * CV.SCALE); }); return; }
+    const lv = owned.lv || 0, soul = owned.soul || 0;
+    const need = D.BEAST_SOUL_PER_LV * (lv + 1);
+    const pct = D.beastPctAt(bd, lv);
+    U.card(function () {
+      U.h3((D.ELEMENT_ICON[bd.elem] || '') + bd.name, bd.rarity + (bd.elem ? ' · ' + bd.elem : ''));
+      U.kv('等级', lv + ' / ' + D.BEAST_MAX_LV, lv >= D.BEAST_MAX_LV ? CV.C.gold : CV.C.text);
+      U.kv('兽魂', soul + (lv >= D.BEAST_MAX_LV ? '' : '（升下一级需要 ' + need + '）'), soul >= need ? CV.C.green : CV.C.dim);
+      const txt = Object.keys(pct || {}).map(function (k) {
+        return ({ atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', skillPct: '技能', evaPct: '闪避', dmgReduce: '减伤', lifesteal: '吸血', initEnergy: '开场能量', spiritPct: '精神' }[k] || k) + ' +' + (pct[k] < 1 ? Math.round(pct[k] * 100) + '%' : pct[k]);
+      }).join(' · ');
+      U.kv('当前加成', txt || '—', CV.C.green);
+      U.space(CV.SP[1]);
+      U.hint(bd.desc || '', 0);
+    });
+    U.card(function () {
+      U.h3('升阶', '消耗兽魂提升等级');
+      U.space(CV.SP[1]);
+      U.btnRow([
+        { label: lv >= D.BEAST_MAX_LV ? '已满级' : ('升 1 级（兽魂 ' + need + '）'), style: 'gold',
+          id: lv < D.BEAST_MAX_LV && soul >= need ? 'beast_up' : '' },
+        { label: Core.S.beast.active === beastDetailId ? '收回随行' : '设为随行', style: 'ghost', id: 'beast_setactive' },
+      ]);
+      U.hint('兽魂从哪来：重复孵到同一只就转成兽魂（越稀有给得越多）。', 4 * CV.SCALE);
+    });
+  });
+  CV.on('beast_detail:*', function (id) { beastDetailId = id; CV.push('beast_detail'); });
+  CV.on('beast_up', function () {
+    const r = Core.beastLevelUp(beastDetailId);
+    CV.toast(r.msg || '升阶失败');
+    CV.render();
+  });
+  CV.on('beast_setactive', function () {
+    const on = Core.S.beast.active === beastDetailId;
+    const r = Core.setActiveBeast(on ? null : beastDetailId);
+    CV.toast(r.msg || (on ? '已收回' : '已随行'));
     CV.render();
   });
 
