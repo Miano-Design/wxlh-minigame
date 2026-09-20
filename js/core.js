@@ -1452,6 +1452,13 @@ window.Core = (function () {
     return { ok: true, lock: eq.lock };
   }
   // 一键最优装备：按"能不能穿 + 词条价值"给主角与全队自动选装，已锁定的装备照常可以给人穿
+  /* ================= 装备评分（V9.6.126 父亲大人："装备加个评分吧……排序就按评分"）=================
+     全项目**唯一的装备评分**，一键最优装备和背包排序都用它 —— 只有一个口径，不会"分高的没被选上"。
+     它就是这件装备**真实数值**的折算（不是另编一套"世界×品质"的表），所以三条要求天然满足：
+       · 世界越靠后 → base 随 tier 线性涨（makeEquip）→ 分更高；
+       · 同图品质越高 → 品质倍率 + 词条条数一起涨 → 分更高；
+       · 强化过 → equipStats 里 1+enhance×5% 放大基础值 → 同款分更高。
+     权重与伙伴战力同一套（atk×2 / def×1.2 / hp×0.2 / spd×3 + 百分比词条单价）。 */
   function equipScore(eq) {
     const st = equipStats(eq);
     let s = st.flat.atk * 2 + st.flat.def * 1.2 + st.flat.hp * 0.2 + st.flat.spd * 3 + (st.flat.critPct || 0) * 2000;
@@ -1651,7 +1658,7 @@ window.Core = (function () {
     save();
     return { ok: true, msg: `已套用预设 ${idx + 1}` };
   }
-  /* 装备槽的固定顺序（排序的第三键用；别按拼音/注册顺序排，那样看着是乱的） */
+  /* 装备槽的固定顺序（**只在评分相同时**当兜底，保证顺序稳定） */
   const EQUIP_SLOT_ORDER = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
   /* 背包里的装备排序（V9.6.123 父亲大人："装备的排序方式要像伙伴那样"）：
      伙伴是 **上阵 → 等级 → 稀有度 → 星级**；装备按同一种"形状"来：
@@ -1661,12 +1668,10 @@ window.Core = (function () {
      ⚠️ 品质必须用 EQUIP_RARITIES（含 MYTH），不能用角色用的 RARITIES ——
      用错表的话神装 indexOf 是 -1，会被排到最后（以前 inventoryEquips 就是这个毛病）。 */
   function sortEquips(list) {
-    const R = D.EQUIP_RARITIES || D.RARITIES;
     return (list || []).slice().sort((a, b) =>
-      (b.enhance || 0) - (a.enhance || 0)
-      || R.indexOf(b.rarity) - R.indexOf(a.rarity)
+      equipScore(b) - equipScore(a)                                   // V9.6.126：按评分（高→低，和"一键最优装备"同一份分）
       || EQUIP_SLOT_ORDER.indexOf(a.slot) - EQUIP_SLOT_ORDER.indexOf(b.slot)
-      || String(a.name || '').localeCompare(String(b.name || ''), 'zh'));
+      || String(a.uid || '').localeCompare(String(b.uid || '')));     // 完全同分也稳定
   }
   function inventoryEquips() {
     const equippedUids = new Set();
@@ -3425,7 +3430,7 @@ window.Core = (function () {
   return {
     get S() { return S; },
     save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
-    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips,
+    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
     addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,

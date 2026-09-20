@@ -281,8 +281,9 @@
       list.slice(0, cap).forEach((e) => {
         /* V9.6.7：批量分解模式下，点格子 = 选中/取消（不再进详情页）——网页版同一口径 */
         cells.push(batchMode
-          ? { id: 'bselu:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance, sel: batchSel.has(e.uid) }
-          : { id: 'eqd:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance });
+          /* V9.6.126（父亲大人："装备加个评分"）：格子副行 = 强化等级 · 评分（与排序同一个数） */
+          ? { id: 'bselu:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance + ' · ' + Core.equipScore(e), sel: batchSel.has(e.uid) }
+          : { id: 'eqd:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance + ' · ' + Core.equipScore(e) });
       });
     } else {
       const isMat = (k) => (D.ITEMS[k] || {}).type === 'material';
@@ -384,6 +385,9 @@
       U.h3(eq.name + ' +' + eq.enhance, wearer ? (Core.charName(wearer) + '装备中') : '未装备');
       U.kv('部位', D.EQUIP_SLOTS[eq.slot]);
       U.kv('品质', eq.rarity, rarColor(eq.rarity));
+      /* V9.6.126（父亲大人："装备加个评分吧"）：世界/品质/强化一起折算的那份分，
+         和背包排序、一键最优装备是同一个函数 —— 玩家看到的数和自动选择用的数是同一个。 */
+      U.kv('评分', String(Core.equipScore(eq)), CV.C.gold);
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
       if (gs) U.kv('血统神装', '仅限' + eq.godSet + '血统装备（穿戴者血统要对得上）');

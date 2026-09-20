@@ -118,17 +118,20 @@ console.log('\n=== 战斗页生命周期审计 ===');
     '第 2 波 run() 返回 ' + String(secondWaveOpened));
   await wait(700);
 
-  /* ③ 离场：结算页返回之后闸门要放开、页面栈要回到上层 */
+  /* ③ 离场：结算页返回之后闸门要放开、页面栈要回到上层
+     V9.6.125：**先把页面摆成"从副本页开打"**再开——战斗页现在会记住"从哪来"，
+     不先摆好，量的就不是"回副本页"而是"回上一条用例留下的那一页"（尺子自己的前提错了）。 */
   UI.clear();
+  CV.reset('dungeon');
   UI.run(cfg());
   await wait(700);
-  CV.reset('dungeon');
   CV.dispatch('battle_close');
   t('结算页点返回后闸门放开（还能再打下一场）', UI.busy() === false, 'busy() = ' + String(UI.busy()));
   t('返回后停在副本页（不是战斗页）', CV.top().name === 'dungeon', '当前页 ' + CV.top().name);
 
-  /* ④ 撤离同样要放开闸门 */
+  /* ④ 撤离同样要放开闸门（同样先摆成"从副本页开打"） */
   UI.clear();
+  CV.reset('dungeon');
   UI.run(cfg());
   await wait(700);
   CV.dispatch('battle_quit');       // 打开确认弹窗
@@ -236,6 +239,24 @@ console.log('\n=== 战斗页生命周期审计 ===');
     await wait(60);
     G.coachFor = savedCoachFor;
   }
+  /* ⑦ 波次卡：**第几波要对应得上**（父亲大人 2026-09-21：
+     "直接试第 12 关，每一波都是第 3/3 波，第二波第三波要对应上"）
+     真因：这里 run.wave 已经 ++ 过（即将打的那一波），照抄网页版的 +2 再被上限一夹 → 每波都 3/3。
+     量法：拿一段 3 波的假流程，逐波看结算回调给出的 sub；同时查"波次卡期间不画战场"。 */
+  {
+    const src = fs.readFileSync(path.join(JS, 'sc-dungeon.js'), 'utf8');
+    t('⑦ 小游戏无缝衔接的波数用 run.wave + 1（不再照抄网页版的 +2）',
+      /sub: '第 ' \+ \(run\.wave \+ 1\) \+ '\/' \+ run\.waves\.length \+ ' 波'/.test(src),
+      /run\.wave \+ 2/.test(src) ? '**还写着 +2（会每波都显示最后一波）**' : '公式正确');
+    const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+    t('⑦b 网页版用 R.wave + 2（它的 ++ 在 afterWave 里，晚一拍）—— 两边公式天生差 1，别互抄',
+      /第 \$\{Math\.min\(R\.wave \+ 2, R\.waves\.length\)\}\//.test(web), '网页版口径未变');
+    const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    t('⑦c 波次卡是"空屏 + 一行第 N 波"：tip 期间不画战场', /if \(B\.tip\) \{ drawWaveCard\(\); return; \}/.test(bsrc));
+    t('⑦d 波次卡不再"飘过"（是淡入停留淡出，位移为 0）',
+      /const alpha = k < 0\.18/.test(bsrc) && !/26 \* CV\.SCALE \* k/.test(bsrc));
+  }
+
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
      运行期这条不好造（假战斗只有一帧，特效早就自己停了）——所以补一条源码断言，
      免得以后有人把 clearTimer 里那行删回去。 */

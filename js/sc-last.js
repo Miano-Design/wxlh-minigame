@@ -862,6 +862,7 @@
       allies: allies, enemies: enemies, worldId: null,
       maxRounds: spec.isBoss ? 50 : 30,
       onQuit: function () { CV.reset('corridor'); },
+      onClose: function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('corridor'); },   // V9.6.124：收下奖励后回深井
       onEnd: function (win, res) {
         if (!win) {
           return {

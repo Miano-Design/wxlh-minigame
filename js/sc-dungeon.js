@@ -329,7 +329,11 @@
           return {
             /* V9.6.123（父亲大人："波间那个继续推进的提示，看着像要点击；
                换成第几波的弹幕，飘过去然后消失"）：文案给"即将开始的第 N 波"。 */
-            title: '本波通过', sub: '第 ' + Math.min(run.wave + 2, run.waves.length) + '/' + run.waves.length + ' 波', rewards: [], acts: [], seamless: true,
+            /* V9.6.125（父亲大人："直接试第 12 关，每一波都是第 3/3 波，第二波第三波要对应上"）：
+               这里 run.wave **已经 ++ 过**，它就是"即将打的那一波"（0 基）→ 显示要 +1。
+               上一版照抄了网页版的 +2（网页版的 ++ 发生在 afterWave 里、晚一拍），再被上限一夹 → 每波都 3/3。
+               两边公式**天生差 1**，注释写清别再互抄。两面都在 battle_flow_audit 里有断言。 */
+            title: '本波通过', sub: '第 ' + (run.wave + 1) + '/' + run.waves.length + ' 波', rewards: [], acts: [], seamless: true,
             after() { fightWave(); },
           };
         }

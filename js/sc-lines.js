@@ -247,6 +247,7 @@
       title: '斗法台 · 第 ' + st.floor + ' 台',
       allies: allies, enemies: st.enemies, worldId: null, maxRounds: 40,
       onQuit: function () { CV.reset('arena'); },
+      onClose: function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); },   // V9.6.124：收下奖励后回斗法台（原来靠兜底 → 被送到残域）
       onEnd: function (win) {
         const r = Core.arenaSettle(win);
         return { title: win ? '守擂成功' : '守擂失败', sub: r.msg || '', rewards: [], acts: [{ label: '返回斗法台', style: 'ghost', id: 'arena_back' }] };

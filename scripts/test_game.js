@@ -477,27 +477,28 @@ setParty(['C021']);
   t('困难难度第 12 关同样只让玩家自己选（不自动跨世界）', h === null, JSON.stringify(h));
 }
 
-// 27c. 装备排序（V9.6.123 父亲大人："装备的排序方式要像伙伴那样"）
+// 27c. 装备评分 + 排序（V9.6.126 父亲大人："装备加个评分吧，按稀有度和世界打分，排序按评分"）
 {
   Core.newGame();
   Core.S.bag.eqCap = 999;
-  const mk = (uid, rarity, enhance, slot, name) => { Core.S.equips[uid] = { uid, rarity, enhance, slot, name, base: {}, affix: {} }; };
-  mk('a', 'SR',  5, 'weapon', '甲');
-  mk('b', 'SSR', 0, 'weapon', '乙');
-  mk('c', 'SR', 12, 'armor',  '丙');
-  mk('d', 'MYTH', 0, 'weapon', '丁');
-  mk('e', 'SR',  5, 'weapon', '戊');
-  mk('f', 'SR',  5, 'armor',  '己');
+  /* 用真实生成器造装备（makeEquip），这样"世界/品质/强化"三件事都落在真实数值上 */
+  const mk = (uid, worldId, rarity, slot) => { const e = D.makeEquip(worldId, slot, rarity, uid, { setType: 'plain' }); Core.S.equips[uid] = e; return e; };
+  const a = mk('a', 'W01', 'SR', 'weapon');      // 早期世界
+  const b = mk('b', 'W20', 'SR', 'weapon');      // 后期世界（同品质同部位）
+  const c = mk('c', 'W20', 'SSR', 'weapon');     // 同世界、更高品质
+  const d = mk('d', 'W20', 'SSR', 'weapon');
+  d.enhance = 10;                                 // 同款但强化过
+  t('装备评分①：同品质同强化，后面的世界分更高', Core.equipScore(b) > Core.equipScore(a),
+    'W01 ' + Core.equipScore(a) + ' < W20 ' + Core.equipScore(b));
+  t('装备评分②：同世界同强化，更高品质分更高', Core.equipScore(c) > Core.equipScore(b),
+    'SR ' + Core.equipScore(b) + ' < SSR ' + Core.equipScore(c));
+  t('装备评分③：同款装备，强化过比分更高', Core.equipScore(d) > Core.equipScore(c),
+    '+0 ' + Core.equipScore(c) + ' < +10 ' + Core.equipScore(d));
   const order = Core.sortEquips(Object.values(Core.S.equips)).map(e => e.uid);
-  /* 规则（和伙伴同一形状：投资在前，稀有度在后）：强化 → 品质 → 部位 → 名称 */
-  t('装备排序①：强化等级最高排最前（+12）', order[0] === 'c', order.join('>'));
-  t('装备排序②：同为 +5 SR 时，武器排在胸甲前（部位固定序）',
-    order.slice(1, 4).join('') === 'aef', order.join('>'));
-  t('装备排序③：完全同级（+5 SR 武器）按名称稳定排出', order[1] === 'a' && order[2] === 'e', order.join('>'));
-  t('装备排序④：强化为 0 的一组里，神话排在史诗之前',
-    order[4] === 'd' && order[5] === 'b', order.join('>'));
-  t('装备排序⑤：神装（MYTH）不再被排到最后（品质表用 EQUIP_RARITIES）',
-    order.indexOf('d') < order.indexOf('b'), 'MYTH 位次 ' + order.indexOf('d') + ' / SSR 位次 ' + order.indexOf('b'));
+  t('装备排序：就是按评分从高到低', order.join('') === 'dcba', order.join(' > ') + '（分 ' +
+    Core.sortEquips(Object.values(Core.S.equips)).map(e => Core.equipScore(e)).join(' > ') + '）');
+  t('装备排序：一键最优装备与背包排序用**同一个分**（同一个函数）',
+    /equipScore/.test(fs.readFileSync('js/core.js', 'utf8').match(/function sortEquips[\s\S]{0,300}/)[0]));
 }
 
 // 28. 批量分解

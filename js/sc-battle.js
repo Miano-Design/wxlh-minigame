@@ -95,6 +95,13 @@
 
   function start(cfg) {
     clearTimer();
+    /* V9.6.124（父亲大人："斗法台战斗完点收下奖励并返回，会返回到残域那边去，跳转错误"）：
+       真因 —— 结算面板底部那颗「收下奖励并返回」用的是 `battle_close`，
+       而它的兜底**写死成 CV.reset('dungeon')**：副本传了 onClose 所以看不出问题，
+       斗法台 / 深井没传 → 一律被送到残域。
+       修法不是给每个入口补一句（那还会漏），而是**战斗页自己记住"从哪来"**：
+       开打那一刻把页面栈与滚动位置存下来，配置没给回调时就还原回去。 */
+    B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
     B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     B.speed = (Core.S.settings && Core.S.settings.speed) || 1;
     CV.battleSpeed = B.speed;
@@ -245,6 +252,8 @@
          文案来自调用方（"第 N/M 波"），这里只管**怎么出现**：
          0.9 秒内往上飘 26px 并淡出，没有边框/底色，点不到（本来也不该点）。
          动画靠一个 33ms 的小计时器重画（停就自己清掉，不白烧电）。 */
+      /* V9.6.125（父亲大人："要不不要飘过的感觉，直接就是空屏然后写第几波，然后再进去战斗"）：
+         改成"波次卡"——这一段**不画战场**，整屏只留一行「第 N 波」，淡入停留淡出，然后下一波开打。 */
       B.tip = B.panel.sub || '本波通过…';
       B.tipAt = Date.now();
       if (B.tipT) { clearInterval(B.tipT); B.tipT = null; }
@@ -261,7 +270,7 @@
            表现就是"第 5 关开始，第一波打完卡住，按啥都没用，只能撤离"。 */
         B.busy = false;
         if (after) after();
-      }, 900);
+      }, 1050);   // V9.6.125：波次卡显示 1.05 秒（和网页版 .b-wave-card 的动画时长一致）
     }
     CV.render();
   }
@@ -305,10 +314,23 @@
     return av + 30 * CV.SCALE + 10 * CV.SCALE;
   }
 
+  /* 波次卡：空屏（底色已是战斗页底色）+ 居中一行「第 N 波」，淡入停留淡出 */
+  function drawWaveCard() {
+    if (!B.tip) return;
+    const k = Math.max(0, Math.min(1, (Date.now() - (B.tipAt || 0)) / 1050));
+    const alpha = k < 0.18 ? (k / 0.18) : (k > 0.72 ? Math.max(0, (1 - k) / 0.28) : 1);
+    CV.text(B.tip, CV.W / 2, CV.H * 0.46,
+      { size: CV.FS.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
+  }
+
   function drawBattle() {
     U.begin();
     const res = B.res;
     if (!res) { U.card(function () { U.h3('战斗'); U.hint('没有进行中的战斗', 6 * CV.SCALE); }); return; }
+    /* V9.6.125（父亲大人："直接就是空屏然后写第几波，然后再进去战斗"）：
+       波次卡期间**战场整段不画** —— 只留深色底 + 居中一行「第 N 波」（在下面的 tip 分支里画）。
+       这样玩家一眼知道"换波了"，也不会再把提示误当成要点的按钮。 */
+    if (B.tip) { drawWaveCard(); return; }
     const units = Object.keys(B.units).map((k) => B.units[k]).filter((u) => u && u.side);
     const enemies = units.filter((u) => u.side === 'enemy');
     const allies = units.filter((u) => u.side === 'ally');
@@ -410,15 +432,8 @@
     });
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
     CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
-    if (B.tip) {
-      /* 波次弹幕：没有框、不加粗金 —— 只是"往上飘 26px 并淡出"的一行字，
-         和网页版 .b-wave-banner 同一个观感（0→1→0 的透明度曲线也一样）。 */
-      const k = Math.max(0, Math.min(1, (Date.now() - (B.tipAt || 0)) / 900));
-      const alpha = k < 0.22 ? (k / 0.22) : Math.max(0, 1 - (k - 0.22) / 0.78);
-      const dy = 10 * CV.SCALE * (1 - k) - 26 * CV.SCALE * k;
-      CV.text(B.tip, CV.W / 2, CV.H * 0.46 + dy,
-        { size: CV.FS.f1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
-    }
+    /* 波次卡已经在 drawBattle 开头接管了整屏（含这一行字），这里不再重复画 */
+
   }
 
   /* 网页版 .reward-chip：bg --panel2 / 边 --line / 胶囊 / 左右 12px / 12px 字 */
@@ -544,17 +559,29 @@
     if (Core.S.settings) { Core.S.settings.speed = B.speed; Core.save(); }
     CV.render();
   });
+  /* 打完/撤离之后回哪儿：优先用配置给的回调；没给就**还原开打时的页面栈**。
+     只有连"从哪来"都没有（极端情况）才退到残域列表。 */
+  function backToSource(kind) {
+    const cfg = B.cfg; B.cfg = null;
+    if (cfg && cfg[kind]) { cfg[kind](); return; }
+    if (B.back && B.back.stack && B.back.stack.length) {
+      CV.stack = B.back.stack.slice();
+      CV.scroll = B.back.scroll || 0;
+      CV.pageOverlay = null; CV.sticky = null;
+      CV.render();
+      return;
+    }
+    CV.reset('dungeon');
+  }
   CV.on('battle_quit', function () {
     U.confirm('撤离', '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。', function () {
       clearTimer(); B.on = false; B.res = null; B.panel = null; B.busy = false;
-      const cfg = B.cfg; B.cfg = null;
-      if (cfg && cfg.onQuit) cfg.onQuit(); else { CV.reset('dungeon'); }
+      backToSource('onQuit');
     });
   });
   CV.on('battle_close', function () {
     clearTimer(); B.on = false; B.res = null; B.panel = null; B.busy = false;
-    const cfg = B.cfg; B.cfg = null;
-    if (cfg && cfg.onClose) cfg.onClose(); else CV.reset('dungeon');
+    backToSource('onClose');
   });
   /* 结算面板上的自定义按钮（下一关 / 返回 / 继续） */
   CV.on('battle_act', function () {});
