@@ -1304,7 +1304,20 @@ window.DATA = (function () {
      我们做成 4 块地：花 ◉ 点数播种 → 到点成熟 → 收获得强化材料，另有几率出稀有物。
      产量按"强化时用点数替代材料"的价（MAT_SUBSTITUTE_POINTS）算，**每块地收货价值约等于投入的 1.2 倍**：
      种地若是比直接买还亏，就等于给玩家挖坑（2026-09-15 体检时发现旧产量只有投入的 1 成~5 成，已调高）。 */
+  /* V9.6.137（父亲大人："各个功能都最好能跟着游戏进程一起发展，不然前期就满了，
+     放在那里很占位置、感觉没啥用"）：药园原来**固定 4 块**，开局没多久就到底了。
+     现在按进度开：基础 4 块，每通关 9 张图多开 1 块，最多 8 块
+     （W09 / W18 / W27 / W36 各一块）。
+     为什么不直接给到 10 块：一块极品灵田 2 小时产 16 个 T4 材料，
+     8 块已经是"养成材料基本不用刷副本"的量；再多就把副本的材料掉落架空了。 */
   const GARDEN_PLOTS = 4;
+  const GARDEN_MAX = 8;
+  const GARDEN_PLOT_REQ = [
+    { w: 'W09', name: '通关 巨兽孤屿·普通' },
+    { w: 'W18', name: '通关 白墙疗养院·普通' },
+    { w: 'W27', name: '通关 百鬼夜行·普通' },
+    { w: 'W36', name: '通关 灯阁王座·普通' },
+  ];
   const GARDEN = [
     { id: 'g1', name: '下品灵田', points: 800,   sec: 600,  out: { item: 'mat_t1', n: 5 },  extra: { item: 'beast_egg', n: 1, p: 0.15 } },
     { id: 'g2', name: '中品灵田', points: 3200,  sec: 1800, out: { item: 'mat_t2', n: 8 },  extra: { item: 'beast_egg', n: 1, p: 0.25 } },
@@ -2230,7 +2243,7 @@ window.DATA = (function () {
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
     KEJI, KEJI_COIN, kejiById, kejiCost,
     TRAVELS, TRAVEL_TOTAL_W, TRAVEL_STEPS_SEC,
-    GARDEN, GARDEN_PLOTS,
+    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ,
     ARENA_DAILY, arenaReward, arenaEnemy,
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,

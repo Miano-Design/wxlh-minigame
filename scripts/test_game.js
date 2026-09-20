@@ -712,6 +712,26 @@ setParty(['C021']);
     return Core.S.chars.C021.skillLv[0] === D.SKILL_MAX;
   })());
   t('芯片价目表覆盖全部等级', Core.SKILL_CHIP_COST.length >= D.SKILL_MAX - 1);
+  /* V9.6.136：技能升级也要"报价 == 实扣"。
+     界面上的价钱就是 SKILL_CHIP_COST[lv]（和小游戏同一份），这里锁住它真的只扣这么多 ——
+     强化那边吃过一次亏（按钮写 1640、实扣 4640），技能这条线不能再来一次。 */
+  t('技能升级：报价 == 实扣的异界结晶', (() => {
+    Core.newGame(); Core.setPlayerName('技能报价');
+    Core.addChar('C021');
+    Core.S.cur.otherworld = 9999999;
+    let ok = true;
+    for (let idx = 0; idx < 3; idx++) {
+      for (let lv = 0; lv < D.SKILL_MAX; lv++) {
+        const quoted = Core.SKILL_CHIP_COST[Core.S.chars.C021.skillLv[idx]];
+        const before = Core.S.cur.otherworld;
+        const r = Core.skillUp('C021', idx);
+        if (!r.ok) break;
+        if (before - Core.S.cur.otherworld !== quoted) { ok = false; break; }
+      }
+      if (!ok) break;
+    }
+    return ok;
+  })());
   t('老档按新口径补技能点（Lv.100 → 100 点）', (() => {
     Core.newGame(); Core.setPlayerName('上限5');
     Core.S.player.level = 100; Core.S.player.skillLv = [1, 1, 1];
@@ -1857,7 +1877,12 @@ setParty(['C021']);
   // 药园：播种扣点数、没熟不能收、熟了能收、点数不足种不下
   Core.newGame();
   const gs0 = Core.gardenState();
-  t('药园有 4 块地', gs0.length === D.GARDEN_PLOTS);
+  /* V9.6.137：地按进度开 —— 数据表里一共 8 格，新号只开了 4 格（其余锁着）。
+     老的那条 `gs0.length === GARDEN_PLOTS` 从此不成立：长度是 8，可用的是 gardenPlots()。 */
+  t('药园一共 8 格、新号只开了 4 格', gs0.length === D.GARDEN_MAX && Core.gardenPlots() === D.GARDEN_PLOTS);
+  t('没开的地锁着，而且写清了差哪张图', gs0.filter(s => s.locked).length === D.GARDEN_MAX - D.GARDEN_PLOTS && gs0.every(s => !s.locked || !!s.req));
+  t('没开的地种不下去', !Core.plantGarden(D.GARDEN_PLOTS, 'g1').ok);
+  t('同一种灵田循环对应（第 5 块还是下品灵田）', gs0[D.GARDEN_PLOTS].kind.id === D.GARDEN[0].id);
   t('药园初始全空', gs0.every(s => !s.plot));
   const pt0 = Core.S.cur.points;
   const p1 = Core.plantGarden(0, 'g1');
@@ -2816,7 +2841,7 @@ setParty(['C021']);
   for (let i = 0; i < 300; i++) { const r = Core.openBox('box_ur'); if (r.equip && r.equip.set === 'W25') wentWorldSet++; }
   t('箱子主要给"当前进度那张图的世界套装"（≥60%）', wentWorldSet >= 180, wentWorldSet + '/300 件是 W25 套装');
 
-  /* ④ 血统神装箱：通关第 20 个世界才上架 · 保底传说 · 小概率神话 */
+/* ④ 血统神装箱：通关第 20 个世界才上架 · 保底传说 · 小概率神话 */
   Core.newGame(); Core.setPlayerName('神装箱'); Core.choosePlayerBloodline('修真');
   const idx = D.SHOPS.otherworld.items.findIndex(x => x.item === 'box_myth');
   t('神装箱在异界商店里、且写着"通关 W20 才上架"',

@@ -305,12 +305,22 @@
     U.begin();
     head('药园');
     U.card(function () {
-      U.h3('药园', busy + ' / ' + D.GARDEN_PLOTS + ' 块在用');
+      /* V9.6.137：地按进度开（基础 4 块，每通关 9 张图多 1 块，最多 8 块）。
+         没开的地也画出来、灰着并写清"通关哪张图开"，玩家才知道药园还能扩。 */
+      U.h3('药园', busy + ' 块在用 · 已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块');
       U.note('有几率出稀有物（兽魂石 / 装备箱）', 2 * CV.SCALE);
+      U.hint('每通关 9 张图多开 1 块，同一种灵田可以多种一块。', 2 * CV.SCALE);
     });
     U.card(function () {
       plots.forEach(function (p, i) {
         const top = U.y, h = 62 * CV.SCALE;
+        if (p.locked) {
+          CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, color: CV.C.dim });
+          CV.text(CV.fit('🔒 未开垦 · ' + (p.req || '继续推图'), U.iw(), CV.FS.sm), U.ix(), top + 32 * CV.SCALE,
+            { size: CV.FS.sm, color: CV.C.dim });
+          U.y = top + h;
+          return;
+        }
         const ready = p.plot && p.leftMs <= 0;
         CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 12 * CV.SCALE, { size: CV.FS.lg, bold: true });
         const bw = 84 * CV.SCALE;
@@ -321,7 +331,9 @@
         /* V9.6.131（父亲大人："药园种植的消耗你也没写，我不知道是机制改了还是怎么"）：
            机制没改（播种照旧扣 ◉ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
            现在把"种这一块要花多少"写回描述里，货币图标取货币表（不是手写符号）。 */
-        const seed = D.GARDEN[i] || {};
+        /* ⚠️ 必须用 p.kind，不能写 D.GARDEN[i] —— 地和灵田是"循环对应"（第 i 块取第 i%4 种），
+           扩到 8 块之后 D.GARDEN[4] 是 undefined，名字和花费都会画成空白。 */
+        const seed = p.kind || {};
         const ptIcon = ((D.CURRENCIES || []).find((c) => c.id === 'points') || {}).icon || '◉ ';
         const desc = !p.plot
           ? ('可种「' + seed.name + '」：' + ptIcon + fmt(seed.points) + ' · ' + (seed.desc || ''))

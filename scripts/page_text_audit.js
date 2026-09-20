@@ -98,7 +98,7 @@ openState();
 /* ---------- 渲染一页，把画出来的字收下来 ---------- */
 function drawPage(name) {
   TEXT.length = 0;
-  try { CV.reset(name); } catch (e) { return null; }
+  try { CV.reset(name); } catch (e) { console.log('  [渲染报错] ' + name + ' → ' + e.message); return null; }
   return TEXT.slice();
 }
 function drawWith(enterId, name) {
@@ -128,7 +128,64 @@ Object.keys(CV.panels || {}).forEach((name) => {
 if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Object] ✓');
 
 console.log('\n=== ② "列东西"的页面：该出现的名字和说明必须真的画出来 ===');
+/* ②-a 退役词：界面上**画出来**的旧名字（网页版那套 copy_audit 只管 HTML，画布这边的字它看不见）。
+   起因（V9.6.136）：货币 8→4 之后，成长页和三条引导里还写着"血统结晶""铭刻五阶"——
+   玩家一眼就能看出这版本没过脑子。这里把退役币名也盯上，和网页版同一份口径。 */
+const RETIRED_TEXT = [
+  [/故事点|技能芯片|血统结晶|深井徽记/, 'V9.6.134 货币 8→4：已并入 ◉ 点数 / ◆ 异界结晶'],
+  [/凡体/, 'V8.1 起的第 1 阶境界不再是"凡体"'],
+  [/跳过战斗/, 'V9.5.64 已删掉该按钮（战斗界面用"撤离"）'],
+  [/个人房间/, '旧界面名，主角面板已并进主页最上面的主角卡'],
+];
+let retiredHits = 0;
+{
+  let ret = 0;
+  Object.keys(CV.panels || {}).forEach((name) => {
+    const got = drawPage(name);
+    if (!got) return;
+    const stream = got.join('');
+    RETIRED_TEXT.forEach(([re, why]) => {
+      const m = stream.match(re);
+      if (!m) return;
+      /* 允许"解释式"提及：为了说明"不再有这东西"而点到名字是正常的
+         （网页版 copy_audit 里同一条规矩：不存在"凡体"这种占位）。 */
+      const at = stream.indexOf(m[0]);
+      const around = stream.slice(Math.max(0, at - 24), at + m[0].length + 24);
+      if (/不再|不存在|没有这种|没有这种|早就|以前|过去|旧版|已删|下架|不该再/.test(around)) return;
+      ret++;
+      console.log(`  ✗ ${name} 页还画着退役词「${m[0]}」（${why}）`);
+    });
+  });
+  if (!ret) console.log('  每一页画出来的文字里都没有退役的旧名字 ✓');
+  retiredHits = ret;
+}
+/* ②-b 同一个规矩，但**直接扫源码**：引导表 / 弹窗文案这类"只在特定时机才画"的字，
+   靠渲染是抓不全的（实测：往引导气泡里塞一个旧币名，光渲染抓不到）。 */
+{
+  const SRC_FILES = fs.readdirSync(JS).filter((f) => /^(sc-.*|cv|uiw|wx-adapter)\.js$/.test(f));
+  const stripComments = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:\\])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+  let ret2 = 0;
+  SRC_FILES.forEach((f) => {
+    let text = '';
+    try { text = stripComments(fs.readFileSync(path.join(JS, f), 'utf8')); } catch (e) { return; }
+    RETIRED_TEXT.forEach(([re, why]) => {
+      const g = new RegExp(re.source, 'g');
+      let m;
+      while ((m = g.exec(text))) {
+        const around = text.slice(Math.max(0, m.index - 24), m.index + m[0].length + 24);
+        if (/不再|不存在|没有这种|早就|以前|过去|旧版|已删|下架|不该再/.test(around)) continue;
+        ret2++;
+        console.log(`  ✗ ${f} 的文案里还写着退役词「${m[0]}」（${why}）`);
+      }
+    });
+  });
+  if (!ret2) console.log('  源码里也没有退役的旧名字（含引导表 / 弹窗文案）✓');
+  retiredHits += ret2;
+}
 let fails = 0;
+
 function expect(page, list, label) {
   const got = drawPage(page);
   if (!got) { fails++; console.log(`  ✗ ${page} 页渲染失败`); return; }
@@ -200,6 +257,7 @@ expect('keji', D.KEJI.map((k) => k.name), '秘术阁（每条线）');
 expect('garden', ['第 1 块'], '药园（地块）');
 expect('sign', D.SIGNS.map((s) => s.tier), '求签（签档）');
 
-console.log(`\n${fails === 0 && badText === 0 ? '结论：每一页画出来的内容都对得上数据 ✓'
-  : `结论：有 ${fails + badText} 处"画了但内容对不上"，要修`}`);
-process.exit(fails + badText ? 1 : 0);
+const totalBad = fails + badText + retiredHits;
+console.log(`\n${totalBad === 0 ? '结论：每一页画出来的内容都对得上数据、也没有退役的旧名字 ✓'
+  : `结论：有 ${totalBad} 处要修（画了但内容对不上 / 还画着退役的旧名字）`}`);
+process.exit(totalBad ? 1 : 0);

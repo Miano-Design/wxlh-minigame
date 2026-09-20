@@ -2562,14 +2562,35 @@ window.Core = (function () {
   /* ================= 药园（对标《道友修仙》洞府里的"药园"） ================= */
   // 种下去等时间，回来收材料——给"点数"开一个稳定出口，也给强化材料一条不用刷副本的路。
   function gardenState() {
-    if (!S.garden) S.garden = Array(D.GARDEN_PLOTS).fill(null);
-    return D.GARDEN.map((g, i) => {
+    if (!S.garden) S.garden = Array(D.GARDEN_MAX).fill(null);
+    while (S.garden.length < D.GARDEN_MAX) S.garden.push(null);
+    /* V9.6.137：地按进度开 —— 已开的地正常玩，没开的挂一个 locked + 差哪张图。
+       地块索引固定（0..7），老存档那 4 块位置不变，后面 4 块只是解锁了才让种。 */
+    const total = gardenPlots();
+    /* 原来 `D.GARDEN.map` 只产出 4 项（4 种灵田一一对应 4 块地）——
+       扩地不是加"新种类"，而是**同一种可以多种一块**：第 i 块地固定取第 i%4 种灵田，
+       所以 8 块 = 下品/中品/上品/极品各 2 块。这样不用给每块地再做一个"选种子"的界面。 */
+    const out = [];
+    for (let i = 0; i < D.GARDEN_MAX; i++) {
+      const g = D.GARDEN[i % D.GARDEN.length];
       const plot = S.garden[i] || null;
+      const locked = i >= total;
       const leftMs = plot ? Math.max(0, plot.at - Date.now()) : 0;
-      return { idx: i, kind: g, plot, leftMs, ready: !!plot && leftMs <= 0 };
+      out.push({ idx: i, kind: g, plot, locked, req: locked ? (D.GARDEN_PLOT_REQ[i - D.GARDEN_PLOTS] || {}).name : '', leftMs, ready: !!plot && leftMs <= 0 });
+    }
+    return out;
+  }
+  /* 现在开了几块地：基础 4 块 + 每通关 9 张图 1 块 */
+  function gardenPlots() {
+    let n = D.GARDEN_PLOTS;
+    D.GARDEN_PLOT_REQ.forEach((r) => {
+      const w = S.worlds[r.w];
+      if (w && w.stages && w.stages.normal && w.stages.normal.every((x) => x > 0)) n++;
     });
+    return Math.min(D.GARDEN_MAX, n);
   }
   function plantGarden(idx, gardenId) {
+    if (idx >= gardenPlots()) return { ok: false, msg: `这块地还没开（${(D.GARDEN_PLOT_REQ[idx - D.GARDEN_PLOTS] || {}).name || '继续推图'}）` };
     const g = D.GARDEN.find(x => x.id === gardenId);
     if (!g) return { ok: false, msg: '没有这种灵田' };
     if (S.garden[idx]) return { ok: false, msg: '这块地还种着东西' };
@@ -3580,7 +3601,7 @@ window.Core = (function () {
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
     travelAccrue, travelTick, travelProgress, travelEverySec, pendingTravel, claimTravel, rollTravel, rewardTextOf,
-    gardenState, plantGarden, harvestGarden, harvestAllGarden,
+    gardenState, gardenPlots, plantGarden, harvestGarden, harvestAllGarden,
     arenaState, arenaSettle, fabaoState, buyFabao, wearFabao, refineFabao, fabaoLv, fabaoEffMul, feedMount, mountLv, mountBonusPct,
     mountState, buyMount, wearMount, applyMount,
     signState, drawSign, signIdleMult,
