@@ -108,26 +108,38 @@
     const res = (last && last.results) || [];
     const cols = 3, gap = CV.SP[2];
     const cw = (U.cw() - gap * (cols - 1)) / cols;
-    /* V9.6.18（父亲大人："招募卡片太长，把两个功能按钮挤出画了；连抽不该还要下滑"）：
-       卡片从 132 压到 104（头像 46→38、内部间距同步收），10 连刚好 4 行不出画。 */
-    const ch = 104 * CV.SCALE;
+    /* V9.6.122（父亲大人："招募出来的卡片排版不行啊，之前不是有反馈过吗"）：
+       上一版为了"10 连不出画"把卡片压到 104、头像缩到 38，**结果内容全挤在上半截**：
+       卡片 104 里实际只用了 65（头像+名字+碎片），底下空 31 —— 看着就是排版散、不齐。
+       现在**照网页版 .char-card 的量重排**（内边距 10 / 头像 46 / 头像下 6 / 名字 13px /
+       小字 11px 且上间距 2），卡片高度由**内容算出来**（≈107），不再写死；
+       10 连是 4 行 ≈ 4×107+3×10 = 458，加上标题与底部固定条仍在画内（854 的屏余量够）。 */
+    const PAD = 10 * CV.SCALE, AV = 46 * CV.SCALE, AVGAP = 6 * CV.SCALE;
+    const NAME_H = CV.FS.lg * 1.35, META_H = CV.FS.sm * 1.55;
+    const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * CV.SCALE + META_H;
     const y0 = U.y;
     res.forEach(function (r, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
       const col = rarColor(r.rarity);
+      /* 网页版：SSR/UR/MYTH 除了描边还有一圈柔光（box-shadow）—— 抽到好东西要看得出来 */
+      if (['SSR', 'UR', 'MYTH'].indexOf(r.rarity) >= 0) {
+        CV.round(x - 1.5 * CV.SCALE, y - 1.5 * CV.SCALE, cw + 3 * CV.SCALE, ch + 3 * CV.SCALE, 13 * CV.SCALE, null,
+          r.rarity === 'UR' ? 'rgba(255,77,109,.35)' : (r.rarity === 'MYTH' ? 'rgba(255,215,106,.4)' : 'rgba(255,176,58,.28)'), 3 * CV.SCALE);
+      }
       CV.round(x, y, cw, ch, 12 * CV.SCALE, CV.C.panel2, col);
       if (r.isUp) {
         const tw = CV.measure('UP', CV.FS.xs) + 10 * CV.SCALE;
         CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, CV.C.gold);
         CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#241c08' });
       }
-      const asz = 38 * CV.SCALE, acx = x + cw / 2, atop = y + 8 * CV.SCALE;
-      CV.ctx.beginPath(); CV.ctx.arc(acx, atop + asz / 2, asz / 2, 0, Math.PI * 2);
+      const acx = x + cw / 2, acTop = y + PAD;
+      CV.ctx.beginPath(); CV.ctx.arc(acx, acTop + AV / 2, AV / 2 - CV.SCALE, 0, Math.PI * 2);
       CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
-      CV.text(String(r.name || '?').slice(0, 1), acx, atop + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
-      CV.text(CV.fit(r.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, atop + asz + 11 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text(r.isNew ? 'NEW' : ('碎片+' + (r.shards || 0)), acx, atop + asz + 27 * CV.SCALE,
+      CV.text(String(r.name || '?').slice(0, 1), acx, acTop + AV / 2, { size: AV * 0.44, bold: true, align: 'center', color: col });
+      const nameCy = acTop + AV + AVGAP + NAME_H / 2;
+      CV.text(CV.fit(r.name, cw - PAD * 2, CV.FS.lg, true), acx, nameCy, { size: CV.FS.lg, bold: true, align: 'center' });
+      CV.text(r.isNew ? 'NEW' : ('碎片+' + (r.shards || 0)), acx, nameCy + NAME_H / 2 + 2 * CV.SCALE + META_H / 2,
         { size: CV.FS.sm, align: 'center', color: r.isNew ? CV.C.green : CV.C.dim });
     });
     U.y = y0 + Math.ceil(res.length / cols) * (ch + gap);

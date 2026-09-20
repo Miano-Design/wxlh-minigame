@@ -118,4 +118,5 @@ if (!rows.length) {
   });
   console.log('\n结论：有 ' + bad + ' 处行距过窄（网页版同类结构请对齐 CSS 行高）\n');
 }
+
 process.exitCode = bad ? 1 : 0;

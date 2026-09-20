@@ -210,6 +210,29 @@ console.log('\n=== ⑤ 标题行的间距 / 按钮大小 / 中线对齐（父亲
   }
 }
 
+console.log('\n=== ⑥ 招募结果卡（父亲大人：排版不行）===');
+{
+  /* 卡内留白必须上下相等、高度由内容撑开；10 连要一屏放得下（上一版是 8/31 不等 + 写死 104） */
+  const src = fs.readFileSync(path.join(JS, 'sc-recruit.js'), 'utf8');
+  const geom = /const PAD = 10 \* CV\.SCALE, AV = 46 \* CV\.SCALE, AVGAP = 6 \* CV\.SCALE/.test(src)
+    && /const ch = PAD \* 2 \+ AV \+ AVGAP \+ NAME_H \+ 2 \* CV\.SCALE \+ META_H/.test(src);
+  t('卡片几何照网页版 .char-card：内边距 10 / 头像 46 / 头像下 6 / 小字上间距 2、高度由内容算',
+    geom, geom ? '同一条算式' : '**没按网页版量**');
+  const S = CV.SCALE, PAD = 10 * S, AV = 46 * S, AVGAP = 6 * S;
+  const NAME_H = CV.FS.lg * 1.35, META_H = CV.FS.sm * 1.55;
+  const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * S + META_H;
+  t('卡内上下留白相等（10 / 10，不是"上 8 下 31"那种空一条）',
+    Math.abs((PAD) - (ch - PAD - (AV + AVGAP + NAME_H + 2 * S + META_H))) < 0.01,
+    '上 ' + Math.round(PAD / S) + ' / 下 ' + Math.round((ch - PAD - (AV + AVGAP + NAME_H + 2 * S + META_H)) / S));
+  U.begin();                                     // 拿页面内容宽，算列宽与整格高度
+  const gap = CV.SP[2], rows = Math.ceil(10 / 3);
+  const gridH = rows * ch + (rows - 1) * gap;
+  const need = (U.BTN_SM * S + CV.SP[2]) + gridH + (U.BTN_H * S + 16 * S);
+  const avail = CV.H - CV.TOP - 8 - CV.NAV_H - CV.safeBottom;
+  t('10 连（4 行）仍在画内 —— 底部两个按钮不用下滑就能点到',
+    need <= avail, '需要 ' + Math.round(need / S) + 'px ≤ 可用 ' + Math.round(avail / S) + 'px');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 console.log('结论：' + (fail === 0 ? '五级层级统一，两边一一对应，没有裸数字字号 ✓' : '有 ' + fail + ' 处不符合层级规格 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

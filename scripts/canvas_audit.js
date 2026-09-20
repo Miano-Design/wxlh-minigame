@@ -27,6 +27,19 @@ const RULES = [
      —— 表现就是"黑底黑字"（父亲大人最早报的毛病，一直没找到根）。
      全仓改成 rgba() 之后加这条规则钉住，别再写回去。（注释里提到不算，见下面的过滤） */
   [/(?:fillStyle|strokeStyle|shadowColor|addColorStop|lineSoft:|CV\.round\()[^\n]*#[0-9a-fA-F]{8}\b/, '画布颜色请用 rgba()，不要用 8 位 hex（#RRGGBBAA 在微信画布上不稳定）'],
+  /* V9.6.122（父亲大人："残域的世界排版也有问题"）—— 残域详情页**必须**带上网页版的那三样，
+     不然玩家看不出精英关/守关 Boss 是什么，也不知道 ⚔ 是什么意思：
+       · 关卡格的 ⚔ 精英角标（网页版 .sc-mark）
+       · 格子下面那行图例（网页版 <div class="hint mt2">）
+       · 格子字号走层级（网页版 .stage-cell 现为二级 15px，别再写 14/16/20 这种编外值） */
+  [/stage:\s*' \+ i[\s\S]{0,400}?size:\s*\(isBoss \?/, '关卡格字号必须走层级 token（原来是编外的 14/16/20）'],
+];
+
+/* 残域详情页的"三件套"——缺一个都算没复刻到位 */
+const DUNGEON_MUST = [
+  [/U\.hint\('⚔ 精英关（更硬、掉得更好）· 👹 守关 Boss（打完开下一个世界）'/, '关卡格下面缺网页版那行图例（⚔/👹 的含义）'],
+  [/isElite[\s\S]{0,200}?CV\.text\('⚔'/, '精英关注册不到 ⚔ 角标（网页版 .sc-mark）'],
+  [/Dun\.wavePlan\(i \+ 1\)\.indexOf\('elite'\)/, '精英关判定要跟网页版同源（Dun.wavePlan）'],
 ];
 // 容易写错的：技能每条上限不同，不能用统一的 SKILL_MAX
 const MUST_USE = [
@@ -38,6 +51,12 @@ files.forEach(f => {
   RULES.forEach(([re, why]) => {
     if (re.test(src)) { bad++; console.log(`  ✗ ${f}：命中 ${re} —— ${why}`); }
   });
+  /* 残域详情页的"三件套"：只在 sc-dungeon.js 里查（缺一样就是没复刻到位） */
+  if (f === 'sc-dungeon.js') {
+    DUNGEON_MUST.forEach(([re, why]) => {
+      if (!re.test(src)) { bad++; console.log(`  ✗ ${f}：缺 ${why}`); }
+    });
+  }
   // 只在真有技能等级显示的地方检查 MUST_USE
   if (/skillLv/.test(src)) {
     MUST_USE.forEach(([re, why]) => {

@@ -110,7 +110,7 @@
     U.card(function () {
       U.h3(ICON[w.theme] + ' ' + w.name);
       U.note(w.desc, 2 * CV.SCALE);                 // 网页版这一行是 0.75rem（12px）
-      U.space(CV.SP[1]);
+      U.space(CV.SP[2]);                            // V9.6.122：网页版 .kv mt2 = 10（原来 4，太挤）
       U.kv('世界机制', w.mechanic, CV.C.accent);     // 整句照抄，别只留冒号前半截
       U.kv('守关Boss', w.boss);
     });
@@ -135,7 +135,7 @@
           CV.ctx.globalAlpha = 1;
         }
       });
-      U.y = top + h + CV.SP[1];
+      U.y = top + h + 12 * CV.SCALE;                // V9.6.122：网页版 .diff-tabs margin-bottom = 12（原来 4）
     }
     // 12 个关卡格（4 列）
     {
@@ -151,20 +151,28 @@
         const unlocked = Core.stageUnlocked(w.id, diff, i);
         const stars = st ? st.stages[diff][i] : 0;
         const isBoss = i === 11;
+        /* V9.6.122（父亲大人："残域的世界排版也有问题"）：照网页版补齐两件事 ——
+           ① 精英关右上角要挂 ⚔ 角标（wg 用 wavePlan 判，和网页版同一份数据）；
+           ② 格子里字号统一走层级：网页版 .stage-cell 是 **二级 15px**、整格粗体
+              （我上一版把守关格写成 20px 反而更偏了）。 */
+        const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
         const done = stars > 0;
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
         CV.round(x, y, cw, cw, 10 * CV.SCALE, done ? '#1d2b22' : CV.C.panel2,
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '👹' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
-          /* V9.6.117：原来写的是 `isBoss ? 16 : 14 * CV.SCALE` —— 两个分支一个乘了缩放一个没乘，
-             小屏/大屏下守关那格的字号会跑偏。现在两边都走 token（守关用展示级、普通关用二级）。 */
-          { size: (isBoss ? CV.DISP.d1 : CV.FS.f1) * CV.SCALE, bold: !isBoss, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
+          { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
+        if (isElite) CV.text('⚔', x + cw - 5 * CV.SCALE, y + 10 * CV.SCALE,
+          { size: CV.FS.xs, align: 'right', color: CV.C.dim });   // .sc-mark：右上角、五级、85% 不透明度
         if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.ctx.globalAlpha = 1;
         if (unlocked) CV.hit('stage:' + i, x, y, cw, cw);
       }
       U.y = top + 3 * cw + 2 * gap;
     }
+    /* V9.6.122：网页版关卡格下面有一行图例（hint mt2）——小游戏这边原来**没有**，
+       玩家看不出 ⚔ / 👹 是什么意思。文案照网页版原样。 */
+    U.hint('⚔ 精英关（更硬、掉得更好）· 👹 守关 Boss（打完开下一个世界）', 10 * CV.SCALE);
     // 扫荡
     const canSweep = st && st.stages[diff].some((s) => s > 0);
     if (canSweep) {
