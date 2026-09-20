@@ -785,6 +785,7 @@
   });
   CV.register('pickleader', function () {
     const S = Core.S;
+    const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;   // 稀有度色（和执灯者同一张表）
     const line = (D.IDLE_LINES || []).find((l) => l.id === leaderLine) || {};
     /* V9.6.101（换档审计抓到的）：`line` 可能找不到 —— leaderLine 是模块级变量，
        读存档槽 / 导入存档 / 删档之后它可能还停在上一次的产线上，
@@ -817,17 +818,40 @@
         U.y = top + ah;
       });
     }
-    const own = Object.keys(S.chars).filter((id) => S.party.indexOf(id) < 0);
+    /* V9.6.131（父亲大人三条）：
+       ① 候选名单**按这条产线看的那项属性**从高到低排（派谁划算一眼看出，不用自己比）；
+       ② 每行**显示稀有度**（原来只有 Lv/属性/战力，看不出品质）；
+       ③ **已经在别的产线当领队的人要标出来**（否则会把人从别的线上挖走还不知道）。 */
+    const attrOf = (id) => Math.round((((Core.effectiveStats(id) || {}).attrs || {})[line.attr] || 0));
+    const leaderOfLine = (id) => {                    // 这个人现在在几条产线上当领队
+      const out = [];
+      D.IDLE_LINES.forEach(function (l) { if ((S.idle.lines || {})[l.id] === id) out.push(l.name); });
+      return out;
+    };
+    const own = Object.keys(S.chars).filter((id) => S.party.indexOf(id) < 0)
+      .sort(function (a, b) { return attrOf(b) - attrOf(a) || Core.power(b) - Core.power(a); });
     U.card(function () {
+      U.h3('可选伙伴', own.length + ' 名 · 按' + (line.attrName || '属性') + '排序');
       if (!own.length) { U.hint('没有可派的伙伴（先去招募）', 4 * CV.SCALE); return; }
+      U.space(CV.SP[1]);
       own.forEach(function (id) {
         const ch = D.charById[id] || {}, c = S.chars[id];
-        const top = U.y, h = 52 * CV.SCALE;
+        const top = U.y, h = 56 * CV.SCALE;
+        const elsewhere = leaderOfLine(id).filter(function (n) { return n !== line.name; });
         CV.text(Core.charName(id), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        /* 和网页版同一行：Lv. · 这条线看的那项属性值 · 战力（派谁划算一眼能比） */
-        CV.text('Lv.' + c.lv + ' · ' + (line.attrName || '') + ' '
-          + Math.round((((Core.effectiveStats(id) || {}).attrs || {})[line.attr] || 0)) + ' · 战力 ' + fmt(Core.power(id)),
-          U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        /* 稀有度角标（跟着品质色） */
+        const rW = CV.measure(ch.rarity || '', CV.FS.xs) + 12 * CV.SCALE;
+        CV.round(U.ix() + CV.measure(Core.charName(id), CV.FS.lg) + 8 * CV.SCALE, top + 8 * CV.SCALE, rW, 16 * CV.SCALE, CV.RADIUS_SM,
+          null, rarColor(ch.rarity || 'N'));
+        CV.text(ch.rarity || '', U.ix() + CV.measure(Core.charName(id), CV.FS.lg) + 8 * CV.SCALE + rW / 2, top + 16 * CV.SCALE,
+          { size: CV.FS.xs, color: rarColor(ch.rarity || 'N'), align: 'center' });
+        if (elsewhere.length) {
+          const t = '已在「' + elsewhere[0] + '」任领队';
+          CV.text(CV.fit(t, U.iw() * 0.42, CV.FS.xs), U.ix() + U.iw(), top + 16 * CV.SCALE,
+            { size: CV.FS.xs, color: CV.C.accent, align: 'right' });
+        }
+        CV.text('Lv.' + c.lv + ' · ' + (line.attrName || '') + ' ' + attrOf(id) + ' · 战力 ' + fmt(Core.power(id)),
+          U.ix(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         CV.hit('setleader:' + id, U.ix(), top, U.iw(), h);
         U.y = top + h;
       });

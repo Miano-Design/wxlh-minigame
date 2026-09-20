@@ -891,11 +891,14 @@ window.Core = (function () {
   }
   /* ---------- 伙伴碎片：按稀有度通用（V9.6.129） ---------- */
   function shardPoolOf(rarity) { return (S.shardPool && S.shardPool[rarity]) || 0; }
+  /* V9.6.131（data_audit 抓到）：导出函数被传异常入参（比如 []）时**不能返回 NaN/Infinity** ——
+     稀有度不认识就退回 N 档，数量非数字就当 0，永远返回一个数字。 */
   function addShardPool(rarity, n) {
     if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
-    if (!(rarity in S.shardPool)) S.shardPool[rarity] = 0;
-    S.shardPool[rarity] = Math.max(0, S.shardPool[rarity] + n);
-    return S.shardPool[rarity];
+    const rar = (typeof rarity === 'string' && rarity && (rarity in S.shardPool)) ? rarity : 'N';
+    const add = Number(n);
+    S.shardPool[rar] = Math.max(0, (S.shardPool[rar] || 0) + (isFinite(add) ? add : 0));
+    return S.shardPool[rar];
   }
   /* 给某个伙伴加碎片 = 加进**他那档**的公共池（抽到重复角色、商店买碎片、悬赏都走这里） */
   function addShardsToPool(charId, n) {

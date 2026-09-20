@@ -202,9 +202,14 @@
         const state = !p.plot ? '空地'
           : (ready ? '已成熟，可以收了' : ('生长中 · 还需 ' + (G.formatDuration ? G.formatDuration(Math.ceil(p.leftMs / 1000)) : '')));
         CV.text(CV.fit(state, textW, CV.FS.sm), U.ix(), top + 32 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
+        /* V9.6.131（父亲大人："药园种植的消耗你也没写，我不知道是机制改了还是怎么"）：
+           机制没改（播种照旧扣 ◈ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
+           现在把"种这一块要花多少"写回描述里，货币图标取货币表（不是手写符号）。 */
+        const seed = D.GARDEN[i] || {};
+        const ptIcon = ((D.CURRENCIES || []).find((c) => c.id === 'points') || {}).icon || '◈ ';
         const desc = !p.plot
-          ? ('可种「' + (D.GARDEN[i] || {}).name + '」：' + ((D.GARDEN[i] || {}).desc || ''))
-          : ('收 ' + ((D.GARDEN[i] || {}).desc || ''));
+          ? ('可种「' + seed.name + '」：' + ptIcon + fmt(seed.points) + ' · ' + (seed.desc || ''))
+          : ('收 ' + (seed.desc || ''));
         CV.text(CV.fit(desc, textW, CV.FS.xs), U.ix(), top + 50 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         if (!p.plot) U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE, '播种', 'ghost', 'garden_plant:' + i);
         else U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
