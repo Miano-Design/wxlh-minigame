@@ -100,8 +100,8 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
     ['网页版 .btn.small = 四级', /^\.btn\.small \{[^}]*font-size: var\(--fs-md\)/m.test(css)],
     ['网页版 .hint = 五级', /^\.hint \{[^}]*font-size: var\(--fs-sm\)/m.test(css)],
     ['网页版 .note = 四级', /^\.note \{[^}]*font-size: var\(--fs-md\)/m.test(css)],
-    ['网页版技能名 .sname = 三级 · 描述 .sdesc = 五级',
-      /\.skill-row \.sname \{[^}]*0\.8125rem/.test(css) && /\.skill-row \.sdesc \{[^}]*0\.6875rem/.test(css)],
+    ['网页版技能名 .sname = 二级（与六维名字同级）· 描述 .sdesc = 五级',
+      /\.skill-row \.sname \{[^}]*font-size: var\(--fs-1\)/.test(css) && /\.skill-row \.sdesc \{[^}]*font-size: var\(--fs-sm\)/.test(css)],
     ['网页版六维：名字二级 + 解释内联五级',
       /class="t1">\$\{a\.name\} <span style="color:var\(--dim\);font-size:0\.6875rem"/.test(fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8'))],
   ];
@@ -155,12 +155,11 @@ console.log('\n=== ④ 具体的两处（父亲大人报的）===');
   const uiwAll = fs.readFileSync(path.join(JS, 'uiw.js'), 'utf8');
   const roster = fs.readFileSync(path.join(JS, 'sc-roster.js'), 'utf8');
   t('技能：行是独立面板（panel 底 + 圆角 10 + 内边距 10）',
-    /U\.skillRow = function[\s\S]{0,1600}?CV\.round\(U\.ix\(\), top, U\.iw\(\), rowH, 10 \* CV\.SCALE, CV\.C\.panel\)/.test(uiwAll));
+    /U\.skillRow = function[\s\S]{0,3000}?CV\.round\(U\.ix\(\), top, U\.iw\(\), rowH, 10 \* CV\.SCALE, CV\.C\.panel\)/.test(uiwAll));
   t('技能：行高按内容算（名字行 + 3px + 描述行），不再写死 22px',
-    /const rowH = PAD \* 2 \+ nameRowH \+ descH/.test(uiwAll));
-  t('技能：描述距名字 3px（网页版 .sdesc margin-top:3px）', /nameRowH \+ 3 \* CV\.SCALE/.test(uiwAll));
-  t('技能：+1 按钮与名字同一中线（按钮高按 nameRowH 算）',
-    /cy - btnH \/ 2/.test(uiwAll));
+    /const rowH = PAD \* 2 \+ contentH/.test(uiwAll));
+  t('技能：描述距名字 3px（网页版 .sdesc margin-top:3px）', /nameH \+ 3 \* CV\.SCALE/.test(uiwAll));
+  t('技能：+1 按钮对齐"名称+注释"整块的中线', /cy - btnH \/ 2/.test(uiwAll));
   t('技能：主角详情与伙伴详情**共用同一个组件**（不再各写一套排版）',
     /U\.skillRow\(/.test(protag) && /U\.skillRow\(/.test(roster),
     (/U\.skillRow\(/.test(protag) ? '主角✓' : '主角**没接**') + ' / ' + (/U\.skillRow\(/.test(roster) ? '伙伴✓' : '伙伴**没接**'));
@@ -181,16 +180,19 @@ console.log('\n=== ⑤ 标题行的间距 / 按钮大小 / 中线对齐（父亲
      这一条同时管标题行（.hbtn）和技能行（.btn.small）—— 上次只查了标题行的"到下一行距离"，
      没查"按钮有没有超出自己那一行"，所以技能行的偏上漏过去了。下面两条都是纯算式。 */
   {
-    /* 技能行：名字行高 = max(名字行高, 按钮高)，按钮以它为中线 */
-    const nameH = CV.FS.lg * 1.35, btnH = U.BTN_SM * CV.SCALE, PAD = 10 * CV.SCALE;
-    const nameRowH = Math.max(nameH, btnH);
-    const btnTop = PAD + (nameRowH - btnH) / 2, btnBottom = btnTop + btnH;
-    t('技能行：按钮完整落在这一行内（顶边不低于内边距、底边不越过名字行）',
-      btnTop >= PAD - 0.01 && btnBottom <= PAD + nameRowH + 0.01,
-      '按钮 ' + Math.round(btnTop) + '~' + Math.round(btnBottom) + 'px（名字行 ' + Math.round(PAD) + '~' + Math.round(PAD + nameRowH) + 'px）');
-    t('技能行：名字 / 等级胶囊 / 按钮共用同一条中线', /const cy = top \+ PAD \+ nameRowH \/ 2/.test(uiw));
-    t('技能行：名字行高按 max(名字, 按钮) 算（和网页版 .sname flex 行同口径）',
-      /const nameRowH = btnH \? Math\.max\(nameH, btnH\) : nameH/.test(uiw));
+    /* 技能行：左边「技能名(二级) + 小字注释」是一整块，按钮对齐这一整块的中线 */
+    const nameH = CV.FS.f1 * 1.35, btnH = U.BTN_SM * CV.SCALE, PAD = 10 * CV.SCALE;
+    const descH = 3 * CV.SCALE + CV.FS.sm * 1.55;      // 一行注释
+    const leftH = nameH + descH, contentH = Math.max(leftH, btnH);
+    const btnTop = PAD + (contentH - btnH) / 2, btnBottom = btnTop + btnH;
+    t('技能行：按钮完整落在这一行内（不戳出面板）',
+      btnTop >= PAD - 0.01 && btnBottom <= PAD + contentH + 0.01,
+      '按钮 ' + Math.round(btnTop) + '~' + Math.round(btnBottom) + 'px / 行高 ' + Math.round(PAD * 2 + contentH) + 'px');
+    t('技能行：左边（名称+注释）当**一整块**居中 —— 中线取整块中点',
+      /const cy = top \+ PAD \+ contentH \/ 2/.test(uiw) && /const leftTop = cy - leftH \/ 2/.test(uiw));
+    t('技能行：整块高度 = max(名称+注释, 按钮)，两者都绕中线摊开',
+      /const leftH = nameH \+ descH/.test(uiw) && /const contentH = Math\.max\(leftH, btnH\)/.test(uiw));
+    t('技能行：技能名 = 二级（与六维名字同级）', /const nameH = CV\.FS\.f1 \* 1\.35/.test(uiw));
     t('技能行：不能点时画成禁用态（不是"看着能点、点了没反应"）',
       /o\.btnStyle \|\| 'ghost', o\.btnId, !!o\.btnDis/.test(uiw)
       && /btnDis: !canUp/.test(fs.readFileSync(path.join(JS, 'sc-protag.js'), 'utf8'))

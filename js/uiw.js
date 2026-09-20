@@ -163,46 +163,50 @@
     o = o || {};
     const PAD = 10 * CV.SCALE, GAP = 8 * CV.SCALE;
     const name = String(o.name || '');
-    const nameH = CV.FS.lg * 1.35;
-    /* V9.6.119（父亲大人："这个加 1 的框明显偏上你没检查出来吗"）：
-       **同一个坑我在标题行修过、却在技能行漏了** —— 按钮高 40px，而这一行只按
-       "名字行高 17.5px"算高度、又拿 nameH/2 当中间线：按钮顶边 = 面板顶 − 1.25px，
-       直接**戳出面板外面**，看着就是"偏上"。
-       网页版不会这样：`.sname` 是 flex 行，放得下 .btn.small(2.5rem) 时这一行就长成 40px，
-       名字和按钮一起在 40px 里居中。现在照它来 —— 名字行高 = max(名字行高, 按钮高)。 */
+    /* V9.6.120（父亲大人："技能名称的字体大小要跟六维的字体大小一样啊，他们不是属于一个层级的吗"）：
+       技能名升到**二级（15px）** —— 和六维那一行的名字（.list-row .t1）同一级。
+       网页版 .skill-row .sname 同步从 0.8125rem(13px) 改成 var(--fs-1)(15px)，两边一起动。 */
+    const nameH = CV.FS.f1 * 1.35;
     const btnH = o.btnId === undefined ? 0 : U.BTN_SM * CV.SCALE;
-    const nameRowH = btnH ? Math.max(nameH, btnH) : nameH;
     const bw = o.btnId === undefined ? 0 : 52 * CV.SCALE;
     const tagW = o.tag ? (CV.measure(o.tag, CV.FS.sm) + 12 * CV.SCALE) : 0;
     const tagH = o.tag ? (CV.FS.sm * 1.4 + 2 * CV.SCALE) : 0;
     const descW = U.iw() - PAD * 2;
     const descLines = o.desc ? CV.wrap(o.desc, descW, CV.FS.sm) : [];
     const descH = descLines.length ? (3 * CV.SCALE + descLines.length * CV.FS.sm * 1.55) : 0;
-    const rowH = PAD * 2 + nameRowH + descH;
+    /* V9.6.120（父亲大人："你得对齐这两者的组合，把左边当成一个整体去对齐，
+       你现在只对齐上面的名称"）：
+       左边的**技能名 + 小字注释是一整个组合**，按钮要对齐这个组合的中线 ——
+       不是只跟名称那一行对齐（那样注释一长，整块看着就偏上）。
+       所以：左边整块高 = 名字行 + 注释块；`cy` 取这块的中点，按钮挂在 cy 上，
+       名字与注释这一整块也以 cy 为中心上下摊开。按钮高再与整块取大者，保证不戳出面板。 */
+    const leftH = nameH + descH;
+    const contentH = Math.max(leftH, btnH);
+    const rowH = PAD * 2 + contentH;
     const top = U.y;
-    CV.round(U.ix(), top, U.iw(), rowH, 10 * CV.SCALE, CV.C.panel);
-    const cy = top + PAD + nameRowH / 2;         // 名字 / 等级胶囊 / 按钮共用这一条中线
+    CV.round(U.ix(), top, U.iw(), rowH, 10 * CV.SCALE, CV.C.panel);   // 参数：圆角 10 / 底色 panel（少一个参数会整块没底）
+    const cy = top + PAD + contentH / 2;
+    const leftTop = cy - leftH / 2;              // 左边整块的顶（整块绕 cy 居中）
     CV.ctx.save();
     if (o.dim) CV.ctx.globalAlpha = 0.5;
-    CV.text(CV.fit(name, U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE, CV.FS.lg, true), U.ix() + PAD, cy,
-      { size: CV.FS.lg, bold: true, color: o.color || CV.C.text });
-    const nw = CV.measure(CV.fit(name, U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE, CV.FS.lg, true), CV.FS.lg, true);
+    const nameMax = U.iw() - PAD * 2 - bw - tagW - 12 * CV.SCALE;
+    const shown = CV.fit(name, nameMax, CV.FS.f1, true);
+    CV.text(shown, U.ix() + PAD, leftTop + nameH / 2,
+      { size: CV.FS.f1, bold: true, color: o.color || CV.C.text });
+    const nw = CV.measure(shown, CV.FS.f1, true);
     if (o.tag) {
-      const tx = U.ix() + PAD + nw + 6 * CV.SCALE;
-      CV.round(tx, cy - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
-      CV.text(o.tag, tx + tagW / 2, cy, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
+      const tx = U.ix() + PAD + nw + 6 * CV.SCALE, ty = leftTop + nameH / 2;
+      CV.round(tx, ty - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
+      CV.text(o.tag, tx + tagW / 2, ty, { size: CV.FS.sm, color: CV.C.text2, align: 'center' });
     }
-    if (descLines.length) {
-      descLines.forEach(function (ln, k) {
-        CV.text(ln, U.ix() + PAD, top + PAD + nameRowH + 3 * CV.SCALE + CV.FS.sm * 1.55 * (k + 0.5),
-          { size: CV.FS.sm, color: CV.C.dim });
-      });
-    }
+    descLines.forEach(function (ln, k) {
+      CV.text(ln, U.ix() + PAD, leftTop + nameH + 3 * CV.SCALE + CV.FS.sm * 1.55 * (k + 0.5),
+        { size: CV.FS.sm, color: CV.C.dim });
+    });
     CV.ctx.restore();
-    /* 按钮在**面板里**、和名字同一条中线（不能像以前那样 top-10 悬到上一行去） */
     if (o.btnId !== undefined) {
-      /* V9.6.119：不能点的时候必须画成**禁用态**（网页版 .btn[disabled]{opacity:.34;pointer-events:none}）——
-         以前传 id='' 只是"登记不上热区"，按钮看着照样是亮的、点了没反应，就是无效按键。 */
+      /* 不能点的时候画成**禁用态**（网页版 .btn[disabled]{opacity:.34}），
+         不留"看着能点、点了没反应"的假按钮。 */
       U.btn(U.ix() + U.iw() - PAD - bw, cy - btnH / 2, bw, btnH, o.btnLabel || '+1',
         o.btnStyle || 'ghost', o.btnId, !!o.btnDis);
     }
