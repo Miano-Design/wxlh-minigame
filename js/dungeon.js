@@ -7,8 +7,11 @@ window.Dungeon = (function () {
   function diffMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).mult; }
   function rewardMult(diff) { return (D.DIFFICULTY.find(d => d.id === diff) || D.DIFFICULTY[0]).rewardMult; }
   /* V9.5.64（父亲大人：副本前期太难、没几关就卡）——
-   关卡成长从 1.16 放到 1.13；攻击曲线也从 1.10 放到 1.085（见 makeEnemies）。 */
-function stageMult(stage) { return Math.pow(1.13, stage - 1); }
+   关卡成长从 1.16 放到 1.13；攻击曲线也从 1.10 放到 1.085（见 makeEnemies）。
+   V1.0.1（父亲大人："整体难度都调整一下，现在主角单挂都能直接平推到十关十一关"）：
+   1.13 这一档被压过头了 —— 第 12 关的敌人只比第 1 关强 4.3 倍，成长太缓。
+   提到 1.15（第 12 关强 5.4 倍），前期手感由上面的 EASE 单独管，两边不打架。 */
+function stageMult(stage) { return Math.pow(1.15, stage - 1); }
 
   // 生成一场战斗的敌人
   function makeEnemies(worldId, diff, stage, kind) {
@@ -21,7 +24,7 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
        所以给前六个世界一个 0.60→0.95 的平滑系数（第 7 个世界起完全不动）：
        敌人 HP 与攻击都乘它，守关 BOSS 自己那份也一样乘 —— 目标是把"守关"从
        前面关卡的 2.6~3.0 倍压到 1.3~1.6 倍，前期不再在最后一关突然变成墙。 */
-    const EASE = [0.26, 0.31, 0.37, 0.50, 0.60, 0.72, 0.86];
+    const EASE = [0.55, 0.62, 0.70, 0.79, 0.87, 0.94, 1.0];   // V1.0.1（父亲大人）：原 0.26 起太软，敌人 HP/攻击只有两三成 —— 开局一刀一个、主角单挂能平推到 10~11 关。整体抬起，第一关落在一只手数得过来的回合数。
     const ease = wi < EASE.length ? EASE[wi] : 1;
     const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
     const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
@@ -63,18 +66,11 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
         mk(w.enemies[Math.floor(Math.random() * 3)], w.hp * m, w.atk * mAtk, w.def * mDef, {}),
       ]);
     }
-    // 前期单人也能打：1关1只(70%)，2关1只(85%)，3关2只(85%)，4关2只(92%)，5关起满编，8关起3只
-    if (stage <= 2) {
-      const weak = stage === 1 ? 0.7 : 0.85;
-      return [mk(w.enemies[0], w.hp * m * weak, w.atk * mAtk * weak, w.def * mDef * weak, {})];
-    }
-    if (stage <= 4) {
-      const weak = stage === 3 ? 0.85 : 0.92;
-      const out = [];
-      for (let i = 0; i < 2; i++) out.push(mk(w.enemies[i % w.enemies.length], w.hp * m * weak, w.atk * mAtk * weak, w.def * mDef * weak, {}));
-      return label(out);
-    }
-    const n = 2 + (stage >= 8 ? 1 : 0);
+    /* V1.0.1（父亲大人："前期可以一个敌人，到后期可以固定 5 个敌人啊，就慢慢增加，
+       到第 3 个世界就固定五个敌人"）：
+       敌人数**按世界**递增，不再按关卡：第 1 个世界 1 只、第 2 个 3 只、
+       第 3 个世界起**固定 5 只**（都不再打折 —— 折扣那套是当初"一刀一个"的根源）。 */
+    const n = wi === 0 ? 1 : (wi === 1 ? 3 : 5);
     const out = [];
     for (let i = 0; i < n; i++) out.push(mk(w.enemies[Math.floor(Math.random() * w.enemies.length)], w.hp * m, w.atk * mAtk, w.def * mDef, {}));
     return label(out);
@@ -254,11 +250,9 @@ function stageMult(stage) { return Math.pow(1.13, stage - 1); }
     return stage === 12 ? 'boss' : stage % 4 === 0 ? 'elite' : 'combat';
   }
   function wavePlan(stage) {
-    const n = stage <= 4 ? 1 : stage <= 8 ? 2 : 3;
-    const out = [];
-    for (let i = 0; i < n - 1; i++) out.push('combat');
-    out.push(finalKind(stage));
-    return out;
+    /* V1.0.1（父亲大人："到第 3 个世界就固定五个敌人，3 波战斗吧"）：
+       每关**恒 3 波**，最后一波按关卡是精英或守关 Boss。 */
+    return ['combat', 'combat', finalKind(stage)];
   }
   // 扫荡
   function sweep(worldId, diff, stage, times) {

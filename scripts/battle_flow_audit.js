@@ -272,8 +272,12 @@ console.log('\n=== 战斗页生命周期审计 ===');
       cornerAt > wrapAt && cornerAt > 0);
     t('⑦e 波次卡不再"飘过"（淡入停留淡出，位移为 0）',
       /const alpha = k < 0\.18/.test(bsrc) && !/26 \* CV\.SCALE \* k/.test(bsrc));
-    t('⑦f 波次卡画在阵容区中间（用内容顶/日志上方那条复算中线）',
-      /const cTop = CV\.TOP \+ 8 \* CV\.SCALE/.test(bsrc) && /const cBottom = CV\.H - CV\.safeBottom - CV\.NAV_H - LOG_H2/.test(bsrc));
+    /* V1.0.1（父亲大人："波间的文字应该是居中在这个区域的，现在的位置不对"）：
+       原来用写死的 LOG_H2=92 自己估下边界（真实是 150）→ 字落在红框偏下。
+       现在改为**由调用方把阵容区真实下边界传进来**，字画在正中。 */
+    t('⑦f 波次卡用阵容区的真实下边界居中（不再自己估 92）',
+      /function drawWaveCard\(areaBottom\)/.test(bsrc) && /CV\.text\(B\.tip, CV\.W \/ 2, areaBottom \/ 2/.test(bsrc)
+      && /drawWaveCard\(FIELD_BOTTOM\)/.test(bsrc));
   }
 
   /* 源码级兜底：打击特效那个 55ms 的 interval（fxT）必须也在"离场清理"里被清掉。
@@ -339,11 +343,19 @@ console.log('\n=== 战斗页生命周期审计 ===');
      把外层坐标系弹掉，整块内容（日志卡 + 撤离/速度按钮）被顶偏。
      当时绕了七八轮才查到，而这一条**静态数数量**就能拦住。 */
   {
-    const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
-    const saves = (bsrc.match(/CV\.ctx\.save\(\)/g) || []).length;
-    const restores = (bsrc.match(/CV\.ctx\.restore\(\)/g) || []).length;
-    t('sc-battle 的画布 save/restore 数量配对（错一个就会整块偏移）', saves === restores,
-      'save ' + saves + ' / restore ' + restores);
+    /* 先**剥掉注释**再数 —— 第一版没剥，结果被自己注释里的字样骗了一回。
+       覆盖**全部画布文件**（不只 sc-battle）：同类错误一次性扫干净。 */
+    const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const files = fs.readdirSync(JS).filter((f) => /^(sc-.*|cv|uiw)\.js$/.test(f));
+    const bad = [];
+    files.forEach((f) => {
+      const src = strip(fs.readFileSync(path.join(JS, f), 'utf8'));
+      const saves = (src.match(/ctx\.save\(\)/g) || []).length;
+      const restores = (src.match(/ctx\.restore\(\)/g) || []).length;
+      if (saves !== restores) bad.push(f + '(save ' + saves + '/restore ' + restores + ')');
+    });
+    t('全部画布文件的 save/restore 数量配对（错一个就会整块偏移）', bad.length === 0,
+      bad.length ? bad.join(' · ') : files.length + ' 个文件全配对');
   }
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');

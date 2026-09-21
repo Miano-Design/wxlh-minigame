@@ -315,16 +315,16 @@
   }
 
   /* 波次卡：空屏（底色已是战斗页底色）+ 居中一行「第 N 波」，淡入停留淡出 */
-  function drawWaveCard() {
+  function drawWaveCard(areaBottom) {
     if (!B.tip) return;
     const k = Math.max(0, Math.min(1, (Date.now() - (B.tipAt || 0)) / 1050));
     const alpha = k < 0.18 ? (k / 0.18) : (k > 0.72 ? Math.max(0, (1 - k) / 0.28) : 1);
-    /* 画在**阵容区**的中间（V9.6.128）：上边界 = 内容顶，下边界 = 日志上方那条
-       —— 和 FIELD_TOP / FIELD_BOTTOM 同一套几何复算，保证字落在阵容区正中。 */
-    const cTop = CV.TOP + 8 * CV.SCALE;
-    const LOG_H2 = 92 * CV.SCALE;
-    const cBottom = CV.H - CV.safeBottom - CV.NAV_H - LOG_H2;
-    CV.text(B.tip, CV.W / 2, cTop + (cBottom - cTop) / 2,
+    /* V1.0.1（父亲大人："波间的文字应该是居中在这个区域的，现在的位置不对"）：
+       原来用写死的 `LOG_H2 = 92` 自己估下半边界（真实是 150），而且是在算出
+       阵容区边界**之前**画 —— 只能靠估，于是字落在红框偏下。
+       现在直接由调用方把**阵容区的真实下边界**（FIELD_BOTTOM）传进来：
+       上边界 = 内容顶 0，字画在正中。 */
+    CV.text(B.tip, CV.W / 2, areaBottom / 2,
       { size: CV.FS.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
   }
 
@@ -348,10 +348,8 @@
     const allies = units.filter((u) => u.side === 'ally');
     const front = allies.filter((u) => u.position === 'front');
     const back = allies.filter((u) => u.position === 'back');
-    /* 波次卡：**只在阵容区**画一行「第 N 波」；日志与按钮不动（V9.6.128） */
-    if (B.tip) {
-      drawWaveCard();
-    }
+    /* 波次卡：**只在阵容区**画一行「第 N 波」；日志与按钮不动（V9.6.128）。
+       它的 y 需要阵容区的下边界，所以调用点挪到 FIELD_BOTTOM 算出来之后（见下）。 */
     /* 战场区：**和网页版同一套规则**（V9.6.0 父亲大人两条意见一起改）——
          · "敌我离得好近"：小游戏原来从战场顶按固定行高往下堆，满编时三行挤在上半屏；
          · "我方前后排离得太远"：网页版原来用 space-evenly 把三行摊满整屏，前后排隔了 185px。
@@ -446,6 +444,8 @@
 
     /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
+    /* 波次卡（居中在阵容区）—— 放在这里是因为它要用 FIELD_BOTTOM */
+    if (B.tip) drawWaveCard(FIELD_BOTTOM);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
     /* 战斗日志（最近 4 行，网页版 #battle-log）
