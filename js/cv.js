@@ -67,6 +67,9 @@
     const canvas = wx.createCanvas();
     CV.canvas = canvas;
     CV.ctx = canvas.getContext('2d');
+    /* 货币符号→专属色：开机就把 data.js 那张表读进来缓存（V9.6.139）。
+       放在 setup 里是因为它一定在 data.js 之后跑。 */
+    try { CV.syncCurrencyColors(); } catch (e) {}
     CV.relayout(info || {});
     try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
     return CV;
@@ -187,6 +190,22 @@
     for (const k in CV.GLYPHS) if (t.indexOf(k) >= 0) return true;
     return false;
   };
+  /* 货币符号 → 专属色（从货币表来，别处不许再手写颜色）。
+     晚一点挂：data.js 先加载，这里只是把表读出来缓存一份。 */
+  CV.CUR_COLOR = {};
+  CV.currencyIn = function (str) {
+    const t = str == null ? '' : String(str);
+    for (const k in CV.CUR_COLOR) if (t.indexOf(k) >= 0) return true;
+    return false;
+  };
+  CV.syncCurrencyColors = function () {
+    const list = (G.DATA && G.DATA.CURRENCIES) || [];
+    CV.CUR_COLOR = {};
+    list.forEach(function (c) {
+      const ch = String(c.icon || '').trim();
+      if (ch) CV.CUR_COLOR[ch] = c.color;
+    });
+  };
   CV.glyphWidth = function (ch, size) { return CV.GLYPHS[ch] ? size : 0; };
 
   /* ---------- 绘制原语（数值都对齐网页版） ---------- */
@@ -220,7 +239,15 @@
     c.textAlign = opt.align || 'left';
     c.textBaseline = opt.baseline || 'middle';
     const raw = _md(str);
-    if (CV.hasGlyph(raw)) {
+    /* V9.6.139（父亲大人："货币的图标还是没有统一，兑换大厅和法宝购买这些需要货币的
+       都要对应到上方 4 种货币的图标，现在还是存在有白色块"）：
+       顶栏那四颗是**带专属色**的，别处（兑换大厅 / 法宝购买 / 各处的价钱）一直是白字 ——
+       同一种货币在两个地方长得不一样，看着就是"没统一"。
+       这里做一次性收口：**只要一段文字里出现那四个货币符号，就自动按货币表的颜色画**，
+       调用点一行都不用改（页面里照旧写 '◉ 500'）。没出现货币符号时这段判断只是一次 indexOf，
+       开销可以忽略。 */
+    const curHits = CV.currencyIn(raw);
+    if (curHits || CV.hasGlyph(raw)) {
       /* 分段：普通文字照旧 fillText，缺字形的字符交给 CV.GLYPHS 画 */
       const size = opt.size || CV.FS.lg;
       /* 必须按**码点**切（Array.from），不能用逐码元切 —— emoji 是代理对，
@@ -231,7 +258,13 @@
       let px = opt.align === 'center' ? x - total / 2 : (opt.align === 'right' ? x - total : x);
       segs.forEach(function (t) {
         if (CV.GLYPHS[t]) { CV.GLYPHS[t](c, px + size / 2, y, size, opt.color || CV.C.text); px += size; }
-        else { const ta = c.textAlign; c.textAlign = 'left'; c.fillText(t, px, y); c.textAlign = ta; px += CV.measure(t, size, opt.bold); }
+        else {
+          const ta = c.textAlign; c.textAlign = 'left';
+          if (curHits && CV.CUR_COLOR[t]) c.fillStyle = CV.CUR_COLOR[t];   // 货币符号：用自己的颜色
+          c.fillText(t, px, y);
+          if (curHits && CV.CUR_COLOR[t]) c.fillStyle = opt.color || CV.C.text;
+          c.textAlign = ta; px += CV.measure(t, size, opt.bold);
+        }
       });
       if (lsOk && opt.ls) { try { c.letterSpacing = '0px'; } catch (e) {} }
       return;
