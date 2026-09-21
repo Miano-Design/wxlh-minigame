@@ -616,7 +616,7 @@ setParty(['C021']);
   t('十连保底至少1个SR', ok.results.some(r => D.RARITIES.indexOf(r.rarity) >= 2));
 
   Core.newGame();
-  // V1.0.3（父亲大人拍板价）：高级池花 ◆ 异界结晶，十连 1800（= 9 × 200）
+  // V1.0.1（父亲大人拍板价）：高级池花 ◆ 异界结晶，十连 1800（= 9 × 200）
   Core.S.cur.otherworld = 1800;
   const ok2 = Core.recruitTen('advanced');
   t('高级十连扣 1800 结晶', !ok2.error && Core.S.cur.otherworld === 0);
@@ -1391,13 +1391,13 @@ setParty(['C021']);
   t('普通池不出 SSR/UR', !P.normal.rates.SSR && !P.normal.rates.UR);
   t('高级池最低 SR', !P.advanced.rates.N && !P.advanced.rates.R && !!P.advanced.rates.SR);
   // V9.5.73：普通单抽 5000 → 500（父亲大人：5000 抽一次太肉了）；十连按 9 次单抽的价
-  // V1.0.3（父亲大人拍板价）：三池单抽 ◉500 / ◆200 / ✦100，十连一律 9 倍
+  // V1.0.1（父亲大人拍板价）：三池单抽 ◉500 / ◆200 / ✦100，十连一律 9 倍
   t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.otherworld === 200 && P.limited.cost.holy === 100);
   t('三池十连都是 9 次单抽的价',
     P.normal.ten.points === 4500 && P.advanced.ten.otherworld === 1800 && P.limited.ten.holy === 900);
   /* 定价口径 = 单抽花掉的货币量 ÷ 该货币的实测日收入（longrun_sim 记账钩子跑出来的）。
      写死实测值是有意的：以后谁改了货币产出却没跟着改价格，这条会当场红。
-     V1.0.3 数据：90 天长线模拟（补上求签/周常/成就/图鉴 + 困难地狱首通之后的口径）。 */
+     V1.0.1 数据：90 天长线模拟（补上求签/周常/成就/图鉴 + 困难地狱首通之后的口径）。 */
   const DAY_INCOME = { points: 115944, otherworld: 6494, holy: 145 };
   const burden = pool => Object.entries(pool.cost).reduce((a, [k, v]) => a + v / DAY_INCOME[k], 0);
   t('定价与稀有度一致：限定池相对负担 > 高级池 > 普通池',
@@ -1419,7 +1419,7 @@ setParty(['C021']);
 
   // 高级池：把"除一个人之外"的所有 SSR 都塞进背包，保底那一抽必须给还没有的那个
   Core.newGame(); Core.setPlayerName('招募2');
-  Core.addCur('otherworld', 200 * 200);      // V1.0.3：高级池单抽 ◆200
+  Core.addCur('otherworld', 200 * 200);      // V1.0.1：高级池单抽 ◆200
   const ssrs = D.characters.filter(c => c.rarity === 'SSR' && !c.hidden);
   const wantId = ssrs[3].id;
   ssrs.forEach(c => {
@@ -1433,7 +1433,7 @@ setParty(['C021']);
 
   // 限定池：UP 保底那一抽必须给当期 UP，且计数与高级池互不干扰
   Core.newGame(); Core.setPlayerName('招募3');
-  Core.addCur('holy', 100 * 120);              // V1.0.3：限定池单抽 ✦100
+  Core.addCur('holy', 100 * 120);              // V1.0.1：限定池单抽 ✦100
   const up = D.recruitUpChar();
   Core.pityOf('limited').up = D.PITY_UP - 1;
   const limR = withRandom(0.5, () => Core.recruitOnce('limited'));
