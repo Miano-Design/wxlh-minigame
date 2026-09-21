@@ -373,7 +373,7 @@
     const CARD_H = AV + 40 * CV.SCALE;            // 一行占的高度 = 头像 + 名字 + 血条 + 百分比（与 unitCard 的返回值一致）
     const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 同一组里两排之间（和网页版 .b-side gap 一致）
-    const GROUP_GAP = AV * 1.5;                   // 敌方组与我方组之间 = 一个半头像（父亲大人定的）
+    const GROUP_GAP = 30 * CV.SCALE;               // 敌方组与我方组之间（V1.0.1：一个半头像 75 → 30，父亲大人定的）
     /* V9.6.2（父亲大人："战斗日志还是出画了"）：这里是**内容坐标**（渲染时已经被顶栏整体下移），
        所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
     const CONTENT_H = CV.H - CV.safeBottom - (CV.TOP + 8) - 8;
