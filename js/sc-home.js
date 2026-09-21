@@ -476,8 +476,14 @@
         CV.text(r[0], U.ix(), cy, { size: CV.FS.md, color: CV.C.dim });
         const vw = CV.measure(r[1], CV.FS.lg, true);
         const sw = r[2] ? CV.measure(r[2], CV.FS.sm) + 8 * CV.SCALE : 0;
+        /* V1.0.1（父亲大人："六维待分的字没有待加的时候灰字展示就行了，不用一直高亮"）：
+           原来 i===2（【主角】六维待分 / 技能待加）**永远金色**，没有待加点时也在发光。
+           改成和网页版同一条判据：有点数才 gold，没有就 dim。 */
+        const valColor = (i === 0 && st.hasBloodline) ? CV.C.gold
+          : i === 2 ? ((S.player.attrPoints || S.player.skillPoints) ? CV.C.gold : CV.C.dim)
+          : CV.C.text;
         CV.text(CV.fit(r[1], U.iw() - 28 * CV.SCALE - sw, CV.FS.lg, true), U.ix() + U.iw() - vw - sw, cy,
-          { size: CV.FS.lg, bold: true, color: (i === 0 && st.hasBloodline) || i === 2 ? CV.C.gold : CV.C.text });
+          { size: CV.FS.lg, bold: true, color: valColor });
         if (r[2]) CV.text(r[2], U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
         /* V9.6.35：四行各登记一颗热区 —— 开局引导要**逐项**讲（父亲大人：逐项介绍），
            只有整卡一颗热区的话，"讲【等级】"就没法只高亮那一行。 */
