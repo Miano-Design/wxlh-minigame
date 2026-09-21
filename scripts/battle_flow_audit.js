@@ -291,10 +291,12 @@ console.log('\n=== 战斗页生命周期审计 ===');
      能整块顶动它的只有滚动量 —— 这里跑一场**无缝波次**，逐帧记录日志卡（每帧最后一个
      CV.card）的 top，全程必须一个像素都不动。 */
   UI.clear();
+  /* ⚠️ 记的是**屏幕坐标**（top + 内容层平移），不是内容坐标 ——
+     内容坐标不变、平移量变，屏幕上照样会弹。上一版就栽在这里。 */
   const cardTops = [];
   const realCardFn = CV.card;
   CV.card = function (pad, top, w, h) {
-    cardTops.push(Math.round(top));
+    cardTops.push(Math.round(top + CV.TOP + 8 - (CV.scroll || 0)));
     return realCardFn.apply(this, arguments);
   };
   /* ⚠️ 必须用**真怪物、真多波**跑：第一版断言用的是空队伍 + 空敌人（假战斗一帧就结束），
