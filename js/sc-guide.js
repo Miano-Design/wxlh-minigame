@@ -76,9 +76,6 @@
       if (currencyFocusId === c.id) U.note('← 你刚点的是这一种', 2 * CV.SCALE);
       U.card(function () {
         U.h3(c.icon + ' ' + c.name, '持有 ' + fmt(S.cur[c.id] || 0));
-        /* V1.0.1（父亲大人）：光看"持有"会误判稀有度 —— 产量单独一行放最上面（同网页版）。
-           ◆ 是流水型（每天大进大出，余额自然低），✦ 是里程碑型（进得少花得也少，攒着显得多）。 */
-        richLine('**产量**：' + (info.rate || '—'), CV.FS.md, c.color);
         /* 网页版这两个标签是 <b style="color:var(--gold)">用途</b> —— 加粗是为了让"用途/来源"两层一眼分开 */
         richLine('**用途**：' + (info.use || '—'), CV.FS.md);
         richLine('**来源**：' + (info.gain || '—'), CV.FS.md, CV.C.dim);
