@@ -28,13 +28,30 @@ require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → �
 const CV = globalThis.CV, Core = globalThis.Core, G = globalThis;
 /* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
 globalThis.GAME_VER = '1.0.1';
-const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+/* V1.0.2（多账号调试自审时在 Console 里抓到的）：
+   这一行原来是**裸调用** —— 冷启动时 jsbridge 还没就绪，wx.getWindowInfo() 会抛
+   「[jsbridge] invoke getSystemInfo fail: jsbridge not ready」。
+   而它写在 game.js 的**顶层**：一抛出去，下面的 CV.setup / bindTouch / 心跳**全都不会执行**，
+   表现就是白屏卡死。下面 onWindowResize 和 onShow 那两处早就包了 try/catch，只有这里是漏的。
+   拿到的是空对象也不怕：CV.relayout 里 `if (!w || !h) return`，会保持默认尺寸，
+   再由下面那次延迟补算 / onWindowResize 兜回来。 */
+let info = {};
+try { info = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}; } catch (e) {}
 /* 底栏四个页签 → 对应页面（网页版 #navbar） */
 CV.NAV_TABS.forEach(function (t) {
   CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); });
 });
 CV.setup(info);
 CV.bindTouch();
+/* 开机那一次如果没拿到尺寸（jsbridge 未就绪），延后补一次 —— onWindowResize 只在
+   "窗口真的变了"时才触发，窗口不变它是不会来救场的。 */
+if (!info.windowWidth) {
+  setTimeout(function () {
+    let now = {};
+    try { now = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}; } catch (e) {}
+    relayoutNow(now.windowWidth, now.windowHeight, now);
+  }, 300);
+}
 /* V9.6.90（父亲大人："底部导航栏出画，刚开始不会，点几下就出画了"）：
    窗口尺寸是**会变的** —— 键盘弹出、横竖屏切换、分屏、切前后台都可能触发。
    以前只在开机算一次布局，一变就按老尺寸画，底栏就掉到画面外。
