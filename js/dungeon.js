@@ -249,10 +249,16 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
   function finalKind(stage) {
     return stage === 12 ? 'boss' : stage % 4 === 0 ? 'elite' : 'combat';
   }
-  function wavePlan(stage) {
-    /* V1.0.1（父亲大人："到第 3 个世界就固定五个敌人，3 波战斗吧"）：
-       每关**恒 3 波**，最后一波按关卡是精英或守关 Boss。 */
-    return ['combat', 'combat', finalKind(stage)];
+  function wavePlan(stage, worldId) {
+    /* V1.0.1（父亲大人："波次也是根据世界递增的，到第三世界后才是固定 3 波"）：
+       波次**按世界**递增 —— 第 1 个世界 1 波、第 2 个 2 波、第 3 个世界起固定 3 波
+       （最后一波按关卡是精英或守关 Boss）。不传 worldId 时按 3 波兜底。 */
+    const wi = worldId ? D.WORLDS.findIndex((w) => w.id === worldId) : -1;
+    const n = wi < 0 ? 3 : (wi === 0 ? 1 : wi === 1 ? 2 : 3);
+    const out = [];
+    for (let i = 0; i < n - 1; i++) out.push('combat');
+    out.push(finalKind(stage));
+    return out;
   }
   // 扫荡
   function sweep(worldId, diff, stage, times) {

@@ -140,10 +140,12 @@ const bossRes = Battle.run({ allies, enemies: bossEnemies, worldId: 'W01', maxRo
 t('Boss战正常结束', typeof bossRes.win === 'boolean' && bossRes.frames.some(f => f.type === 'end'));
 
 // 8. 副本波次（V8.1：点进去就打，不再选路线）
-/* V1.0.1（父亲大人："到第 3 个世界就固定五个敌人，3 波战斗吧"）：
-   波次改成**每关恒 3 波**（最后一波按关卡是精英 / 守关 Boss），不再按关卡递增。 */
-t('每关都是 3 波', [1, 5, 9, 12].every(s => Dungeon.wavePlan(s).length === 3));
-t('第 5 关最后一波仍是普通战斗（精英在 4/8 关、Boss 在 12 关）', Dungeon.wavePlan(5)[2] === 'combat');
+/* V1.0.1（父亲大人："波次也是根据世界递增的，到第三世界后才是固定 3 波"）：
+   波次按**世界**递增（不再按关卡），最后一波按关卡是精英 / 守关 Boss。 */
+t('波次按世界递增：W01 一波、W02 两波、W03 起固定三波',
+  Dungeon.wavePlan(1, 'W01').length === 1 && Dungeon.wavePlan(1, 'W02').length === 2 &&
+  Dungeon.wavePlan(9, 'W03').length === 3 && Dungeon.wavePlan(9, 'W10').length === 3);
+t('第 5 关最后一波仍是普通战斗（精英在 4/8 关、Boss 在 12 关）', Dungeon.wavePlan(5, 'W03')[2] === 'combat');
 /* 敌人数按**世界**递增：W01 一只、W02 三只、W03 起固定五只。 */
 t('W01 一只敌人 / W02 三只 / W03 起固定五只',
   Dungeon.makeEnemies('W01', 'normal', 1, 'combat').length === 1 &&
