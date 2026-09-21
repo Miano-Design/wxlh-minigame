@@ -383,10 +383,16 @@
     const CORNER_H = U.BTN_SM * CV.SCALE + 10 * CV.SCALE;
     const FIELD_BOTTOM_UNITS = FIELD_BOTTOM - CORNER_H;
     /* 四行：0 敌方后排 / 1 敌方前排 / 2 我方前排 / 3 我方后排（后排在上、前排朝对面，像象棋）。
-       整组在战场区里**竖直居中**（上下留白均分），屏幕越高留白越多。 */
-    const needH = (CARD_H + SIDE_GAP) * 4 + GROUP_GAP;
-    const rowTop = FIELD_TOP + Math.max(8 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - needH) / 2);
-    const rowY = (i) => rowTop + i * (CARD_H + SIDE_GAP) + (i >= 2 ? GROUP_GAP : 0);
+       整组在战场区里竖直居中，屏幕越高留白越多。两处细节（V1.0.1，父亲大人："我方往上一点，
+       现在跟两颗按钮太贴了"）：
+         · **末行不该再算一次排间距**（needH 里那个 SIDE_GAP 是行"之间"的，最后一排后面没有行）；
+         · 底部额外留 BOTTOM_PAD —— "撤离 / 速度"就在下面，居中的均分留白不够它们喘气。 */
+    const BOTTOM_PAD = 20 * CV.SCALE;                       // 我方最后一排与两颗按钮之间的呼吸感
+    const rowStep = CARD_H + SIDE_GAP;
+    const needH = rowStep * 4 + GROUP_GAP - SIDE_GAP;
+    const areaH = (FIELD_BOTTOM_UNITS - BOTTOM_PAD) - FIELD_TOP;
+    const rowTop = FIELD_TOP + Math.max(8 * CV.SCALE, (areaH - needH) / 2);
+    const rowY = (i) => rowTop + i * rowStep + (i >= 2 ? GROUP_GAP : 0);
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
         { list: enemies.filter((u) => u.position !== 'front'), y: rowY(0), ally: false },   // 敌方后排（最上）
