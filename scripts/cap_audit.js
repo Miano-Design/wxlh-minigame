@@ -45,6 +45,9 @@ const day = {
      并入异界结晶。`battleRewards` / `arenaReward` 返回的对象**已经**是合并后的口径，
      所以这里不能再按老键名去取（取不到就是 NaN，整个体检会失真）。 */
   otherworld: r.otherworldPer10Min * 144 + boss.otherworld * sweep * 0.5 + arena.otherworld * D.ARENA_DAILY,
+  /* V1.0.1（父亲大人）：圣洁晶石从"拍脑袋写死的 20"换成**实测口径** ——
+     longrun_sim 的记账钩子（Core.tallyCur）跑出来是 90 天日均 18、30 天日均 37
+     （里程碑货币，前面几关拿得多、后面摊薄）。取 20 做保守估计，与实测吻合。 */
   holy: 20,
   exp: r.expPerMin * 1440 * 1.5 + boss.exp * sweep * 0.5,      // 主角经验：挂机（含闭关领队）+ 副本
   charExp: boss.exp * sweep,                                   // 伙伴经验池：副本/扫荡那一份

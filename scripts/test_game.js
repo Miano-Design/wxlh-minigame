@@ -616,12 +616,13 @@ setParty(['C021']);
   t('十连保底至少1个SR', ok.results.some(r => D.RARITIES.indexOf(r.rarity) >= 2));
 
   Core.newGame();
-  Core.S.cur.holy = 900;
+  // V1.0.1（父亲大人）：高级池改花 ◆ 异界结晶，十连 2700（= 9 × 300）
+  Core.S.cur.otherworld = 2700;
   const ok2 = Core.recruitTen('advanced');
-  t('高级十连扣 900 晶石', !ok2.error && Core.S.cur.holy === 0);
-  Core.S.cur.holy = 899;
+  t('高级十连扣 2700 结晶', !ok2.error && Core.S.cur.otherworld === 0);
+  Core.S.cur.otherworld = 2699;
   const poor2 = Core.recruitTen('advanced');
-  t('晶石不足高级十连被拒', !!poor2.error && Core.S.cur.holy === 899);
+  t('结晶不足高级十连被拒', !!poor2.error && Core.S.cur.otherworld === 2699);
 }
 
 // 31. 回归：强化失败不许白吞材料
@@ -1384,12 +1385,20 @@ setParty(['C021']);
 // 50. 招募三池：花三种货币、出三种结构、保底各自独立
 {
   const P = D.RECRUIT_POOLS;
-  t('三池花三种货币', P.normal.currency === 'points' && P.advanced.currency === 'holy' && P.limited.currency === 'otherworld');
+  /* V1.0.1（父亲大人）：按实测日收入（◉ 57k : ◆ 3.5k : ✦ 41）重排 ——
+     三档货币 = 三档稀有度，池子越贵花越稀有的钱。 */
+  t('三池花三种货币', P.normal.currency === 'points' && P.advanced.currency === 'otherworld' && P.limited.currency === 'holy');
   t('普通池不出 SSR/UR', !P.normal.rates.SSR && !P.normal.rates.UR);
   t('高级池最低 SR', !P.advanced.rates.N && !P.advanced.rates.R && !!P.advanced.rates.SR);
   // V9.5.73：普通单抽 5000 → 500（父亲大人：5000 抽一次太肉了）；十连按 9 次单抽的价
-  // V9.6.134：货币 8 → 4，限定池的"异界结晶"价格 ×1.55（池子并入技能芯片 / 血统结晶 / 深井徽记）
-  t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.holy === 100 && P.limited.cost.otherworld === 90);
+  // V1.0.1：高级池 100 晶石 → ◆ 300、限定池 90 结晶 → ✦ 20（旧价与货币稀有度反着来）
+  t('三池单抽价各不相同', P.normal.cost.points === 500 && P.advanced.cost.otherworld === 300 && P.limited.cost.holy === 20);
+  /* 定价口径 = 单抽花掉的货币量 ÷ 该货币的实测日收入（longrun_sim 记账钩子跑出来的）。
+     写死实测值是有意的：以后谁改了货币产出却没跟着改价格，这条会当场红。 */
+  const DAY_INCOME = { points: 56633, otherworld: 3493, holy: 41 };
+  const burden = pool => Object.entries(pool.cost).reduce((a, [k, v]) => a + v / DAY_INCOME[k], 0);
+  t('定价与稀有度一致：限定池相对负担 > 高级池 > 普通池',
+    burden(P.limited) > burden(P.advanced) && burden(P.advanced) > burden(P.normal));
   t('十连价 = 9 次单抽（不会出现十连比单抽贵几十倍）', P.normal.ten.points === P.normal.cost.points * 9);
 
   Core.newGame(); Core.setPlayerName('招募');
@@ -1407,7 +1416,7 @@ setParty(['C021']);
 
   // 高级池：把"除一个人之外"的所有 SSR 都塞进背包，保底那一抽必须给还没有的那个
   Core.newGame(); Core.setPlayerName('招募2');
-  Core.addCur('holy', 100 * 200);
+  Core.addCur('otherworld', 300 * 200);      // V1.0.1：高级池现在花异界结晶
   const ssrs = D.characters.filter(c => c.rarity === 'SSR' && !c.hidden);
   const wantId = ssrs[3].id;
   ssrs.forEach(c => {
@@ -1421,7 +1430,7 @@ setParty(['C021']);
 
   // 限定池：UP 保底那一抽必须给当期 UP，且计数与高级池互不干扰
   Core.newGame(); Core.setPlayerName('招募3');
-  Core.addCur('otherworld', 60 * 120);
+  Core.addCur('holy', 20 * 120);               // V1.0.1：限定池现在花圣洁晶石
   const up = D.recruitUpChar();
   Core.pityOf('limited').up = D.PITY_UP - 1;
   const limR = withRandom(0.5, () => Core.recruitOnce('limited'));
@@ -1651,23 +1660,23 @@ setParty(['C021']);
 
   // 十连：10 张券 = 免货币
   Core.addItem('ticket_adv', 10);
-  Core.S.cur.holy = 0;
-  const beforeSweep = Core.S.cur.holy;
+  Core.S.cur.otherworld = 0;                   // V1.0.1：高级池现在花异界结晶
+  const beforeSweep = Core.S.cur.otherworld;
   const ten = withRandom(0.99, () => Core.recruitTen('advanced'));
   t('十连有 10 张券时整付券', !ten.error && ten.usedTickets === 10 && (Core.S.items.ticket_adv || 0) === 0);
-  t('十连用券时不扣货币', Core.S.cur.holy === beforeSweep);
+  t('十连用券时不扣货币', Core.S.cur.otherworld === beforeSweep);
   t('十连出满 10 个结果', ten.results.length === 10);
 
   // 十连：券只有 9 张 → 不混付，改扣货币
   Core.addItem('ticket_adv', 9);
-  Core.addCur('holy', D.RECRUIT_POOLS.advanced.ten.holy);
-  const holyBefore = Core.S.cur.holy;
+  Core.addCur('otherworld', D.RECRUIT_POOLS.advanced.ten.otherworld);
+  const curBefore = Core.S.cur.otherworld;
   const ten2 = withRandom(0.99, () => Core.recruitTen('advanced'));
-  t('券不足 10 张时不混付、改扣货币', !ten2.error && ten2.usedTickets === 0 && Core.S.cur.holy === holyBefore - D.RECRUIT_POOLS.advanced.ten.holy);
+  t('券不足 10 张时不混付、改扣货币', !ten2.error && ten2.usedTickets === 0 && Core.S.cur.otherworld === curBefore - D.RECRUIT_POOLS.advanced.ten.otherworld);
   t('券不足 10 张时券原样留着', (Core.S.items.ticket_adv || 0) === 9);
 
   // 货币和券都不够 → 明确失败
-  Core.S.cur.holy = 0; Core.S.items.ticket_adv = 0;
+  Core.S.cur.otherworld = 0; Core.S.items.ticket_adv = 0;
   t('券和货币都不足时招募失败', !!Core.recruitOnce('advanced').error);
 
   // 募捐券能进背包、能被奖励系统发出来

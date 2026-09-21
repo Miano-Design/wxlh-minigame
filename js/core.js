@@ -569,7 +569,21 @@ window.Core = (function () {
     if (!Number.isFinite(raw) || !raw) return;
     const d = Math.floor(raw);
     S.cur[id] = Math.max(0, (S.cur[id] || 0) + d);
+    /* V9.6.146（父亲大人："你自己根据获得的程度你判定一下货币的稀有度"）：
+       给体检脚本一根"收入记账"的钩子 —— **只记进项**（d>0），花出去的不算。
+       为什么要走这一层：`addCur` 是**所有**产出的唯一入口，在这里记账，
+       任何一条线（副本/悬赏/任务/求签/奇遇/分解…）都跑不掉，也不用逐个函数去插桩。
+       默认关闭，不影响正式游戏。 */
+    if (curTally && d > 0) curTally[id] = (curTally[id] || 0) + d;
     emitCur(id, d);
+  }
+  let curTally = null;
+  /* `tallyCur(true)` 开始记、`tallyCur(false)` 停并清空、**`tallyCur()` 只读**（不清空）。
+     ⚠️ 第一版写成 `tallyCur(on){ curTally = on ? {} : null }` —— 于是"读取"那一下会把累计清零，
+     跑出来全是 0。取值和重置必须是两件事。 */
+  function tallyCur(on) {
+    if (on !== undefined) curTally = on ? {} : null;
+    return curTally;
   }
   function canAfford(cost) {
     return Object.entries(cost).every(([k, v]) => (S.cur[k] || 0) >= v);
@@ -3602,7 +3616,7 @@ window.Core = (function () {
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore, shardPoolOf, addShardPool, addShardsToPool,
     setNoticeListener, stashItem, stashCount, stashList, claimStash,
     bagUsage, buyBagCap,
-    addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
+    tallyCur, addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
     craftSerum, useSerum, serumTaken, serumApplied, serumUnlocked, serumUnlockTip,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,
