@@ -291,12 +291,15 @@ console.log('\n=== 战斗页生命周期审计 ===');
      能整块顶动它的只有滚动量 —— 这里跑一场**无缝波次**，逐帧记录日志卡（每帧最后一个
      CV.card）的 top，全程必须一个像素都不动。 */
   UI.clear();
-  /* ⚠️ 记的是**屏幕坐标**（top + 内容层平移），不是内容坐标 ——
-     内容坐标不变、平移量变，屏幕上照样会弹。上一版就栽在这里。 */
+  /* ⚠️ 量的是**滚动量**：内容坐标一直是常数（量过），真正把整块页面顶上去的是
+     `translate(0, TOP+8-scroll)` 里的 scroll。父亲大人两张截图实测差约 60px，
+     正好等于战斗页"多算了一个底栏高度"的 maxScroll。 */
   const cardTops = [];
+  const scrolls = [];
   const realCardFn = CV.card;
   CV.card = function (pad, top, w, h) {
     cardTops.push(Math.round(top + CV.TOP + 8 - (CV.scroll || 0)));
+    scrolls.push(Math.round(CV.scroll || 0));
     return realCardFn.apply(this, arguments);
   };
   /* ⚠️ 必须用**真怪物、真多波**跑：第一版断言用的是空队伍 + 空敌人（假战斗一帧就结束），
@@ -325,6 +328,10 @@ console.log('\n=== 战斗页生命周期审计 ===');
   t('战斗日志卡全程不移动（每波不再往上弹）', uniq.length <= 1,
     '出现过的 top：' + uniq.slice(0, 6).join(' / ') + (uniq.length > 6 ? ' …' : '')
     + '（共 ' + cardTops.length + ' 帧）');
+  const uniqScroll = Array.from(new Set(scrolls));
+  t('战斗页全程不参与滚动（maxScroll 恒 0，scroll 不会把整页顶起来）',
+    uniqScroll.length === 1 && uniqScroll[0] === 0,
+    '出现过的 scroll：' + uniqScroll.slice(0, 6).join(' / ') + ' · maxScroll=' + Math.round(CV.maxScroll || 0));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exitCode = fail ? 1 : 0;
