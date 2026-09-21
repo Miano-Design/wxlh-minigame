@@ -135,7 +135,9 @@ async function doBattleStage(stageIdx) {
   if (!h) return { ok: false, why: '世界页上没有第 ' + (stageIdx + 1) + ' 关的热区' };
   tap(h);
   /* V1.0.1：每关改成 3 波后，一场要走 3 次无缝交接 —— 900ms 不够，放宽到 2.6s。 */
-  await wait(2600);                      // 一帧就赢的假战斗 × 3 波 + 结算页
+  /* V1.0.1：每关改成 3 波后，**每波之间还有 1050ms 的波次卡** ——
+     总时长 = 3×1050 + 结算 ≈ 3.5s，原来等 900ms 根本等不到，所以主线尺子报"打完停在 battle"。 */
+  await wait(4500);                      // 3 波 × 波次卡 1050ms + 结算页
   if (page() === 'battle') {
     /* 结算页：优先「下一关」，没有就「返回」 */
     tapId('dun_next') || tapId('battle_close');

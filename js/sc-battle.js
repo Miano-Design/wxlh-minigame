@@ -362,9 +362,18 @@
        现在两边都是：**敌方占上方、我方前排+后排收成一组贴在日志上方**，
        我方两排之间只隔 14px（就是"一支部队"该有的距离），屏幕越高上下留白越多。 */
     const FIELD_TOP = U.y;
-    const CARD_H = 92 * CV.SCALE;                 // 一张单位卡的高度（头像 + 名字 + 血条 + 百分比）
+    /* ── 战场四行：**几何只定义一次** ──────────────────────────────────────
+       V1.0.1（父亲大人："你每次修改都要代码级修改啊，别老是只改表面"）：
+       这段以前是三处各写各的 —— 行高写死 92（而 unitCard 实际画出来是 90）、
+       每一行的 y 手写、组间距又有两个互相打架的约束（space*2 / 固定值）。
+       所以每次调间距都要重新算一遍，还算错过一次。
+       现在：**行高、排内间距、组间距三个常量**摆在这儿，行的 y 一律由行号推出来，
+       中间那道组间距只在这一个地方出现 —— 以后调间距就是改一个数。 */
+    const AV = 50 * CV.SCALE;                     // 头像直径（敌我统一，与 unitCard 同源）
+    const CARD_H = AV + 40 * CV.SCALE;            // 一行占的高度 = 头像 + 名字 + 血条 + 百分比（与 unitCard 的返回值一致）
     const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
-    const SIDE_GAP = 14 * CV.SCALE;               // 我方前排与后排的间距（和网页版 .b-side gap 一致）
+    const SIDE_GAP = 14 * CV.SCALE;               // 同一组里两排之间（和网页版 .b-side gap 一致）
+    const GROUP_GAP = AV * 1.5;                   // 敌方组与我方组之间 = 一个半头像（父亲大人定的）
     /* V9.6.2（父亲大人："战斗日志还是出画了"）：这里是**内容坐标**（渲染时已经被顶栏整体下移），
        所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
     const CONTENT_H = CV.H - CV.safeBottom - (CV.TOP + 8) - 8;
@@ -373,29 +382,17 @@
        这一行要占位置，所以单位摆放的下边界要再往上让出它的高度，免得挤在一起。 */
     const CORNER_H = U.BTN_SM * CV.SCALE + 10 * CV.SCALE;
     const FIELD_BOTTOM_UNITS = FIELD_BOTTOM - CORNER_H;
-    /* V9.6.1（父亲大人给的批注）：中间那块不能是空的 —— 敌方 / 我方 / 日志要**紧凑占满一屏**。
-       把余量**四等分**（上留白 / 敌我之间×2 / 下留白），也就是敌我空档 = 上下留白的 2 倍，
-       和网页版 .b-field 的 `justify-content: space-around` 是同一套几何。 */
-    /* V1.0.1（父亲大人："敌方阵型跟我方阵型一样，前 2 后 3，战斗显示为上方为后排、
-       下方为前排，像下象棋一样"）：敌我各两排 —— **后排在上、前排在下**（前排朝对面），
-       所以是 4 行、两个排间距。 */
-    const stackH = CARD_H * 4 + SIDE_GAP * 2;
-    const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
-    const enemyY = FIELD_TOP + space;
-    /* V1.0.1（父亲大人："敌我间距可以大一点，差不多一个半头像那么大" / "现在还是贴在一起的"）：
-       上一版算错了 —— `allyTop` 只加了"敌方前排的**顶**"，没加它**自身的高度**，
-       于是那 75px 全被卡片自己吃掉了，看着依旧贴在一起。
-       现在按"一排占的高度 × 2（敌方两排） + 组间距"来放我方那组。
-       组间距 = 1.5 × 头像(50) = 75，与父亲大人要的一致。 */
-    const ROW_H = CARD_H + SIDE_GAP;                        // 一排占的高度（含排内间距）
-    const GROUP_GAP = Math.max(space * 2, 75 * CV.SCALE);
-    const allyTop = enemyY + ROW_H * 2 + GROUP_GAP;
+    /* 四行：0 敌方后排 / 1 敌方前排 / 2 我方前排 / 3 我方后排（后排在上、前排朝对面，像象棋）。
+       整组在战场区里**竖直居中**（上下留白均分），屏幕越高留白越多。 */
+    const needH = (CARD_H + SIDE_GAP) * 4 + GROUP_GAP;
+    const rowTop = FIELD_TOP + Math.max(8 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - needH) / 2);
+    const rowY = (i) => rowTop + i * (CARD_H + SIDE_GAP) + (i >= 2 ? GROUP_GAP : 0);
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
-        { list: enemies.filter((u) => u.position !== 'front'), y: enemyY, ally: false },                       // 敌方后排（最上）
-        { list: enemies.filter((u) => u.position === 'front'), y: enemyY + CARD_H + SIDE_GAP, ally: false },   // 敌方前排（靠中）
-        { list: front, y: allyTop, ally: true },                                                              // 我方前排（靠中）
-        { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },                                           // 我方后排（最下）
+        { list: enemies.filter((u) => u.position !== 'front'), y: rowY(0), ally: false },   // 敌方后排（最上）
+        { list: enemies.filter((u) => u.position === 'front'), y: rowY(1), ally: false },   // 敌方前排（靠中）
+        { list: front, y: rowY(2), ally: true },                                            // 我方前排（靠中）
+        { list: back, y: rowY(3), ally: true },                                             // 我方后排（最下）
       ];
       /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
          （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
