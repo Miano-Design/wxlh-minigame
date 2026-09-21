@@ -382,10 +382,14 @@
     const stackH = CARD_H * 4 + SIDE_GAP * 2;
     const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
-    /* V1.0.1（父亲大人："敌我间距可以大一点，差不多一个半头像那么大"）：
-       头像统一都是 50，所以这里按 1.5 × 50 = 75 给最小间距（原来是半张卡高 46，偏挤）。 */
+    /* V1.0.1（父亲大人："敌我间距可以大一点，差不多一个半头像那么大" / "现在还是贴在一起的"）：
+       上一版算错了 —— `allyTop` 只加了"敌方前排的**顶**"，没加它**自身的高度**，
+       于是那 75px 全被卡片自己吃掉了，看着依旧贴在一起。
+       现在按"一排占的高度 × 2（敌方两排） + 组间距"来放我方那组。
+       组间距 = 1.5 × 头像(50) = 75，与父亲大人要的一致。 */
+    const ROW_H = CARD_H + SIDE_GAP;                        // 一排占的高度（含排内间距）
     const GROUP_GAP = Math.max(space * 2, 75 * CV.SCALE);
-    const allyTop = enemyY + CARD_H + SIDE_GAP + GROUP_GAP;
+    const allyTop = enemyY + ROW_H * 2 + GROUP_GAP;
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
         { list: enemies.filter((u) => u.position !== 'front'), y: enemyY, ally: false },                       // 敌方后排（最上）
