@@ -36,7 +36,6 @@ window.Core = (function () {
   function defaultState() {
     return {
       v: 5,
-      createdAt: Date.now(),
       player: Object.assign(freshProtagonist('执灯者'), { geneLock: 0, reincarnations: 0, talents: { body: 0, energy: 0, nerve: 0, grace: 0 } }),
       altPlayers: [],         // 新建的主角（体验不同血统），与当前主角可切换
       // V9.2：背包分三池（道具 / 材料 / 装备），各 50 格起、各自扩容
@@ -64,7 +63,6 @@ window.Core = (function () {
       /* V9.6.130：法宝多一条"祭炼"等级线、坐骑多一条"喂养"等级线（父亲大人点头的方案）
          lvMap = { id → 等级 }；0 级＝刚买到时的原始效果 */
       fabao: { own: [], on: null, lvMap: {} },
-      fabaoLvMap: {},   // 兼容：祭炼等级也挂一份在这里（读档迁移用）
       mount: { own: [], on: null, lvMap: {} },   // 坐骑（V9.6.130：lvMap = 喂养等级）
       sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 求签（对标"SignItem"）：今天的签文与挂机加成
       worlds: {},           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
@@ -97,7 +95,6 @@ window.Core = (function () {
       unlocks: {},
       quests: { claimed: [] },
       ssrTicket: 0,
-      tutorial: false,
     };
   }
 

@@ -1479,12 +1479,16 @@ window.DATA = (function () {
   /* ================= 求签（对标《道友修仙》的求签 / SignItem） =================
      每天免费摇一次签，签文分五档（大吉→末吉），给当日的挂机加成 + 一点硬通货。
      它解决的问题是"每天上线第一件事点哪里"——先求一签，再看今天要干嘛。 */
+  /* 签文（V9.6.144）：五档各带一个"当天挂机加成" + 一笔硬通货。
+     ⚠️ 这里原来每条都写着 `days: 1` —— 但**全仓没有一行读它**：有效期是 core.drawSign()
+     里按"日期 = 今天"算出来的（跨天作废），数据里那个字段是早期"签文能挂好几天"设计的遗骸。
+     留着会误导后人以为改这个数字就能调有效期，所以删掉，把口径写在注释里。 */
   const SIGNS = [
-    { id: 'sg1', tier: '大吉', weight: 4,   text: '紫气东来，今日诸事皆宜。',   gain: { holy: 60, otherworld: 126 },  idlePct: 0.30, days: 1 },
-    { id: 'sg2', tier: '上吉', weight: 10,  text: '云开见月，所行皆顺。',       gain: { holy: 40, otherworld: 84 },   idlePct: 0.22, days: 1 },
-    { id: 'sg3', tier: '中吉', weight: 22,  text: '平顺之日，稳中有进。',       gain: { holy: 25, otherworld: 52 },   idlePct: 0.15, days: 1 },
-    { id: 'sg4', tier: '小吉', weight: 30,  text: '小有收获，宜守不宜攻。',     gain: { holy: 15, otherworld: 31 },   idlePct: 0.10, days: 1 },
-    { id: 'sg5', tier: '末吉', weight: 34,  text: '谋事在人，今日宜稳扎稳打。', gain: { holy: 8,  otherworld: 15 },                    idlePct: 0.06, days: 1 },
+    { id: 'sg1', tier: '大吉', weight: 4,  text: '紫气东来，今日诸事皆宜。',   gain: { holy: 60, otherworld: 126 }, idlePct: 0.30 },
+    { id: 'sg2', tier: '上吉', weight: 10, text: '云开见月，所行皆顺。',       gain: { holy: 40, otherworld: 84 },  idlePct: 0.22 },
+    { id: 'sg3', tier: '中吉', weight: 22, text: '平顺之日，稳中有进。',       gain: { holy: 25, otherworld: 52 },  idlePct: 0.15 },
+    { id: 'sg4', tier: '小吉', weight: 30, text: '小有收获，宜守不宜攻。',     gain: { holy: 15, otherworld: 31 },  idlePct: 0.10 },
+    { id: 'sg5', tier: '末吉', weight: 34, text: '谋事在人，今日宜稳扎稳打。', gain: { holy: 8,  otherworld: 15 },  idlePct: 0.06 },
   ];
   function rollSign() {
     const total = SIGNS.reduce((a, s) => a + s.weight, 0);
