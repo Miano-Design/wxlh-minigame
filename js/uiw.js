@@ -87,7 +87,13 @@
     U.inCard = true;
     U.dry = true; U.y = top + padY; content(); const inner = U.y - top - padY;
     U.dry = false;
-    const h = inner + padY * 2;
+    /* V1.0.1（父亲大人："每一波结束战斗日志都会往上顶一下"）：
+       加一个 minH —— 内容少的时候卡片也**撑住固定高度**。
+       起因：原来高度完全跟内容走，日志从 2 行长到 4 行时整张卡在长个儿，
+       每波结束都会顶一下。网页版那边 #battle-log 本来就是定高（height: 5.375rem + overflow-y），
+       所以这里补上同一个能力，两边行为对齐。 */
+    const minH = (opt && opt.minH) ? opt.minH * CV.SCALE : 0;
+    const h = Math.max(inner + padY * 2, minH);
     if (h > 4) CV.card(U.pad(), top, U.cw(), h);
     U.y = top + padY; content();
     U.inCard = outer;

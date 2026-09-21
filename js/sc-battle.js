@@ -434,13 +434,16 @@
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
-    /* 战斗日志（最近 4 行，网页版 #battle-log） */
+    /* 战斗日志（最近 4 行，网页版 #battle-log）
+       V1.0.1（父亲大人："每一波结束战斗日志都会往上顶一下"）：
+       高度**钉死在 LOG_H** —— 日志不足 4 行时也是这么高，不再随行数长个儿。
+       网页版那块的 `height: 5.375rem` 就是定高，这里照同一个规矩来。 */
     U.card(function () {
       U.h3('战斗日志');
       const lines = B.log.slice(-4);
       if (!lines.length) U.hint('（战斗开始）', 4 * CV.SCALE);
       lines.forEach((ln) => U.hint(ln, 2 * CV.SCALE));
-    });
+    }, { minH: 150 });
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
     CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
     /* 波次卡已经在 drawBattle 开头接管了整屏（含这一行字），这里不再重复画 */
