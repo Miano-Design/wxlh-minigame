@@ -285,6 +285,34 @@ console.log('\n=== 战斗页生命周期审计 ===');
       clearFn ? '已包含' : '**没找到 clearTimer**');
   }
 
+  /* ⑨ 日志卡"每波往上弹"回归测试（V1.0.1 父亲大人）：
+     报的是"结束一波整个日志卡往上跳，下一波又回来"。日志卡位置 = 常量反推，
+     能整块顶动它的只有滚动量 —— 这里跑一场**无缝波次**，逐帧记录日志卡（每帧最后一个
+     CV.card）的 top，全程必须一个像素都不动。 */
+  UI.clear();
+  const cardTops = [];
+  const realCardFn = CV.card;
+  CV.card = function (pad, top, w, h) {
+    cardTops.push(Math.round(top));
+    return realCardFn.apply(this, arguments);
+  };
+  UI.run(cfg({
+    seamless: true, sub: '本波通过',
+    onEnd() { return { seamless: true, sub: '本波通过', after() {} }; },
+  }));
+  let tickProbe = 0;
+  await new Promise((res) => {
+    const iv = setInterval(() => {
+      CV.render();
+      if (++tickProbe > 60) { clearInterval(iv); res(); }        // 覆盖整场（含波次卡那 1 秒）
+    }, 25);
+  });
+  CV.card = realCardFn;
+  const uniq = Array.from(new Set(cardTops));
+  t('战斗日志卡全程不移动（每波不再往上弹）', uniq.length <= 1,
+    '出现过的 top：' + uniq.slice(0, 6).join(' / ') + (uniq.length > 6 ? ' …' : '')
+    + '（共 ' + cardTops.length + ' 帧）');
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exitCode = fail ? 1 : 0;
 })();
