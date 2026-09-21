@@ -333,6 +333,19 @@ console.log('\n=== 战斗页生命周期审计 ===');
     uniqScroll.length === 1 && uniqScroll[0] === 0,
     '出现过的 scroll：' + uniqScroll.slice(0, 6).join(' / ') + ' · maxScroll=' + Math.round(CV.maxScroll || 0));
 
+  /* ⑩ 画布 save/restore 必须**数量配对**（V1.0.1 那个"波次卡往上弹"的教训）。
+     起因：drawBattle 里 `CV.ctx.save()` 写在 `if (!B.tip)` 里面、配对的 `restore()`
+     却写在 if 外面 —— 战斗态配对正常，一到波次卡就每帧多弹出一层画布状态，
+     把外层坐标系弹掉，整块内容（日志卡 + 撤离/速度按钮）被顶偏。
+     当时绕了七八轮才查到，而这一条**静态数数量**就能拦住。 */
+  {
+    const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    const saves = (bsrc.match(/CV\.ctx\.save\(\)/g) || []).length;
+    const restores = (bsrc.match(/CV\.ctx\.restore\(\)/g) || []).length;
+    t('sc-battle 的画布 save/restore 数量配对（错一个就会整块偏移）', saves === restores,
+      'save ' + saves + ' / restore ' + restores);
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exitCode = fail ? 1 : 0;
 })();
