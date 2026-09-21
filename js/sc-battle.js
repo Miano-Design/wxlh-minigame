@@ -387,7 +387,7 @@
        现在跟两颗按钮太贴了"）：
          · **末行不该再算一次排间距**（needH 里那个 SIDE_GAP 是行"之间"的，最后一排后面没有行）；
          · 底部额外留 BOTTOM_PAD —— "撤离 / 速度"就在下面，居中的均分留白不够它们喘气。 */
-    const BOTTOM_PAD = 20 * CV.SCALE;                       // 我方最后一排与两颗按钮之间的呼吸感
+    const BOTTOM_PAD = 45 * CV.SCALE;                       // 我方最后一排与两颗按钮之间的呼吸感（V1.0.1：20 → 45，父亲大人"再往上一点"）
     const rowStep = CARD_H + SIDE_GAP;
     const needH = rowStep * 4 + GROUP_GAP - SIDE_GAP;
     const areaH = (FIELD_BOTTOM_UNITS - BOTTOM_PAD) - FIELD_TOP;
