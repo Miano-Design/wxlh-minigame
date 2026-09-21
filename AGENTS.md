@@ -8,7 +8,13 @@
 
 | 改了什么 | 至少跑 |
 |---|---|
-| 界面 / 排版 / 字号 | `type_scale_audit` `spacing_audit` `page_smoke` `tap_audit` |
+| 界面 / 排版 / 字号 | `layout_audit` `page_text_audit` `type_scale_audit` `spacing_audit` `page_smoke` `tap_audit` |
+
+> `layout_audit`（V9.6.143 新增）：把每一页画出来的**文字 / 按钮 / 卡片都当成矩形**，
+> 查三件事 —— 文字出画、文字压在按钮上、文字掉出卡片底。
+> `page_text_audit` 查的是"内容对不对、有没有被省略号砍"；这两把合起来才盖得住"排版"。
+> 立它的原因：父亲大人连着三次报排版问题（药园那行丢半句、伴生体那行被省略、
+> 炼化台文字压按钮），当时所有尺子都是绿的 —— 因为它们只看"画没画"，不看"画在哪"。
 | 战斗 / 副本 / 结算 | `battle_flow_audit` `journey_audit` |
 | 引导 / 主线任务 | `guide_walk_audit` `quest_play_audit` `coach_audit` |
 | 数值 / 掉落 / 扫荡 | `sweep_ticket_audit` `cap_audit` `test_game` |

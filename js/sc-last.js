@@ -59,9 +59,11 @@
           }
         });
         U.y = top + nameLh + 4 * CV.SCALE;
-        U.hint(String(((D.ITEMS[itemId] || {}).desc) || '').replace(/^【[^】]*】/, ''), 0, lw);
+        /* ⚠️ 第三参数是颜色、第四才是宽度（V9.6.143 修：原来把 lw 当颜色传了，
+           结果限宽失效、文字压到右边的按钮底下）。 */
+        U.hint(String(((D.ITEMS[itemId] || {}).desc) || '').replace(/^【[^】]*】/, ''), 0, CV.C.dim, lw);
         U.hint('配方：' + matName + ' ×' + s.matN + ' + ◉ ' + fmt(s.points)
-          + '　（现有 ' + matName + ' ' + haveMat + ' · ◉ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, lw);
+          + '　（现有 ' + matName + ' ' + haveMat + ' · ◉ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, CV.C.dim, lw);
         const ownTop = U.y + 4 * CV.SCALE;
         U.draw(function () {
           CV.text('已有血清 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8,

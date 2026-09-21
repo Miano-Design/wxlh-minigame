@@ -177,7 +177,12 @@
   }
   /* V9.6.90：第 3 个参数以前叫 widthIn（两栏卡用的可用宽度），但全仓从来没人传过宽度，
      倒是有地方想传"颜色" —— 统一改成 color，别再让调用方猜。 */
-  U.hint = function (text, gapTop, color) { return wrapBlock(text, CV.FS.sm, 1.7, color || CV.C.dim, gapTop); };
+  /* V9.6.143（版面尺子抓到的真 bug）：第三参数是**颜色**，可炼化台那两行把**宽度**传了进来 ——
+     于是 `fillStyle` 被赋成一个数字（画布会忽略非法颜色，继续用上一次的颜色），
+     而且宽度没生效 → 文字按整卡宽度折行、直接压到右边的按钮底下。
+     现在补一个第四参数 widthIn：要限宽就传 `U.hint(文本, 间距, 颜色, 宽度)`，
+     调用方不用再猜"这个位置到底是颜色还是宽度"。 */
+  U.hint = function (text, gapTop, color, widthIn) { return wrapBlock(text, CV.FS.sm, 1.7, color || CV.C.dim, gapTop, widthIn); };
   U.note = function (text, gapTop, widthIn) { return wrapBlock(text, CV.FS.md, 1.75, CV.C.dim, gapTop, widthIn); };
 
   /* ---------- 技能行 .skill-row（V9.6.117：主角详情 / 伙伴详情**共用这一个**）----------
