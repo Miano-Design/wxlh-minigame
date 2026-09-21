@@ -22,7 +22,7 @@
     const pc = (v) => Math.round((v || 0) * 100) + '%';
     const rows = [
       ['攻击', fmt(st.atk)], ['防御', fmt(st.def)], ['生命', fmt(st.hp)], ['速度', fmt(st.spd)],
-      ['暴击', pc(st.crit)], ['暴击伤害', '×' + (st.critDmg || 2).toFixed(2)], ['闪避', pc(st.eva)],
+      ['暴击', pc(st.crit)], ['暴击伤害', '×' + G.fmtMul(st.critDmg || 2)], ['闪避', pc(st.eva)],
       ['吸血', pc(st.lifesteal)],
     ];
     const red = Math.min(0.6, (st.resPct || 0) + (st.dmgReduce || 0));

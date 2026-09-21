@@ -269,7 +269,7 @@
     U.card(function () {
       U.h3('📊 属性面板', '装备 / 血统 / 星级都已算进来');
       [['攻击', st.atk], ['防御', st.def], ['生命', st.hp], ['速度', st.spd],
-        ['暴击率', (st.crit * 100).toFixed(1) + '%'], ['暴击伤害', st.critDmg.toFixed(2) + '×'],
+        ['暴击率', (st.crit * 100).toFixed(1) + '%'], ['暴击伤害', (G.fmtMul(st.critDmg)) + '×'],
         ['闪避', ((st.eva || 0) * 100).toFixed(1) + '%'], ['技能伤害', ((st.skillMult || 1) * 100).toFixed(0) + '%']]
         .forEach((r) => U.kv(r[0], String(r[1])));
     });

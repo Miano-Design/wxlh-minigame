@@ -27,7 +27,7 @@ require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → �
 
 const CV = globalThis.CV, Core = globalThis.Core, G = globalThis;
 /* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
-globalThis.GAME_VER = '9.6.139';
+globalThis.GAME_VER = '9.6.140';
 const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
 /* 底栏四个页签 → 对应页面（网页版 #navbar） */
 CV.NAV_TABS.forEach(function (t) {

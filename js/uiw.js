@@ -16,16 +16,21 @@
   G.U = U;
 
   /* ---------- 全局工具（逐字对齐网页版 js/ui.js 的同名函数） ---------- */
-  /* fmt：网页版把 20000 显示成「2.0万」、1.2 亿显示成「1.20亿」——
-     小游戏原来没有这个函数，各页各自 `G.fmt || String` 兜底，于是首页显示成「55000」，
+  /* fmt：数字显示（口径与网页版同一份，V9.6.140 起**一律不带小数点**）。
+     父亲大人："有些都不需要小数点，像货币就不用，直接取整数就行了。"
+       · 10 万以下原样显示精确整数（14,200 就写 14200 —— 缩写成"1万"会瞒掉 30% 的价钱）；
+       · 10 万起才缩写且取整：100,000 → 10万、142,000 → 14万、9 亿还是 9 亿。
+     小游戏以前没有这个函数，各页各自 `G.fmt || String` 兜底，于是首页显示成「55000」，
      和网页版完全不是一个观感（V9.5.93 修：补上同一个 fmt，并挂到全局给所有页用）。 */
   G.fmt = function (n) {
     n = Math.floor(n || 0);
-    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-    if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    if (n >= 1e8) return Math.round(n / 1e8) + '亿';
+    if (n >= 1e5) return Math.round(n / 1e4) + '万';
     return String(n);
   };
   U.fmt = G.fmt;
+  /* 倍率显示（V9.6.140）：×2.00 → ×2、×2.35 → ×2.35（口径与网页版同） */
+  G.fmtMul = function (x) { return String(Math.round((x || 0) * 100) / 100); };
   /* formatDuration：网页版同一段逻辑（小时/分/秒三档） */
   G.formatDuration = function (sec) {
     sec = Math.floor(sec || 0);

@@ -19,8 +19,9 @@ window.Core = (function () {
   // 核心层自己也要给文案用（挂机产线、渡劫消耗），格式与界面保持一致
   function fmtNum(n) {
     n = Math.floor(n || 0);
-    if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-    if (n >= 1e4) return (n / 1e4).toFixed(1) + '万';
+    // V9.6.140：口径与界面层 fmt() 同一份 —— 一律不带小数点，10 万以下原样显示精确整数
+    if (n >= 1e8) return Math.round(n / 1e8) + '亿';
+    if (n >= 1e5) return Math.round(n / 1e4) + '万';
     return String(n);
   }
 
@@ -2114,8 +2115,10 @@ window.Core = (function () {
       let per = '未派领队，不产出';
       if (l.out === 'exp') per = `+${fmtNum(c.exp)} EXP / 分`;
       else if (l.out === 'points') per = `+${fmtNum(c.points)} 点 / 分`;
-      else if (l.out === 'otherworld') per = `+${c.otherworld.toFixed(2)} 结晶 / 10 分`;
-      else per = `+${c.matPerMin.toFixed(2)} 材料 / 分`;
+      /* V9.6.140（父亲大人："有些都不需要小数点"）：速率保留**一位**小数就够。
+         "+0.67 结晶 / 10 分" 这种两位小数只是噪音，取整又会让低产线变成 0（看着像没派领队）。 */
+      else if (l.out === 'otherworld') per = `+${c.otherworld.toFixed(1)} 结晶 / 10 分`;
+      else per = `+${c.matPerMin.toFixed(1)} 材料 / 分`;
       const st = leaderId ? effectiveStats(leaderId) : null;
       const attrValue = (st && st.attrs && l.attr) ? Math.round(st.attrs[l.attr] || 0) : 0;
       return { line: l, leaderId, bonus, attrValue, per: leaderId ? per : '未派领队，不产出' };

@@ -128,6 +128,24 @@ Object.keys(CV.panels || {}).forEach((name) => {
 if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Object] ✓');
 
 console.log('\n=== ② "列东西"的页面：该出现的名字和说明必须真的画出来 ===');
+/* 计数器先声明（②-0 / ②-a / ②-b 三段都要往里加，声明放后面会踩 TDZ） */
+let retiredHits = 0;
+/* ②-0 数字显示口径（V9.6.140，父亲大人："有些都不需要小数点，像货币就不用，直接取整数"）：
+   和网页版 test_ui 里那条同一个规矩 —— 一律不带小数点，10 万以下还是精确数。 */
+{
+  let fmtBad = 0;
+  const F = global.fmt;          // uiw.js 把 G.fmt 挂在 GameGlobal（= global）上
+  if (typeof F !== 'function') { fmtBad++; console.log('  ✗ 全局 fmt 不存在（顶栏和各页都靠它）'); }
+  else {
+    [[0, '0'], [999, '999'], [14200, '14200'], [99999, '99999'], [100000, '10万'],
+      [142000, '14万'], [900000000, '9亿']].forEach(([n, want]) => {
+      const got = F(n);
+      if (got !== want || got.indexOf('.') >= 0) { fmtBad++; console.log(`  ✗ fmt(${n}) = ${got}，应该是 ${want}`); }
+    });
+  }
+  if (!fmtBad) console.log('  数字显示一律不带小数点，10 万以下还是精确数 ✓');
+  retiredHits += fmtBad;
+}
 /* ②-a 退役词：界面上**画出来**的旧名字（网页版那套 copy_audit 只管 HTML，画布这边的字它看不见）。
    起因（V9.6.136）：货币 8→4 之后，成长页和三条引导里还写着"血统结晶""铭刻五阶"——
    玩家一眼就能看出这版本没过脑子。这里把退役币名也盯上，和网页版同一份口径。 */
@@ -137,7 +155,6 @@ const RETIRED_TEXT = [
   [/跳过战斗/, 'V9.5.64 已删掉该按钮（战斗界面用"撤离"）'],
   [/个人房间/, '旧界面名，主角面板已并进主页最上面的主角卡'],
 ];
-let retiredHits = 0;
 {
   let ret = 0;
   Object.keys(CV.panels || {}).forEach((name) => {
