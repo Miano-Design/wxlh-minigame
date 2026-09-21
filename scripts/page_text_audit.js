@@ -169,7 +169,77 @@ if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Obj
   badText += dangling;
 }
 
-/* ①-c 被省略号砍掉的文字（V9.6.142，父亲大人："伴生体的孵化那行字被省略了……说了还没改"）。
+/* ①-b2 计数行：界面上写着的「N / M」必须**等于数据算出来的 N / M**
+   （V9.6.145，父亲大人："再审一遍"）。
+   这一条以前没人管：文案对得上、版面也不挤，但数字可能悄悄漂了 ——
+   比如伴生体"已收集 3 / 12"、法宝"已得 5 / 20"、秘术阁"已修 0 / 1505"、
+   图鉴"收集进度 N / 114"。这些 M 全都来自数据表，一旦表改了而界面写死，就会骗人。 */
+{
+  let cBad = 0;
+  const KEJI_TOTAL = D.KEJI.reduce((a, k) => a + k.max, 0);
+  const CASES = [
+    ['beast', () => '已收集 ' + Core.beastState().count + ' / ' + D.BEASTS.length],
+    ['beast', () => '我的伴生体', 0],
+    ['fabao', () => '已得 ' + Core.fabaoState().own.length + ' / ' + D.FABAO.length + ' 件'],
+    ['mount', () => '已驯服 ' + Core.mountState().own.length + ' / ' + D.MOUNTS.length + ' 匹'],
+    ['garden', () => '已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块'],
+    ['authority', () => 'Lv.' + (Core.S.auth || 0) + ' / ' + D.AUTHORITY_MAX],
+    ['keji', () => '已修 ' + D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0) + ' / ' + KEJI_TOTAL + ' 级'],
+    ['codex', () => '收集进度 ' + (Core.S.codex.chars || []).length + ' / ' + D.characters.filter(c => !c.hidden).length],
+    ['realm', () => '已突破 ' + (Core.S.player.realm || 0) + ' / ' + D.REALM_STAGE_COUNT + ' 阶'],
+  ];
+  CASES.forEach(([page, fn]) => {
+    const want = fn();
+    if (want === undefined) return;
+    const got = drawPage(page);
+    if (!got) return;
+    if (got.join('').indexOf(want) < 0) { cBad++; console.log(`  ✗ ${page} 页的计数对不上：应该有「${want}」`); }
+  });
+  if (!cBad) console.log('  各页的计数（N / M）都和当前数据一致 ✓');
+  badText += cBad;
+}
+
+/* ①-b3 伙伴列表的**显示顺序**必须等于父亲大人定的那条规则：
+   ① 上阵的排前面 ② 等级高的 ③ 稀有度高的 ④ 同稀有度看星级。
+   V9.6.145：网页版有这条验收（test_ui 的"伙伴默认排序"），**小游戏没有** ——
+   而"排序乱"正是父亲大人以前专门抱怨过的。这里验的是**真的画出来的顺序**
+   （按 y、再按 x 读），不是"排序函数返回了什么"，所以连"排版时又被打乱"也能抓到。 */
+{
+  const S = Core.S;
+  const ids = D.characters.filter(c => !c.hidden).slice(0, 12).map(c => c.id);
+  ids.forEach(id => Core.addChar(id));
+  // 造出"等级 / 星级 / 稀有度互相交错"的场面，否则排序错了也看不出来
+  ids.forEach((id, i) => { const c = S.chars[id]; c.lv = (i * 7) % 40; c.star = 1 + (i % 5); });
+  S.party = ['@player', ids[5], ids[10], null, null];
+  const rarIdx = id => D.RARITIES.indexOf(D.charById[id].rarity);
+  const want = ids.slice().sort((a, b) => {
+    const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
+    if (pa !== pb) return pb - pa;
+    if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
+    if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
+    return S.chars[b].star - S.chars[a].star;
+  }).map(id => Core.charName(id));
+  const got = drawPage('roster') || [];
+  const nameAt = [];
+  got.forEach((s, i) => { if (want.indexOf(String(s)) >= 0) nameAt.push({ s: String(s), p: LAST_POS[i] || { x: 0, y: 0 } }); });
+  // 画布是网格：先按行（y）再按列（x）读，才是玩家眼中的顺序
+  nameAt.sort((a, b) => (Math.abs(a.p.y - b.p.y) > 8 ? a.p.y - b.p.y : a.p.x - b.p.x));
+  const seen = [];
+  nameAt.forEach(o => { if (seen.indexOf(o.s) < 0) seen.push(o.s); });
+  if (seen.length && seen.join() !== want.join()) {
+    badText++;
+    console.log('  ✗ 伙伴列表的显示顺序和规则不一致');
+    console.log('     期望：' + want.slice(0, 6).join(' → '));
+    console.log('     实际：' + seen.slice(0, 6).join(' → '));
+  } else if (!seen.length) {
+    badText++;
+    console.log('  ✗ 伙伴列表页一个名字都没画出来（排序没法验）');
+  } else {
+    console.log('  伙伴列表的显示顺序 = 上阵 → 等级 → 稀有度 → 星级 ✓');
+  }
+}
+
+/* ①-c 被省略号砍掉的文字（V9.6.142，父亲人："伴生体的孵化那行字被省略了……说了还没改"）。
    画布上没有 HTML 的自动折行，很多地方是 `CV.fit(text, 固定宽)` —— 文字一长就静默变成「…」，
    玩家看到的就是"话说到一半"。这次顺着这个线索把全站扫了一遍：**105 处**在丢信息
    （转生条件第三项、悬赏奖励、坐骑价格、法宝祭炼等级、建筑说明、药园收成…），已逐条改成折行。

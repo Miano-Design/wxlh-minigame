@@ -608,6 +608,21 @@
       const active = CV.top().name === t.id || (CV.top().name === 'home' && t.id === 'home');
       CV.text(t.ico, cx, y + 22, { size: CV.ICO, align: 'center' });
       CV.text(t.name, cx, y + 42, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
+      /* V9.6.145（"再审一遍"抓到的两边不一致）：网页版底栏有**红点**（主页=挂机有待领、
+         背包=待领箱里有东西），小游戏这边**一个点都没画** —— 玩家在小游戏里看不出
+         "有东西等你处理"。这里照网页版 navbarHtml 的同一套规则补上（一处判定都不另写）：
+           · 主页：挂机攒够 5 分钟（和网页版 idleClaimable() 同一个门槛）
+           · 背包：待领箱里有东西（stashCount() > 0）
+         执灯者那格**不点**——网页版 V9.5.67 专门删过（那格没有"待领"的东西，纯误报）。 */
+      let dot = false;
+      if (t.id === 'home') dot = ((G.Core.S && (G.Core.idleBankGains() || {}).seconds) || 0) >= 300;
+      else if (t.id === 'bag') dot = ((G.Core.stashCount && G.Core.stashCount()) || 0) > 0;
+      if (dot) {
+        c.fillStyle = CV.C.accent;
+        /* 位置照网页版 `.nav-item .dot`：**图标的右上角**（top 0.5rem、靠右 18px），
+           直径 0.4375rem ≈ 7px；颜色是 var(--accent)（两边同一个红）。 */
+        c.beginPath(); c.arc(cx + 16 * CV.SCALE, y + 13 * CV.SCALE, 3.5 * CV.SCALE, 0, Math.PI * 2); c.fill();
+      }
       if (active) {
         c.fillStyle = CV.C.gold;
         c.fillRect(cx - 13, y, 26, 2);          // 网页版 .nav-item.active::before：1.625rem × 2px
