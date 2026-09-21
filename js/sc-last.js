@@ -104,14 +104,19 @@
         const textW = U.iw() - bw - 12 * CV.SCALE;
         CV.text(CV.fit(b.name, textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         CV.text(CV.fit(b.desc || '', textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-        CV.text(CV.fit('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
-          + '　奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm), U.ix(), top + 56 * CV.SCALE,
-          { size: CV.FS.sm, color: CV.C.dim });
+        /* V9.6.142：这一行原来单行 fit → 「剩余时间 12小时00分　奖励 ◉ 9500 …」尾巴被砍，
+           玩家看不到奖励是什么。改成**折到最多两行**，卡片高度跟着算。 */
+        const bLines = CV.wrap('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
+          + '　奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm, 2);
+        const cardH = (bLines.length > 1 ? 46 + bLines.length * 17 : h);
+        bLines.forEach(function (ln, k) {
+          CV.text(ln, U.ix(), top + (56 + k * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
         const claimable = x.done && !x.claimed && !x.expired;
-        U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+        U.btn(U.ix() + U.iw() - bw, top + (cardH - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           claimable ? '领取奖励' : (x.claimed ? '已领取' : '去完成'), claimable ? 'primary' : 'ghost',
           claimable ? 'bounty_claim:' + b.id : '');
-        U.y = top + h;
+        U.y = top + cardH;
       });
     });
     if (st.allOver) {

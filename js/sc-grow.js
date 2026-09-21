@@ -71,7 +71,10 @@
         const curTxt = ok ? x.cur : '未解锁';
         const descTxt = ok ? x.desc : Core.unlockTip(x.unlock);
         if (!ok) CV.ctx.globalAlpha = 0.55;
-        const cw = Math.min(U.iw() * 0.42, CV.measure(curTxt, CV.FS.md) + 4 * CV.SCALE);
+        /* V9.6.142：右边那格原来**封死在 42% 宽** → 境界那行「炼气初期（第 0/36 阶）」
+           被砍成「炼气初期（第 0/36 …」。改成"至少 42%，文字长就给到够"，
+           反正左边只有名字（短），右边又是右对齐，不会打架。 */
+        const cw = Math.min(U.iw() * 0.72, Math.max(U.iw() * 0.42, CV.measure(curTxt, CV.FS.md) + 4 * CV.SCALE));
         CV.text(CV.fit(curTxt, cw, CV.FS.md), U.ix() + U.iw(), top + 15 * CV.SCALE,
           { size: CV.FS.md, color: CV.C.gold, align: 'right' });
         const descLines = CV.wrap(descTxt, U.iw() - 34 * CV.SCALE, CV.FS.sm, 2);

@@ -169,6 +169,28 @@ if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Obj
   badText += dangling;
 }
 
+/* ①-c 被省略号砍掉的文字（V9.6.142，父亲大人："伴生体的孵化那行字被省略了……说了还没改"）。
+   画布上没有 HTML 的自动折行，很多地方是 `CV.fit(text, 固定宽)` —— 文字一长就静默变成「…」，
+   玩家看到的就是"话说到一半"。这次顺着这个线索把全站扫了一遍：**105 处**在丢信息
+   （转生条件第三项、悬赏奖励、坐骑价格、法宝祭炼等级、建筑说明、药园收成…），已逐条改成折行。
+   这条尺子从此盯着它：任何一页再出现「…」就报。
+   唯一豁免：玩法指南 —— 它的正文是**成段的说明文**，里面本来就有作者写的省略号
+   （"攻/生/防/速/暴击…"），而且它是逐字折行的，不算"被砍"。 */
+{
+  let cut = 0;
+  Object.keys(CV.panels || {}).forEach((name) => {
+    if (name === 'guide') return;                 // 说明文，正文自带省略号
+    const got = drawPage(name);
+    if (!got) return;
+    linesOf(got, LAST_POS).forEach((ln) => {
+      const t = String(ln);
+      if (t.indexOf('…') >= 0) { cut++; console.log(`  ✗ ${name} 页有被省略号砍掉的文字：${t.slice(0, 44)}`); }
+    });
+  });
+  if (!cut) console.log('  没有"被省略号砍掉"的文字（每一页都写全）✓');
+  badText += cut;
+}
+
 console.log('\n=== ② "列东西"的页面：该出现的名字和说明必须真的画出来 ===');
 /* 计数器先声明（②-0 / ②-a / ②-b 三段都要往里加，声明放后面会踩 TDZ） */
 let retiredHits = 0;

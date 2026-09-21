@@ -1355,6 +1355,16 @@ window.DATA = (function () {
      —— 结尾挂着一个孤零零的「· 」，种下去之后那行干脆是空的「收 」。
      同一句话写两遍迟早会分叉，所以收进数据层。 */
   const gardenItemName = id => (ITEMS[id] || {}).name || id;
+  /* 倒计时一律「分:秒」（V9.6.142，父亲大人："游历怎么现在变成几千秒了，按分:秒这样显示"）。
+     放在数据层是因为药园那行文案也是这里拼的 —— 两边界面共用同一个格式，
+     不会再出现"网页版写 50分0秒、小游戏写 3000 秒"这种分叉。
+     超过一小时才退化成"X小时Y分"（那种场合读分秒没意义）。 */
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    if (sec >= 3600) return Math.floor(sec / 3600) + '小时' + Math.floor(sec % 3600 / 60) + '分';
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
   function gardenYieldText(g) {
     let s = gardenItemName(g.out.item) + '×' + g.out.n;
     if (g.extra) s += ' · ' + Math.round(g.extra.p * 100) + '% 出 ' + gardenItemName(g.extra.item) + '×' + g.extra.n;
@@ -1370,7 +1380,7 @@ window.DATA = (function () {
   function gardenRowLines(kind, state, leftSec) {
     const head = state === 'empty'
       ? ('可种「' + kind.name + '」：◉ ' + kind.points + ' · ' + Math.round(kind.sec / 60) + ' 分钟')
-      : (state === 'ready' ? '已成熟，可以收了' : ('成熟还需 ' + Math.ceil(leftSec || 0) + ' 秒'));
+      : (state === 'ready' ? '已成熟，可以收了' : ('成熟还需 ' + fmtClock(leftSec || 0)));
     return [head, '收 ' + gardenYieldText(kind)];
   }
   function gardenRowText(kind, state, leftSec) {
@@ -2295,7 +2305,7 @@ window.DATA = (function () {
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
     KEJI, KEJI_COIN, kejiById, kejiCost,
     TRAVELS, TRAVEL_TOTAL_W, TRAVEL_STEPS_SEC,
-    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, gardenYieldText, gardenRowText, gardenRowLines,
+    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, gardenYieldText, gardenRowText, gardenRowLines, fmtClock,
     ARENA_DAILY, arenaReward, arenaEnemy,
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,

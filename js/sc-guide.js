@@ -104,7 +104,7 @@
         U.space(CV.SP[1]);
         U.bar(prog.pct);
         U.space(CV.SP[1]);
-        U.kv('距离下一次', Math.max(0, Math.round(prog.every - prog.sec)) + ' 秒');
+        U.kv('距离下一次', D.fmtClock(Math.max(0, prog.every - prog.sec)));
       }
     });
     U.sectionTitle('可能遇到什么（' + D.TRAVELS.length + ' 种）');

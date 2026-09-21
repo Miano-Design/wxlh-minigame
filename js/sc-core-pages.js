@@ -19,12 +19,29 @@
   }
   CV.on('page_back', () => CV.pop());
   /* 一行"左标题 / 右小字"（网页版 .list-row 的 t1 + t2 两行） */
+  /* 两行式列表行（灯阁权限 / 铭刻 / 境界 / 图鉴收集…都用它）
+     V9.6.142（父亲大人："伴生体的孵化那行字被省略了" → 顺着全站扫了一遍）：**
+     原来 t1 固定按 62% 宽、t2 固定按 72% 宽去 fit** —— 于是只要描述长一点就被砍成「…」。
+     全站扫出 105 处这种"被省略"，光这个函数就占了一大半（灯阁权限那 20 行连
+     「还差哪张图解锁」都被砍没了）。现在：
+       · t1 / right 先量宽度，放得下就原样，放不下才让；
+       · t2 **折成最多两行**画（行高跟着算），所以描述不会再丢半句。 */
   function row2(t1, t2, right, rightColor) {
-    const top = U.y, h = t2 ? 52 * CV.SCALE : 34 * CV.SCALE;
-    CV.text(CV.fit(t1, U.iw() * 0.62, CV.FS.lg, true), U.ix(), top + (t2 ? 17 : h / 2) * CV.SCALE, { size: CV.FS.lg, bold: true });
-    if (t2) CV.text(CV.fit(t2, U.iw() * 0.72, CV.FS.sm), U.ix(), top + 37 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
-    if (right) CV.text(CV.fit(right, U.iw() * 0.34, CV.FS.sm), U.ix() + U.iw(), top + (t2 ? 17 : h / 2) * CV.SCALE,
+    const iw = U.iw();
+    const rw = right ? CV.measure(right, CV.FS.sm) : 0;
+    const t1Max = iw - rw - (right ? 8 * CV.SCALE : 0);
+    const t1Shown = CV.fit(t1, t1Max, CV.FS.lg, true);
+    const lines = t2 ? CV.wrap(t2, iw, CV.FS.sm, 2) : [];
+    const nameH = CV.FS.lg * 1.35, dH = CV.FS.sm * 1.55;
+    const h = (t2 ? (10 * CV.SCALE + nameH + 3 * CV.SCALE + lines.length * dH + 8 * CV.SCALE)
+      : 34 * CV.SCALE);
+    const top = U.y, cy = top + (t2 ? 10 * CV.SCALE + nameH / 2 : h / 2);
+    CV.text(t1Shown, U.ix(), cy, { size: CV.FS.lg, bold: true });
+    if (right) CV.text(CV.fit(right, iw - CV.measure(t1Shown, CV.FS.lg, true) - 6 * CV.SCALE, CV.FS.sm), U.ix() + iw, cy,
       { size: CV.FS.sm, color: rightColor || CV.C.dim, align: 'right' });
+    lines.forEach(function (ln, k) {
+      CV.text(ln, U.ix(), top + 10 * CV.SCALE + nameH + 3 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.sm, color: CV.C.dim });
+    });
     U.y = top + h;
     return h;
   }
@@ -104,11 +121,18 @@
       D.BUILDINGS.forEach(function (b) {
         const lv = S.buildings[b.id] || 0;
         const cost = D.buildingCost(b.id, lv);
-        const top = U.y, h = 56 * CV.SCALE;
+        const top = U.y;
         const bw = 112 * CV.SCALE;
         const textW = U.iw() - bw - 8 * CV.SCALE;
+        /* V9.6.142：建筑说明原来单行 fit → 「每级：装备强化费用 -1%（最多-40…」被砍。
+           这些说明本身就是两句话，改成折到最多两行（行高跟着算），一字不丢。 */
+        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 2);
+        const rowH = (dLines.length > 1 ? 62 : 56) * CV.SCALE;
+        const h = rowH;
         CV.text(CV.fit(b.name + '  Lv.' + lv + '/50', textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text(CV.fit(b.desc, textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        dLines.forEach(function (ln, k2) {
+          CV.text(ln, U.ix(), top + (36 + k2 * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
         const can = (S.cur.points || 0) >= cost && lv < 50;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           lv >= 50 ? '已满级' : ('升级（◉ ' + fmt(cost) + '）'), 'ghost', can ? 'bup:' + b.id : '');
@@ -376,9 +400,11 @@
       U.h3('转生', '已转生 ' + (S.player.reincarnations || 0) + ' 次');
       U.note('会重置：玩家等级（回到 Lv.0）、残域世界进度、深井层数。', 2 * CV.SCALE);
       U.note('会保留：伙伴（含等级与技能）、装备、主角技能与属性、血统、铭刻、天赋、全部货币。', 2 * CV.SCALE);
-      U.kv('第 ' + ((S.player.reincarnations || 0) + 1) + ' 次转生条件',
-        '玩家Lv.' + S.player.level + '/' + need.lv + ' · 铭刻' + S.player.geneLock + '/' + need.geneLock + ' · 灯芯Lv.' + (S.buildings.core || 0) + '/' + need.core,
-        can.ok ? CV.C.green : CV.C.dim);
+      /* V9.6.142：三个条件并排塞进 kv 的右半边 → 「… · 灯芯Lv.0/…」被砍掉，
+         玩家看不到第三个门槛。改成**整行说明**（占满宽度），三项一条不漏。 */
+      U.hint('第 ' + ((S.player.reincarnations || 0) + 1) + ' 次转生条件：玩家 Lv.' + S.player.level + '/' + need.lv
+        + ' · 铭刻 ' + S.player.geneLock + '/' + need.geneLock + ' · 灯芯 Lv.' + (S.buildings.core || 0) + '/' + need.core,
+        2 * CV.SCALE, can.ok ? CV.C.green : CV.C.gold);
       if (!can.ok && can.msg) U.hint(can.msg, 4 * CV.SCALE);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '开始转生', style: 'primary', id: can.ok ? 'do_reincarn' : '' }]);

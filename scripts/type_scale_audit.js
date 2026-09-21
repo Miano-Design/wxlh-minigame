@@ -92,7 +92,9 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
     ['标题右侧小字 .sub = 五级', /const subRight[\s\S]{0,400}?size: CV\.FS\.sm/.test(uiw)],
     ['注释 hint = 五级', /U\.hint = function[^\n]*CV\.FS\.sm/.test(uiw)],
     ['次要说明 note = 四级', /U\.note = function[^\n]*CV\.FS\.md/.test(uiw)],
-    ['键值行 kv = 三级', /U\.kv = function[\s\S]{0,300}?size: CV\.FS\.lg/.test(uiw)],
+    /* V9.6.142：窗口从 300 放到 1200 —— 给 U.kv 补了注释之后，第一条 `size: CV.FS.lg`
+       被推到 300 字之外，尺子就误报"不符合层级"了（是尺子过期，不是代码退化）。 */
+    ['键值行 kv = 三级', /U\.kv = function[\s\S]{0,1200}?size: CV\.FS\.lg/.test(uiw)],
     ['说明框 eventDesc = 三级', /U\.eventDesc = function[\s\S]{0,200}?size = CV\.FS\.lg/.test(uiw)],
     ['列表行主标题 .t1 = 二级', /const t1 = CV\.FS\.f1 \*/.test(uiw)],
     ['列表行副标题 .t2 = 五级', /const t1 = CV\.FS\.f1 \*[\s\S]{0,60}?t2 = CV\.FS\.sm \*/.test(uiw)],

@@ -93,10 +93,14 @@
            现在改成网页版 .card h3 .hbtn 那种排法：**按钮挪到卡片标题行右侧**（和血统名同一行），
            并且**整张卡片都能点** —— 点哪张就是哪张，不用瞄准一颗小按钮。 */
         const cardTop = U.y - CV.SP[2];        // 卡片外框上沿（U.card 的上下内边距 = SP[2]）
-        U.h3(id, bl.desc, { btn: { label: '觉醒', id: 'bl_pick:' + id } });
-        U.kv('境界线', bl.realms.slice(0, 5).join(' → ') + (bl.realms.length > 5 ? ' → …' : ''));
-        U.hint(bl.role ? (bl.role + '。每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。')
-          : ('每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。'), 6 * CV.SCALE);
+        /* V9.6.142：血统说明原来塞在标题右边的窄位里 → 「狼人近战输出。每级：攻击+1.2%、…」被砍。
+           改成**标题行只放名字 + 觉醒按钮**，说明和境界线各占一整行 —— 一字不丢。 */
+        U.h3(id, '', { btn: { label: '觉醒', id: 'bl_pick:' + id } });
+        U.hint(bl.desc, 2 * CV.SCALE);
+        /* V9.6.142：境界线那串名字走 kv（右边只能占约 62% 宽）→ 被砍成「兽崽 → 幼狼 → …」。
+           改成**整行小字**（占满宽度），六条血统的完整境界线都看得见。 */
+        U.hint('境界线：' + bl.realms.join(' → '), 2 * CV.SCALE);
+        U.hint('每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。', 2 * CV.SCALE);
         if (!U.dry) CV.hit('bl_pick:' + id, U.pad(), cardTop, U.cw(), U.y - cardTop);
       });
     });

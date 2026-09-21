@@ -534,11 +534,19 @@
         CV.text(tag, U.ix() + tw + 6 * CV.SCALE + tagW / 2, top + y1, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
         /* V9.6.72（父亲大人："通关条件这一行小字注释吧，要符合实际"）：
            desc 就是判定条件，原样写出来；check 和 desc 必须一致（网页版有审计规则⑥盯着）。 */
-        CV.text(CV.fit('完成条件：' + q.q.desc, textW, CV.FS.sm), U.ix(), top + y2, { size: CV.FS.sm, color: CV.C.dim });
-        CV.text(CV.fit('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm), U.ix(), top + y3, { size: CV.FS.sm, color: CV.C.dim });
+        /* V9.6.142（父亲大人："伴生体的孵化那行字被省略了"顺带全站扫）：这两行也是单行 fit →
+           任务条件一长就被砍成「完成条件：打开主页最上面的主角卡，…」。
+           网页版那两行是 HTML，会自己折行；画布这边改成**折到最多两行**、卡片高度跟着算。 */
+        const condLines = CV.wrap('完成条件：' + q.q.desc, textW, CV.FS.sm, 2);
+        const rwLines = CV.wrap('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm, 2);
+        const y2top = LH1 + LGAP;
+        condLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y2top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
+        const y3top = y2top + condLines.length * LH2 + LGAP;
+        rwLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y3top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
+        const blockH = y3top + rwLines.length * LH2;
         /* 按钮跟整块内容**垂直居中**（.list-row 是 align-items:center），不是贴顶 */
-        U.btn(U.ix() + U.iw() - bw, top + (y3 + LH2 / 2 - BH) / 2, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
-        U.y = top + y3 + LH2 / 2 + LGAP;     // 内容撑高（= 20.25 + 4 + 17.05 + 4 + 17.05）
+        U.btn(U.ix() + U.iw() - bw, top + (blockH - BH) / 2, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
+        U.y = top + blockH;                  // 内容撑高（每多折一行就多一个行盒）
       } else {
         CV.text('主线 · 已走完', U.ix(), top + y1, { size: CV.FS.f1, bold: true });
         CV.text('挑战更高难度与深井', U.ix(), top + y2, { size: CV.FS.sm, color: CV.C.dim });
@@ -626,7 +634,7 @@
         CV.text(CV.fit(rw, rwW, CV.FS.sm), U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
         CV.hit('claim_travel', U.pad(), top, U.cw(), h);
       } else {
-        CV.text('距下一次 ' + Math.round(Math.max(0, prog.every - prog.sec)) + ' 秒', U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
+        CV.text('距下一次 ' + D.fmtClock(Math.max(0, prog.every - prog.sec)), U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
         CV.hit('open_travel', U.pad(), top, U.cw(), h);
       }
       U.y = top + h;
@@ -647,9 +655,15 @@
       CV.text(v1, x, top + lh / 2, { size: CV.FS.md, color: txt });
       x += CV.measure(v1, CV.FS.md) + GAP;
       const s1 = 'EXP ' + r0.expPerMin.toFixed(1) + '/分 · 离线 ' + Math.round(Core.offlineEfficiency() * 100) + '% · 上限 ' + Core.offlineCapHours().toFixed(1) + 'h';
-      CV.text(CV.fit(s1, U.ix() + U.iw() - x, CV.FS.sm), x, top + lh / 2, { size: CV.FS.sm, color: dim });
+      /* V9.6.142：这一段原来硬塞在同一行、放不下就 `fit` 砍掉 —— 屏幕窄一点就变成
+         「… 离线 85% · …」，把最重要的"离线上限"吃掉。网页版那里是 flex，会自动折到下一行；
+         这里照做：**放不下就另起一行，后面几行整体下移**（卡片自己长高）。 */
+      const wrap1 = (x + CV.measure(s1, CV.FS.sm) > U.ix() + U.iw());
+      if (wrap1) CV.text(s1, U.ix(), top + lh * 1.5, { size: CV.FS.sm, color: dim });
+      else CV.text(s1, x, top + lh / 2, { size: CV.FS.sm, color: dim });
+      const dy = wrap1 ? lh : 0;                // 行 1 折了，后面整体下移一行
       /* 行 2：【已挂】+ 时长（网页版 V9.6.3 起把【待领】挪到单独一行，这里照做） */
-      const y2 = top + lh;
+      const y2 = top + lh + dy;
       const dur = G.formatDuration ? G.formatDuration(bank.seconds) : (bank.seconds + '秒');
       const durTxt = dur + (Core.idleFull && Core.idleFull() ? '（已满）' : '');
       let x2 = U.ix();
@@ -657,7 +671,7 @@
       x2 += CV.measure('【已挂】', CV.FS.md) + GAP;
       CV.text(durTxt, x2, y2 + lh / 2, { size: CV.FS.md, color: txt });
       /* 行 3：【待领】**单开一行**（父亲大人：窄屏就不会被挤断行了） */
-      const y3 = top + lh * 2;
+      const y3 = top + lh * 2 + dy;
       const gainTxt = '◉ ' + fmt(bank.points) + ' · EXP ' + fmt(bank.exp)
         + (bank.otherworld ? ' · ◆ ' + bank.otherworld : '');
       let x3 = U.ix();
@@ -665,7 +679,7 @@
       x3 += CV.measure('【待领】', CV.FS.md) + GAP;
       CV.text(CV.fit(gainTxt, U.ix() + U.iw() - x3, CV.FS.md), x3, y3 + lh / 2, { size: CV.FS.md, color: txt });
       /* 行 4：【分工】+ 名单 */
-      const y4 = top + lh * 3;
+      const y4 = top + lh * 3 + dy;
       CV.text('【分工】', U.ix(), y4 + lh / 2, { size: CV.FS.md, color: dim });
       const x4 = U.ix() + CV.measure('【分工】', CV.FS.md) + GAP;
       /* V9.6.7（父亲大人）：只写产线名，**不写人名** —— 派了谁、加多少，点进「挂机分工」里看。

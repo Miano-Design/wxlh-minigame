@@ -63,20 +63,27 @@
         const cost = Core.kejiCostOf(k.id);
         const cur = lv ? (k.rate * lv * 100) : 0;
         const next = cost === null ? cur : (k.rate * (lv + 1) * 100);
-        const top = U.y, h = 56 * CV.SCALE;
+        const top = U.y;
+        const sub0 = k.info + ' 当前 +' + cur.toFixed(1) + '%'
+          + (cost === null ? ' · 已满级' : (' → 下一级 +' + next.toFixed(1) + '%（需 ◆ ' + fmt(cost) + '）'));
+        /* V9.6.142：这一行原来单行 fit → 尾巴「→ 下一级 +0.4%（需 ◆ 13）」被砍成「…」。
+           现在折到最多两行，行高跟着算 —— 12 条线一条不漏地看得见升级收益和价钱。 */
+        const bw = 78 * CV.SCALE;
+        const textW0 = U.iw() - 30 * CV.SCALE - bw - 8 * CV.SCALE;
+        const subLines = CV.wrap(sub0, textW0, CV.FS.sm, 2);
+        const h = (subLines.length > 1 ? 74 : 56) * CV.SCALE;
         CV.text(k.ico, U.ix(), top + h / 2, { size: CV.ICO * CV.SCALE, align: 'left' });
         const tx = U.ix() + 30 * CV.SCALE;
-        const bw = 78 * CV.SCALE;
-        const textW = U.iw() - 30 * CV.SCALE - bw - 8 * CV.SCALE;
+        const textW = textW0;
         CV.text(CV.fit(k.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         const nw = CV.measure(k.name, CV.FS.lg, true);
         const tag = 'Lv.' + lv + ' / ' + k.max;
         const tw = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE;
         CV.round(tx + nw + 6 * CV.SCALE, top + 8 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_SM, null, CV.C.line2);
         CV.text(tag, tx + nw + 6 * CV.SCALE + tw / 2, top + 16 * CV.SCALE, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
-        const sub = k.info + ' 当前 +' + cur.toFixed(1) + '%'
-          + (cost === null ? ' · 已满级' : (' → 下一级 +' + next.toFixed(1) + '%（需 ◆ ' + fmt(cost) + '）'));
-        CV.text(CV.fit(sub, textW, CV.FS.sm), tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        subLines.forEach(function (ln, k2) {
+          CV.text(ln, tx, top + (36 + k2 * 18) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
         const can = cost !== null && coin >= cost;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           cost === null ? '满级' : '升 1 级', 'ghost', can ? 'keji_up:' + k.id : '');
@@ -108,14 +115,19 @@
         const own = st.own.indexOf(f.id) >= 0;
         const wearing = st.on === f.id;
         const lv = Core.fabaoLv(f.id);
-        const top = U.y, h = 52 * CV.SCALE;
-        CV.text(f.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(f.rarity) });
+        const top = U.y;
         const tx = U.ix() + 40 * CV.SCALE;
         const bw = 84 * CV.SCALE;
         const textW = U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE;
+        /* V9.6.142：效果说明原来单行 fit → 尾巴「· 祭炼 3/15」被砍成「…」。
+           折到最多两行，行高跟着算（稀有度标签仍按行高垂直居中）。 */
+        const dLines = CV.wrap(f.desc + (own ? ' · 祭炼 ' + lv + '/' + D.FABAO_MAX_LV : ''), textW, CV.FS.sm, 3);
+        const h = (52 + (dLines.length - 1) * 17) * CV.SCALE;
+        CV.text(f.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(f.rarity) });
         CV.text(CV.fit(f.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        CV.text(CV.fit(f.desc + (own ? ' · 祭炼 ' + lv + '/' + D.FABAO_MAX_LV : ''), textW, CV.FS.sm),
-          tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        dLines.forEach(function (ln, k) {
+          CV.text(ln, tx, top + (36 + k * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
         if (!own) {
           /* V9.6.112：法宝改扣 **◉ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
              最便宜也要 1000，新号根本买不起，主线"获得 1 件法宝"永远完不成。 */
@@ -211,17 +223,22 @@
         const own = st.own.indexOf(m.id) >= 0;
         const riding = st.on === m.id;
         const lv = Core.mountLv(m.id), mx = D.MOUNT_MAX_LV[m.rarity] || 10;
-        const top = U.y, h = 52 * CV.SCALE;
-        CV.text(m.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(m.rarity) });
+        const top = U.y;
         const tx = U.ix() + 40 * CV.SCALE;
         const bw = 84 * CV.SCALE;
         const textW = U.iw() - 40 * CV.SCALE - bw - 8 * CV.SCALE;
-        CV.text(CV.fit(m.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         const costTxt = Object.keys(m.cost).filter((k) => k !== 'mat' && k !== 'matN')
           .map((k) => curIcon(k) + fmt(m.cost[k])).join(' + ')
           + (m.cost.mat ? (' + ' + ((D.ITEMS[m.cost.mat] || {}).name || m.cost.mat) + '×' + m.cost.matN) : '');
-        CV.text(CV.fit(m.desc + (own ? (' · 喂养 ' + lv + '/' + mx) : (' · 驯服需要 ' + costTxt)), textW, CV.FS.sm),
-          tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        /* V9.6.142：同法宝 —— 单行 fit 会把「· 驯服需要 ◉ 5000…」砍掉，改成最多两行。 */
+        /* 高阶坐骑的"驯服需要 …"要写三样（点数 + 结晶 + 材料），两行也不够 → 放到三行。 */
+        const dLines = CV.wrap(m.desc + (own ? (' · 喂养 ' + lv + '/' + mx) : (' · 驯服需要 ' + costTxt)), textW, CV.FS.sm, 3);
+        const h = (52 + (dLines.length - 1) * 17) * CV.SCALE;
+        CV.text(m.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(m.rarity) });
+        CV.text(CV.fit(m.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        dLines.forEach(function (ln, k) {
+          CV.text(ln, tx, top + (36 + k * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
         const by = top + (h - U.BTN_SM * CV.SCALE) / 2;
         if (!own) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '驯服', 'ghost', 'mount_buy:' + m.id);
         else {
@@ -315,29 +332,31 @@
       plots.forEach(function (p, i) {
         const top = U.y;
         const bw = 84 * CV.SCALE;
-        const textW = U.iw() - bw - 8 * CV.SCALE;
-        /* V9.6.141：说明原来是一行 fit → 末尾被省略号切掉（"…出 兽魂石"整段没了）。
-           网页版那一行是 HTML，会自动折行；画布这边得自己折 —— 最多两行，
-           行高跟着算，所以"收什么 / 几成出稀有物"一定看得见。 */
+        /* V9.6.142：说明改成**占满整行**（按钮挪到标题那一行的右边）。
+           上一版把说明限制在"减去按钮宽"的 246px 里，第二行照样被砍成
+           「→ 收 异界合金×12 · 20% 出 SR装…」—— 等于没修干净。 */
+        const fullW = U.iw();
+        /* V9.6.141/142：说明原来是一行 fit → 末尾被省略号切掉（"…出 兽魂石"整段没了）。
+           现在按语义拆两行（状态 / 收什么），并且**占满整行宽度**，行高跟着算。 */
         const ready = p.plot && p.leftMs <= 0;
         const state2 = !p.plot ? 'empty' : (ready ? 'ready' : 'growing');
-        /* 两截直接画两行（不再拿一句长文本去自动折行）：
-           否则断点会落在"基础金属×5 ·"和"15% 出…"中间，行尾留一个孤零零的「·」。 */
         const descLines = D.gardenRowLines(p.kind || {}, state2, p.leftMs / 1000)
-          .map((t, k) => (k === 0 ? CV.fit(t, textW, CV.FS.xs) : CV.fit('→ ' + t, textW, CV.FS.xs)));
-        const dH = CV.FS.xs * 1.55;
-        const h = Math.max(62 * CV.SCALE, 50 * CV.SCALE + descLines.length * dH + 6 * CV.SCALE);
+          .map((t, k) => CV.fit(k === 0 ? t : ('→ ' + t), fullW, CV.FS.xs));
+        /* 行内布局（按钮挪到**标题那一行的右边**，把下面的整行让给说明）：
+             第 N 块            [播种]
+             空地 · 可种「下品灵田」：◉ 800 · 10 分钟
+             → 收 基础金属×5 · 15% 出 兽魂石×1 */
+        const h = 72 * CV.SCALE;
         if (p.locked) {
-          CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, color: CV.C.dim });
-          CV.text(CV.fit('🔒 未开垦 · ' + (p.req || '继续推图'), U.iw(), CV.FS.sm), U.ix(), top + 32 * CV.SCALE,
+          CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true, color: CV.C.dim });
+          CV.text(CV.fit('🔒 未开垦 · ' + (p.req || '继续推图'), fullW, CV.FS.sm), U.ix(), top + 44 * CV.SCALE,
             { size: CV.FS.sm, color: CV.C.dim });
           U.y = top + 62 * CV.SCALE;
           return;
         }
-        CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 12 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        const state = !p.plot ? '空地'
-          : (ready ? '已成熟，可以收了' : ('生长中 · 还需 ' + (G.formatDuration ? G.formatDuration(Math.ceil(p.leftMs / 1000)) : '')));
-        CV.text(CV.fit(state, textW, CV.FS.sm), U.ix(), top + 32 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
+        CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        const state = (p.plot ? '' : '空地 · ') + descLines[0];
+        CV.text(CV.fit(state, fullW, CV.FS.sm), U.ix(), top + 44 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
         /* V9.6.131（父亲大人："药园种植的消耗你也没写，我不知道是机制改了还是怎么"）：
            机制没改（播种照旧扣 ◉ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
            现在把"种这一块要花多少"写回描述里，货币图标取货币表（不是手写符号）。 */
@@ -348,11 +367,11 @@
            于是每行都只剩「可种「下品灵田」：◉ 800 · 」，结尾挂着一个孤零零的「· 」；
            种下去之后那行干脆是空的「收 」。产物、稀有掉落、成熟时间**全都没写出来**。
            现在改用数据层的 D.gardenRowText()（与网页版同一份文案）+ 两行折行。 */
-        descLines.forEach(function (ln, k) {
-          CV.text(ln, U.ix(), top + 50 * CV.SCALE + dH * (k + 0.5), { size: CV.FS.xs, color: CV.C.dim });
-        });
-        if (!p.plot) U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE, '播种', 'ghost', 'garden_plant:' + i);
-        else U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+        CV.text(descLines[1], U.ix(), top + 60 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
+        /* 按钮跟"第 N 块"那一行居中对齐，不再压在说明上 */
+        const by = top + 16 * CV.SCALE - (U.BTN_SM * CV.SCALE) / 2;
+        if (!p.plot) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '播种', 'ghost', 'garden_plant:' + i);
+        else U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE,
           ready ? '收获' : '生长中', ready ? 'primary' : 'ghost', ready ? 'garden_get:' + i : '');
         U.y = top + h;
       });

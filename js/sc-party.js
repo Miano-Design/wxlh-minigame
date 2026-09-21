@@ -49,7 +49,9 @@
          · 伙伴格：**高 115**（原来 92，太扁）、内边距 10、圆角 10
          · 格内：头像 40 上下各留 8 → 名字 13/行高 17.5 且下间距 4 → 小字 11/行高 15.4
          这一套行距是网页版 .pslot/.pname/.pmeta 的实测值，别再自己压。 */
-      const gap = CV.SP[2], th = 115 * CV.SCALE;
+      /* V9.6.142：格子里那行信息改成两行显示（等级 / 血统 / 阵营不再截断）→ 高 115 → 126。
+         网页版 .pslot 是内容撑高的，所以两边都装得下。 */
+      const gap = CV.SP[2], th = 126 * CV.SCALE;
       const PAD = 10 * CV.SCALE;
       const NAME_LH = 17.5 * CV.SCALE, META_LH = 15.4 * CV.SCALE;
       /* V9.6.69（父亲大人："第 5 步的高亮框只亮一小块，应该是整个上阵区域"）：
@@ -172,11 +174,19 @@
           const nameY = avTop + 40 * CV.SCALE + 8 * CV.SCALE + NAME_LH / 2;
           CV.text(CV.fit(Core.charName(id), cw - PAD * 2, CV.FS.lg, true), x + cw / 2, nameY,
             { size: CV.FS.lg, bold: true, align: 'center', color: grabbing ? CV.C.gold : undefined });   // 网页版 .pslot.grabbing .pname 是金色
+          /* V9.6.142（父亲大人："伴生体的孵化那行字被省略了"→顺着全站扫）：格子里这行
+             原来是单行 fit → 「Lv.0 · 泰坦 · 灰…」，血统和阵营全被砍掉。
+             网页版那边同样是 ellipsis（两边都错）。现在**折到最多两行、居中**，
+             格子高度跟着算 —— 上阵时该看的"等级 / 血统 / 阵营"一个不丢。 */
           const meta = id === '@player'
             ? ('Lv.' + S.player.level + ' · 战力 ' + fmt(Core.playerPower()))
             : ('Lv.' + S.chars[id].lv + ' · ' + (D.charById[id] || {}).bloodline + ' · ' + (D.charById[id] || {}).faction);
-          CV.text(CV.fit(meta, cw - PAD * 2, CV.FS.xs), x + cw / 2, nameY + NAME_LH / 2 + 4 * CV.SCALE + META_LH / 2,
-            { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+          const metaLines = CV.wrap(meta, cw - PAD * 2, CV.FS.xs, 2);
+          const metaTop = nameY + NAME_LH / 2 + 4 * CV.SCALE;
+          metaLines.forEach(function (ln, k) {
+            CV.text(ln, x + cw / 2, metaTop + META_LH * (k + 0.5),
+              { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+          });
           CV.hit('poke:' + i, x, y, cw, th);
         });
         U.y = y + th + CV.SP[2];

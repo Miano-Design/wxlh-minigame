@@ -39,6 +39,15 @@
     if (m) return m + '分' + s + '秒';
     return s + '秒';
   };
+  /* 分:秒（V9.6.142，父亲大人："游历怎么现在变成几千秒了，按分:秒，这样显示呀"）。
+     倒计时一律用这个：3000 秒 → 50:00、65 → 01:05。
+     以前直接写 `X 秒`，而游历的间隔会一路涨到 3600 秒 ——
+     屏幕上就是"距下一次 3600 秒"，玩家还得自己心算除以 60。
+     超过一小时才退化成"X小时Y分"（那种场合读分秒没意义）。 */
+  /* 「分:秒」只有一份实现（数据层的 D.fmtClock）—— 这里只是给页面用的快捷方式。
+     ⚠️ 不要在这里再抄一遍算法：抄两遍迟早分叉，这一整轮（货币图标、药园文案）
+     都是栽在"同一件事写两份"上。 */
+  G.fmtClock = function (sec) { return (G.DATA && G.DATA.fmtClock) ? G.DATA.fmtClock(sec) : String(sec); };
 
   U.y = 0;                 // 纵向游标（从内容区顶部算起）
   U.dry = false;           // true = 只量高度不画（U.card 用它先量后画底）
@@ -112,7 +121,11 @@
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
       CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
-      CV.text(CV.fit(title, U.iw() - 120, CV.FS.f1, true), U.ix() + bar + gap, cy,
+      /* V9.6.142：标题原来**一律**按 `iw - 120` 截断 —— 哪怕这一行既没有小字也没有按钮
+         （玩法指南那些章标题就是这么被砍成「⑸ 血统与境界线：换了血统就换了…」的）。
+         现在只有真的有右侧内容时才让位；只有标题时占满整行。 */
+      const titleMax = (opt.btn || sub) ? (U.iw() - 120) : (U.iw() - bar - gap - 4 * CV.SCALE);
+      CV.text(CV.fit(title, titleMax, CV.FS.f1, true), U.ix() + bar + gap, cy,
         { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text, ls: 0.2 });   // .card h3 letter-spacing .2px
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
@@ -127,8 +140,20 @@
     const top = U.y;
     draw(() => {
       const cy = top + h / 2;
-      CV.text(CV.fit(k, U.iw() * 0.55, CV.FS.lg), U.ix(), cy, { size: CV.FS.lg, color: CV.C.dim });
-      CV.text(CV.fit(v, U.iw() * 0.45, CV.FS.lg), U.ix() + U.iw(), cy, { size: CV.FS.lg, color: color || CV.C.text, align: 'right' });
+      /* V9.6.142（父亲大人："伴生体的孵化那行字被省略了……每10颗.…"）：
+         原来这里**死板地**把左边按 55%、右边按 45% 去 fit —— 于是右边稍长一点就被砍成
+         「兽魂石 0 颗 · 每 10 颗…」。这是通用缺陷，任何一个 kv 行只要值长一点都会中招。
+         现在先量两边：**放得下就按自然宽度画，谁也不截**；真的放不下时，
+         优先保住右边的数值（它是玩家真正要看的东西），只截左边那半。
+         —— 于是"每 10 颗孵 1 只"这种完整的短句再也不会被无谓地砍掉。 */
+      const gap = 10 * CV.SCALE, iw = U.iw();
+      const kw = CV.measure(k, CV.FS.lg), vw = CV.measure(v, CV.FS.lg);
+      let kMax, vMax;
+      if (kw + gap + vw <= iw) { kMax = kw; vMax = vw; }              // 放得下：原样
+      else if (vw <= iw * 0.62) { vMax = vw; kMax = iw - vw - gap; }   // 右边不长：先保右边
+      else { vMax = iw * 0.62; kMax = iw - vMax - gap; }               // 两边都长：才各让一步
+      CV.text(CV.fit(k, kMax, CV.FS.lg), U.ix(), cy, { size: CV.FS.lg, color: CV.C.dim });
+      CV.text(CV.fit(v, vMax, CV.FS.lg), U.ix() + iw, cy, { size: CV.FS.lg, color: color || CV.C.text, align: 'right' });
       CV.ctx.save();
       CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
       CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();
