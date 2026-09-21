@@ -497,15 +497,7 @@
        （深井就是）也还能被拉动十来像素。现在只有内容真的超出一屏才给那点留白。 */
     const viewH = CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8;
     const bottom = CV.contentH - 20;        // contentH 里那 20 是给"滚到底"留的尾白，量的时候要减掉
-    /* V1.0.1（父亲大人："结束一波整个战斗日志卡往上弹，下一波又回来"）：
-       真凶在这里 —— 战斗页（chromeless）是**一屏固定版面**，本来就不该参与滚动，
-       可是 viewH 里仍然减了 NAV_H（战斗页根本不画底栏），于是日志卡贴底后
-       内容还"多出"约 60px → maxScroll ≈ 60，页面**可滚**；
-       波次卡那 1 秒里布局参数一抖，夹取后的 scroll 就落到 60 上下，
-       整块内容（含日志卡、"撤离/速度"两颗按钮）被 translate 顶上去 —— 下一波又回来。
-       （父亲大人两张截图实测：战斗中卡片底边在 88.7% 高度、波次卡时在 81.7%，正好差约 60px。）
-       修法：**chromeless 页面（战斗 / 开局那几页）maxScroll 恒 0**，彻底不参与滚动。 */
-    CV.maxScroll = chromeless ? 0 : (bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]));
+    CV.maxScroll = bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]);
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
        页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
