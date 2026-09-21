@@ -51,6 +51,14 @@ global.wx = {
   removeStorageSync(k) { delete store[k]; },
   setClipboardData() {}, getClipboardData() {}, showKeyboard() {}, onKeyboardConfirm() {}, offKeyboardConfirm() {},
   env: { USER_DATA_PATH: '/tmp' },
+  /* V1.0.1：补上文件系统。
+     game.js 末尾那段"开发期截图"（CE-SHOT，给 scripts/shot.js 用）会调 getFileSystemManager，
+     stub 里没有它就走进 else 分支，打出「[CE-SHOT-FAIL] 不能写文件」——
+     看着像 bug，其实 devtools 里那条链路是好的（Console 里是 `[CE-SHOT] http://usr/ce-shot.png`）。
+     这里给它一个真会落盘的实现，既消掉误导，又顺手验了截图链路。 */
+  getFileSystemManager: () => ({
+    writeFileSync(p, b64) { try { fs.writeFileSync(p, Buffer.from(String(b64), 'base64')); } catch (e) {} },
+  }),
   vibrateShort() {},
 };
 
@@ -178,6 +186,29 @@ console.log('\n=== 小游戏开机与心跳审计 ===');
   const src = fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8');
   t('game.js 里有每秒心跳（setInterval + onlineTick + 15 秒存盘）',
     /setInterval\(/.test(src) && /Core\.onlineTick\(dt\)/.test(src) && /saveCounter >= 15/.test(src));
+
+  /* ---------- 场景 4：冷启动时 jsbridge 还没就绪 ---------- */
+  /* V1.0.1（多账号调试里抓到的真报错）：
+     新窗口的 Console 里有 `[jsbridge] invoke getSystemInfo fail: jsbridge not ready`。
+     溯源到 game.js **顶层**那句 `const info = wx.getWindowInfo ? …` —— 原来没有 try/catch，
+     一抛出去，后面的 CV.setup / bindTouch / 心跳全都不会执行，玩家看到的就是白屏卡死。
+     同一个文件里另外两处同类调用（onWindowResize / onShow）早就包了 try/catch，只有开机这处漏了。
+     这里把两个 API 都改成抛错，验"开机不崩" + "界面照样出来" + "事后补算尺寸"。 */
+  const realGetWindow = global.wx.getWindowInfo;
+  const realGetSystem = global.wx.getSystemInfoSync;
+  global.wx.getWindowInfo = () => { throw new Error('jsbridge not ready'); };
+  global.wx.getSystemInfoSync = () => { throw new Error('jsbridge not ready'); };
+  delete require.cache[require.resolve(path.join(ROOT, 'game.js'))];
+  let bootErr = null;
+  try { require(path.join(ROOT, 'game.js')); } catch (e) { bootErr = e; }
+  global.wx.getWindowInfo = realGetWindow;      // 马上还原：下面那次"延迟补算"要用真的
+  global.wx.getSystemInfoSync = realGetSystem;
+  await wait(150);
+  t('jsbridge 未就绪时开机不抛错（不然就是白屏）', !bootErr, bootErr ? String(bootErr.message) : '✓');
+  t('……而且界面照样渲染出来了', !!(CV.top() && CV.top().name), CV.top() ? CV.top().name : '（没有页面）');
+  await wait(250);                              // 等那次 300ms 的延迟补算
+  t('……并且事后自动补算出了窗口尺寸（不靠 onWindowResize 救场）',
+    CV.W > 0 && CV.H > 0, 'W=' + CV.W + ' H=' + CV.H);
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed\n');
   process.exit(fail ? 1 : 0);
