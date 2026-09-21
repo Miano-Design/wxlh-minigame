@@ -49,6 +49,7 @@ global.wx = {
 const CV = global.CV, Core = global.Core, G = global.GameGlobal, D = global.DATA;
 CV.setup(global.wx.getWindowInfo());
 const UI = G.BattleUI;
+const Dun = G.Dungeon;
 
 /* 战斗引擎换成"一帧就打完"的假结果 —— 这里考的是页面状态机，不是数值 */
 G.Battle.run = function () {
@@ -296,10 +297,20 @@ console.log('\n=== 战斗页生命周期审计 ===');
     cardTops.push(Math.round(top));
     return realCardFn.apply(this, arguments);
   };
-  UI.run(cfg({
+  /* ⚠️ 必须用**真怪物、真多波**跑：第一版断言用的是空队伍 + 空敌人（假战斗一帧就结束），
+     根本没走到父亲大人真机上那条路径（第 11 关 · 3 波 · 3× 速度），所以才"全绿却还在弹"。 */
+  const waveCfg = (hitLeft) => cfg({
+    worldId: 'W01', allies: UI.buildAllies({}, {}),
+    enemies: Dun.makeEnemies('W01', 'normal', 11, 'combat'),
     seamless: true, sub: '本波通过',
-    onEnd() { return { seamless: true, sub: '本波通过', after() {} }; },
-  }));
+    onEnd() {
+      return {
+        seamless: true, sub: '本波通过',
+        after() { if (hitLeft > 0) UI.run(waveCfg(hitLeft - 1)); },   // 真接着开下一波
+      };
+    },
+  });
+  UI.run(waveCfg(2));                       // 3 波
   let tickProbe = 0;
   await new Promise((res) => {
     const iv = setInterval(() => {
