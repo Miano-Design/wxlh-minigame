@@ -1,6 +1,6 @@
 {
   "description": "《残域》微信小游戏版（个人主体 · 广告变现）",
-  "appid": "wx69e989a1d09967aa",
+  "appid": "wx61631124a2f9084b",
   "projectname": "wxlh-minigame",
   "compileType": "game",
   "libVersion": "3.5.0",
@@ -32,12 +32,30 @@
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [
-      { "type": "file", "value": "README.md" },
-      { "type": "file", "value": "CHANGELOG.md" },
-      { "type": "file", "value": "GM_DOC.md" },
-      { "type": "file", "value": "_preview.html" },
-      { "type": "folder", "value": "scripts" },
-      { "type": "folder", "value": "截图" }
+      {
+        "type": "file",
+        "value": "README.md"
+      },
+      {
+        "type": "file",
+        "value": "CHANGELOG.md"
+      },
+      {
+        "type": "file",
+        "value": "GM_DOC.md"
+      },
+      {
+        "type": "file",
+        "value": "_preview.html"
+      },
+      {
+        "type": "folder",
+        "value": "scripts"
+      },
+      {
+        "type": "folder",
+        "value": "截图"
+      }
     ],
     "include": []
   },
