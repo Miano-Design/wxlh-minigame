@@ -55,15 +55,15 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
       /* V9.5.64（父亲大人：前期副本卡关）——首关 Boss 血量系数 0.28 → 0.10，
          之后每个世界再 +0.05：第一个 Boss 是"能打赢的关"，不是劝退墙。 */
       const bossHpMult = (0.05 + wi * 0.05) * ease;
-      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true })];
-      list.push(mk(w.enemies[0], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
-      if (diff !== 'normal') list.push(mk(w.enemies[1], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, {}));
+      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true, position: 'back' })];
+      list.push(mk(w.enemies[0], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, { position: 'front' }));
+      if (diff !== 'normal') list.push(mk(w.enemies[1], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, { position: 'front' }));
       return label(list);
     }
     if (kind === 'elite') {
       return label([
-        mk(w.elite, w.hp * 2.0 * m, w.atk * 1.35 * mAtk, w.def * 1.3 * mDef, { isElite: true }),   // V9.5.64：精英不再是一堵墙
-        mk(w.enemies[Math.floor(Math.random() * 3)], w.hp * m, w.atk * mAtk, w.def * mDef, {}),
+        mk(w.elite, w.hp * 2.0 * m, w.atk * 1.35 * mAtk, w.def * 1.3 * mDef, { isElite: true, position: 'back' }),
+        mk(w.enemies[Math.floor(Math.random() * 3)], w.hp * m, w.atk * mAtk, w.def * mDef, { position: 'front' }),
       ]);
     }
     /* V1.0.1（父亲大人："前期可以一个敌人，到后期可以固定 5 个敌人啊，就慢慢增加，
@@ -72,7 +72,14 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
        第 3 个世界起**固定 5 只**（都不再打折 —— 折扣那套是当初"一刀一个"的根源）。 */
     const n = wi === 0 ? 1 : (wi === 1 ? 3 : 5);
     const out = [];
-    for (let i = 0; i < n; i++) out.push(mk(w.enemies[Math.floor(Math.random() * w.enemies.length)], w.hp * m, w.atk * mAtk, w.def * mDef, {}));
+    for (let i = 0; i < n; i++) {
+      /* V1.0.1（父亲大人："敌方阵型跟我方阵型一样，前 2 后 3"）：
+         敌人也分前后排 —— 引擎本来就按 position 选目标（先打前排），
+         以前只给敌人一排，等于"所有人都能打到"；现在前 2 后 3，
+         前排站着就替后排挡刀（打光前排才碰后排），和我方同一套规矩。 */
+      out.push(mk(w.enemies[Math.floor(Math.random() * w.enemies.length)],
+        w.hp * m, w.atk * mAtk, w.def * mDef, { position: i < 2 ? 'front' : 'back' }));
+    }
     return label(out);
   }
 
@@ -243,7 +250,7 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
   }
 
   /* 关卡 = 一场接一场的连续战斗（对标《道友修仙》的副本：点进去就打，不再让人选路线）。
-     波数随关卡推进：1~4 关 1 波、5~8 关 2 波、9~12 关 3 波。
+     波数随**世界**推进：W01 一波、W02 两波、W03 起固定三波（V1.0.1）。
      最后一波才是"结算波"：第 4/8 关是精英、第 12 关是守关 Boss，其余是区域决战。
      波与波之间血量继承——这是"连打"的重量所在，也是治疗剂 / 强化剂仍然有用的地方。 */
   function finalKind(stage) {

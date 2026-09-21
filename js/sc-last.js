@@ -655,54 +655,24 @@
         { label: '🧱 各档材料 ×200', style: 'ghost', id: 'gm_mats' },
         { label: '📘 各档经验 ×50', style: 'ghost', id: 'gm_exps' },
       ]);
-    });
-    U.card(function () {
-      U.h3('跳转到任意页面', Object.keys(CV.panels).length + ' 页');
-      /* 每页一颗小按钮。CV.panels 里注册过的都能进，包括平时解锁不了的那些。 */
-      const keys = Object.keys(CV.panels).sort();
-      const cols = 3, gap = 8 * CV.SCALE;
-      const w = (U.iw() - gap * (cols - 1)) / cols, h = 32 * CV.SCALE;
-      const y0 = U.y;
-      keys.forEach(function (k, i) {
-        const x = U.ix() + (i % cols) * (w + gap);
-        const y = y0 + Math.floor(i / cols) * (h + gap);
-        U.btn(x, y, w, h, k, 'ghost', 'gm_go:' + k);
-      });
-      U.y = y0 + Math.ceil(keys.length / cols) * (h + gap);
-    });
-    /* V9.6.68（资料 §5「引导每一步都要能测」）：本地引导漏斗 ——
-       和网页版同一套数据（S.coachStats），按"被跳过率"排序，越高越该改。 */
-    U.card(function () {
-      const st = S.coachStats || {};
-      const keys = Object.keys(st);
-      U.h3('引导漏斗', '本地统计 · ' + keys.length + ' 步');
-      if (!keys.length) {
-        U.hint('还没有数据 —— 跑一遍新手引导就会出现（每步记：看过 / 点过 / 跳过 / 停留）。', 3 * CV.SCALE);
-        return;
-      }
-      const rows = keys.map(function (k) {
-        const s = st[k];
-        const total = (s.tap || 0) + (s.skip || 0);
-        return { k: k, s: s, total: total, rate: total ? Math.round((s.skip || 0) / total * 100) : 0,
-          avg: s.msN ? Math.round(s.ms / s.msN / 100) / 10 : 0 };
-      }).sort(function (a, b) { return b.rate - a.rate || b.total - a.total; });
-      U.hint('按被跳过率排序 —— 越高＝这一步越没人看，优先改它。', 3 * CV.SCALE);
-      rows.slice(0, 14).forEach(function (r) {
-        U.listRow({
-          t1: r.k,
-          t2: '看过 ' + (r.s.view || 0) + ' · 点过 ' + (r.s.tap || 0) + ' · 跳过 ' + (r.s.skip || 0)
-            + (r.s.miss ? (' · 没指到 ' + r.s.miss) : '') + ' · 平均 ' + r.avg + 's',
-          rightText: r.rate + '%',
-        });
-      });
-      if (rows.length > 14) U.hint('（只列前 14 条）', 3 * CV.SCALE);
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '清空漏斗统计', style: 'ghost', id: 'gm_funnel_reset' }], undefined, U.BTN_SM);
+      /* V1.0.1（父亲大人："GM 里加多一个全员满级的"）：
+         等级满了技能还锁着照样测不了后期内容，所以等级 + 三条技能一起拉满。 */
+      U.btnRow([{ label: '⬆ 全员满级（Lv.100 + 技能满）', style: 'primary', id: 'gm_max' }]);
     });
-    U.hint('当前：' + CV.top().name + ' · 存档 v' + (S.v || '?') + ' · 点页面名直接跳过去', 4 * CV.SCALE);
   });
-  CV.on('gm_go:*', function (k) { CV.reset(k); });
-  CV.on('gm_funnel_reset', function () { Core.S.coachStats = {}; Core.save(); CV.toast('引导漏斗统计已清空'); CV.render(); });
+  CV.on('gm_max', function () {
+    const S = Core.S;
+    const maxSkill = [35, 35, 30];                 // 三条技能各自的上限
+    S.player.level = 100; S.player.exp = 0; S.player.skillLv = maxSkill.slice();
+    Object.keys(S.chars).forEach(function (id) {
+      S.chars[id].lv = 100; S.chars[id].exp = 0;
+      S.chars[id].skillLv = maxSkill.slice();
+    });
+    Core.save();
+    CV.toast('全员满级：主角 + ' + Object.keys(S.chars).length + ' 名伙伴');
+    CV.render();
+  });
   /* V9.6.77（父亲大人："GM 后门的货币都改成给我 9 亿，现在给的太少了"）：
      与网页版同一口径 —— 读 D.CURRENCIES，一次把每种货币（含转生点 ♾）拉满 9 亿。
      以前是四个按钮各发一种、还都没给转生点，测转生天赋得来回点。 */

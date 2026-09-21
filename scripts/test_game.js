@@ -146,6 +146,17 @@ t('波次按世界递增：W01 一波、W02 两波、W03 起固定三波',
   Dungeon.wavePlan(1, 'W01').length === 1 && Dungeon.wavePlan(1, 'W02').length === 2 &&
   Dungeon.wavePlan(9, 'W03').length === 3 && Dungeon.wavePlan(9, 'W10').length === 3);
 t('第 5 关最后一波仍是普通战斗（精英在 4/8 关、Boss 在 12 关）', Dungeon.wavePlan(5, 'W03')[2] === 'combat');
+/* V1.0.1（父亲大人："敌方阵型跟我方阵型一样，前 2 后 3"、"精英/BOSS 应该在后排中间"）：
+   敌人也分前后排（前排挡刀）；精英与守关 Boss 站**后排**，随从在前排。 */
+t('敌人前 2 后 3，且精英 / Boss 站后排、随从站前排', (() => {
+  const c = Dungeon.makeEnemies('W03', 'normal', 1, 'combat');
+  if (c.filter(e => e.position === 'front').length !== 2) return false;
+  if (c.filter(e => e.position !== 'front').length !== 3) return false;
+  const b = Dungeon.makeEnemies('W01', 'normal', 12, 'boss');
+  if (!b.some(e => e.isBoss && e.position === 'back')) return false;
+  const el = Dungeon.makeEnemies('W01', 'normal', 4, 'elite');
+  return el.some(e => e.isElite && e.position === 'back') && el.filter(e => e.position === 'front').length >= 1;
+})());
 /* 敌人数按**世界**递增：W01 一只、W02 三只、W03 起固定五只。 */
 t('W01 一只敌人 / W02 三只 / W03 起固定五只',
   Dungeon.makeEnemies('W01', 'normal', 1, 'combat').length === 1 &&

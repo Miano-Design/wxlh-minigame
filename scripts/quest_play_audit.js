@@ -134,7 +134,8 @@ async function doBattleStage(stageIdx) {
   const h = findHit(['stage:' + stageIdx, 'stage_grid']);
   if (!h) return { ok: false, why: '世界页上没有第 ' + (stageIdx + 1) + ' 关的热区' };
   tap(h);
-  await wait(900);                       // 一帧就赢的假战斗 + 结算页
+  /* V1.0.1：每关改成 3 波后，一场要走 3 次无缝交接 —— 900ms 不够，放宽到 2.6s。 */
+  await wait(2600);                      // 一帧就赢的假战斗 × 3 波 + 结算页
   if (page() === 'battle') {
     /* 结算页：优先「下一关」，没有就「返回」 */
     tapId('dun_next') || tapId('battle_close');

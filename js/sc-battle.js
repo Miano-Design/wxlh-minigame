@@ -370,15 +370,19 @@
     /* V9.6.1（父亲大人给的批注）：中间那块不能是空的 —— 敌方 / 我方 / 日志要**紧凑占满一屏**。
        把余量**四等分**（上留白 / 敌我之间×2 / 下留白），也就是敌我空档 = 上下留白的 2 倍，
        和网页版 .b-field 的 `justify-content: space-around` 是同一套几何。 */
-    const stackH = CARD_H * 3 + SIDE_GAP;
+    /* V1.0.1（父亲大人："敌方阵型跟我方阵型一样，前 2 后 3，战斗显示为上方为后排、
+       下方为前排，像下象棋一样"）：敌我各两排 —— **后排在上、前排在下**（前排朝对面），
+       所以是 4 行、两个排间距。 */
+    const stackH = CARD_H * 4 + SIDE_GAP * 2;
     const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
     const allyTop = enemyY + CARD_H + space * 2;
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
-        { list: enemies, y: enemyY, ally: false },
-        { list: front, y: allyTop, ally: true },
-        { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },
+        { list: enemies.filter((u) => u.position !== 'front'), y: enemyY, ally: false },                       // 敌方后排（最上）
+        { list: enemies.filter((u) => u.position === 'front'), y: enemyY + CARD_H + SIDE_GAP, ally: false },   // 敌方前排（靠中）
+        { list: front, y: allyTop, ally: true },                                                              // 我方前排（靠中）
+        { list: back, y: allyTop + CARD_H + SIDE_GAP, ally: true },                                           // 我方后排（最下）
       ];
       /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
          （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
