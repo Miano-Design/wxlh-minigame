@@ -351,7 +351,14 @@
        我方两排之间只隔 14px（就是"一支部队"该有的距离），屏幕越高上下留白越多。 */
     const FIELD_TOP = U.y;
     const CARD_H = 92 * CV.SCALE;                 // 一张单位卡的高度（头像 + 名字 + 血条 + 百分比）
-    const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
+    /* V1.0.1（父亲大人："战斗一波结束的战斗日志往上移动，一直跳"）：
+       原来只显示**最后 4 行** —— 每来一条新日志，这 4 行就整体上移一格，
+       战斗帧又快（3× 速度下几乎每帧都在 push），看起来就是一直在跳。
+       网页版那边是**滚动区**（height 5.375rem + overflow-y，能往上翻历史），
+       画布没法滚，所以对齐它的办法是**把可见行数加大**：4 行 → 6 行，
+       一次能看到更多上下文，上移的"格"就不那么扎眼了。LOG_H 跟着放到 6 行的预算。 */
+    const LOG_LINES = 6;
+    const LOG_H = 185 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 6 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 我方前排与后排的间距（和网页版 .b-side gap 一致）
     /* V9.6.2（父亲大人："战斗日志还是出画了"）：这里是**内容坐标**（渲染时已经被顶栏整体下移），
        所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
@@ -440,10 +447,10 @@
        网页版那块的 `height: 5.375rem` 就是定高，这里照同一个规矩来。 */
     U.card(function () {
       U.h3('战斗日志');
-      const lines = B.log.slice(-4);
+      const lines = B.log.slice(-LOG_LINES);
       if (!lines.length) U.hint('（战斗开始）', 4 * CV.SCALE);
       lines.forEach((ln) => U.hint(ln, 2 * CV.SCALE));
-    }, { minH: 150 });
+    }, { minH: 185 });
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
     CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
     /* 波次卡已经在 drawBattle 开头接管了整屏（含这一行字），这里不再重复画 */
