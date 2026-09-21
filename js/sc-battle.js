@@ -373,7 +373,7 @@
     const CARD_H = AV + 40 * CV.SCALE;            // 一行占的高度 = 头像 + 名字 + 血条 + 百分比（与 unitCard 的返回值一致）
     const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 同一组里两排之间（和网页版 .b-side gap 一致）
-    const GROUP_GAP = 30 * CV.SCALE;               // 敌方组与我方组之间（V1.0.1：一个半头像 75 → 30，父亲大人定的）
+    const GROUP_GAP = AV * 1.5;                   // 敌方组与我方组之间 = 一个半头像（V1.0.1 父亲大人定的：75）
     /* V9.6.2（父亲大人："战斗日志还是出画了"）：这里是**内容坐标**（渲染时已经被顶栏整体下移），
        所以"画面底部"要减掉顶栏与安全区 —— 以前直接拿 CV.H 算，日志被推出去约一整个顶栏的高度。 */
     const CONTENT_H = CV.H - CV.safeBottom - (CV.TOP + 8) - 8;
@@ -387,7 +387,7 @@
        现在跟两颗按钮太贴了"）：
          · **末行不该再算一次排间距**（needH 里那个 SIDE_GAP 是行"之间"的，最后一排后面没有行）；
          · 底部额外留 BOTTOM_PAD —— "撤离 / 速度"就在下面，居中的均分留白不够它们喘气。 */
-    const BOTTOM_PAD = 45 * CV.SCALE;                       // 我方最后一排与两颗按钮之间的呼吸感（V1.0.1：20 → 45，父亲大人"再往上一点"）
+    const BOTTOM_PAD = 30 * CV.SCALE;                       // 我方最后一排与两颗按钮之间的呼吸感（V1.0.1 父亲大人定的：30）
     const rowStep = CARD_H + SIDE_GAP;
     const needH = rowStep * 4 + GROUP_GAP - SIDE_GAP;
     const areaH = (FIELD_BOTTOM_UNITS - BOTTOM_PAD) - FIELD_TOP;
