@@ -495,9 +495,17 @@
        V9.6.7（父亲大人："能一屏显示就一屏显示，不要还能上下拉一点的，很别扭"）：
        以前不管内容多高都额外加一段 CV.SP[1] 的下留白，于是**刚好铺满一屏**的页面
        （深井就是）也还能被拉动十来像素。现在只有内容真的超出一屏才给那点留白。 */
-    const viewH = CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8;
+    /* V1.0.1（父亲大人："现在战斗界面可以上下滑动，你调整一下，不要上下滑动"）：
+       真因 —— 战斗页（以及开局那几页）是 **chromeless、根本不画底栏**，
+       可这里算"可视高度"时**照样减了一个 NAV_H**，于是凭空多出约 54px 的可滚空间，
+       页面就能上下拉动。无底栏的页面不该减它。 */
+    const viewH = CV.H - CV.TOP - (chromeless ? 0 : CV.NAV_H) - CV.safeBottom - 8;
     const bottom = CV.contentH - 20;        // contentH 里那 20 是给"滚到底"留的尾白，量的时候要减掉
-    CV.maxScroll = bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]);
+    /* V1.0.1（父亲大人："现在战斗界面可以上下滑动，你调整一下，不要上下滑动"）：
+       战斗页和开局那几页（chromeless）是**一屏固定版面** —— 里面每一个元素
+       （敌方两排 / 我方两排 / 撤离速度 / 战斗日志）的位置都是按窗口高度算死的，
+       本来就不该参与滚动。这里把它们（也只有它们）的可滚量恒定为 0。 */
+    CV.maxScroll = chromeless ? 0 : (bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]));
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
        页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
