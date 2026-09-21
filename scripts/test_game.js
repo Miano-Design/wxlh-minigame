@@ -157,6 +157,15 @@ t('敌人前 2 后 3，且精英 / Boss 站后排、随从站前排', (() => {
   const el = Dungeon.makeEnemies('W01', 'normal', 4, 'elite');
   return el.some(e => e.isElite && e.position === 'back') && el.filter(e => e.position === 'front').length >= 1;
 })());
+/* ⚠️ 这一条是补的：上面只验了 makeEnemies 的**输出**，没验**战斗引擎有没有保留** ——
+   结果 allies 那行设了 position、enemies 那行漏了，进引擎后全变 undefined，
+   渲染时统统落进"后排"一行，看着就是"一排五个"。 */
+t('战斗引擎保留敌人的前后排标记', (() => {
+  const es = Dungeon.makeEnemies('W03', 'normal', 1, 'combat');
+  const r = Battle.run({ allies: [], enemies: es, worldId: 'W03', maxRounds: 1 });
+  const f = r.frames[0].enemies;
+  return f.filter(e => e.position === 'front').length === 2 && f.filter(e => e.position === 'back').length === 3;
+})());
 /* 敌人数按**世界**递增：W01 一只、W02 三只、W03 起固定五只。 */
 t('W01 一只敌人 / W02 三只 / W03 起固定五只',
   Dungeon.makeEnemies('W01', 'normal', 1, 'combat').length === 1 &&

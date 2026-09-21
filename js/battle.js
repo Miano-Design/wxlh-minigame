@@ -219,7 +219,16 @@ window.Battle = (function () {
       u.charId = spec.charId;                 // 记住这是队伍里的谁：波间血量继承 / 战后写回都要靠它
       return u;
     });
-    const enemies = cfg.enemies.map(spec => makeEnemyUnit(spec));
+    /* V1.0.1（父亲大人："为啥我现在打还是一排五个的布局"）：
+       真凶 —— 上面 allies 那行有 `u.position = spec.position`，**enemies 这行漏了**，
+       于是敌人的前后排标记在进引擎时被丢掉（= undefined），
+       渲染时 `position !== 'front'` 恒成立 → 五个全落进"后排"那一行，看着就是一排。
+       补上；没标的一律当前排（老数据 / 其他调用点不至于空着）。 */
+    const enemies = cfg.enemies.map(spec => {
+      const u = makeEnemyUnit(spec);
+      u.position = spec.position || 'front';
+      return u;
+    });
     if (mech.enemyShield) enemies.forEach(u => { u.shield = Math.round(u.maxHp * mech.enemyShield); });
     if (mech.enemySpd) enemies.forEach(u => { u.spd *= mech.enemySpd; });
     if (mech.enemyLifesteal) enemies.forEach(u => { u.lifesteal += mech.enemyLifesteal; });
