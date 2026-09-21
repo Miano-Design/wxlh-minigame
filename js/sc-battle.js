@@ -456,6 +456,19 @@
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
+    /* ⚠️ 临时探针（查完删）：只在"波次卡开始/结束"这两个瞬间各打一行 —— 输出极少，
+       真机调试的 Console 里一眼就能看到，且能和父亲大人看到的"弹"对上时刻。 */
+    if (globalThis.__tipPrev !== (B.tip ? 1 : 0)) {
+      globalThis.__tipPrev = B.tip ? 1 : 0;
+      console.log('[PROBE] tip=' + (B.tip ? 1 : 0)
+        + ' logCardScreenTop=' + (U.y + CV.TOP + 8 - (CV.scroll || 0)).toFixed(1)
+        + ' logCardTop=' + U.y.toFixed(1)
+        + ' scroll=' + (CV.scroll || 0).toFixed(1) + '/' + (CV.maxScroll || 0).toFixed(1)
+        + ' H=' + CV.H.toFixed(0) + ' safeB=' + (CV.safeBottom || 0).toFixed(0)
+        + ' TOP=' + CV.TOP.toFixed(0) + ' SCALE=' + CV.SCALE.toFixed(3)
+        + ' fieldTop=' + FIELD_TOP.toFixed(1) + ' fieldBottom=' + FIELD_BOTTOM.toFixed(1)
+        + ' corner=' + CORNER_H.toFixed(1));
+    }
     /* 战斗日志（最近 4 行，网页版 #battle-log）
        V1.0.1（父亲大人："每一波结束战斗日志都会往上顶一下"）：
        高度**钉死在 LOG_H** —— 日志不足 4 行时也是这么高，不再随行数长个儿。
