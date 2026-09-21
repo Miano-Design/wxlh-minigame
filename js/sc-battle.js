@@ -382,10 +382,9 @@
     const stackH = CARD_H * 4 + SIDE_GAP * 2;
     const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
-    /* V1.0.1（父亲大人："现在双方阵型贴在一起了"）：改成四行之后余量被摊薄，
-       敌我两组就挤到一块儿了。这里给两组之间一个**最小间距**（至少半张卡高），
-       小屏也不会贴脸。 */
-    const GROUP_GAP = Math.max(space * 2, CARD_H * 0.5);
+    /* V1.0.1（父亲大人："敌我间距可以大一点，差不多一个半头像那么大"）：
+       头像统一都是 50，所以这里按 1.5 × 50 = 75 给最小间距（原来是半张卡高 46，偏挤）。 */
+    const GROUP_GAP = Math.max(space * 2, 75 * CV.SCALE);
     const allyTop = enemyY + CARD_H + SIDE_GAP + GROUP_GAP;
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
