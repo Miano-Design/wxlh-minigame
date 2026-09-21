@@ -1349,6 +1349,33 @@ window.DATA = (function () {
     { id: 'g3', name: '上品灵田', points: 12000, sec: 3600, out: { item: 'mat_t3', n: 12 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
     { id: 'g4', name: '极品灵田', points: 40000, sec: 7200, out: { item: 'mat_t4', n: 16 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
   ];
+  /* 一块地收成什么（V9.6.141）——**放在数据层**，两边界面共用一份。
+     以前只有网页版 ui.js 里有一份 gardenYieldText()，小游戏那边自己拼字符串时用了
+     一个不存在的字段（`seed.desc`），于是每一行都只剩「可种「下品灵田」：◉ 800 · 」
+     —— 结尾挂着一个孤零零的「· 」，种下去之后那行干脆是空的「收 」。
+     同一句话写两遍迟早会分叉，所以收进数据层。 */
+  const gardenItemName = id => (ITEMS[id] || {}).name || id;
+  function gardenYieldText(g) {
+    let s = gardenItemName(g.out.item) + '×' + g.out.n;
+    if (g.extra) s += ' · ' + Math.round(g.extra.p * 100) + '% 出 ' + gardenItemName(g.extra.item) + '×' + g.extra.n;
+    return s;
+  }
+  /* 一行完整说明（"可种 / 成熟还需 / 已成熟"三种状态拼的就是同一份数据）。
+     按**语义切成两截**返回，而不是一句长文本：
+       第 1 截：这一块地现在什么状态、种下去要花多少 / 还要多久
+       第 2 截：收了能拿到什么
+     这样画布那边自己折行时，断点一定落在"→"上，不会把"基础金属×5 · 15% 出…"
+     从中间劈开、也不会在行尾留一个孤零零的「·」。网页版把两截用「 → 」连起来当一句。
+     （V9.6.141：这正是父亲大人指出"药园排版明显有问题"的那一行。） */
+  function gardenRowLines(kind, state, leftSec) {
+    const head = state === 'empty'
+      ? ('可种「' + kind.name + '」：◉ ' + kind.points + ' · ' + Math.round(kind.sec / 60) + ' 分钟')
+      : (state === 'ready' ? '已成熟，可以收了' : ('成熟还需 ' + Math.ceil(leftSec || 0) + ' 秒'));
+    return [head, '收 ' + gardenYieldText(kind)];
+  }
+  function gardenRowText(kind, state, leftSec) {
+    return gardenRowLines(kind, state, leftSec).join(' → ');
+  }
 
   /* ================= 斗法台（对标《道友修仙》的斗法 / Arena） =================
      单机做不了真 PVP，所以做成"镜像擂台"：守擂者按你自己的队伍战力换算出来，
@@ -2268,7 +2295,7 @@ window.DATA = (function () {
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
     KEJI, KEJI_COIN, kejiById, kejiCost,
     TRAVELS, TRAVEL_TOTAL_W, TRAVEL_STEPS_SEC,
-    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ,
+    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, gardenYieldText, gardenRowText, gardenRowLines,
     ARENA_DAILY, arenaReward, arenaEnemy,
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,

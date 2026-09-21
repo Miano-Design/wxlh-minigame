@@ -29,10 +29,13 @@ global.localStorage = {
 
 /* ---------- 会记账的假 ctx：凡是画出来的字都收进 TEXT ---------- */
 const TEXT = [];
+/* 同一次绘制的位置（V9.6.141）：V9.6.139 起，含货币符号的句子会**逐字画**，
+   于是"行尾有没有挂一个 ·"这类判断不能只看单次 fillText —— 得按 y 把同一行的碎片拼回来。 */
+const TXY = [];
 const ctxStub = new Proxy({}, {
   get(t, k) {
     if (k === 'measureText') return (s) => ({ width: String(s == null ? '' : s).length * 7 });
-    if (k === 'fillText') return (s) => { TEXT.push(String(s)); };
+    if (k === 'fillText') return (s, x, y) => { TEXT.push(String(s)); TXY.push({ x: Number(x) || 0, y: Number(y) || 0 }); };
     if (k === 'createLinearGradient') return () => ({ addColorStop() {} });
     const props = ['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'globalAlpha', 'textAlign',
       'textBaseline', 'shadowColor', 'shadowBlur', 'shadowOffsetY', 'letterSpacing'];
@@ -96,10 +99,23 @@ function openState() {
 openState();
 
 /* ---------- 渲染一页，把画出来的字收下来 ---------- */
+let LAST_POS = [];
 function drawPage(name) {
-  TEXT.length = 0;
+  TEXT.length = 0; TXY.length = 0;
   try { CV.reset(name); } catch (e) { console.log('  [渲染报错] ' + name + ' → ' + e.message); return null; }
+  LAST_POS = TXY.slice();          // 留给"按行判断"的检查用
   return TEXT.slice();
+}
+/* 把"逐字画"的碎片按 y 合成一行（同 y 的按 x 排好拼起来） */
+function linesOf(textArr, posArr) {
+  const byY = {};
+  textArr.forEach((s, i) => {
+    const p = posArr[i] || { x: 0, y: 0 };
+    const k = Math.round(p.y);
+    (byY[k] = byY[k] || []).push({ s, x: p.x });
+  });
+  return Object.keys(byY).map(k => byY[k].sort((a, b) => a.x - b.x).map(o => o.s).join(''))
+    .filter(t => t.trim());
 }
 function drawWith(enterId, name) {
   /* 引导开着时 CV.dispatch 是**真模态**（只放行高亮那颗），进不去二级页。
@@ -127,6 +143,32 @@ Object.keys(CV.panels || {}).forEach((name) => {
 });
 if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Object] ✓');
 
+/* ①-b 残句：一行画完却"话没说完"（行尾挂着 · → + / ： 这种连接符）。
+   这是"少写了半句"的通用指纹 —— V9.6.141 药园那行就是「可种「下品灵田」：◉ 800 · 」
+   （产物、稀有掉落全没了）。它**不含 undefined**，所以上面那条抓不到；
+   网页版那次是被"每块地必须写清收什么"那条专门验收挡住的，小游戏当时没这条。
+   改成对**每一页**都扫一遍，以后任何页面少半句都会报。 */
+{
+  let dangling = 0;
+  Object.keys(CV.panels || {}).forEach((name) => {
+    /* 玩法指南 / 货币图鉴是**长段落逐字折行**的页面：折行断点会落在句子中间，
+       刚好断在「执灯者 → 伙伴详情」这种箭头后面是正常的，不是"话没说完"。
+       这两页排除（它们的内容是成段的说明文，没有"一行一条数据"的结构）。 */
+    if (name === 'guide' || name === 'currency') return;
+    const got = drawPage(name);
+    if (!got) return;
+    linesOf(got, LAST_POS).forEach((ln) => {
+      const t = String(ln).trim();
+      /* 只认「·」和「→」这两个**我们自己的连接符**：
+         正文里合法折行可能刚好断在 " / " 或 "+" 后面（吉凶档位、配方写法），
+         那不算残句 —— 报假警的尺子等于没有尺子。 */
+      if (/[·→]$/.test(t)) { dangling++; console.log(`  ✗ ${name} 页有"话没说完"的行：${t}`); }
+    });
+  });
+  if (!dangling) console.log('  没有"行尾挂着连接符"的残句（每一页都话说完）✓');
+  badText += dangling;
+}
+
 console.log('\n=== ② "列东西"的页面：该出现的名字和说明必须真的画出来 ===');
 /* 计数器先声明（②-0 / ②-a / ②-b 三段都要往里加，声明放后面会踩 TDZ） */
 let retiredHits = 0;
@@ -145,6 +187,24 @@ let retiredHits = 0;
   }
   if (!fmtBad) console.log('  数字显示一律不带小数点，10 万以下还是精确数 ✓');
   retiredHits += fmtBad;
+}
+/* ②-0b 药园每一块地都要写清"收什么"（V9.6.141，父亲大人："药园的排版明显有问题"）。
+   起因：这一行原来拼的是灵田数据里**不存在**的 `seed.desc`，于是每行都只剩
+   「可种「下品灵田」：◉ 800 · 」—— 结尾挂着一个孤零零的「· 」，产物和稀有掉落全没了；
+   种下去之后那行干脆是空的「收 」。网页版有这条验收，小游戏没有 —— 现在补上。 */
+{
+  const got = drawPage('garden') || [];
+  const stream = got.join('');
+  let g = 0;
+  (D.GARDEN || []).forEach(kind => {
+    const y = D.gardenYieldText(kind);
+    if (stream.indexOf(y) < 0) { g++; console.log('  ✗ 药园没写清「' + kind.name + '」收什么：' + y); }
+  });
+  // 按"合成后的整行"判断行尾 —— 逐字画的碎片不算（V9.6.139 起含货币符号的句子会逐字画）
+  const dangling = linesOf(got, LAST_POS).filter(t => /·\s*$/.test(String(t).trim()));
+  if (dangling.length) { g++; console.log('  ✗ 药园有"行尾挂一个 ·"的残句：' + dangling.slice(0, 2).join(' / ')); }
+  if (!g) console.log('  药园每块地都写清了收什么，也没有"行尾挂 ·"的残句 ✓');
+  retiredHits += g;
 }
 /* ②-a 退役词：界面上**画出来**的旧名字（网页版那套 copy_audit 只管 HTML，画布这边的字它看不见）。
    起因（V9.6.136）：货币 8→4 之后，成长页和三条引导里还写着"血统结晶""铭刻五阶"——
