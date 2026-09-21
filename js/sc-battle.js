@@ -434,21 +434,29 @@
         else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
         CV.ctx.restore();
       });
-
+      /* V1.0.1（父亲大人："波次卡的高度和战斗阵容的高度不一样，所以切到波次卡日志就向上补位"）：
+         真凶 —— 这一句原来写在 `if (!B.tip)` **外面**，而与之配对的 `CV.ctx.save()`
+         在 if **里面**。战斗中两者配对；**一到波次卡，save 不执行、restore 照样执行**，
+         每帧多弹出一层画布状态，把外层 `translate(0, 顶栏+8)` 的坐标系弹掉，
+         整块内容（日志卡 + 撤离/速度按钮）就被顶偏；下一波 tip 变回假又恢复 ——
+         正是"弹上去又回来"。这也解释了为什么"去掉波次卡就不弹"。
+         修法：把它挪进 if，与 save 严格配对。 */
+      CV.ctx.restore();                       // 震屏结束：还原坐标系（必须与上面的 save 配对）
     }
-    CV.ctx.restore();                       // 震屏结束：还原坐标系
 
     /* 右下角两个按钮：撤离 / N×速度（战斗日志上面） */
     battleCornerButtons(FIELD_BOTTOM - 4 * CV.SCALE);
     /* 战斗日志贴着内容底部（网页版 #battle-log） */
     U.y = FIELD_BOTTOM + 6 * CV.SCALE;
-    /* 战斗日志（最近 4 行，网页版 #battle-log） */
+    /* 战斗日志（最近 4 行，网页版 #battle-log）
+       V1.0.1（父亲大人）：**高度锁死** —— 新一波开始时 B.log 会清空，
+       不锁的话卡片先缩上去、再随日志变多重新拉长。minH 取 4 行时的自然高度（140）。 */
     U.card(function () {
       U.h3('战斗日志');
       const lines = B.log.slice(-4);
       if (!lines.length) U.hint('（战斗开始）', 4 * CV.SCALE);
       lines.forEach((ln) => U.hint(ln, 2 * CV.SCALE));
-    });
+    }, { minH: 140 });
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
     CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
     /* 波次卡已经在 drawBattle 开头接管了整屏（含这一行字），这里不再重复画 */

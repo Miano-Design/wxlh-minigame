@@ -87,7 +87,11 @@
     U.inCard = true;
     U.dry = true; U.y = top + padY; content(); const inner = U.y - top - padY;
     U.dry = false;
-    const h = inner + padY * 2;
+    /* V1.0.1（父亲大人："新的一波开始上一波的日志会清空，日志卡就缩上去重新拉长，
+       你直接锁定卡片的高度"）：加一个 minH —— 内容变少时卡片也撑住固定高度，
+       高度不再随内容涨缩。 */
+    const minH = (opt && opt.minH) ? opt.minH * CV.SCALE : 0;
+    const h = Math.max(inner + padY * 2, minH);
     if (h > 4) CV.card(U.pad(), top, U.cw(), h);
     U.y = top + padY; content();
     U.inCard = outer;
