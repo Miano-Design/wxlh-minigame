@@ -278,7 +278,9 @@
   /* ---------- 画一帧战斗 ---------- */
   function unitCard(x, y, w, u, small) {
     const dead = u.hp <= 0;
-    const av = small ? 42 : 50;
+    /* V1.0.1（父亲大人："我方人员的大小也很敌方的不一样，统一做成敌方那样的大小标准"）：
+       原来我方 small 走 42、敌方 50 —— 两边一大一小。统一成 50。 */
+    const av = 50;
     /* V9.6.28：受击抖一下 + 闪红；出手时朝对面冲一小步（我方右冲、敌方左冲） */
     const now = Date.now();
     const hitP = B.hitAt[u.uid] ? Math.max(0, 1 - (now - B.hitAt[u.uid]) / 300) : 0;
@@ -301,15 +303,19 @@
     if (dead) CV.ctx.globalAlpha = 1;
     // 名字
     CV.text(CV.fit(u.name, w, CV.FS.sm), cx, y + av + 9 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'center' });
-    // 血条
-    const by = y + av + 20 * CV.SCALE, bw = w - 6 * CV.SCALE, bh = 5 * CV.SCALE;
+    /* V1.0.1（父亲大人："血条可以短一点（减长度不是减血量）"）：
+       血条收成卡片内宽的 70% 并居中 —— 只动长度，血量与百分比都不变。 */
+    const fullW = w - 6 * CV.SCALE;
+    const bw = fullW * 0.7;
+    const bx = x + 3 * CV.SCALE + (fullW - bw) / 2;
+    const by = y + av + 20 * CV.SCALE, bh = 5 * CV.SCALE;
     const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
-    CV.round(x + 3 * CV.SCALE, by, bw, bh, 3 * CV.SCALE, '#0d1120');
-    if (pct > 0) CV.round(x + 3 * CV.SCALE, by, bw * pct, bh, 3 * CV.SCALE, pct < 0.35 ? CV.C.accent : CV.C.green);
+    CV.round(bx, by, bw, bh, 3 * CV.SCALE, '#0d1120');
+    if (pct > 0) CV.round(bx, by, bw * pct, bh, 3 * CV.SCALE, pct < 0.35 ? CV.C.accent : CV.C.green);
     CV.text(Math.round(pct * 100) + '%', cx, by + bh + 7 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     if (u.side === 'ally') {
       const en = B.energy[u.uid] || 0;
-      if (en > 0) CV.round(x + 3 * CV.SCALE, by + bh + 13 * CV.SCALE, bw * (en / 100), 2.5 * CV.SCALE, 2, CV.C.gold);
+      if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), 2.5 * CV.SCALE, 2, CV.C.gold);
     }
     return av + 30 * CV.SCALE + 10 * CV.SCALE;
   }
@@ -376,7 +382,11 @@
     const stackH = CARD_H * 4 + SIDE_GAP * 2;
     const space = Math.max(6 * CV.SCALE, ((FIELD_BOTTOM_UNITS - FIELD_TOP) - stackH) / 4);
     const enemyY = FIELD_TOP + space;
-    const allyTop = enemyY + CARD_H + space * 2;
+    /* V1.0.1（父亲大人："现在双方阵型贴在一起了"）：改成四行之后余量被摊薄，
+       敌我两组就挤到一块儿了。这里给两组之间一个**最小间距**（至少半张卡高），
+       小屏也不会贴脸。 */
+    const GROUP_GAP = Math.max(space * 2, CARD_H * 0.5);
+    const allyTop = enemyY + CARD_H + SIDE_GAP + GROUP_GAP;
     if (!B.tip) {   // V9.6.128：波次卡期间**只跳过阵容绘制**，日志与撤离/加速照常画
       const rows = [
         { list: enemies.filter((u) => u.position !== 'front'), y: enemyY, ally: false },                       // 敌方后排（最上）
@@ -398,7 +408,9 @@
         if (!list.length) return;
         const n = Math.max(1, list.length);
         const g = 8 * CV.SCALE;
-        const maxW = row.ally ? U.cw() * 0.24 : U.cw() * 0.3;
+        /* V1.0.1（父亲大人："我方人员的大小也很敌方的不一样，统一做成敌方那样的大小标准"）：
+           原来我方按 24% 宽、敌方按 30% —— 同一张卡两种尺寸。统一走 30%。 */
+        const maxW = U.cw() * 0.3;
         const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
         const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
         list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally));
