@@ -33,7 +33,9 @@
   const rarIdx = (id) => D.RARITIES.indexOf(D.charById[id].rarity);
   /* 卡片右下角「未穿装备 / 可升级」要用它（V9.6.8 删排序时误删过一次，卡片只画出一张就抛异常了） */
   const eqCount = (id) => Object.keys(Core.S.equipped[id] || {}).filter((k) => Core.S.equipped[id][k]).length;
-  /* 默认排序的**唯一实现**：上阵 → 等级 → 稀有度 → 星级（父亲大人定的）。
+  /* 默认排序的**唯一实现**：上阵 → **稀有度** → 等级 → 星级（父亲大人 2026-09-22 亲口更正）。
+     原来写的是"上阵 → 等级 → 稀有度"，**优先级记反了**，两端都反着跑了很久 ——
+     低等级的 R 会把 SSR 压到后面，玩家找强力伙伴要找半天。
      V9.6.19：换将页（sc-party）也要用同一套顺序，所以挂到 G 上共用一份，
      不要各写一遍 —— 两处排序一旦分家，就会出现"这边和那边不一样"。 */
   G.charSortDefault = function (ids) {
@@ -41,8 +43,8 @@
     return [].concat(ids).sort((a, b) => {
       const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
       if (pa !== pb) return pb - pa;
-      if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
       if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
+      if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
       /* V1.0.1：四档全平时要有个**唯一兜底键** —— 否则顺序取决于 `Object.keys` 的
          插入顺序，读档后会变，玩家看到的就是"排序又乱了"。详见网页版 ui.js 同一处。 */
       return (S.chars[b].star - S.chars[a].star) || String(a).localeCompare(String(b));
