@@ -124,7 +124,7 @@
     draw(() => {
       const cy = top + rowH / 2;                     // 标题 / 小字 / 按钮共用这一条中线
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
-      g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
+      g.addColorStop(0, CV.C.gold); g.addColorStop(1, 'CV.C.goldDeep');
       CV.round(U.ix(), cy - 6.5, bar, 13, CV.RADIUS_CHIP,  g);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
       /* V9.6.142：标题原来**一律**按 `iw - 120` 截断 —— 哪怕这一行既没有小字也没有按钮
@@ -416,12 +416,12 @@
     /* 主行动恒定金（V1.1 父亲大人拍板 + 创意总监复审）：红退回只管"危险 / 消耗 / 不可行"。
        字用深墨 #0b0e15 —— 与网页版 .btn.primary 同一条渐变（--gold → --gold-deep）。 */
     if (style === 'primary') { g.addColorStop(0, CV.C.gold); g.addColorStop(1, CV.C.goldDeep); }
-    if (style === 'gold') { g.addColorStop(0, '#b98d2a'); g.addColorStop(1, '#87631a'); }
+    if (style === 'gold') { g.addColorStop(0, 'CV.C.goldBtn'); g.addColorStop(1, 'CV.C.goldBtnDeep'); }
     const fill = g || (style === 'ghost' ? null : CV.C.panel2);
     /* V9.6.90：颜色一律 rgba()，**不许用 8 位 hex**（#RRGGBBAA）——
        微信画布对这个格式"部分支持/不稳定"，赋值失败时画布会**保持上一次的填充色**，
        表现就是"黑底黑字"（父亲大人最早报的那个毛病）。见 canvas_audit 的同名规则。 */
-    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? 'rgba(230,182,76,.33)' : style === 'gold' ? 'rgba(230,182,76,.27)' : CV.C.line2);
+    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? 'CV.a(CV.C.gold, .33)' : style === 'gold' ? 'CV.a(CV.C.gold, .27)' : CV.C.line2);
     draw(() => {
       if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
       /* 按下态：网页版 .btn:active 是 scale(.97) + 背景压暗一档。
@@ -429,14 +429,14 @@
       const down = CV.pressed && id && CV.pressed === id;
       if (down) { x += 1; y += 1; w -= 2; h -= 2; }
       CV.round(x, y, w, h, CV.RADIUS_SM, fill, line);
-      if (down) CV.round(x, y, w, h, CV.RADIUS_SM, 'rgba(0,0,0,.22)', null);
+      if (down) CV.round(x, y, w, h, CV.RADIUS_SM, 'CV.a(CV.C.shade, .22)', null);
       /* 长标签换行，不截断 —— 网页版 .btn-row .btn { white-space: normal; line-height: 1.25 } */
       const size = h <= U.BTN_SM * CV.SCALE ? CV.FS.md : CV.FS.lg;
       const lines = CV.wrap(label, w - 16 * CV.SCALE, size, 2);
       const lh = size * 1.25;
       lines.forEach(function (ln, i) {
         CV.text(ln, x + w / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh,
-          { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'primary' ? '#0b0e15' : style === 'gold' ? '#fdf3dc' : CV.C.text });
+          { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'primary' ? 'CV.C.bg2' : style === 'gold' ? 'CV.C.cream' : CV.C.text });
       });
       if (dis) CV.ctx.restore();
     });
@@ -464,7 +464,7 @@
   U.bar = function (pct, color) {
     const h = 8 * CV.SCALE, top = U.y;
     draw(() => {
-      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  '#0d1120');
+      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  'CV.C.bar');
       const w2 = Math.max(0, Math.min(1, pct)) * U.iw();
       if (w2 > 1) CV.round(U.ix(), top, w2, h, CV.RADIUS_CHIP,  color || CV.C.gold);
     });
@@ -883,13 +883,13 @@
       }
     }
     c.save();
-    c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(0, 0, CV.W, CV.H);
+    c.fillStyle = 'CV.a(CV.C.shade, .55)'; c.fillRect(0, 0, CV.W, CV.H);
     const pad = 6;
     if (r) {
       /* 高亮框：把锚点"挖"出来（先清一块、再描金框） */
-      c.fillStyle = 'rgba(0,0,0,0)';
+      c.fillStyle = 'CV.a(CV.C.shade, 0)';
       c.clearRect ? null : null;
-      CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, CV.RADIUS,  'rgba(0,0,0,0)', CV.C.gold, 2);
+      CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, CV.RADIUS,  'CV.a(CV.C.shade, 0)', CV.C.gold, 2);
     }
     /* V9.6.63（父亲大人："高亮没了、去别的界面又跳回来、回来也没高亮、不知道要干嘛"）：
        高亮只画在"目标就在本页"时；如果这一步的目标在**别的页**，就必须在提示卡里
@@ -946,12 +946,12 @@
     const o = U.overlay;
     if (!o) return;
     const c = CV.ctx;
-    c.fillStyle = 'rgba(0,0,0,.62)'; c.fillRect(0, 0, CV.W, CV.H);
+    c.fillStyle = 'CV.a(CV.C.shade, .62)'; c.fillRect(0, 0, CV.W, CV.H);
     /* V9.6.10（自审：整体偏"笨重"）：网页版的浮层 / 底部条都带投影
        （box-shadow: 0 -4px 1.25rem rgba(0,0,0,.45)），小游戏原来是一块贴死的平色，
        所以弹窗像"糊"在页面上。这里补一层柔和外投影。 */
     c.save();
-    c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 22 * CV.SCALE; c.shadowOffsetY = 6 * CV.SCALE;
+    c.shadowColor = 'CV.a(CV.C.shade, .55)'; c.shadowBlur = 22 * CV.SCALE; c.shadowOffsetY = 6 * CV.SCALE;
     CV.round(o.x, o.y, o.w, o.h, CV.RADIUS,  CV.C.bg2, CV.C.line);
     c.restore();
     /* 所有 y 都由 U.confirm 排好版（o.titleY / o.lineY / o.chipY / o.noteY / o.btnY），

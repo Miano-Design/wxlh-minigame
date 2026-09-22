@@ -18,22 +18,35 @@
     /* —— 设计令牌：逐条抄自网页版 css/style.css 的 :root（唯一标准）——
        V1.1（视觉语言基准 §2）：含义色按语义命名 —— 红从"主动作"退回，只管危险／消耗／不可行；
        主色金管主行动／关键／选中／品牌。下面的旧名字（accent/green/blue/red）留成别名，
-       三百多处 `CV.C.accent` 调用点一个字都不用动，但新代码请写语义名。 */
+       三百多处 `CV.C.accent` 调用点一个字都不用动，但新代码请写语义名。
+       V1.1.1（存量收敛）：与网页版**同一张色板**，四大类一一对应
+         A 类 登记基色 24 ／ B 类 派生档 ／ C 类 表面与状态底 ／ D 类 通道底色（给 CV.a 派生 α）
+       **透明色只许写 `CV.a(CV.C.x, 0.4)`**，不许再手写 'rgba(230,182,76,.4)' ——
+       `scripts/visual_audit.js` 第 ② 条会逐条扫，裸色值当场报红。 */
     C: {
+      /* A 类 · 登记基色 24 */
       bg: '#07090e', bg2: '#0b0e15',
       panel: '#111621', panel2: '#161d2a', panel3: '#1d2534',
-      line: '#232b3b', line2: '#333e55', lineSoft: 'rgba(255,255,255,.05)',
+      line: '#232b3b', line2: '#333e55',
       text: '#e9edf6', text2: '#b6bfd0', dim: '#7a849b',
-      gold: '#e6b64c', goldDeep: '#8a6a1e',
-      danger: '#d43a4f', dangerText: '#e8626f',      /* 面／线 用 danger；文字用 dangerText（12px 上对比度 5.15，达标） */
+      gold: '#e6b64c',
+      danger: '#d43a4f',                            /* 面／线 用 danger；文字用 dangerText（12px 上对比度 5.15，达标） */
       gain: '#56c894', info: '#6ec6ff', anom: '#b06bff',
       /* 稀有阶梯（与网页版 :root、data.js:RARITY_COLOR 同源） */
       rn: '#9aa4b2', rr: '#4da3ff', rsr: '#b06bff', rssr: '#ffb03a', rur: '#ff5fa2',
       /* 五族锚色（data.js:WORLD_THEME_HUE 取样；36 个世界格色是派生值） */
       famBio: '#53a26b', famGhost: '#765d98', famMystic: '#a26353', famTech: '#538aa2', famGod: '#a49951',
-      /* 旧名字 = 别名 */
-      accent: '#d43a4f', accent2: '#97273a', red: '#d43a4f',
-      green: '#56c894', blue: '#6ec6ff',
+      /* B 类 · 派生档（与网页版逐条同名同值） */
+      goldDeep: '#8a6a1e', dangerText: '#e8626f', accent2: '#97273a',
+      goldBright: '#ffd76a', goldBtn: '#b98d2a', goldBtnDeep: '#87631a', cream: '#fdf3dc',
+      exp: '#b8860b', hp: '#37b26c', hpH: '#5dd39e', hpLow: '#b23737',
+      en: '#6a5ae0', enH: '#9d8cff', dmg: '#ff8080', debuff: '#c8a2ff',
+      holy: '#ff9ecb', rp: '#7ee0a3',
+      /* C 类 · 表面／状态底 */
+      bar: '#0d1120', doneBg: '#1d2b22', doneLine: '#2f5b41',
+      enemy: '#2e1a24', overlay: '#1a1220', sel: '#241c08',
+      /* D 类 · 通道底色（只为 CV.a 派生 α；值＝黑／白本人） */
+      shade: '#000000', white: '#ffffff',
     },
     /* 下面这几组数值在 setup() 里按网页版的根字号等比缩放：
        网页版 css 里是 html { font-size: clamp(14.5px, 3.85vw, 16px) }，
@@ -72,6 +85,22 @@
     ],
   };
   CV.cur = 'home';
+
+  /* ---------- 派生 α 的唯一写法（V1.1.1 · 存量收敛）----------
+     `CV.a(CV.C.gold, 0.4)` → 'rgba(230,182,76,0.4)'。
+     由来：画布这边原来满天飞 'rgba(230,182,76,.4)' 这种手写值 —— 光金色一族就 12 种透明度、
+     四个通道色的写法，改一次主色要全库搜一遍。现在通道只认令牌本人，透明度只认调用点那个数。
+     尺子（scripts/visual_audit.js ②）扫到 'rgba(数字…' 这种裸通道就报红。 */
+  CV.a = function (color, a) {
+    const h = String(color).replace('#', '');
+    const n = h.length === 3 ? h.split('').map(function (c) { return c + c; }).join('') : h;
+    return 'rgba(' + parseInt(n.slice(0, 2), 16) + ',' + parseInt(n.slice(2, 4), 16)
+      + ',' + parseInt(n.slice(4, 6), 16) + ',' + a + ')';
+  };
+  /* 旧名字 = 别名（不再重复写一遍色值） */
+  CV.C.accent = CV.C.danger; CV.C.red = CV.C.danger;
+  CV.C.green = CV.C.gain; CV.C.blue = CV.C.info;
+  CV.C.lineSoft = CV.a(CV.C.white, .05);
 
   /* ---------- 初始化：按真实窗口算尺寸（不再"375 设计 + 整体缩放"） ---------- */
   CV.setup = function (info) {
@@ -172,7 +201,7 @@
       const w = s * 0.34, h = s * 0.46;
       c.save(); c.fillStyle = color;
       c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); c.fill();
-      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = Math.max(1, s * 0.05);
+      c.strokeStyle = 'CV.a(CV.C.white, .55)'; c.lineWidth = Math.max(1, s * 0.05);
       c.beginPath(); c.moveTo(x - w * 0.46, y - h * 0.46); c.lineTo(x + w * 0.46, y + h * 0.46); c.stroke();
       c.restore();
     },
@@ -475,6 +504,39 @@
     c.restore();
     return s;
   };
+  /* ---------- 头像（V1.1.2 · 基准 §4.4）----------
+     与网页版**同一份配方**（数据层 D.avatarSpec / D.avatarParts）：
+     圆盘（panel3）＋ 剪影（阵营色 55%）＋ 头饰（阵营色本人）＋ 阵营纹。
+     旧版是"圆框 + 名字首字"——44px 下只有字、没有形；现在一个人一张形，两端同一个形。
+     18 个部件 × 组合的完整表在 data.js（6 剪影 × 6 头饰 × 4 阵营纹 × 2 体型 ＝ 288 组合）。 */
+  CV.avatar = function (id, cx, cy, size, ring) {
+    const D = G.DATA;
+    if (!D || !D.avatarParts) return;
+    const c = CV.ctx;
+    const isMe = id === '@player';
+    const ch = isMe ? null : (D.charById[id] || null);
+    const S = (G.Core && G.Core.S) || null;
+    const info = {
+      bloodline: isMe ? ((S && S.player && S.player.bloodline) || '') : (ch && ch.bloodline),
+      faction: isMe ? (S && S.player && S.player.faction) : (ch && ch.faction),
+    };
+    const spec = D.avatarSpec(id, info);
+    const r = size / 2, ink = CV.a(spec.tint, .55);
+    c.save();
+    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = CV.C.panel3; c.fill();
+    c.lineWidth = 2; c.strokeStyle = ring || CV.C.line2; c.stroke();
+    c.beginPath(); c.arc(cx, cy, r - 1, 0, Math.PI * 2); c.clip();       // 剪影不许出圆盘
+    D.avatarParts(id, info).forEach(function (p) {
+      const col = p.role === 'ink' ? ink : spec.tint;
+      c.beginPath();
+      p.pts.forEach(function (q, i) {
+        const px = cx - r + q[0] * size, py = cy - r + q[1] * size;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      });
+      c.closePath(); c.fillStyle = col; c.fill();
+    });
+    c.restore();
+  };
   /* 货币符号 → 专属色（从货币表来，别处不许再手写颜色）。
      晚一点挂：data.js 先加载，这里只是把表读出来缓存一份。 */
   CV.CUR_COLOR = {};
@@ -622,8 +684,8 @@
     if (opt.line !== null) {
       const r = Math.min(opt.radius === undefined ? CV.RADIUS : opt.radius, w / 2, h / 2);
       CV.ctx.save();
-      CV.ctx.strokeStyle = 'rgba(255,255,255,.06)'; CV.ctx.lineWidth = 1;
-      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, 'rgba(255,255,255,.06)');
+      CV.ctx.strokeStyle = 'CV.a(CV.C.white, .06)'; CV.ctx.lineWidth = 1;
+      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, 'CV.a(CV.C.white, .06)');
       CV.ctx.restore();
     }
   };
@@ -890,7 +952,7 @@
     const ROW_H = 34, CHIP_H = 40, BAR_TOP = 2, BAR_BOTTOM = 10;
     const h = top + ROW_H + BAR_TOP + CHIP_H + BAR_BOTTOM;
     CV.TOP = h;
-    c.fillStyle = 'rgba(7,9,14,.94)';
+    c.fillStyle = 'CV.a(CV.C.bg, .94)';
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -909,7 +971,7 @@
     const name = CV.fit((S && S.player.name) || '执灯者', ROW_RIGHT - PAD - lw - 20 * CV.SCALE, CV.FS.f1, true);
     CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
     const nw = CV.measure(name, CV.FS.f1, true);
-    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, 'rgba(230,182,76,.4)');
+    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, 'CV.a(CV.C.gold, .4)');
     CV.text(lvTxt, PAD + nw + 10 * CV.SCALE + lw / 2, ny, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
     /* 铭刻名（网页版 .genelock：11px 红字，只在解锁后出现） */
     if (S && S.player.geneLock > 0 && D && D.GENE_LOCKS && D.GENE_LOCKS[S.player.geneLock - 1]) {
@@ -957,7 +1019,7 @@
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
     const y = CV.H - h;
-    c.fillStyle = 'rgba(12,15,23,.98)';
+    c.fillStyle = 'CV.a(CV.C.bg2, .98)';
     c.fillRect(0, y, CV.W, h);
     const tabW = CV.W / CV.NAV_TABS.length;
     CV.NAV_TABS.forEach((t, i) => {
@@ -995,7 +1057,7 @@
     const t = CV.toasts[0];
     const w = Math.min(CV.W - 40, CV.measure(t.msg, CV.FS.lg) + 32);
     const x = (CV.W - w) / 2, y = CV.TOP + 12;
-    CV.round(x, y, w, 34, CV.PILL,  'rgba(0,0,0,.85)', CV.C.line);
+    CV.round(x, y, w, 34, CV.PILL,  'CV.a(CV.C.shade, .85)', CV.C.line);
     CV.text(t.msg, CV.W / 2, y + 17, { size: CV.FS.lg, align: 'center' });
   };
   /* V9.6.90：加了时长参数（网页版 toast(msg, ms) 同款）——

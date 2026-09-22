@@ -247,8 +247,8 @@
     tabs.forEach(function (t) {
       const on = taskTab === t[0];
       const w = Math.max(72 * CV.SCALE, CV.measure(t[1], CV.FS.md) + 28 * CV.SCALE);
-      CV.round(x, top, w, h, CV.PILL,  on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
+      CV.round(x, top, w, h, CV.PILL,  on ? 'CV.a(CV.C.danger, .13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? 'CV.C.white' : CV.C.dim });
       CV.hit('tasktab:' + t[0], x, top, w, h);
       x += w + gap;
     });
@@ -739,7 +739,7 @@
          没派领队 = 没激活 → 边框虚线、标题/产出压灰；派了领队 = 激活 → 边框与文字一律金色。 */
       if (h > 4) {
         if (led) {
-          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, 'rgba(230,182,76,.4)');
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, 'CV.a(CV.C.gold, .4)');
         } else {
           CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, null);
           CV.ctx.save();

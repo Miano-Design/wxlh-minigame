@@ -107,7 +107,9 @@
       const w = CV.measure(label, CV.FS.md) + 28 * CV.SCALE;
       if (x + w > U.pad() + U.cw()) return;
       const on = shopTab === k;
-      CV.round(x, U.y, w, pillH, pillH / 2, on ? '#3a1620' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      /* 选中态底：原来是写死的深红 #3a1620，改成"危险红 16% 透明度"——
+         与背包页同一套选中态写法（V1.1.1 存量收敛）。 */
+      CV.round(x, U.y, w, pillH, pillH / 2, on ? CV.a(CV.C.danger, .16) : CV.C.panel, on ? CV.C.accent : CV.C.line);
       CV.text(label, x + w / 2, U.y + pillH / 2, { size: CV.FS.md, align: 'center', color: on ? CV.C.text : CV.C.dim });
       CV.hit('shoptab:' + k, x, U.y, w, pillH);
       x += w + gap;

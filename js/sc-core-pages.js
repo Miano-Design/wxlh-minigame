@@ -495,7 +495,7 @@
         list.forEach(function (c, i) {
           const mine = !!Core.S.chars[c.id];
           const x = U.ix() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
-          CV.round(x, y, cw, ch, CV.RADIUS_CHIP,  mine ? CV.C.panel2 : 'rgba(0,0,0,.13)', mine ? rarColor(c.rarity) : CV.C.line);
+          CV.round(x, y, cw, ch, CV.RADIUS_CHIP,  mine ? CV.C.panel2 : 'CV.a(CV.C.shade, .13)', mine ? rarColor(c.rarity) : CV.C.line);
           CV.text(mine ? c.name.slice(0, 2) : '？', x + cw / 2, y + 22 * CV.SCALE,
             { size: CV.FS.sm, align: 'center', color: mine ? rarColor(c.rarity) : CV.C.dim });
           CV.text(mine ? c.bloodline : c.rarity, x + cw / 2, y + 42 * CV.SCALE,

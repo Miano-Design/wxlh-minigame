@@ -23,14 +23,10 @@
   let pickSlot = null;        // 正在给哪一格挑人
   let detailFrom = null;      // 从队伍点进详情的格子号
 
-  /* 伙伴头像（圆形 + 首字 + 稀有度描边） */
+  /* 伙伴头像（V1.1.2 · 基准 §4.4）：改成组合剪影，画法统一在 CV.avatar（与网页版同一个形） */
   function avatar(id, size, cx, cy) {
     const ch = D.charById[id] || {};
-    const col = id === '@player' ? CV.C.gold : rarColor(ch.rarity);
-    CV.ctx.beginPath(); CV.ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
-    CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
-    CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
-    CV.text(Core.charName(id).slice(0, 1), cx, cy, { size: size * 0.44, bold: true, align: 'center', color: col });
+    CV.avatar(id, cx, cy, size, id === '@player' ? CV.C.gold : rarColor(ch.rarity));
   }
 
   CV.register('party', function () {
@@ -103,7 +99,7 @@
         const gid = S.party[CV.grab.from];
         const gname = gid ? Core.charName(gid) : '';
         const bh = 30 * CV.SCALE, btop = U.y, bw = 56 * CV.SCALE;
-        CV.round(U.ix(), btop, U.iw(), bh, CV.RADIUS_CHIP,  'rgba(230,182,76,.10)', 'rgba(230,182,76,.45)');
+        CV.round(U.ix(), btop, U.iw(), bh, CV.RADIUS_CHIP,  'CV.a(CV.C.gold, .10)', 'CV.a(CV.C.gold, .45)');
         CV.text(CV.fit('已抓起「' + gname + '」 · 拖到别的位置松手放下', U.iw() - bw - 20 * CV.SCALE, CV.FS.xs),
           U.ix() + 8 * CV.SCALE, btop + bh / 2, { size: CV.FS.xs, color: CV.C.gold });
         U.btn(U.ix() + U.iw() - bw - 6 * CV.SCALE, btop + 4 * CV.SCALE, bw, bh - 8 * CV.SCALE, '取消', 'ghost', 'pgrab_cancel');
@@ -124,7 +120,7 @@
           try {
             c.save();
             c.setLineDash([5 * CV.SCALE, 4 * CV.SCALE]);
-            c.strokeStyle = 'rgba(230,182,76,.55)'; c.lineWidth = 1;
+            c.strokeStyle = 'CV.a(CV.C.gold, .55)'; c.lineWidth = 1;
             const r = CV.RADIUS;
             c.beginPath();
             c.moveTo(rx + r, ry);
@@ -161,11 +157,11 @@
           if (aiming && !grabbing) {
             CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 2);
             CV.round(x + 2 * CV.SCALE, y - 18 * CV.SCALE, cw - 4 * CV.SCALE, 16 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
-            CV.text('放这里', x + cw / 2, y - 10 * CV.SCALE, { size: CV.FS.xs, color: '#241c08', align: 'center', bold: true });
+            CV.text('放这里', x + cw / 2, y - 10 * CV.SCALE, { size: CV.FS.xs, color: 'CV.C.sel', align: 'center', bold: true });
           }
           if (id === '@player') {
             const tw = CV.measure('主角', CV.FS.xs) + 10 * CV.SCALE;
-            CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  null, 'rgba(230,182,76,.4)');
+            CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  null, 'CV.a(CV.C.gold, .4)');
             CV.text('主角', x + 4 * CV.SCALE + tw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
           }
           /* 头像 40（上留 8）、名字 13/行高 17.5、小字 11/行高 15.4 —— 全按网页版实测 */
@@ -193,7 +189,7 @@
         /* 手指压在这一排的标签上＝要"整排搬过去"：那一条高亮 + 右侧写「放这里」 */
         if (CV.grab && CV.grab.over === 'row:' + rowKey) {
           const r = rowRect[rowKey];
-          CV.round(r.x, r.y, r.w, r.h, CV.RADIUS_CHIP,  'rgba(230,182,76,.14)', CV.C.gold, 2);
+          CV.round(r.x, r.y, r.w, r.h, CV.RADIUS_CHIP,  'CV.a(CV.C.gold, .14)', CV.C.gold, 2);
           CV.text('放这里', r.x + r.w - 6 * CV.SCALE, r.y + r.h / 2,
             { size: CV.FS.xs, color: CV.C.gold, align: 'right', bold: true });
         }
@@ -235,7 +231,7 @@
       D.FORMATIONS.forEach(function (f) {
         const on = fb.hit.indexOf(f.id) >= 0;
         const h = 40 * CV.SCALE, top = U.y;
-        if (on) CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  'rgba(86,200,148,.08)', '#2f5b41');
+        if (on) CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  'CV.a(CV.C.gain, .08)', 'CV.C.doneLine');
         else CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  null, CV.C.line);
         CV.text(f.name, U.ix() + 8 * CV.SCALE, top + 13 * CV.SCALE, { size: CV.FS.lg, bold: true, color: on ? CV.C.green : CV.C.text });
         CV.text(f.reqText, U.ix() + 8 * CV.SCALE, top + 30 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });

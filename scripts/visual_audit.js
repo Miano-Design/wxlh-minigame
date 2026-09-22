@@ -1,14 +1,23 @@
 /* 视觉语言尺子（小游戏端）：node scripts/visual_audit.js
    ------------------------------------------------------------------------------
-   姊妹尺子：网页版 wxlh-game/scripts/visual_audit.js。同一份《视觉语言基准》，
-   两端各守一遍 —— 上一轮的病根正是"规范只在文档里、只在 specimen 里"。
-     ① 色：CV.C 的令牌层不透明基色 ≤ 24（派生档不算，理由逐条列）
-     ② 字：11px（CV.FS.tag）用量占比 < 15%，且不带裸数字（type_scale_audit 已守一遍）
-     ③ 圆角：画布上只准 3 档 ＋ 2 形状特例
-     ④ 品质框 v2：CV.qframe 在位 ＋ 角色卡真接上
-     ⑤ 动效：受击 / 出手两处与网页版同值
+   姊妹尺子：网页版 wxlh-game/scripts/visual_audit.js。同一份《视觉语言基准》，两端各守一遍。
 
-   只读脚本，不写任何东西。
+   第一版只查"新写的是不是用令牌"，**不查旧裸值还在不在** —— 所以网页版全绿、CSS 里却
+   躺着 120+ 个裸色值。这一版两端把缺的那一半补上（V1.1.1）：
+
+     ① 色      ：CV.C 登记基色 ≤ 24（基准 §2.2）＋ 与网页版 :root 同源
+     ② 存量    ：**全库零裸值**（新增）
+                  ②-1 色值：只准写在 CV.C 色板与 data.js 数据层色表里，别处一个都不许有
+                  ②-2 α   ：只准 CV.a(CV.C.x, a) —— 不许手写 'rgba(230,182,76,.4)'
+                  ②-3 圆角：半径一律走 CV.RADIUS / RADIUS_SM / RADIUS_CHIP / PILL
+                  ②-4 字号：不许裸数字（CV.FS / CV.TIER / CV.DISP / CV.ICO 之外）
+     ③ 字      ：11px（tag）占比 < 15%（基准 §3.2）
+     ④ 圆角    ：三档 + 胶囊都在用
+     ⑤ 品质框 v2：CV.qframe 在位 ＋ 角色卡真接上
+     ⑥ 动效    ：受击 / 出手与网页版同值（基准 §5.2）
+     ⑦ 命格主题：小游戏取的是数据层同一张表（锚色 + 现算灯梯）
+
+   只读脚本，不写任何东西。要加色 → 先登记进 CV.C，再引用。
 */
 const fs = require('fs');
 const path = require('path');
@@ -19,26 +28,112 @@ const read = (f) => fs.readFileSync(path.join(JS, f), 'utf8');
 let pass = 0, fail = 0;
 const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
 const cv = read('cv.js');
+const COLOR_RE = /#[0-9a-fA-F]{3,8}\b|(?<![a-zA-Z0-9_-])rgba?\([^)]*\)/g;
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+const cBlock = (cv.match(/C:\s*\{[\s\S]*?\n    \},/) || [''])[0];
 
 console.log('\n=== ① 色：令牌层 CV.C 登记基色 ≤ 24（基准 §2.2）===');
 {
-  const C = cv.match(/C:\s*\{[\s\S]*?\n    \},/);
-  const hex = [...new Set((C ? C[0].match(/#[0-9a-fA-F]{6}\b/g) : []).map((x) => x.toLowerCase()))];
-  const DERIVED = { '#8a6a1e': 'goldDeep', '#e8626f': 'dangerText（危险红提亮档）', '#97273a': 'accent2' };
-  const base = hex.filter((c) => !DERIVED[c]);
-  t('CV.C 不透明基色 ≤ 24', base.length <= 24, base.length + ' 个');
-  t('网页版 :root 与小游戏 CV.C 同源（每个基色都能在网页版令牌里找到）', (() => {
-    const web = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8').match(/:root\s*\{[\s\S]*?\n\}/)[0];
-    const webSet = new Set([...web.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0].toLowerCase()));
-    const miss = base.filter((c) => !webSet.has(c));
-    return miss.length === 0 || (console.log('    缺 ' + miss.join(' ')), false);
+  const BASE = ['bg', 'bg2', 'panel', 'panel2', 'panel3', 'line', 'line2', 'text', 'text2', 'dim',
+    'gold', 'danger', 'gain', 'info', 'anom', 'rn', 'rr', 'rssr', 'rur',
+    'famBio', 'famGhost', 'famMystic', 'famTech', 'famGod'];
+  const pairs = [...cBlock.matchAll(/([a-zA-Z]+):\s*'(#[0-9a-fA-F]{3,8})'/g)].map((m) => [m[1], m[2].toLowerCase()]);
+  const base = [...new Set(pairs.filter((p) => BASE.includes(p[0])).map((p) => p[1]))];
+  const other = [...new Set(pairs.filter((p) => !BASE.includes(p[0]) && !['shade', 'white'].includes(p[0])).map((p) => p[1]))];
+  t('CV.C 登记基色 ≤ 24', base.length <= 24, base.length + ' 个');
+  t('派生／表面／通道分开记（不混进 24）', true,
+    '派生+表面 ' + other.length + ' · 通道底色 2 · 别名 4（accent/red/green/blue，不再重复写值）');
+  t('网页版 :root 与小游戏 CV.C 同源（每个色值都能在网页版找到）', (() => {
+    const web = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
+    const webSet = new Set([...(web.match(/:root\s*\{[\s\S]*?\n\}/)[0]
+      .matchAll(/#[0-9a-fA-F]{6}\b/g))].map((m) => m[0].toLowerCase()));
+    /* 黑白两个通道底色在网页版写成 --shade-rgb / --white-rgb（通道令牌），值就是 #000/#fff */
+    webSet.add('#000000'); webSet.add('#ffffff');
+    const miss = [...base, ...other].filter((c) => !webSet.has(c));
+    return miss.length === 0 || (console.log('    网页版没有：' + miss.join(' ')), false);
   })());
-  t('语义名齐全（danger / gain / info / anom / 稀有阶梯 / 五族锚），旧名字留成别名',
-    /danger:\s*'#d43a4f'/.test(cv) && /dangerText:/.test(cv) && /gain:/.test(cv) && /info:/.test(cv) && /anom:/.test(cv)
-    && /rn:/.test(cv) && /rur:/.test(cv) && /famBio:/.test(cv) && /accent:\s*'#d43a4f'/.test(cv));
+  t('语义名齐全（danger / dangerText / gain / info / anom / 稀有阶梯 / 五族锚），旧名字留成别名',
+    /danger: '#d43a4f'/.test(cv) && /dangerText:/.test(cv) && /gain:/.test(cv) && /info:/.test(cv) && /anom:/.test(cv)
+    && /rn:/.test(cv) && /rur:/.test(cv) && /famBio:/.test(cv) && /CV\.C\.accent = CV\.C\.danger/.test(cv));
 }
 
-console.log('\n=== ② 字：11px（tag）占比 < 15%（基准 §3.2）===');
+console.log('\n=== ② 存量：全库零裸值（V1.1.1 新增的那一半尺子）===');
+{
+  const dataSrc = stripComments(read('data.js'));
+  const SCAN = { 'cv.js': cv, 'data.js': dataSrc };
+  fs.readdirSync(JS).filter((f) => /^(sc-.*|uiw|wx-adapter)\.js$/.test(f)).forEach((f) => { SCAN[f] = read(f); });
+  SCAN['game.js'] = fs.readFileSync(path.resolve(__dirname, '../game.js'), 'utf8');
+  /* **准写字面量的地方**：CV.C 色板、CV.a 实现、data.js 的三张色表与两个兜底色 */
+  const ZONES = [
+    /C:\s*\{[\s\S]*?\n    \},/g,
+    /CV\.a = function \(color, a\) \{[\s\S]*?\n  \};/g,
+    /RARITY_COLOR\s*=\s*\{[^}]*\}/g,
+    /color:\s*'#[0-9a-fA-F]{3,8}'/g,
+    /lamp:\s*'#[0-9a-fA-F]{3,8}'/g,
+    /AVATAR_FACTION_TINT\s*=\s*\{[^}]*\}/g,
+    /'#(?:1d2534|8ea3c8)'/g,
+  ];
+  const blankZones = (s) => ZONES.reduce((a, re) => a.replace(re, (m) => m.replace(/[^\n]/g, ' ')), s);
+  const spill = [];
+  const total = new Set();
+  for (const [f, src] of Object.entries(SCAN)) {
+    const clean = stripComments(src);
+    [...clean.matchAll(COLOR_RE)].forEach((m) => total.add(m[0].toLowerCase()));
+    [...blankZones(clean).matchAll(COLOR_RE)].forEach((m) => spill.push(f + ' ' + m[0].toLowerCase()));
+  }
+  t('②-1 色值只准写在 CV.C / data.js 色表里（别处一个都不许有）', spill.length === 0,
+    spill.length ? '裸写 ' + spill.length + ' 处：' + [...new Set(spill)].slice(0, 8).join(' · ')
+      : '全库色值 ' + total.size + ' 个，全部写在登记过的色板里');
+  const badA = [];
+  for (const [f, src] of Object.entries(SCAN)) {
+    [...blankZones(stripComments(src)).matchAll(/(?<![a-zA-Z0-9_-])rgba?\([^)]*\)/g)].forEach((m) => badA.push(f + ' ' + m[0]));
+  }
+  t('②-2 α 只走 CV.a(CV.C.x, a)', badA.length === 0,
+    badA.length ? '手写 rgba 的 ' + badA.length + ' 处：' + [...new Set(badA)].slice(0, 6).join(' · ')
+      : '全库 0 处手写 rgba —— 通道只认令牌本人，透明度只在调用点给');
+  /* 圆角：CV.round 的第 5 个参数 */
+  const splitArgs = (s) => {
+    const out = []; let d = 0, q = null, cur = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (q) { cur += ch; if (ch === q) q = null; continue; }
+      if (ch === "'" || ch === '"') { q = ch; cur += ch; continue; }
+      if ('([{'.indexOf(ch) >= 0) { d++; cur += ch; continue; }
+      if (')]}'.indexOf(ch) >= 0) { if (d === 0) { out.push(cur); return out; } d--; cur += ch; continue; }
+      if (ch === ',' && d === 0) { out.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    out.push(cur); return out;
+  };
+  const radii = {}, bad = [];
+  for (const [f, src] of Object.entries(SCAN)) {
+    let i = 0;
+    while ((i = src.indexOf('CV.round(', i)) >= 0) {
+      const start = i + 9;
+      const r = (splitArgs(src.slice(start))[4] || '').trim();
+      radii[r] = (radii[r] || 0) + 1;
+      const ok = /CV\.RADIUS(_SM|_CHIP)?/.test(r) || r === 'CV.PILL' || r === 'null'
+        || /^[\w.$]+$/.test(r) || /\/\s*2$/.test(r) || /Math\.(max|min)\(/.test(r) || r === '';
+      if (!ok) bad.push(f + ' → ' + r);
+      i = start;
+    }
+  }
+  t('②-3 半径一律走 CV.RADIUS / RADIUS_SM / RADIUS_CHIP / PILL（或算出来的 / 直角）', bad.length === 0,
+    bad.length ? bad.slice(0, 5).join(' · ') : '干净');
+  /* 字号：不许裸数字（font: { size: 13 } / size: 13 这种） */
+  const bareSize = [];
+  for (const [f, src] of Object.entries(SCAN)) {
+    if (f === 'data.js') continue;
+    /* 只认"选项对象里的字号"：`{ size: 12` / `, size: 12` / `{ font: 12`
+       （三元表达式 `? size : 0` 不是字号，别误伤） */
+    [...stripComments(src).matchAll(/(?:\{|,)\s*(?:font|size)\s*:\s*[0-9.]+/g)]
+      .forEach((m) => bareSize.push(f + ' ' + m[0].trim()));
+  }
+  t('②-4 没有裸数字字号（CV.FS / CV.TIER / CV.DISP / CV.ICO / BATTLE_GEOM 之外）', bareSize.length === 0,
+    bareSize.length ? bareSize.slice(0, 5).join(' · ') : '全走令牌（type_scale_audit 另有一遍）');
+}
+
+console.log('\n=== ③ 字：11px（tag）占比 < 15%（基准 §3.2）===');
 {
   const files = fs.readdirSync(JS).filter((f) => /^(sc-.*|uiw|cv|wx-adapter)\.js$/.test(f));
   const use = {};
@@ -59,49 +154,20 @@ console.log('\n=== ② 字：11px（tag）占比 < 15%（基准 §3.2）===');
   t('11px 只留给"图形里的字"（tag 档）', /CV\.FS\.sm = 12|sm: 12 \* k/.test(cv));
 }
 
-console.log('\n=== ③ 圆角：画布上 3 档 ＋ 2 形状特例（基准 §4.3）===');
+console.log('\n=== ④ 圆角：画布上 3 档 ＋ 2 形状特例（基准 §4.3）===');
 {
-  /* 把 CV.round(...) 的第 5 个参数（半径）抠出来 —— 括号/引号要配对，不能用简单 split */
-  const splitArgs = (s) => {
-    const out = []; let d = 0, q = null, cur = '';
-    for (let i = 0; i < s.length; i++) {
-      const ch = s[i];
-      if (q) { cur += ch; if (ch === q) q = null; continue; }
-      if (ch === "'" || ch === '"') { q = ch; cur += ch; continue; }
-      if ('([{'.indexOf(ch) >= 0) { d++; cur += ch; continue; }
-      if (')]}'.indexOf(ch) >= 0) { if (d === 0) { out.push(cur); return out; } d--; cur += ch; continue; }
-      if (ch === ',' && d === 0) { out.push(cur); cur = ''; continue; }
-      cur += ch;
-    }
-    out.push(cur); return out;
-  };
   const files = fs.readdirSync(JS).filter((f) => /^(sc-.*|uiw|cv)\.js$/.test(f));
-  const bad = [], radii = {};
-  files.forEach((f) => {
-    const src = read(f);
-    let i = 0;
-    while ((i = src.indexOf('CV.round(', i)) >= 0) {
-      const start = i + 9;
-      const args = splitArgs(src.slice(start));
-      const r = (args[4] || '').trim();
-      radii[r] = (radii[r] || 0) + 1;
-      const ok = /CV\.RADIUS(_SM|_CHIP)?/.test(r) || r === 'CV.PILL' || r === 'null'
-        || /^[\w.$]+$/.test(r) || /\/\s*2$/.test(r) || /Math\.(max|min)\(/.test(r) || r === '';
-      if (!ok) bad.push(f + ' → ' + r);
-      i = start;
-    }
-  });
-  t('半径一律走 CV.RADIUS / CV.RADIUS_SM / CV.RADIUS_CHIP / CV.PILL（或算出来的 / 直角）',
-    bad.length === 0, bad.length ? bad.slice(0, 5).join(' · ') : '干净');
+  const radii = {};
+  files.forEach((f) => { (read(f).match(/CV\.(RADIUS[A-Z_]*|PILL)\b/g) || []).forEach((k) => { radii[k] = (radii[k] || 0) + 1; }); });
   t('三档 + 胶囊都在用（不是只定义了没人用）',
     /CV\.RADIUS\b/.test(JSON.stringify(radii)) && /CV\.RADIUS_SM/.test(JSON.stringify(radii))
     && /CV\.RADIUS_CHIP/.test(JSON.stringify(radii)) && /CV\.PILL/.test(JSON.stringify(radii)),
-    Object.keys(radii).filter((k) => /CV\.(RADIUS|PILL)/.test(k)).join(' '));
+    Object.keys(radii).join(' '));
   t('三个圆角令牌齐', /RADIUS: 10/.test(cv) && /RADIUS_SM: 7/.test(cv) && /RADIUS_CHIP: 3/.test(cv)
     && /CV\.RADIUS_CHIP = 3 \* k/.test(cv));
 }
 
-console.log('\n=== ④ 品质框 v2：档色环 ＋ 档码铭牌（基准 §4.2）===');
+console.log('\n=== ⑤ 品质框 v2：档色环 ＋ 档码铭牌（基准 §4.2）===');
 {
   t('CV.qframe 在位（画面 ＋ 环 ＋ 铭牌 ＋ 档码字）',
     /CV\.qframe = function/.test(cv) && /RAR_CODE/.test(cv) && /fillText\(CV\.RAR_CODE/.test(cv));
@@ -116,18 +182,34 @@ console.log('\n=== ④ 品质框 v2：档色环 ＋ 档码铭牌（基准 §4.2�
   t('UR 与危险红分开（CV.C.rur = #ff5fa2）', /rur: '#ff5fa2'/.test(cv));
 }
 
-console.log('\n=== ⑤ 动效：受击 / 出手与网页版同值（基准 §5.2）===');
+console.log('\n=== ⑥ 动效：受击 / 出手与网页版同值（基准 §5.2）===');
 {
   const web = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
   const battle = read('sc-battle.js');
-  const hasHit = /hit/i.test(battle) || /shake/i.test(battle);
   t('网页版受击/出手已统一到 --d1 120ms（本尺子守的是"同一份基准"）',
     /\.unit\.hit \.u-avatar \{ animation: shake var\(--d1\)/.test(web)
     && /\.unit\.acting \.u-avatar \{ animation: lunge var\(--d1\)/.test(web));
   t('小游戏战斗的表现层时长有名字（不是散落的裸毫秒）',
-    hasHit, 'sc-battle 仍在用既有帧步进；视觉层只加闪/抖/飘（基准 §5.3 划界）');
+    /hit/i.test(battle) || /shake/i.test(battle), 'sc-battle 仍在用既有帧步进；视觉层只加闪/抖/飘（基准 §5.3 划界）');
+}
+
+console.log('\n=== ⑦ 命格主题：取的是数据层同一张表（V1.1.1）===');
+{
+  const dataSrc = read('data.js');
+  t('灯色走 D.BLOOD_THEME / 灯梯走 D.BLOOD_LAMP（画布这端不再自己写一套 hex）',
+    /G\.DATA\.BLOOD_LAMP/.test(cv) && /D\.BLOOD_THEME|BLOOD_THEME/.test(cv + read('sc-recruit.js') + read('sc-roster.js')));
+  t('灯梯由锚色现算（Lab +1/级，封顶 4 级），不是 54 个写死的色值',
+    /function bloodLamp\(/.test(dataSrc) && /LAMP_LEVELS/.test(dataSrc) && !/#6d9b39|#399e8a/.test(dataSrc));
+  t('六套锚色在数据层（data.js:BLOOD_THEME）齐全', (dataSrc.match(/lamp:\s*'#/g) || []).length === 6);
+  /* 数据层是**两端共用**的：它只能放平台中立的字面量色值。
+     写平台的取色写法（小游戏 CV.C / 网页 var(--)）在另一端会变成一个"认不出来的颜色字符串"——
+     画布不吃 'CV.C.rn'，直接变成默认黑，而且**尺子不报、界面不崩**，最难查。
+     这条是给"共享层串味"上的锁（V1.1.2 我自己的脚本差点这么干，靠两端逐字节比对才发现）。 */
+  const leak = (stripComments(dataSrc).match(/CV\.C\.|var\(--/g) || []).length;
+  t('共享逻辑层没有平台取色写法（CV.C / var(--) 都不许出现在 data.js）', leak === 0,
+    leak ? '串味 ' + leak + ' 处' : 'data.js 里只有平台中立色值（两端逐字节一致）');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
-console.log('结论：' + (fail === 0 ? '小游戏端五节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
+console.log('结论：' + (fail === 0 ? '小游戏端七节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

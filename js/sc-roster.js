@@ -12,15 +12,12 @@
   let cur = null;                                          // 详情页当前看的伙伴
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
 
-  /* 头像（网页版 charAvatar：圆形 + 首字 + 稀有度描边色） */
+  /* 头像（V1.1.2 · 基准 §4.4）：组合剪影，配方在数据层，画法在 CV.avatar —— 与网页版同一个形。
+     圈色仍按稀有度（网页版 charAvatar 也是这条：主角金圈、伙伴稀有度圈）。 */
   function avatar(id, size, y) {
     const ch = D.charById[id] || {};
-    const c = rarColor(ch.rarity);
     const cx = U.pad() + U.cw() / 2;
-    CV.ctx.beginPath(); CV.ctx.arc(cx, y + size / 2, size / 2, 0, Math.PI * 2);
-    CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
-    CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = c; CV.ctx.stroke();
-    CV.text(nm(id).slice(0, 1), cx, y + size / 2, { size: size * 0.44, bold: true, align: 'center', color: c });
+    CV.avatar(id, cx, y + size / 2, size, id === '@player' ? CV.C.gold : rarColor(ch.rarity));
   }
   /* 星级（网页版 .stars：金色，字距收紧） */
   function stars(n, max, x, y, size) {
@@ -98,7 +95,7 @@
       if (isP) {
         const tw = CV.measure('上阵', CV.FS.xs) + 10 * CV.SCALE;   // .inparty：padding 1px 5px
         CV.round(cx + cw - tw - 3 * CV.SCALE, cy + 3 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.accent);
-        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#fff' });
+        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: 'CV.C.white' });
       }
       /* 头像 → 名字 → 星级 → 两行小字：每一行的中心都按"上一行结束处"往下推（网页版顺序） */
       const acx = cx + cw / 2;

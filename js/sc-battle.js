@@ -177,7 +177,7 @@
         B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
         B.shakePx = f.crit ? 3 * CV.SCALE : 1.5 * CV.SCALE;
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
-        floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : '#ff8080',
+        floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : 'CV.C.dmg',
           0, f.crit ? D.BATTLE_GEOM.floatCrit : D.BATTLE_GEOM.floatBase);
         B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
         if (f.healed) { const s = B.units[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); floater(f.source, '+' + f.healed, CV.C.green); } }
@@ -188,7 +188,7 @@
         const u = B.units[f.target];
         hitFx(f.target);
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
-        floater(f.target, '-' + f.dmg, '#ff8080');
+        floater(f.target, '-' + f.dmg, 'CV.C.dmg');
         if (f.killed) pushLog('✗ ' + nameOf(f.target) + ' 倒下');
         break;
       }
@@ -203,7 +203,7 @@
       case 'dodge': floater(f.target, '闪避', CV.C.dim); break;
       case 'skip': pushLog('😵 ' + nameOf(f.actor) + ' 无法行动'); break;
       case 'buff': floater(f.target, '↑ ' + f.name, CV.C.green); break;
-      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', '#c8a2ff', 1500); break;
+      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', 'CV.C.debuff', 1500); break;
       /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
          等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
       case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text); break;
@@ -303,7 +303,7 @@
     if (u.side === 'enemy') CV.ctx.arc(cx, y + av / 2, av / 2, 0, Math.PI * 2);
     else CV.round(cx - av / 2, y, av, av, CV.RADIUS,  CV.C.panel3, u.isBoss ? CV.C.accent : CV.C.line, u.isBoss ? 2 : 1.5);
     if (u.side === 'enemy') {
-      CV.ctx.fillStyle = '#2e1a24';
+      CV.ctx.fillStyle = 'CV.C.enemy';
       CV.ctx.fill();
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
     } else CV.ctx.fillStyle = CV.C.panel3;
@@ -319,7 +319,7 @@
     const bx = x + 3 * CV.SCALE + (fullW - bw) / 2;
     const by = y + av + 20 * CV.SCALE, bh = D.BATTLE_GEOM.barHp * CV.SCALE;   // V1.0.1：与网页版同源（原 5）
     const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
-    CV.round(bx, by, bw, bh, CV.RADIUS_CHIP,  '#0d1120');
+    CV.round(bx, by, bw, bh, CV.RADIUS_CHIP,  'CV.C.bar');
     if (pct > 0) CV.round(bx, by, bw * pct, bh, CV.RADIUS_CHIP,  pct < 0.35 ? CV.C.accent : CV.C.green);
     CV.text(Math.round(pct * 100) + '%', cx, by + bh + 7 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     if (u.side === 'ally') {
@@ -340,7 +340,7 @@
        现在直接由调用方把**阵容区的真实下边界**（FIELD_BOTTOM）传进来：
        上边界 = 内容顶 0，字画在正中。 */
     CV.text(B.tip, CV.W / 2, areaBottom / 2,
-      { size: CV.TIER.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });   // V1.0.1：原来是死 token CV.FS.t1（不存在）→ 按兜底 13px 画，比网页版整整小两级
+      { size: CV.TIER.t1, bold: true, align: 'center', color: CV.a(CV.C.text, alpha.toFixed(2)) });   // V1.0.1：原来是死 token CV.FS.t1（不存在）→ 按兜底 13px 画，比网页版整整小两级
   }
 
   function drawBattle() {
@@ -442,7 +442,7 @@
         CV.ctx.save();
         CV.ctx.globalAlpha = alpha;
         const size = (f.size || D.BATTLE_GEOM.floatBase) * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）；现在按类型取（暴击走 floatCrit＝一级 17）
-        CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
+        CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'CV.a(CV.C.shade, .75)';
         CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
         CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
         CV.ctx.strokeText(f.text, u._cx, fy);
@@ -458,9 +458,9 @@
         if (p <= 0) return;
         CV.ctx.save();
         CV.ctx.globalAlpha = 0.75 * p;
-        CV.ctx.strokeStyle = '#ff5a5a'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
+        CV.ctx.strokeStyle = 'CV.C.dangerText'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
         if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
-        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, CV.RADIUS,  null, '#ff5a5a', 2.5 * CV.SCALE);
+        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, CV.RADIUS,  null, 'CV.C.dangerText', 2.5 * CV.SCALE);
         CV.ctx.restore();
       });
       /* V1.0.1（父亲大人："波次卡的高度和战斗阵容的高度不一样，所以切到波次卡日志就向上补位"）：
@@ -528,7 +528,7 @@
   }
   function drawSettle(res, p) {
     const c = CV.ctx;
-    c.fillStyle = 'rgba(5,6,10,.9)';
+    c.fillStyle = 'CV.a(CV.C.shade, .9)';
     c.fillRect(0, 0, CV.W, CV.H);
     CV.hitMode = 'screen';                 // 这一层画在屏幕坐标里，命中区也要按屏幕坐标登记
     const prevOverlay = CV.pageOverlay;
@@ -586,7 +586,7 @@
   CV.battleHead = function (title) {
     const c = CV.ctx;
     const y = CV.safeTop;
-    c.fillStyle = 'rgba(16,12,18,.98)';
+    c.fillStyle = 'CV.a(CV.C.overlay, .98)';
     c.fillRect(0, y, CV.W, 44 * CV.SCALE);
     /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）：
        ① 这一条画在**屏幕坐标**里（在内容裁剪之前），命中区也必须按屏幕坐标登记 ——
