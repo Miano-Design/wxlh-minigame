@@ -127,7 +127,22 @@
     U.space(U.BTN_SM * CV.SCALE + CV.SP[2]);                       // 按钮下 14（.btn margin-bottom）
     // 世界卡
     U.card(function () {
-      U.h3((w.ico || ICON[w.theme] || '⚔') + ' ' + w.name);   // V9.6.127：用世界自己的图标
+      /* V1.0.1：头部换成"族色图标格 + 世界名"（和列表页世界卡同一套视觉语言）。
+         同一个世界在列表页和详情页必须看到**同一个色、同一个形** ——
+         列表页上了色、点进去又变回纯文字，看着像两套界面。
+         几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
+      const box = 40 * CV.SCALE, top = U.y, x = U.ix();
+      CV.round(x, top, box, box, 10 * CV.SCALE, D.worldTint(w.id), CV.C.line);
+      CV.text(w.ico || ICON[w.theme] || '⚔', x + box / 2, top + box / 2,
+        { size: CV.DISP.d2, align: 'center' });
+      const gs = 11 * CV.SCALE;
+      if (D.FACTION_GLYPH[w.theme]) {
+        CV.poly(D.FACTION_GLYPH[w.theme], x + box - 3 * CV.SCALE - gs, top + 3 * CV.SCALE,
+          gs, D.worldGlyphColor(w.theme));
+      }
+      CV.text(CV.fit(w.name, U.iw() - box - 12 * CV.SCALE, CV.FS.f1, true),
+        x + box + 10 * CV.SCALE, top + box / 2, { size: CV.FS.f1, bold: true, ls: 0.2 });
+      U.y = top + box + 10 * CV.SCALE;
       U.note(w.desc, 2 * CV.SCALE);                 // 网页版这一行是 0.75rem（12px）
       U.space(CV.SP[2]);                            // V9.6.122：网页版 .kv mt2 = 10（原来 4，太挤）
       U.kv('世界机制', w.mechanic, CV.C.accent);     // 整句照抄，别只留冒号前半截
