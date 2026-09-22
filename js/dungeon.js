@@ -24,7 +24,7 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
        所以给前六个世界一个 0.60→0.95 的平滑系数（第 7 个世界起完全不动）：
        敌人 HP 与攻击都乘它，守关 BOSS 自己那份也一样乘 —— 目标是把"守关"从
        前面关卡的 2.6~3.0 倍压到 1.3~1.6 倍，前期不再在最后一关突然变成墙。 */
-    const EASE = [0.55, 0.62, 0.70, 0.79, 0.87, 0.94, 1.0];   // V1.0.1（父亲大人）：原 0.26 起太软，敌人 HP/攻击只有两三成 —— 开局一刀一个、主角单挂能平推到 10~11 关。整体抬起，第一关落在一只手数得过来的回合数。
+    const EASE = [0.75, 0.78, 0.82, 0.86, 0.90, 0.95, 1.0];   // V1.0.1（父亲大人）：原 0.26 起太软，敌人 HP/攻击只有两三成 —— 开局一刀一个、主角单挂能平推到 10~11 关。整体抬起，第一关落在一只手数得过来的回合数。
     const ease = wi < EASE.length ? EASE[wi] : 1;
     const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
     const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
@@ -86,7 +86,17 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
   // 战斗奖励
   function battleRewards(worldId, diff, stage, kind) {
     const tier = D.WORLDS.findIndex(x => x.id === worldId) + 1;
-    const rm = rewardMult(diff) * (1 + (stage - 1) * 0.08);
+    /* V1.0.1（游戏策划总监会诊查出：**奖励线性 × 难度指数**）：
+       原来 `1+(stage-1)×0.08` —— 第 12 关只 1.88×；而敌人 HP 是 `1.15^(stage-1)`，
+       第 12 关 4.65× → **单位血量的收益只剩 40%**（越往后打越亏）。
+       改成与 HP **同底**（`1.15^(stage-1)`）。系数取 **1.68** 的算法：
+         · 旧曲线 12 关合计 = Σ(1+0.08(s-1)) = 17.28
+         · 新曲线 12 关合计 = Σ(1.15^(s-1)) = 29.0
+         · 29.0 / 17.28 = **1.68** → 总量不变，只有**形状**变：
+           前几关少给（第 1 关 1.000→0.595）、后几关多给（第 12 关 1.880→2.769）。
+       （⚠️ 第一版我写的是 ÷2.47 —— 那是"第 12 关不变"，结果前面全降 40~60%，
+        30 天长线从推到 W11 掉到只到 W02。÷2.47 与 ÷1.68 差的就是"保末关"还是"保总量"。） */
+    const rm = rewardMult(diff) * Math.pow(1.15, stage - 1) / 1.68;
     const base = { points: 0, exp: 0, otherworld: 0, equipChance: 0 };
     if (kind === 'boss') {
       base.points = Math.round((500 + tier * 150) * rm);
