@@ -18,7 +18,7 @@
   /* ---------- 世界卡（网页版 .world-card：图标 52 / 标题 / 小字 / 右箭头） ---------- */
   /* bg：格底色。V1.0.1 起由数据层的 D.worldTint(世界id) 给（五族色相 × 族内明度阶梯），
      网页版同一串颜色内联到 .world-ico 上；不传就退回旧底色（转生门那张、以及 ♾ 深井格）。 */
-  function worldCard(icon, title, sub, tag, id, dim, bg) {
+  function worldCard(icon, title, sub, tag, id, dim, bg, theme) {
     const h = 82 * CV.SCALE, top = U.y;      // 网页版 .world-card 实测 82（图标 52 + 上下内边距 14）
     const x = U.pad(), w = U.cw();
     /* 未解锁的世界：整张卡压暗（网页版 .world-card 加了 opacity:.45），不只是标题变灰 */
@@ -27,6 +27,14 @@
     const box = 52 * CV.SCALE;
     CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, 12 * CV.SCALE, bg || '#232c42', CV.C.line);
     CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: CV.DISP.d2, align: 'center' });
+    /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
+       顶点表与网页版同一份（D.FACTION_GLYPH），别在这儿另画一套形状。 */
+    const gs = 12 * CV.SCALE;
+    if (theme && D.FACTION_GLYPH[theme]) {
+      CV.poly(D.FACTION_GLYPH[theme],
+        x + 12 * CV.SCALE + box - 3 * CV.SCALE - gs, top + (h - box) / 2 + 3 * CV.SCALE,
+        gs, D.worldGlyphColor(theme));
+    }
     const tx = x + 12 * CV.SCALE + box + 12 * CV.SCALE;
     const tw = CV.measure(title, CV.FS.f1, true);
     /* V9.6.127（父亲大人："世界名和进度的小字得作为一个整体，去居中对齐前面的图标；
@@ -90,7 +98,7 @@
       const prog = st.stages.normal.filter((s) => s > 0).length;
       worldCard(w.ico || ICON[w.theme] || '⚔', w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
-        cleared ? '已通关' : '', 'w:' + w.id, false, D.worldTint(w.id));
+        cleared ? '已通关' : '', 'w:' + w.id, false, D.worldTint(w.id), w.theme);
     });
     /* 转生门：门后那一张要显示出来（跟网页版同一口径）。
        "没解锁的不显示"说的是**还没走到**的世界；转生门是"走到了、过不去"，

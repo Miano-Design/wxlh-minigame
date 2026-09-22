@@ -82,6 +82,23 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
     /const worldIcon = \(w\) => \(w && w\.ico\)/.test(web) && /worldIcon\(w\)/.test(web));
 }
 
+/* ⑦ 五族形状语言（V1.0.1）——色 + 形双重编码，两边必须用同一份顶点表
+   起因（AI 视觉工程师会诊）：阵营 / 世界主题只有字符串，界面只写文字，形状语言 0/5。
+   这条钉住三件事：顶点表存在且 5 族齐全 / 5 个形状互不重复 / 两端都从 D.FACTION_GLYPH 取。 */
+{
+  const G = D.FACTION_GLYPH || {};
+  const themes = ['bio', 'ghost', 'mystic', 'tech', 'god'];
+  t('五族形状表齐全（bio/ghost/mystic/tech/god）', themes.every((x) => Array.isArray(G[x]) && G[x].length >= 3));
+  const sig = (k) => G[k].map((p) => p.map((v) => (+v).toFixed(3)).join(',')).join(';');
+  t('五个族的形状互不重复（按顶点串比对）', new Set(themes.map(sig)).size === 5);
+  t('每个世界的 theme 都取得到形状', D.WORLDS.every((w) => Array.isArray(G[w.theme])));
+  t('五族的形状颜色互不相同', new Set(themes.map((x) => D.worldGlyphColor(x))).size === 5);
+  const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+  const mini = fs.readFileSync(path.resolve(JS, 'sc-dungeon.js'), 'utf8');
+  t('网页版族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(web));
+  t('小游戏族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(mini));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 console.log('结论：' + (fail === 0 ? '图标一对一，没有重复 ✓' : '有 ' + fail + ' 处重复/缺失 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

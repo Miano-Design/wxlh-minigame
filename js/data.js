@@ -469,7 +469,11 @@ window.DATA = (function () {
     const i = WORLDS.findIndex(x => x.id === worldId);
     if (i < 0) return '#232c42';                       // 认不出来就退回旧底色，不崩
     const w = WORLDS[i];
-    const hue = WORLD_THEME_HUE[w.theme] || { h: 220, s: 20 };
+    const hue0 = WORLD_THEME_HUE[w.theme];
+    /* 兜底要查**分量**，不能只查对象在不在：色相表被写坏（h 丢了）时，
+       `hue.h` 是 undefined → 算出来是 "#NaNNaNNaN"，画面上是一块透明/黑块，
+       而且**尺子看不出来**（它只比颜色字符串互不互异，NaN 串也算"不同"）。 */
+    const hue = (hue0 && isFinite(hue0.h) && isFinite(hue0.s)) ? hue0 : { h: 220, s: 20 };
     /* 巡阶梯 = 族内第几个世界（1 起算）：
          · 明度每往后一档 +1.8%，连续走、不封顶 —— 一族最多的 bio 有 8 个世界，
            封顶到第 4 档的话后 5 个会变成**同一块颜色**（第一版就是这么错的）。
@@ -478,7 +482,38 @@ window.DATA = (function () {
     const nth = WORLDS.slice(0, i + 1).filter(x => x.theme === w.theme).length;
     const l = 20 + (nth - 1) * 1.8;
     const dh = ((nth - 1) % 3) * 5 - 5;
-    return (_worldTintCache[worldId] = hslToHex(hue.h + dh, hue.s, l));
+    const hex = hslToHex(hue.h + dh, hue.s, l);
+    return (_worldTintCache[worldId] = /NaN|undefined/.test(hex) ? '#232c42' : hex);
+  }
+
+  /* ================= 五族的形状语言（V1.0.1） =================
+     光靠色相有个先天缺陷：**色觉障碍玩家分不出**，而且角标缩到 10px 时色差会被压扁。
+     所以补一层**形状编码** —— 色 + 形双重冗余，任意一条通道失效都还认得出来。
+
+     形状按"轮廓差异最大化"挑，不是按好看挑（都是最简单、最不像彼此的轮廓）：
+       mystic 正三角（3 边）· tech 正方形（4 边）· bio 六边形（6 边）
+       · god 四角星（凹凸）· ghost 水滴（圆头尖尾）
+
+     顶点是**归一化 0~1 坐标**，两端各取所需：
+       网页版 → <svg><polygon points="…"/></svg>（乘 10 转 viewBox 0 0 10 10）
+       小游戏 → ctx.moveTo / lineTo
+     "同一形状"只有这一份定义 —— 不然又是"改一边忘一边"。 */
+  const FACTION_GLYPH = {
+    bio:    [[0.5, 0], [0.933, 0.25], [0.933, 0.75], [0.5, 1], [0.067, 0.75], [0.067, 0.25]],
+    ghost:  [[0.18, 0.34], [0.223, 0.18], [0.34, 0.063], [0.5, 0.02], [0.66, 0.063], [0.777, 0.18], [0.82, 0.34], [0.5, 1]],
+    mystic: [[0.5, 0.04], [0.96, 0.92], [0.04, 0.92]],
+    tech:   [[0.06, 0.06], [0.94, 0.06], [0.94, 0.94], [0.06, 0.94]],
+    god:    [[0.5, 0], [0.627, 0.373], [1, 0.5], [0.627, 0.627], [0.5, 1], [0.373, 0.627], [0, 0.5], [0.373, 0.373]],
+  };
+  /* 形状的颜色：跟格底**同一色相、但亮得多**（66% 明度）——
+     这样角标既属于这个族，又不会和格底糊在一起。 */
+  const _worldGlyphColorCache = {};
+  function worldGlyphColor(theme) {
+    if (_worldGlyphColorCache[theme]) return _worldGlyphColorCache[theme];
+    const hue = WORLD_THEME_HUE[theme];
+    if (!hue || !isFinite(hue.h) || !isFinite(hue.s)) return '#8ea3c8';
+    const hex = hslToHex(hue.h, Math.min(64, hue.s + 22), 66);
+    return (_worldGlyphColorCache[theme] = /NaN|undefined/.test(hex) ? '#8ea3c8' : hex);
   }
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
@@ -2406,6 +2441,7 @@ window.DATA = (function () {
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     WORLD_THEME_HUE, worldTint,          // 世界格底：五族色相 × 族内明度阶梯
+    FACTION_GLYPH, worldGlyphColor,      // 五族形状语言（色 + 形双重编码）
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
     EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,

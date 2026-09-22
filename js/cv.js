@@ -355,6 +355,21 @@
     if (fill) { c.fillStyle = fill; c.fill(); }
     if (stroke) { c.strokeStyle = stroke; c.lineWidth = lw || 1; c.stroke(); }
   };
+  /* 多边形填充：顶点是**归一化 0~1 坐标**（原点在左上角），传入框的左上角与边长。
+     V1.0.1：五族形状语言（色 + 形双重编码）用 —— 顶点表在数据层 D.FACTION_GLYPH，
+     网页版同一个表转成 <polygon points>。**别在这儿另写一套形状**，否则两端又会不一致。 */
+  CV.poly = function (points, x, y, size, color) {
+    if (!points || !points.length) return;
+    const c = CV.ctx;
+    c.beginPath();
+    points.forEach(function (p, i) {
+      const px = x + p[0] * size, py = y + p[1] * size;
+      if (i) c.lineTo(px, py); else c.moveTo(px, py);
+    });
+    c.closePath();
+    c.fillStyle = color;
+    c.fill();
+  };
   CV.card = function (x, y, w, h, opt) {
     opt = opt || {};
     CV.round(x, y, w, h, opt.radius === undefined ? CV.RADIUS : opt.radius,
