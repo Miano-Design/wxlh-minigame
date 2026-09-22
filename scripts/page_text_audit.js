@@ -224,14 +224,13 @@ if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Obj
   // 造出"等级 / 星级 / 稀有度互相交错"的场面，否则排序错了也看不出来
   ids.forEach((id, i) => { const c = S.chars[id]; c.lv = (i * 7) % 40; c.star = 1 + (i % 5); });
   S.party = ['@player', ids[5], ids[10], null, null];
-  const rarIdx = id => D.RARITIES.indexOf(D.charById[id].rarity);
-  const want = ids.slice().sort((a, b) => {
-    const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
-    if (pa !== pb) return pb - pa;
-    if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
-    if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
-    return S.chars[b].star - S.chars[a].star;
-  }).map(id => Core.charName(id));
+  /* V1.0.1：这里原来**自己又写了一套比较链** —— 而且写的是旧顺序（等级 → 稀有度）、还缺兜底键。
+     父亲大人把顺序改成「上阵 → 稀有度 → 等级 → 星级」之后，代码对了、**尺子没跟上**，
+     于是它报"伙伴列表的显示顺序和规则不一致" —— 那次**是尺子错了，不是页面错了**。
+     排序这件事在本项目已经栽过一次（两端各写一套实现），尺子不许再当第三套：
+     直接调代码里的唯一实现 G.charSortDefault。
+     ⚠️ 不许写"拿不到就自己排"的静默兜底 —— 拿不到就该红，这正是下面这行的意义。 */
+  const want = global.charSortDefault(ids).map(id => Core.charName(id));
   const got = drawPage('roster') || [];
   const nameAt = [];
   got.forEach((s, i) => { if (want.indexOf(String(s)) >= 0) nameAt.push({ s: String(s), p: LAST_POS[i] || { x: 0, y: 0 } }); });
