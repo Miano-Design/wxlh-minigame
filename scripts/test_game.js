@@ -1999,6 +1999,10 @@ setParty(['C021']);
   const w1 = Core.arenaSettle(true);
   t('打赢能升台', w1.ok && w1.win && Core.S.arena.floor === 2);
   t('打赢拿异界结晶', Core.S.cur.otherworld > ow0);
+  /* V1.0.1 回归：V9.6.134「货币 8→4」是文本替换做的，把这两个插值一起抹掉了 →
+     玩家每次赢都只看到"升到第  台 · ◆ "（两处空着）。 */
+  t('守擂成功文案带着台数与结晶数（不留空插值）',
+    /第\s*\d+\s*台/.test(w1.msg) && /◆\s*\d+/.test(w1.msg));
   const l1 = Core.arenaSettle(false);
   t('打输退一台', l1.ok && Core.S.arena.floor === 1);
   t('输也有保底（不会跌破第 1 台）', (() => { Core.arenaSettle(false); return Core.S.arena.floor === 1; })());
@@ -2825,13 +2829,17 @@ setParty(['C021']);
   t('首通保底表：W01 普通只覆盖前 6 关', D.earlyGuarantee('W01', 'normal', 0).rarity === 'N'
     && D.earlyGuarantee('W01', 'normal', 5).rarity === 'R' && !D.earlyGuarantee('W01', 'normal', 6)
     && !D.earlyGuarantee('W01', 'hard', 0) && !D.earlyGuarantee('W02', 'normal', 0));
-  /* 随机钉成 0.99：普通/精英那两档"概率掉落"一律不出，剩下的装备只可能来自保底 */
+  /* 随机钉成 0.99：普通/精英那两档"概率掉落"一律不出，剩下的装备只可能来自保底。
+     ⚠️ V1.0.1：这里原来按 **0 基** 调 `grantRewards(…, st, …)`，
+     而线上走的是 **1 基**（`ui.js` 的 `startRun` 里 `stage = stageIdx + 1`）→
+     **尺子和实现各说各话**，实现里那两处 0 基 / 1 基混用就是从这个缝里漏过去的。
+     现在统一按 1 基调，跟线上一致。 */
   const drops = [];
   withRandom(0.99, () => {
-    for (let st = 0; st < 6; st++) {
-      const g = Dungeon.grantRewards('W01', 'normal', st, st === 3 ? 'elite' : 'combat');
+    for (let idx = 0; idx < 6; idx++) {
+      const g = Dungeon.grantRewards('W01', 'normal', idx + 1, idx === 3 ? 'elite' : 'combat');
       g.got.filter(x => x.k === 'equip').forEach(x => drops.push(x.v));
-      Core.stageComplete('W01', 'normal', st, 3);      // 标记已通，之后再打就不是首通了
+      Core.stageComplete('W01', 'normal', idx, 3);     // 标记已通，之后再打就不是首通了
     }
   });
   t('前 6 关首通各保底掉 1 件装备（共 6 件）', Object.keys(Core.S.equips).length === 6);
@@ -2839,12 +2847,30 @@ setParty(['C021']);
     drops.length === 6 && D.PLAYER_SLOTS.every(s => drops.some(e => e.slot === s)));
   t('保底按表给稀有度：前 3 件 N、后 3 件 R',
     ['N', 'N', 'N', 'R', 'R', 'R'].every((r, i) => drops[i] && drops[i].rarity === r));
+  /* V1.0.1 回归（游戏策划总监会诊查出的 0 基 / 1 基混用）：
+     旧代码拿 1 基的 stage 去查 0 基的 EARLY_GUARANTEE → 第 1 关给的是"头"、
+     武器那条永远查不到、第 6 关直接查空（等于没有保底）。 */
+  t('保底按 1 基查表：第 1 关给武器（0 基查法会错给成"头"）', !!drops[0] && drops[0].slot === 'weapon');
+  t('第 6 关首通仍有保底（0 基查法会查空）', !!drops[5] && drops[5].slot === 'accessory');
   /* 掉落只进背包、不自动穿上（网页版和这里一致）；穿不穿由玩家决定（一键最优装备） */
   t('保底掉落进背包，不自动穿上', Object.values(Core.S.equipped['@player'] || {}).every(v => !v));
   const g7 = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 6, 'combat'));
   t('主角穿满之后第 7 关不再保底', g7.got.filter(x => x.k === 'equip').length === 0);
-  const again = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 0, 'combat'));
+  const again = withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 1, 'combat'));
   t('重复刷已通关的关不再保底', again.got.filter(x => x.k === 'equip').length === 0);
+  /* V1.0.1 回归之二：只通第 1 关、第 2 关还没通 —— 旧代码读的是 `stages[diff][stage]`
+     （也就是**下一关**的星数），于是"下一关没通关"时每重打一次就再发一次保底
+     （扫荡正好满足这个条件）。前期单场 ◆ 因此从 6 变 11（+83%，无上限）。 */
+  Core.newGame();
+  const farm = withRandom(0.99, () => {
+    const first = Dungeon.grantRewards('W01', 'normal', 1, 'combat');   // 第 1 关首通 → 武器
+    Core.stageComplete('W01', 'normal', 0, 3);                          // 第 1 关标记已通
+    const repeat = Dungeon.grantRewards('W01', 'normal', 1, 'combat');  // 第 2 关仍没过，重打第 1 关
+    return { first, repeat };
+  });
+  t('重打第 1 关（下一关还没通）不再吃保底',
+    farm.first.got.filter(x => x.k === 'equip').length === 1
+    && farm.repeat.got.filter(x => x.k === 'equip').length === 0);
 }
 
 /* ---- 掉落实跑（放最后：要 newGame，不冲掉前面用例依赖的存档） ----

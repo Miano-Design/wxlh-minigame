@@ -2707,7 +2707,10 @@ window.Core = (function () {
       Object.entries(rw).forEach(([k, v]) => addCur(k, v));
       S.arena.floor++;
       S.arena.best = Math.max(S.arena.best, S.arena.floor);
-      msg = `守擂成功！升到第  台 · ◆ `;
+      /* V1.0.1（游戏策划总监会诊查出）：V9.6.134「货币 8→4」那次是**文本替换**做的，
+         把 `${S.arena.floor}` 和 `${rw.otherworld}` 两个插值一起抹掉了 —— 玩家每次赢
+         都只看到"升到第  台 · ◆ "（两处空着）。这里补回真值。 */
+      msg = `守擂成功！升到第 ${S.arena.floor} 台 · ◆ ${rw.otherworld || 0}`;
     } else {
       S.arena.floor = Math.max(1, S.arena.floor - 1);
       msg = '守擂失败，退一台再来（次数照常消耗）';

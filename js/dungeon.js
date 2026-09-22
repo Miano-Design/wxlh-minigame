@@ -160,10 +160,17 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
        稀有度按 data.js 的 EARLY_GUARANTEE（前 3 关 N、后 3 关 R）。
        主角六个槽都满了就不再保底（自限，不需要额外开关）。
        判定"首通"用 S.worlds[...].stages[...] === 0 —— grantRewards 在 stageComplete 之前调用，
-       所以这时读到的还是"未通关"状态。 */
-    const gRule = D.earlyGuarantee(worldId, diff, stage);
+       所以这时读到的还是"未通关"状态。
+       V1.0.1（游戏策划总监会诊查出，两个都是 0 基 / 1 基混用）：
+        ① 保底表 `EARLY_GUARANTEE.W01.normal` 的键是 **0~5**（0 基），这里却拿 **1 基的 stage**
+           去查 → 第 1 关查到的是"头"、**武器那条永远查不到**、第 6 关直接查空（没有保底）。
+           本文件 288 行的 `stages[diff][stage - 1]` 才是对的写法，这里漏了 -1。
+        ② `gStage` 同样读的是 `[stage]`，也就是**下一关**的星数 —— 于是"下一关没通关"时
+           重打本关每次都再触发一次保底（扫荡也满足这个条件）→ 前期单场 ◆ 从 6 变 11（+83%，无上限）。
+       两处都改成 0 基。 */
+    const gRule = D.earlyGuarantee(worldId, diff, stage - 1);
     const gStage = (Core.S.worlds[worldId] && Core.S.worlds[worldId].stages && Core.S.worlds[worldId].stages[diff]
-      && Core.S.worlds[worldId].stages[diff][stage]) || 0;
+      && Core.S.worlds[worldId].stages[diff][stage - 1]) || 0;
     const guarantee = (gRule && gStage === 0) ? gRule : null;
     if (guarantee || Math.random() < Math.min(1, r.equipChance * dropBoost)) {
       /* V9.6.78：品质改由**世界段**决定（见 data.js 的 DROP_BLOCKS）——
