@@ -17,7 +17,7 @@ window.DATA = (function () {
   const RARITIES = ['N', 'R', 'SR', 'SSR', 'UR'];
   /* MYTH 是**装备**的最高档（血统神装），角色永远不会有这个稀有度；
      放进来是为了让"按稀有度取颜色"的界面（小游戏 canvas 就是这么取的）不用各自兜底。 */
-  const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff4d6d', MYTH: '#ffd76a' };
+  const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff5fa2', MYTH: '#e6b64c' };
   const STAR_MULT = [1, 1.10, 1.22, 1.36, 1.52, 1.70];
   const RARITY_MAXSTAR = { N: 3, R: 4, SR: 5, SSR: 6, UR: 6 };
   /* V9.6.129（父亲大人两条一起定）：
@@ -472,7 +472,7 @@ window.DATA = (function () {
   function worldTint(worldId) {
     if (_worldTintCache[worldId]) return _worldTintCache[worldId];
     const i = WORLDS.findIndex(x => x.id === worldId);
-    if (i < 0) return '#232c42';                       // 认不出来就退回旧底色，不崩
+    if (i < 0) return '#1d2534';                       // 认不出来就退回旧底色，不崩
     const w = WORLDS[i];
     const hue0 = WORLD_THEME_HUE[w.theme];
     /* 兜底要查**分量**，不能只查对象在不在：色相表被写坏（h 丢了）时，
@@ -495,7 +495,7 @@ window.DATA = (function () {
     const l = 18 + (nth - 1) * 4;
     const dh = ((nth - 1) % 5) * 6 - 12;
     const hex = hslToHex(hue.h + dh, hue.s, l);
-    return (_worldTintCache[worldId] = /NaN|undefined/.test(hex) ? '#232c42' : hex);
+    return (_worldTintCache[worldId] = /NaN|undefined/.test(hex) ? '#1d2534' : hex);
   }
 
   /* ================= 五族的形状语言（V1.0.1） =================

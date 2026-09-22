@@ -47,14 +47,19 @@ CV.setup(global.wx.getWindowInfo());
 let pass = 0, fail = 0;
 const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
 
-/* 定稿的五级阶梯（这是唯一出处；两边都必须等于它） */
+/* 定稿的五级阶梯（这是唯一出处；两边都必须等于它）—— V1.1 数字一个没变，
+   变的是第五级的**载体名字**：11px 不再是"注释"档，而是 `--fs-tag` / `CV.FS.tag`
+   （只给图形里的字：血条内数字、角落标签、飘字）。原来挂在第五级的 sm / xs 跟到四级（12px），
+   理由见基准 §3.2：11px 原来占了全站 44% 的声明。 */
 const LADDER = { t1: 17, t2: 15, t3: 13, t4: 12, t5: 11 };
-const TIER_NAME = { t1: '一级', t2: '二级', t3: '三级', t4: '四级', t5: '五级' };
+const TIER_NAME = { t1: '一级', t2: '二级', t3: '三级', t4: '四级', t5: '五级（图形内嵌）' };
+/* 四级有三个名字（md / sm / xs 同值），五级只有 tag 一个名字 */
+const T4_ALIAS = ['md', 'sm', 'xs'];
 
 console.log('\n=== ① 五级阶梯本身 ===');
 {
   /* 画布：CV.FS 是历史名字，CV.TIER 是新名字，两套必须一一对上 */
-  const map = { t1: 'f2', t2: 'f1', t3: 'lg', t4: 'md', t5: 'sm' };
+  const map = { t1: 'f2', t2: 'f1', t3: 'lg', t4: 'md', t5: 'tag' };
   const bad = [];
   Object.keys(LADDER).forEach((k) => {
     if (CV.TIER[k] !== LADDER[k]) bad.push('CV.TIER.' + k + '=' + CV.TIER[k] + '（应为 ' + LADDER[k] + '）');
@@ -62,8 +67,9 @@ console.log('\n=== ① 五级阶梯本身 ===');
   });
   t('画布：五级阶梯与定稿一致（CV.TIER / CV.FS 两套名字一一对上）', bad.length === 0,
     bad.length ? bad.join(' · ') : Object.keys(LADDER).map((k) => TIER_NAME[k] + ' ' + LADDER[k]).join(' / '));
-  t('画布：xs 与 sm 是同一级（五级），没有"第 5.5 级"',
-    CV.FS.xs === CV.FS.sm && CV.FS.sm === LADDER.t5, 'xs=' + CV.FS.xs + ' sm=' + CV.FS.sm);
+  t('画布：md / sm / xs 是同一级（四级 12px），11px 只剩 tag 一个名字，没有"第 5.5 级"',
+    T4_ALIAS.every((k) => CV.FS[k] === LADDER.t4) && CV.FS.tag === LADDER.t5,
+    T4_ALIAS.map((k) => k + '=' + CV.FS[k]).join(' ') + ' · tag=' + CV.FS.tag);
 
   /* 网页版：--fs-* 的 rem 换算成 px 必须等于同一张表（16px 根字号） */
   const css = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
@@ -72,12 +78,14 @@ console.log('\n=== ① 五级阶梯本身 ===');
     const mm = /--(fs-[a-z0-9]+):\s*([0-9.]+)rem/.exec(m);
     if (mm) vars[mm[1]] = Math.round(parseFloat(mm[2]) * 16);
   });
-  const webMap = { t1: 'fs-2', t2: 'fs-1', t3: 'fs-lg', t4: 'fs-md', t5: 'fs-sm' };
+  const webMap = { t1: 'fs-2', t2: 'fs-1', t3: 'fs-lg', t4: 'fs-md', t5: 'fs-tag' };
   const wbad = [];
   Object.keys(LADDER).forEach((k) => {
     if (vars[webMap[k]] !== LADDER[k]) wbad.push('--' + webMap[k] + '=' + vars[webMap[k]] + 'px（应为 ' + LADDER[k] + '）');
   });
-  if (vars['fs-xs'] !== LADDER.t5) wbad.push('--fs-xs=' + vars['fs-xs'] + 'px（应与五级同为 ' + LADDER.t5 + '）');
+  ['fs-xs', 'fs-sm'].forEach((k) => {
+    if (vars[k] !== LADDER.t4) wbad.push('--' + k + '=' + vars[k] + 'px（应与四级同为 ' + LADDER.t4 + '）');
+  });
   t('网页版：CSS 变量换算成 px 后与画布**逐级相等**', wbad.length === 0,
     wbad.length ? wbad.join(' · ') : Object.keys(LADDER).map((k) => TIER_NAME[k] + ' ' + vars[webMap[k]]).join(' / '));
 }
@@ -89,23 +97,23 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
   /* 画布侧的"出字口子"——全项目都从这几个口子出字，所以查它们就等于查了全项目 */
   const rules = [
     ['卡片标题 h3 = 二级', /U\.h3 = function[\s\S]{0,2200}?size: CV\.FS\.f1/.test(uiw)],
-    ['标题右侧小字 .sub = 五级', /const subRight[\s\S]{0,400}?size: CV\.FS\.sm/.test(uiw)],
-    ['注释 hint = 五级', /U\.hint = function[^\n]*CV\.FS\.sm/.test(uiw)],
+    ['标题右侧小字 .sub = 四级', /const subRight[\s\S]{0,400}?size: CV\.FS\.(sm|md)/.test(uiw)],
+    ['注释 hint = 四级', /U\.hint = function[^\n]*CV\.FS\.(sm|md)/.test(uiw)],
     ['次要说明 note = 四级', /U\.note = function[^\n]*CV\.FS\.md/.test(uiw)],
     /* V9.6.142：窗口从 300 放到 1200 —— 给 U.kv 补了注释之后，第一条 `size: CV.FS.lg`
        被推到 300 字之外，尺子就误报"不符合层级"了（是尺子过期，不是代码退化）。 */
     ['键值行 kv = 三级', /U\.kv = function[\s\S]{0,1200}?size: CV\.FS\.lg/.test(uiw)],
     ['说明框 eventDesc = 三级', /U\.eventDesc = function[\s\S]{0,200}?size = CV\.FS\.lg/.test(uiw)],
     ['列表行主标题 .t1 = 二级', /const t1 = CV\.FS\.f1 \*/.test(uiw)],
-    ['列表行副标题 .t2 = 五级', /const t1 = CV\.FS\.f1 \*[\s\S]{0,60}?t2 = CV\.FS\.sm \*/.test(uiw)],
+    ['列表行副标题 .t2 = 四级', /const t1 = CV\.FS\.f1 \*[\s\S]{0,60}?t2 = CV\.FS\.(sm|md) \*/.test(uiw)],
     ['网页版 .btn = 三级', /^\.btn \{[\s\S]{0,400}?font-size: var\(--fs-lg\)/m.test(css)],
     ['网页版 .btn.small = 四级', /^\.btn\.small \{[^}]*font-size: var\(--fs-md\)/m.test(css)],
-    ['网页版 .hint = 五级', /^\.hint \{[^}]*font-size: var\(--fs-sm\)/m.test(css)],
+    ['网页版 .hint = 四级', /^\.hint \{[^}]*font-size: var\(--fs-(sm|md)\)/m.test(css)],
     ['网页版 .note = 四级', /^\.note \{[^}]*font-size: var\(--fs-md\)/m.test(css)],
-    ['网页版技能名 .sname = 二级（与六维名字同级）· 描述 .sdesc = 五级',
-      /\.skill-row \.sname \{[^}]*font-size: var\(--fs-1\)/.test(css) && /\.skill-row \.sdesc \{[^}]*font-size: var\(--fs-sm\)/.test(css)],
-    ['网页版六维：名字二级 + 解释内联五级',
-      /class="t1">\$\{a\.name\} <span style="color:var\(--dim\);font-size:0\.6875rem"/.test(fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8'))],
+    ['网页版技能名 .sname = 二级（与六维名字同级）· 描述 .sdesc = 四级',
+      /\.skill-row \.sname \{[^}]*font-size: var\(--fs-1\)/.test(css) && /\.skill-row \.sdesc \{[^}]*font-size: var\(--fs-(sm|md)\)/.test(css)],
+    ['网页版六维：名字二级 + 解释内联四级',
+      /class="t1">\$\{a\.name\} <span style="color:var\(--dim\);font-size:var\(--fs-md\)"/.test(fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8'))],
   ];
   rules.forEach(([name, ok]) => t(name, ok));
 }
@@ -151,13 +159,13 @@ console.log('\n=== ④ 具体的两处（父亲大人报的）===');
   t('六维：名字与解释**分开画**（t1 = 二级名字 · t1sub = 五级解释）',
     /U\.listRow\(\{ t1: a\.name, t1sub: a\.desc/.test(protag),
     /t1sub/.test(protag) ? '已拆开' : '**还把 name+desc 拼在一起**');
-  t('六维解释文字的字号 = 五级（11px）',
+  t('六维解释文字的字号 = 四级（12px，V1.1 起 11px 只给图形里的字）',
     /o\.t1sub[\s\S]{0,260}?size: CV\.FS\.sm/.test(fs.readFileSync(path.join(JS, 'uiw.js'), 'utf8')));
   /* 技能行现在是**共用组件**（U.skillRow）：查它一处，等于查了主角详情 + 伙伴详情两个页面。 */
   const uiwAll = fs.readFileSync(path.join(JS, 'uiw.js'), 'utf8');
   const roster = fs.readFileSync(path.join(JS, 'sc-roster.js'), 'utf8');
-  t('技能：行是独立面板（panel 底 + 圆角 10 + 内边距 10）',
-    /U\.skillRow = function[\s\S]{0,3000}?CV\.round\(U\.ix\(\), top, U\.iw\(\), rowH, 10 \* CV\.SCALE, CV\.C\.panel\)/.test(uiwAll));
+  t('技能：行是独立面板（panel 底 + 圆角 CV.RADIUS + 内边距 10）',
+    /U\.skillRow = function[\s\S]{0,3000}?CV\.round\(U\.ix\(\), top, U\.iw\(\), rowH, CV\.RADIUS, CV\.C\.panel\)/.test(uiwAll));
   t('技能：行高按内容算（名字行 + 3px + 描述行），不再写死 22px',
     /const rowH = PAD \* 2 \+ contentH/.test(uiwAll));
   t('技能：描述距名字 3px（网页版 .sdesc margin-top:3px）', /nameH \+ 3 \* CV\.SCALE/.test(uiwAll));

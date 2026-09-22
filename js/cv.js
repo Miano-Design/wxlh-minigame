@@ -15,22 +15,32 @@
     ctx: null, DPR: 1, safeTop: 0, safeBottom: 0,
     stack: [], hits: [], toasts: [],
     panels: {},
-    /* —— 设计令牌：逐条抄自网页版 css/style.css 的 :root（唯一标准）—— */
+    /* —— 设计令牌：逐条抄自网页版 css/style.css 的 :root（唯一标准）——
+       V1.1（视觉语言基准 §2）：含义色按语义命名 —— 红从"主动作"退回，只管危险／消耗／不可行；
+       主色金管主行动／关键／选中／品牌。下面的旧名字（accent/green/blue/red）留成别名，
+       三百多处 `CV.C.accent` 调用点一个字都不用动，但新代码请写语义名。 */
     C: {
       bg: '#07090e', bg2: '#0b0e15',
       panel: '#111621', panel2: '#161d2a', panel3: '#1d2534',
       line: '#232b3b', line2: '#333e55', lineSoft: 'rgba(255,255,255,.05)',
       text: '#e9edf6', text2: '#b6bfd0', dim: '#7a849b',
-      accent: '#d43a4f', accent2: '#97273a', gold: '#e6b64c',
-      goldDeep: '#8a6a1e',
-      green: '#56c894', blue: '#6ec6ff', red: '#d43a4f',
+      gold: '#e6b64c', goldDeep: '#8a6a1e',
+      danger: '#d43a4f', dangerText: '#e8626f',      /* 面／线 用 danger；文字用 dangerText（12px 上对比度 5.15，达标） */
+      gain: '#56c894', info: '#6ec6ff', anom: '#b06bff',
+      /* 稀有阶梯（与网页版 :root、data.js:RARITY_COLOR 同源） */
+      rn: '#9aa4b2', rr: '#4da3ff', rsr: '#b06bff', rssr: '#ffb03a', rur: '#ff5fa2',
+      /* 五族锚色（data.js:WORLD_THEME_HUE 取样；36 个世界格色是派生值） */
+      famBio: '#53a26b', famGhost: '#765d98', famMystic: '#a26353', famTech: '#538aa2', famGod: '#a49951',
+      /* 旧名字 = 别名 */
+      accent: '#d43a4f', accent2: '#97273a', red: '#d43a4f',
+      green: '#56c894', blue: '#6ec6ff',
     },
     /* 下面这几组数值在 setup() 里按网页版的根字号等比缩放：
        网页版 css 里是 html { font-size: clamp(14.5px, 3.85vw, 16px) }，
        所有令牌都是 rem —— 这里用**同一条公式**算出系数 k，两边字距/间距才会一样大。 */
     SCALE: 1,
     SP: [4, 10, 14, 18, 24],       // --sp1..--sp5
-    RADIUS: 10, RADIUS_SM: 7,      // --radius / --radius-sm
+    RADIUS: 10, RADIUS_SM: 7, RADIUS_CHIP: 3, PILL: 999,   // --r-card / --r-ctl / --r-chip / 形状特例
     /* ===== 排版层级（V9.6.117 定稿，父亲大人："整体游戏得区分字体的层级，一级二级三级…）=====
        全项目**只有这五级**，每一级只对应一个尺寸；任何"我就用 12.5 试试"的做法都是违例
        （type_scale_audit 会当场报出来）。两边必须一一对应（网页版是 rem，画布是 px）：
@@ -114,8 +124,11 @@
     const k = 1;
     CV.SCALE = k;
     CV.SP = [4, 10, 14, 18, 24].map((v) => v * k);
-    CV.FS = { xs: 11 * k, sm: 11 * k, md: 12 * k, lg: 13 * k, f1: 15 * k, f2: 17 * k };
-    CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k;
+    /* V1.1（基准 §3.2 第 1 步）：sm / xs 从 11px 跟到四级 12px —— 它们原来是五级，
+       结果 11px 占了全站 46% 的声明。第四级＝md/sm/xs（12px），
+       11px 只留给"图形里的字"＝ tag。五级阶梯的数字没变（17/15/13/12/11）。 */
+    CV.FS = { xs: 12 * k, sm: 12 * k, md: 12 * k, lg: 13 * k, f1: 15 * k, f2: 17 * k, tag: 11 * k };
+    CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k; CV.RADIUS_CHIP = 3 * k;
     CV.NAV_H = 62 * k;
     CV.NAV_BASE = 62 * k;      // 底栏基准高：战斗页会把它清成 0（整屏接管），离开时必须恢复
     return CV;
@@ -614,6 +627,38 @@
       CV.ctx.restore();
     }
   };
+  /* ===== 品质框 v2（V1.1 · 视觉语言基准 §4.2）=====
+     旧代码只有一道 round(...rarColor) 的描边；新方案把档位压在三个**不许数**的通道上：
+       ① 整块档色（环 ＋ 铭牌底） ② 铭牌上直写档码（细读 / 色盲通道） ③ 亮牌 / 暗牌（MYTH 形差）
+     铭牌画在画面下缘 24%（最矮 14px），上缘切平、下缘随框圆角，上唇 1px --line 把牌与画面切开。
+     MYTH 反色（暗底金字）＋ 1px 金内环 —— 它与 SSR 橙 ΔE00 只有 7.5，只能靠"形"分家。 */
+  CV.RAR_CODE = { N: 'N', R: 'R', SR: 'SR', SSR: 'SSR', UR: 'UR', MYTH: 'MYTH' };
+  CV.qframe = function (x, y, w, h, rarity, radius, bandH) {
+    const r = radius === undefined ? CV.RADIUS : radius;
+    const rar = CV.RAR_CODE[rarity] ? rarity : 'N';
+    const col = CV.C['r' + rar.toLowerCase()] || (rar === 'MYTH' ? CV.C.gold : CV.C.text2);
+    const myth = (rar === 'MYTH');
+    const bh = bandH === undefined ? Math.max(14 * CV.SCALE, Math.round(Math.min(w, h) * 0.24)) : bandH;
+    const by = y + h - bh, br = Math.min(r, bh / 2, w / 2);
+    CV.round(x, y, w, h, r, CV.C.panel2, col);                                  /* 画面 + 档色环 */
+    if (myth) CV.round(x + 3, y + 3, w - 6, h - 6, Math.max(0, r - 3), null, CV.C.gold);
+    const c = CV.ctx;                                                           /* 铭牌：上缘切平 */
+    c.beginPath();
+    c.moveTo(x, by); c.lineTo(x + w, by);
+    c.lineTo(x + w, y + h - br);
+    c.arcTo(x + w, y + h, x + w - br, y + h, br);
+    c.lineTo(x + br, y + h);
+    c.arcTo(x, y + h, x, y + h - br, br);
+    c.closePath();
+    c.fillStyle = myth ? CV.C.bg2 : col; c.fill();
+    c.strokeStyle = myth ? col : CV.C.line; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, by + 0.5); c.lineTo(x + w, by + 0.5); c.stroke();
+    c.font = '700 ' + CV.FS.tag + 'px ' + CV.FONT;                              /* 档码字：唯一的可靠通道 */
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = myth ? col : CV.C.bg2;
+    c.fillText(CV.RAR_CODE[rar], x + w / 2, by + bh / 2 + 0.5);
+    c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+  };
   /* 文字截断：超宽加省略号（网页版的 text-overflow: ellipsis） */
   CV.fit = function (str, maxW, size, bold) {
     str = String(str == null ? '' : str);
@@ -950,7 +995,7 @@
     const t = CV.toasts[0];
     const w = Math.min(CV.W - 40, CV.measure(t.msg, CV.FS.lg) + 32);
     const x = (CV.W - w) / 2, y = CV.TOP + 12;
-    CV.round(x, y, w, 34, 999, 'rgba(0,0,0,.85)', CV.C.line);
+    CV.round(x, y, w, 34, CV.PILL,  'rgba(0,0,0,.85)', CV.C.line);
     CV.text(t.msg, CV.W / 2, y + 17, { size: CV.FS.lg, align: 'center' });
   };
   /* V9.6.90：加了时长参数（网页版 toast(msg, ms) 同款）——

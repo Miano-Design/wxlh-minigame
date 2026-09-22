@@ -53,7 +53,7 @@
       const h = 76 * CV.SCALE, top = U.y, asz = 56 * CV.SCALE;
       const cx = U.ix() + asz / 2;
       CV.ctx.beginPath(); CV.ctx.arc(cx, top + asz / 2, asz / 2, 0, Math.PI * 2);
-      CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = CV.C.gold; CV.ctx.stroke();
       CV.text(Core.charName('@player').slice(0, 1), cx, top + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: CV.C.gold });
       const tx = U.ix() + asz + 12 * CV.SCALE;
@@ -143,7 +143,7 @@
       slots.forEach(function (slot, i) {
         const e = eq[slot] && S.equips[eq[slot]];
         const x = U.ix() + (i % cols) * (tw2 + gap), y = y0 + Math.floor(i / cols) * (th + gap);
-        CV.round(x, y, tw2, th, 6 * CV.SCALE, CV.C.panel2, e ? CV.C.line2 : CV.C.line);
+        CV.round(x, y, tw2, th, CV.RADIUS_CHIP,  CV.C.panel2, e ? CV.C.line2 : CV.C.line);
         CV.text(D.EQUIP_SLOTS[slot], x + 8 * CV.SCALE, y + 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         if (e) {
           CV.text(CV.fit(e.name + ' +' + e.enhance, tw2 - 16 * CV.SCALE, CV.FS.md, true), x + tw2 / 2, y + th / 2 + 6 * CV.SCALE,

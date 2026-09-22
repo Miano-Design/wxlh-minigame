@@ -27,7 +27,7 @@
     if (dim) CV.ctx.globalAlpha = 0.45;
     CV.card(x, top, w, h);
     const box = 52 * CV.SCALE;
-    CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, 12 * CV.SCALE, bg || '#232c42', CV.C.line);
+    CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.C.panel3, CV.C.line);
     CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: CV.DISP.d2, align: 'center' });
     /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
        顶点表与网页版同一份（D.FACTION_GLYPH），别在这儿另画一套形状。 */
@@ -134,7 +134,7 @@
          列表页上了色、点进去又变回纯文字，看着像两套界面。
          几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
       const box = 40 * CV.SCALE, top = U.y, x = U.ix();
-      CV.round(x, top, box, box, 10 * CV.SCALE, D.worldTint(w.id), CV.C.line);
+      CV.round(x, top, box, box, CV.RADIUS,  D.worldTint(w.id), CV.C.line);
       CV.text(w.ico || ICON[w.theme] || '⚔', x + box / 2, top + box / 2,
         { size: CV.DISP.d2, align: 'center' });
       const gs = 11 * CV.SCALE;
@@ -194,7 +194,7 @@
         const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
         const done = stars > 0;
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
-        CV.round(x, y, cw, cw, 10 * CV.SCALE, done ? '#1d2b22' : CV.C.panel2,
+        CV.round(x, y, cw, cw, CV.RADIUS,  done ? '#1d2b22' : CV.C.panel2,
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
           { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
@@ -248,7 +248,7 @@
         const bx = U.pad() + c * (cw + gap), by = top + r * (cw + gap);
         const sel = x.i === sweepSel;
         CV.ctx.globalAlpha = 1;
-        CV.round(bx, by, cw, cw, 10 * CV.SCALE, sel ? '#1d2b22' : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
+        CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? '#1d2b22' : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
         CV.text(String(x.i + 1), bx + cw / 2, by + cw / 2 - 6 * CV.SCALE, { size: CV.FS.f1, bold: true, align: 'center', color: sel ? CV.C.gold : CV.C.text });
         CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.hit('ssel:' + x.i, bx, by, cw, cw);

@@ -125,7 +125,7 @@
       const cy = top + rowH / 2;                     // 标题 / 小字 / 按钮共用这一条中线
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, '#8a6a1e');
-      CV.round(U.ix(), cy - 6.5, bar, 13, 2, g);
+      CV.round(U.ix(), cy - 6.5, bar, 13, CV.RADIUS_CHIP,  g);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
       /* V9.6.142：标题原来**一律**按 `iw - 120` 截断 —— 哪怕这一行既没有小字也没有按钮
          （玩法指南那些章标题就是这么被砍成「⑸ 血统与境界线：换了血统就换了…」的）。
@@ -225,7 +225,7 @@
     const contentH = Math.max(leftH, btnH);
     const rowH = PAD * 2 + contentH;
     const top = U.y;
-    CV.round(U.ix(), top, U.iw(), rowH, 10 * CV.SCALE, CV.C.panel);   // 参数：圆角 10 / 底色 panel（少一个参数会整块没底）
+    CV.round(U.ix(), top, U.iw(), rowH, CV.RADIUS, CV.C.panel);   // 参数：圆角 10 / 底色 panel（少一个参数会整块没底）
     const cy = top + PAD + contentH / 2;
     const leftTop = cy - leftH / 2;              // 左边整块的顶（整块绕 cy 居中）
     CV.ctx.save();
@@ -333,7 +333,7 @@
          V9.5.68（父亲大人）：主页格子里**只留功能名**；"有东西可领"改用红点表达。 */
       const dot = t[4];
       draw(() => {
-        CV.round(x, y, cellW, th, 6 * CV.SCALE, CV.C.panel, CV.C.line2);
+        CV.round(x, y, cellW, th, CV.RADIUS_CHIP,  CV.C.panel, CV.C.line2);
         const inner = cellW - 12 * CV.SCALE;
         const hasSub = !!(t[2]);
         const cy = hasSub ? y + th / 2 - 7 * CV.SCALE : y + th / 2;
@@ -394,7 +394,7 @@
       if (o.tag) {
         const tw = CV.measure(l1[l1.length - 1], CV.FS.f1, true), th = CV.FS.xs * 1.5;
         const tx = U.ix() + 4 + icoW + Math.min(tw, availW - tagW) + 6 * CV.SCALE, ty = y0 + t1 * (l1.length - 0.5) - th / 2;
-        CV.round(tx, ty, tagW, th, 999, null, CV.C.gold);
+        CV.round(tx, ty, tagW, th, CV.PILL,  null, CV.C.gold);
         CV.text(o.tag, tx + tagW / 2, ty + th / 2, { size: CV.FS.xs, align: 'center', color: CV.C.gold });
       }
       l2.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + l1.length * t1 + 4 * CV.SCALE + t2 * (i + 0.5),
@@ -464,9 +464,9 @@
   U.bar = function (pct, color) {
     const h = 8 * CV.SCALE, top = U.y;
     draw(() => {
-      CV.round(U.ix(), top, U.iw(), h, 6 * CV.SCALE, '#0d1120');
+      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS_CHIP,  '#0d1120');
       const w2 = Math.max(0, Math.min(1, pct)) * U.iw();
-      if (w2 > 1) CV.round(U.ix(), top, w2, h, 6 * CV.SCALE, color || CV.C.gold);
+      if (w2 > 1) CV.round(U.ix(), top, w2, h, CV.RADIUS_CHIP,  color || CV.C.gold);
     });
     U.y = top + h;
     return h;
@@ -889,7 +889,7 @@
       /* 高亮框：把锚点"挖"出来（先清一块、再描金框） */
       c.fillStyle = 'rgba(0,0,0,0)';
       c.clearRect ? null : null;
-      CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, 12 * CV.SCALE, 'rgba(0,0,0,0)', CV.C.gold, 2);
+      CV.round(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2, CV.RADIUS,  'rgba(0,0,0,0)', CV.C.gold, 2);
     }
     /* V9.6.63（父亲大人："高亮没了、去别的界面又跳回来、回来也没高亮、不知道要干嘛"）：
        高亮只画在"目标就在本页"时；如果这一步的目标在**别的页**，就必须在提示卡里
@@ -907,7 +907,7 @@
     const tw = CV.W - 40 * CV.SCALE;
     const tx = 20 * CV.SCALE;
     const ty = r ? Math.min(CV.H - th - 40 * CV.SCALE, r.y + r.h + 16 * CV.SCALE) : (CV.H - th) / 2;
-    CV.round(tx, ty, tw, th, 14 * CV.SCALE, CV.C.panel, CV.C.gold);
+    CV.round(tx, ty, tw, th, CV.RADIUS,  CV.C.panel, CV.C.gold);
     lines.forEach(function (ln, i) {
       CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
     });
@@ -952,7 +952,7 @@
        所以弹窗像"糊"在页面上。这里补一层柔和外投影。 */
     c.save();
     c.shadowColor = 'rgba(0,0,0,.55)'; c.shadowBlur = 22 * CV.SCALE; c.shadowOffsetY = 6 * CV.SCALE;
-    CV.round(o.x, o.y, o.w, o.h, 14 * CV.SCALE, CV.C.bg2, CV.C.line);
+    CV.round(o.x, o.y, o.w, o.h, CV.RADIUS,  CV.C.bg2, CV.C.line);
     c.restore();
     /* 所有 y 都由 U.confirm 排好版（o.titleY / o.lineY / o.chipY / o.noteY / o.btnY），
        这里只负责照着画 —— V9.6.94 起不再各算各的。 */
@@ -965,7 +965,7 @@
       const total = row.reduce((s, c) => s + c.w, 0) + CHIP_GAP * (row.length - 1);
       let cx = o.x + (o.w - total) / 2;
       row.forEach(function (c) {
-        CV.round(cx, cy - CHIP_H / 2, c.w, CHIP_H, 999, CV.C.panel2, CV.C.line);
+        CV.round(cx, cy - CHIP_H / 2, c.w, CHIP_H, CV.PILL,  CV.C.panel2, CV.C.line);
         CV.text(c.t, cx + c.w / 2, cy, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
         cx += c.w + CHIP_GAP;
       });

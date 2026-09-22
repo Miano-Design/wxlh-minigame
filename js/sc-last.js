@@ -247,7 +247,7 @@
     tabs.forEach(function (t) {
       const on = taskTab === t[0];
       const w = Math.max(72 * CV.SCALE, CV.measure(t[1], CV.FS.md) + 28 * CV.SCALE);
-      CV.round(x, top, w, h, 999, on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.round(x, top, w, h, CV.PILL,  on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
       CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit('tasktab:' + t[0], x, top, w, h);
       x += w + gap;
@@ -793,7 +793,7 @@
         const ah = 40 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bw = 62 * CV.SCALE;
         U.h3('当前领队', '加成 +' + Math.round((row.bonus || 0) * 100) + '%', { color: CV.C.gold, subColor: CV.C.gold });
         const top = U.y;
-        CV.round(U.ix(), top, ah, ah, 999, CV.C.panel2, CV.C.line);
+        CV.round(U.ix(), top, ah, ah, CV.PILL,  CV.C.panel2, CV.C.line);
         CV.text(CV.fit(Core.charName(cur), ah - 6, CV.FS.sm), U.ix() + ah / 2, top + ah / 2, { size: CV.FS.sm, align: 'center', bold: true });
         const tx = U.ix() + ah + 8 * CV.SCALE;
         CV.text(CV.fit(Core.charName(cur), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.f1, true), tx, top + ah / 2 - 8 * CV.SCALE, { size: CV.FS.f1, bold: true });

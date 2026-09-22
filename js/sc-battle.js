@@ -301,12 +301,12 @@
     if (dead) CV.ctx.globalAlpha = 0.25;
     CV.ctx.beginPath();
     if (u.side === 'enemy') CV.ctx.arc(cx, y + av / 2, av / 2, 0, Math.PI * 2);
-    else CV.round(cx - av / 2, y, av, av, 12 * CV.SCALE, '#232c42', u.isBoss ? CV.C.accent : CV.C.line, u.isBoss ? 2 : 1.5);
+    else CV.round(cx - av / 2, y, av, av, CV.RADIUS,  CV.C.panel3, u.isBoss ? CV.C.accent : CV.C.line, u.isBoss ? 2 : 1.5);
     if (u.side === 'enemy') {
       CV.ctx.fillStyle = '#2e1a24';
       CV.ctx.fill();
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
-    } else CV.ctx.fillStyle = '#232c42';
+    } else CV.ctx.fillStyle = CV.C.panel3;
     u._cx = cx; u._top = y; u._av = av;   // 飘字要用：记住这一张卡画在哪
     CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: small ? CV.FS.f1 : CV.DISP.d1, bold: true, align: 'center' });   // 头像首字：跟着层级 token 走（原来是裸 16/18）
     if (dead) CV.ctx.globalAlpha = 1;
@@ -319,12 +319,12 @@
     const bx = x + 3 * CV.SCALE + (fullW - bw) / 2;
     const by = y + av + 20 * CV.SCALE, bh = D.BATTLE_GEOM.barHp * CV.SCALE;   // V1.0.1：与网页版同源（原 5）
     const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
-    CV.round(bx, by, bw, bh, 3 * CV.SCALE, '#0d1120');
-    if (pct > 0) CV.round(bx, by, bw * pct, bh, 3 * CV.SCALE, pct < 0.35 ? CV.C.accent : CV.C.green);
+    CV.round(bx, by, bw, bh, CV.RADIUS_CHIP,  '#0d1120');
+    if (pct > 0) CV.round(bx, by, bw * pct, bh, CV.RADIUS_CHIP,  pct < 0.35 ? CV.C.accent : CV.C.green);
     CV.text(Math.round(pct * 100) + '%', cx, by + bh + 7 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     if (u.side === 'ally') {
       const en = B.energy[u.uid] || 0;
-      if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), D.BATTLE_GEOM.barEn * CV.SCALE, 2, CV.C.gold);
+      if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), D.BATTLE_GEOM.barEn * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
     }
     return av + 30 * CV.SCALE + 10 * CV.SCALE;
   }
@@ -460,7 +460,7 @@
         CV.ctx.globalAlpha = 0.75 * p;
         CV.ctx.strokeStyle = '#ff5a5a'; CV.ctx.lineWidth = 2.5 * CV.SCALE;
         if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
-        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, 13 * CV.SCALE, null, '#ff5a5a', 2.5 * CV.SCALE);
+        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, CV.RADIUS,  null, '#ff5a5a', 2.5 * CV.SCALE);
         CV.ctx.restore();
       });
       /* V1.0.1（父亲大人："波次卡的高度和战斗阵容的高度不一样，所以切到波次卡日志就向上补位"）：

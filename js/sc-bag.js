@@ -36,7 +36,7 @@
     list.forEach(function (t) {
       const on = cur === t[0];
       const w = CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE;
-      CV.round(x, top, w, h, 999, on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.round(x, top, w, h, CV.PILL,  on ? 'rgba(212,58,79,.13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
       CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? '#fff' : CV.C.dim });
       CV.hit(prefix + t[0], x, top, w, h);
       x += w + gap;
@@ -90,7 +90,7 @@
     /* 和网页版 .batch-bar 一样带一层上投影（原来贴死的平色块，看着很"重"） */
     CV.ctx.save();
     CV.ctx.shadowColor = 'rgba(0,0,0,.45)'; CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
-    CV.round(pad, y, CV.W - pad * 2, h, 14 * CV.SCALE, 'rgba(18,22,34,.97)', CV.C.line);
+    CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  'rgba(18,22,34,.97)', CV.C.line);
     CV.ctx.restore();
     /* 第一行：快选 N / R / SR + 清空 */
     let x = pad + 12 * CV.SCALE;
@@ -161,7 +161,7 @@
       }
       CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.lg, bold: true, align: 'center', color: on ? CV.C.gold : CV.C.dim });
       if (on) {  // 选中：下面一条金色下划线（左右各留 26%）
-        CV.round(x + w * 0.26, y + h - 5 * CV.SCALE, w * 0.48, 2 * CV.SCALE, 2 * CV.SCALE, CV.C.gold);
+        CV.round(x + w * 0.26, y + h - 5 * CV.SCALE, w * 0.48, 2 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
       }
       CV.hit('bagview:' + t[0], x, y, w, h);
     });

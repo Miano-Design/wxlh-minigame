@@ -55,7 +55,7 @@
         /* 网页版只在**有券**时才画这一行（`tk && tk.n > 0`）；没券什么都不显示 */
         if (tk && tk.n > 0) {
           const txt = '🎫 ' + tkName + ' ×' + tk.n;
-          CV.round(U.ix(), U.y, U.iw(), rowH, 8 * CV.SCALE, null, 'rgba(255,215,106,.4)');
+          CV.round(U.ix(), U.y, U.iw(), rowH, CV.RADIUS_CHIP,  null, 'rgba(255,215,106,.4)');
           CV.text(CV.fit(txt, U.iw() - 16 * CV.SCALE, CV.FS.xs), U.ix() + 9 * CV.SCALE, U.y + rowH / 2,
             { size: CV.FS.xs, color: CV.C.text });
           U.y += rowH + 8 * CV.SCALE;
@@ -78,8 +78,8 @@
             CV.ctx.save();
             const grd = CV.ctx.createLinearGradient(U.ix(), 0, U.ix() + U.iw(), 0);
             grd.addColorStop(0, 'rgba(255,215,106,.13)'); grd.addColorStop(1, 'transparent');
-            CV.round(U.ix(), U.y, U.iw(), bh, 6 * CV.SCALE, grd);
-            CV.round(U.ix(), U.y, 3 * CV.SCALE, bh, 2 * CV.SCALE, CV.C.gold);
+            CV.round(U.ix(), U.y, U.iw(), bh, CV.RADIUS_CHIP,  grd);
+            CV.round(U.ix(), U.y, 3 * CV.SCALE, bh, CV.RADIUS_CHIP,  CV.C.gold);
             CV.ctx.restore();
             CV.text('本期 UP：' + up.name + ' · 「' + up.faction + '」阵营', U.ix() + 10 * CV.SCALE, U.y + bh / 2,
               { size: CV.FS.xs, color: CV.C.text });
@@ -116,25 +116,27 @@
        10 连是 4 行 ≈ 4×107+3×10 = 458，加上标题与底部固定条仍在画内（854 的屏余量够）。 */
     const PAD = 10 * CV.SCALE, AV = 46 * CV.SCALE, AVGAP = 6 * CV.SCALE;
     const NAME_H = CV.FS.lg * 1.35, META_H = CV.FS.sm * 1.55;
-    const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * CV.SCALE + META_H;
+    /* V1.1（基准 §4.2）：卡底再让出 16px 画品质框 v2 的**档色铭牌 ＋ 档码字**。 */
+    const BAND = 16 * CV.SCALE;
+    const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * CV.SCALE + META_H + BAND;
     const y0 = U.y;
     res.forEach(function (r, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
       const col = rarColor(r.rarity);
       /* 网页版：SSR/UR/MYTH 除了描边还有一圈柔光（box-shadow）—— 抽到好东西要看得出来 */
       if (['SSR', 'UR', 'MYTH'].indexOf(r.rarity) >= 0) {
-        CV.round(x - 1.5 * CV.SCALE, y - 1.5 * CV.SCALE, cw + 3 * CV.SCALE, ch + 3 * CV.SCALE, 13 * CV.SCALE, null,
-          r.rarity === 'UR' ? 'rgba(255,77,109,.35)' : (r.rarity === 'MYTH' ? 'rgba(255,215,106,.4)' : 'rgba(255,176,58,.28)'), 3 * CV.SCALE);
+        CV.round(x - 1.5 * CV.SCALE, y - 1.5 * CV.SCALE, cw + 3 * CV.SCALE, ch + 3 * CV.SCALE, CV.RADIUS,  null,
+          r.rarity === 'UR' ? 'rgba(255,95,162,.35)' : (r.rarity === 'MYTH' ? 'rgba(255,215,106,.4)' : 'rgba(255,176,58,.28)'), 3 * CV.SCALE);
       }
-      CV.round(x, y, cw, ch, 12 * CV.SCALE, CV.C.panel2, col);
+      CV.qframe(x, y, cw, ch, r.rarity, 12 * CV.SCALE, BAND);
       if (r.isUp) {
         const tw = CV.measure('UP', CV.FS.xs) + 10 * CV.SCALE;
-        CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, 6 * CV.SCALE, CV.C.gold);
+        CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
         CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: '#241c08' });
       }
       const acx = x + cw / 2, acTop = y + PAD;
       CV.ctx.beginPath(); CV.ctx.arc(acx, acTop + AV / 2, AV / 2 - CV.SCALE, 0, Math.PI * 2);
-      CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(r.name || '?').slice(0, 1), acx, acTop + AV / 2, { size: AV * 0.44, bold: true, align: 'center', color: col });
       const nameCy = acTop + AV + AVGAP + NAME_H / 2;
@@ -278,14 +280,16 @@
     U.space(CV.SP[2]);
     const ssrs = D.characters.filter(function (c) { return c.rarity === 'SSR' && !c.hidden; });
     const cols = 3, gap = CV.SP[2];
-    const cw = (U.cw() - gap * (cols - 1)) / cols, ch = 132 * CV.SCALE, y0 = U.y;
+    /* V1.1（基准 §4.2）：让出 16px 给品质框 v2 的铭牌。 */
+    const SSBAND = 16 * CV.SCALE;
+    const cw = (U.cw() - gap * (cols - 1)) / cols, ch = 132 * CV.SCALE + SSBAND, y0 = U.y;
     ssrs.forEach(function (c, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
       const col = rarColor(c.rarity);
-      CV.round(x, y, cw, ch, 12 * CV.SCALE, CV.C.panel2, col);
+      CV.qframe(x, y, cw, ch, c.rarity, 12 * CV.SCALE, SSBAND);
       const asz = 46 * CV.SCALE, acx = x + cw / 2;
       CV.ctx.beginPath(); CV.ctx.arc(acx, y + 10 * CV.SCALE + asz / 2, asz / 2, 0, Math.PI * 2);
-      CV.ctx.fillStyle = '#232c42'; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(c.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
       CV.text(CV.fit(c.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
