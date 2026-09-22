@@ -286,11 +286,16 @@ console.log('\n=== 主线真玩一遍（带引导、带真动作）===');
       !moved ? '还挂着同一条、高亮也没动：' + (g1 && g1.key)
         : (g1 ? '高亮移到 ' + h1.id : '已收掉'));
     /* 两步/多段的步骤：像玩家那样**接着做，直到真的做完**（多段任务就是一关一关推） */
-    for (let k = 0; k < 6 && !qCheck(want); k++) {
+    for (let k = 0; k < 10 && !qCheck(want); k++) {
       const pageNow = page();
       if (pageNow === 'battle') {
-        await wait(800);
-        tapId('dun_next') || tapId('battle_close');
+        /* V1.0.1 根因：原来只等 800ms，而每关现在 3 波、每波之间有 1050ms 的波次卡 ——
+           一场要 3150ms 以上，等 800ms 就 continue，循环上限又只有 6 次，
+           时间根本不够，打两下就到顶退出（报出来就是"停在 battle"）。 */
+        await wait(3400);
+        /* V1.0.1：原来**优先点「下一关」** —— 等于又开一关，于是永远走不出 battle。
+           主线的目的是"打完这一关"，所以优先「返回」。 */
+        tapId('battle_close') || tapId('dun_next');
         await wait(350);
         if (page() === 'battle') { tapId('battle_close'); await wait(250); }
         continue;
