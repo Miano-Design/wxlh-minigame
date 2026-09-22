@@ -21,8 +21,19 @@ window.Battle = (function () {
     W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭/流血' },
     W03: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '恐惧' },
     W04: { onEnemyHit(t, fr) { if (Math.random() < 0.15) applyStatus(t, fr, 'stun', 1); }, bossRevive: true, note: '陷阱/复活' },
-    // 效果是"打到只剩 1 点血"（濒死），不是真的秒杀——飘字也跟着改成"濒死"（V9.2 对齐）
-    W05: { onEnemyHit(t, frames) { if (Math.random() < 0.03 && t.hp > 1) { t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); } }, note: '濒死判定' },
+    /* 效果是"打到只剩 1 点血"（濒死），不是真的秒杀 —— 飘字也跟着叫"濒死"（V9.2 对齐）。
+       V1.0.1（游戏策划总监会诊揪出的真 bug）：原来**每次敌人命中都独立掷 3%**，
+       而一场 12 关的战斗里敌人要命中几十上百次 —— 累积起来几乎必中，
+       于是"稀有事件"变成了"迟早挨一次"。实测最狠的一档：裸装 3 人、Lv.100 打 W05
+       **0/3 通过**（第 7/10/12 关 3~7 回合被打死）；把这条关掉，同一套配置 **3/3 通过**。
+       后果不只是难：`world_curve` 算出的 W05 下限 >100、W06 只要 85 ——
+       **曲线在第 5/6 世界倒挂**（越往后越容易），玩家看到的"卡关"和数值曲线对不上。
+       改法按策划建议取最省的一种：**每个单位每场最多触发一次**。
+       标记打在单位对象上（`t._ndUsed`），而单位是每场新建的 → 天然随场重置，不用额外的开场钩子。 */
+    W05: { onEnemyHit(t, frames) {
+      if (t._ndUsed || t.hp <= 1) return;
+      if (Math.random() < 0.03) { t._ndUsed = 1; t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); }
+    }, note: '濒死判定' },
     W06: { enemyShield: 0.2, note: '护盾' },
     W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠' },
     W08: { allyHitMod: -0.15, note: '浓雾' },
