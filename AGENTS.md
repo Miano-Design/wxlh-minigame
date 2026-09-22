@@ -1,88 +1,47 @@
-# 残域 · 微信小游戏（本项目专用规矩）
+# 残域 · 微信小游戏（项目专属事实）
 
-> 这是**项目级**规矩，只在这个目录里生效。全局规矩（称呼、硬边界等）在 `~/.codex/AGENTS.md`。
+> **通用做法不写在这里** —— 四步收尾（尺子 → 上传 → 预览 → 重编译）、存档纪律、
+> 两端同源、版本号只在定版 +1、后门不进仓库 —— 一律读
+> `~/.codex/knowledge/guides/小游戏开发纪律.md`（类级，去掉项目名字也成立）。
+> 本文件只写**绑在这个项目上的事实**。
 
-## 一、每次改完必须做的四件事（顺序固定）
+## 一、两端
 
-**① 跑尺子**：改哪个模块就跑对应那几把（全量清单见 `scripts/`）：
+| | 路径 | 说明 |
+|---|---|---|
+| 网页版（**唯一标准**） | `../wxlh-game/` | 仓库 `Miano-Design/wxlh-game`（private） |
+| 小游戏 | 本目录 | AppID `wx69e989a1d09967aa`，账号「残域灯阁」；**无远端、只本地 commit** |
+
+- 逻辑层（`data.js` / `core.js` / `battle.js` / `dungeon.js`）**只有一份真相**，住在 `../wxlh-game/js/`；
+  改完跑 `node scripts/sync-logic.js` 单向同步过来。
+- 界面以网页版 `js/ui.js` + `css/style.css` 为准，canvas 逐条对齐。
+
+## 二、版本号改这四处（必须一起改）
+
+`../wxlh-game/index.html`（7 处 `?v=`）· `../wxlh-game/sw.js` 的 `const V` ·
+`../wxlh-game/js/ui.js` 的 `GAME_VER` · 本目录 `game.js` 的 `globalThis.GAME_VER`
+
+## 三、尺子（`scripts/`，改哪块跑哪把）
 
 | 改了什么 | 至少跑 |
 |---|---|
 | 界面 / 排版 / 字号 | `layout_audit` `page_text_audit` `type_scale_audit` `spacing_audit` `page_smoke` `tap_audit` |
-
-> `layout_audit`（V9.6.143 新增）：把每一页画出来的**文字 / 按钮 / 卡片都当成矩形**，
-> 查三件事 —— 文字出画、文字压在按钮上、文字掉出卡片底。
-> `page_text_audit` 查的是"内容对不对、有没有被省略号砍"；这两把合起来才盖得住"排版"。
-> 立它的原因：父亲大人连着三次报排版问题（药园那行丢半句、伴生体那行被省略、
-> 炼化台文字压按钮），当时所有尺子都是绿的 —— 因为它们只看"画没画"，不看"画在哪"。
 | 战斗 / 副本 / 结算 | `battle_flow_audit` `journey_audit` |
-| 引导 / 主线任务 | `guide_walk_audit` `quest_play_audit` `coach_audit` |
-| 数值 / 掉落 / 扫荡 | `sweep_ticket_audit` `cap_audit` `test_game` |
+| 引导 / 主线 | `guide_walk_audit` `quest_play_audit` `coach_audit` |
+| 数值 / 掉落 | `sweep_ticket_audit` `cap_audit` `test_game` |
 | 存档 / 迁移 | `save_migrate_audit` `switch_save_audit` |
-| 逻辑层（data/core/battle/dungeon） | 先改**网页版**再 `node scripts/sync-logic.js`，然后两边都跑 `test_game` |
+| 逻辑层 | 先改网页版 → `sync-logic.js` → 两边都跑 `test_game` |
+| **画布 `save/restore`** | `battle_flow_audit` 里那条"数量配对"断言（**配错一个就会整块偏移**） |
+| 整体自审（最慢，各约 10 分钟） | `frame_audit`（画布帧）× `tap_audit`（交互死键） |
 
-**② 上传体验版（只在定版时做）**：`node scripts/release.js --desc "这次定版的汇总"`
-（它按 `game.js` 里的 `GAME_VER` 上传，并**紧接着推手机预览**）
-—— 没定版、只是过程中的迭代就**跳过这一步**：版本号不动，只做 ③④ 让他手机能看到效果。
+## 四、命令
 
-**③ 推手机预览 —— 每次必做，不许省。**
-父亲大人要看效果只能靠手机，所以任何一次改动（哪怕只改一个字）都要让他手机上能立刻看到：
-`wechatide -c Codex auto_preview --project <项目绝对路径>`
-（`release.js` 已经带上这一步；如果只改了界面想快点看，用 `node scripts/release.js --preview-only`）
+- 上传体验版 + 推预览：`node scripts/release.js --desc "…"`（只推预览加 `--preview-only`）
+- 重编译模拟器：`close_project_window` → `open_project_window`
+  （`simulator_refresh` **只重载不编译**）
+- 截图：`node scripts/shot.js <名字>`（输出到 `截图/`）
 
-**④ 重编译模拟器**：`close_project_window` → `open_project_window`
-（`simulator_refresh` **不会**重新编译，只重载模拟器）
+## 五、多账号调试的存档位置（测试用）
 
-最后：删除临时代码与临时截图，确认 `git status` 只剩本次要提交的文件。
-
-## 二、版本号四处必须一致
-
-`wxlh-game/index.html`（7 处 `?v=`）· `wxlh-game/sw.js` 的 `const V` ·
-`wxlh-game/js/ui.js` 的 `GAME_VER` · `wxlh-minigame/game.js` 的 `globalThis.GAME_VER`。
-改版本号时**四处一起改**，改完 `grep` 一遍确认（踩过一次：只提交了代码、漏改版本号）。
-
-### 什么时候才改版本号（V1.0.1 父亲大人定的规矩）
-
-- **只在"定版"时改一次**：攒够一批改动 → 自审全绿 → 定版 → 才 +1。
-  **不许"改一点就 +1"** —— 后台审核列表里全是碎版本，谁也看不出哪一版是什么。
-- 同一次定版里写的注释标记（`// Vx.y.z：…`）**统一成这一个版本号**，别留中间号
-  （V1.0.1 那次就出现过同一批改动标着 1.0.1 / 1.0.2 / 1.0.3 三个号，全统一了）。
-- 上传时的 `--desc` 是**这一次定版的汇总**，它会直接显示在后台的"项目备注"里给审核看：
-  分条写清玩家能感知的改动，条数控制在 5 条以内，别只写一句"修了些问题"。
-
-### 谁来做上传（V1.0.1 父亲大人授权）
-
-**上传体验版 + 推手机预览由康康直接做，不必每次问**（父亲大人原话："以后自己上传就行了"）。
-仍然要先问一声的只有一件：**提交审核**（那是对外报送，不可逆）。
-
-## 三、两条血泪教训（每次都自查）
-
-1. **绝不让测试代码碰玩家存档。**（踩过两次，记牢）
-   - **首选解法（V1.0.1 实测，最省事）**：「工具 → 多账号调试」勾一个**虚拟测试账号**
-     → 它会**另开一个窗口**跑那个号，**主窗口和主存档都不动**。
-     内置 24 个测试号（测试号🐷🐶🐼🐒 + 测试号v1~v20），每个账号在
-     `~/Library/Application Support/微信开发者工具/<hash>/WeappSimulator/WeappStorage/`
-     下**各存一份** `storage_<appid>_<openid>.json`（文件名就是 openid）。
-     实测：在测试号里把游戏跑起来、连存好几轮，主档 md5 分毫未动。
-     **要在里面看"删档重开才出现的界面"（开局契约弹窗、新手引导第一遍），走这条即可**，
-     不用再折腾备份还原。用完关掉那个新窗口就回到主号。（也能"添加"真实测试账号）
-   - 看效果用的后台挂钩只做"跳页面"，不许 `Core.newGame()`、不许改角色名/数值 ——
-     游戏有**定时存盘**，测试数据会被写进存档（第一次：模拟器里角色名被我写成"临时"）。
-   - 要看"必须产生状态才会出现的界面"（抽卡结果页、结算页这类），**优先在假环境里量**（`scripts/` 的审计脚本）；
-     万不得已要在真机/模拟器上看，必须走这套**固定流程**：
-     ① 先 `cp` 一份存档到 `/tmp` 并记下 `md5`；
-     ② 看完图后**先 `close_project_window`**（把游戏进程关掉，否则它的定时存盘会把你还原的存档再覆盖一遍 ——
-        这是第二次踩的坑）；
-     ③ 再把那份存档原样拷回去，`md5` 校验一致才算完；
-     ④ 之后重新开窗口时，游戏只会更新"上次见到玩家"这类时间戳字段（这是设计行为），
-        校验时看**内容**（角色名 / 等级 / 货币），别死抠 md5。
-2. **改完一定要看图。**
-   尺子查不出"参数少一个""画出来是空的"这类事 —— 至少截一张你改动的那一屏。
-   看图用 `node scripts/shot.js <名字>`（输出到 `截图/`，看完删掉）。
-
-## 四、网页版是标准
-
-- 逻辑层（`data/core/battle/dungeon`）**只有一份真相**，住在 `../wxlh-game/js/`；
-  改逻辑 → 改网页版 → `node scripts/sync-logic.js`。
-- 界面层：网页版 `js/ui.js` + `css/style.css` 是版式标准（字号五级、间距、按钮尺寸），
-  小游戏 canvas 逐条对齐；两边不一致时**以网页版为准**，并在 `type_scale_audit` 里加一条断言。
+`~/Library/Application Support/微信开发者工具/<hash>/WeappSimulator/WeappStorage/storage_<appid>_<openid>.json`
+（文件名就是 openid；本项目主档 `o6zAJszR55N4ACs7cgHoJBq1Hlm4`）
