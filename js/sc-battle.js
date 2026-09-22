@@ -138,17 +138,19 @@
     if (fxT) return;
     fxT = setInterval(function () {
       const now = Date.now();
-      const alive = (B.floaters || []).some(function (f) { return now - f.t < 900; })
+      const alive = (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || 900); })
         || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
         || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; });
       if (!alive) { clearInterval(fxT); fxT = null; }
       CV.render();
     }, 55);
   }
-  function floater(uid, text, color) {
+  /* V1.0.1（UI 设计师会诊）：异常状态 / Boss 二阶段这类"要看清一句话"的提示 0.9 秒读不完，
+     允许传 ttl（网页版 js/ui.js 的 floater(..., ms) 是同一套口径，两边一起改）。 */
+  function floater(uid, text, color, ttl) {
     const u = B.units[uid];
     if (!u) return;
-    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now() });
+    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now(), ttl: ttl || 900 });
     ensureFx();
   }
   /* 受击 / 出手：记一个时间戳，unitCard 按它算抖动与红闪 */
@@ -196,9 +198,11 @@
       case 'dodge': floater(f.target, '闪避', CV.C.dim); break;
       case 'skip': pushLog('😵 ' + nameOf(f.actor) + ' 无法行动'); break;
       case 'buff': floater(f.target, '↑ ' + f.name, CV.C.green); break;
-      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', '#c8a2ff'); break;
-      case 'phase': pushLog('🔥 ' + f.text); break;
-      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); pushLog('♻ ' + f.text); break; }
+      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', '#c8a2ff', 1500); break;
+      /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
+         等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
+      case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text); break;
+      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻ 复活', CV.C.green, 1500); pushLog('♻ ' + f.text); break; }
       case 'summon': pushLog('🕯 ' + f.text); break;
       case 'rule': pushLog('👁 ' + f.text); break;
       case 'nearDeath': floater(f.target, '⚠ 濒死', CV.C.gold); break;
@@ -426,7 +430,7 @@
       (B.floaters || []).forEach(function (f) {
         const u = B.units[f.uid];
         if (!u || u._cx == null) return;
-        const p = Math.min(1, (Date.now() - f.t) / 900);
+        const p = Math.min(1, (Date.now() - f.t) / (f.ttl || 900));
         if (p >= 1) return;
         const fy = u._top - 4 * CV.SCALE - 26 * CV.SCALE * p;
         const alpha = 1 - p * p;
