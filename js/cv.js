@@ -126,6 +126,16 @@
      又容易跟别的界面联系不上"）。这里给这些符号配**矢量画法**，并挂在 CV.GLYPHS 上；
      CV.text / CV.measure 会自动识别：遇到这些字符就按图标宽（= 字号）走，其余照常排版。
      代价为零，调用点一行都不用改（页面里照旧写 '♜ 深井印记'）。 */
+  /* 五角星顶点（归一化 0~1，10 点内外半径交替）—— ★ 与 ☆ 共用一张表。
+     放在 GLYPHS 外面是因为它只是**几何数据**，不是某个字的画法。 */
+  const STAR5 = (function () {
+    const p = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, d = i % 2 ? 0.2 : 0.5;
+      p.push([0.5 + Math.cos(a) * d, 0.5 + Math.sin(a) * d]);
+    }
+    return p;
+  })();
   CV.GLYPHS = {
     /* ── 四种货币：从「文字字形」换成「矢量画法」（P2 素材立项第一步）────────────
        V1.0.1（AI 视觉工程师会诊：192 个字形全靠 emoji —— 两端字形不同、部分平台出黑白轮廓、
@@ -225,6 +235,195 @@
       sword(P(0.13, 0.05), P(0.63, 0.60), P(0.75, 0.74));
       sword(P(0.87, 0.05), P(0.37, 0.60), P(0.25, 0.74));
       c.restore();
+    },
+    /* ── 第二批：**文本呈现型**符号（第三批与详情见下面的注释）─────────────────
+       V1.0.1（AI 视觉工程师会诊："16 个符号在部分平台出黑白轮廓"）。
+       技术判据不是"它长得像不像 emoji"，而是 Unicode 的 **Emoji_Presentation**：
+         · 默认**文本呈现**（如 ⚔ ♜ ★ ☆ ✓ ✗ ➕ ⬆ ❖ ♂ ♀ ❥ ◉ ◆ ✦ ♾）——
+           走的是**文本字体**，而画布用的中文字体里根本没这几个字 → **豆腐块**。
+           （⚔ 和 ♜ 就是栽在这条上，前面两个版本已经补过。）
+         · 默认 **emoji 呈现**（如 🛡 🗡 ⛰ ⚗ ⛏ ⚠ ⚙ ⚡）——
+           系统有 emoji 字体就出彩色，没有就退成黑白轮廓甚至方块，**各平台不一致**。
+       所以这一批先补"一定会出豆腐块"的 10 个（下面这批），
+       下一批再补"各平台不一致"的 8 个。形状一律画成最简单的几何，
+       14px 以下细节等于噪点，认得出是什么比画得好看重要。 */
+    '★': function (c, x, y, s, color) {          // 实心五角星
+      CV.poly(STAR5, x - s * 0.45, y - s * 0.45, s * 0.9, color);
+    },
+    '☆': function (c, x, y, s, color) {          // 空心五角星（同一张顶点表）
+      const sp = s * 0.9, ox = x - sp / 2, oy = y - sp / 2;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.2, s * 0.085); c.lineJoin = 'round';
+      c.beginPath();
+      STAR5.forEach(function (p, i) {
+        const px = ox + p[0] * sp, py = oy + p[1] * sp;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      });
+      c.closePath(); c.stroke(); c.restore();
+    },
+    '✓': function (c, x, y, s, color) {          // 对勾
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.4, s * 0.12);
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      c.beginPath(); c.moveTo(x - s * 0.3, y + s * 0.02);
+      c.lineTo(x - s * 0.09, y + s * 0.24); c.lineTo(x + s * 0.32, y - s * 0.24);
+      c.stroke(); c.restore();
+    },
+    '✗': function (c, x, y, s, color) {          // 叉（对勾的反义，成对出现）
+      const d = s * 0.28;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.4, s * 0.115); c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x - d, y - d); c.lineTo(x + d, y + d); c.stroke();
+      c.beginPath(); c.moveTo(x + d, y - d); c.lineTo(x - d, y + d); c.stroke();
+      c.restore();
+    },
+    '➕': function (c, x, y, s, color) {          // 加号（"再加一次"这类动作）
+      const a = s * 0.34, b = s * 0.09;
+      c.save(); c.fillStyle = color;
+      c.fillRect(x - a, y - b, a * 2, b * 2);
+      c.fillRect(x - b, y - a, b * 2, a * 2);
+      c.restore();
+    },
+    '⬆': function (c, x, y, s, color) {          // 上箭头（升级 / 提升）
+      const w = s * 0.32, h = s * 0.4;
+      c.save(); c.fillStyle = color;
+      c.beginPath();
+      c.moveTo(x, y - h); c.lineTo(x + w, y + h * 0.1);
+      c.lineTo(x + w * 0.42, y + h * 0.1); c.lineTo(x + w * 0.42, y + h);
+      c.lineTo(x - w * 0.42, y + h); c.lineTo(x - w * 0.42, y + h * 0.1);
+      c.lineTo(x - w, y + h * 0.1); c.closePath(); c.fill(); c.restore();
+    },
+    '❖': function (c, x, y, s, color) {          // 四瓣花（宝石 / 稀有标记）
+      /* 刻意和 ✦（四角尖星）拉开：这个是**四个菱形花瓣**、中间留空，
+         远看是"花"不是"星"—— 两个符号都当稀有标记用，长一样就白分了。 */
+      const R = s * 0.42;
+      c.save(); c.fillStyle = color;
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2, dx = Math.cos(a), dy = Math.sin(a);
+        c.beginPath();
+        c.moveTo(x + dx * R, y + dy * R);
+        c.lineTo(x - dy * R * 0.34, y + dx * R * 0.34);
+        c.lineTo(x - dx * R * 0.2, y - dy * R * 0.2);
+        c.lineTo(x + dy * R * 0.34, y - dx * R * 0.34);
+        c.closePath(); c.fill();
+      }
+      c.restore();
+    },
+    '♂': function (c, x, y, s, color) {          // 男（性别筛选）
+      const r = s * 0.24, cy = y + s * 0.1;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.3, s * 0.1); c.lineCap = 'round';
+      c.beginPath(); c.arc(x - s * 0.06, cy, r, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.moveTo(x - s * 0.06 + r * 0.7, cy - r * 0.7);
+      c.lineTo(x + s * 0.34, y - s * 0.34); c.stroke();
+      c.beginPath(); c.moveTo(x + s * 0.34, y - s * 0.34); c.lineTo(x + s * 0.34, y - s * 0.1); c.stroke();
+      c.beginPath(); c.moveTo(x + s * 0.34, y - s * 0.34); c.lineTo(x + s * 0.1, y - s * 0.34); c.stroke();
+      c.restore();
+    },
+    '♀': function (c, x, y, s, color) {          // 女（性别筛选）
+      const r = s * 0.24;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.3, s * 0.1); c.lineCap = 'round';
+      c.beginPath(); c.arc(x, y - s * 0.1, r, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.moveTo(x, y - s * 0.1 + r); c.lineTo(x, y + s * 0.4); c.stroke();
+      c.beginPath(); c.moveTo(x - s * 0.16, y + s * 0.24); c.lineTo(x + s * 0.16, y + s * 0.24); c.stroke();
+      c.restore();
+    },
+    '❥': function (c, x, y, s, color) {          // 心（好感 / 体力）
+      const w = s * 0.42, h = s * 0.4;
+      c.save(); c.fillStyle = color;
+      c.beginPath(); c.moveTo(x, y + h);
+      c.bezierCurveTo(x - w * 1.4, y - h * 0.2, x - w * 0.55, y - h, x, y - h * 0.34);
+      c.bezierCurveTo(x + w * 0.55, y - h, x + w * 1.4, y - h * 0.2, x, y + h);
+      c.closePath(); c.fill(); c.restore();
+    },
+    /* ── 第三批：**emoji 呈现型**符号（各平台字形不一致的那 8 个）─────────────
+       它们和上一批的问题不同：不是"一定画不出来"，而是**各平台各画各的**——
+       有 emoji 字体就出彩色（iOS），没有就退成黑白轮廓甚至方块（部分安卓 / 旧机型）。
+       而它们全在**功能位**（警告 / 装备 / 关卡 / 设置 / 速度），不是一个平台一个样无所谓的花边，
+       玩家看到的"图标坏了"就是这么来的。自绘成单色后，两端、所有机型完全同源。 */
+    '⚠': function (c, x, y, s, color) {          // 警告（三角 + 叹号）
+      const w = s * 0.44, h = s * 0.4;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.2, s * 0.085);
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y + h * 0.7);
+      c.lineTo(x - w, y + h * 0.7); c.closePath(); c.stroke();
+      c.beginPath(); c.moveTo(x, y - h * 0.32); c.lineTo(x, y + h * 0.18); c.stroke();
+      c.beginPath(); c.arc(x, y + h * 0.46, Math.max(1, s * 0.05), 0, Math.PI * 2);
+      c.fillStyle = color; c.fill();
+      c.restore();
+    },
+    '🛡': function (c, x, y, s, color) {          // 盾（防御 / 减伤）
+      const w = s * 0.38, h = s * 0.44;
+      c.save(); c.fillStyle = color;
+      c.beginPath();
+      c.moveTo(x - w, y - h * 0.8); c.lineTo(x + w, y - h * 0.8);
+      c.lineTo(x + w, y + h * 0.05);
+      c.quadraticCurveTo(x + w, y + h * 0.75, x, y + h);
+      c.quadraticCurveTo(x - w, y + h * 0.75, x - w, y + h * 0.05);
+      c.closePath(); c.fill(); c.restore();
+    },
+    '🗡': function (c, x, y, s, color) {          // 匕首（装备位的武器）
+      const H = s * 0.4;
+      c.save(); c.fillStyle = color;
+      c.beginPath();                                        // 剑身（上尖下宽）
+      c.moveTo(x, y - H);
+      c.lineTo(x + s * 0.075, y - H * 0.45); c.lineTo(x + s * 0.075, y + H * 0.1);
+      c.lineTo(x - s * 0.075, y + H * 0.1); c.lineTo(x - s * 0.075, y - H * 0.45);
+      c.closePath(); c.fill();
+      c.fillRect(x - s * 0.2, y + H * 0.1, s * 0.4, s * 0.07);      // 护手
+      c.fillRect(x - s * 0.045, y + H * 0.17, s * 0.09, s * 0.22);   // 柄
+      c.restore();
+    },
+    '⛰': function (c, x, y, s, color) {          // 山（残域 / 世界）
+      const B = y + s * 0.34;
+      c.save(); c.fillStyle = color;
+      c.beginPath(); c.moveTo(x - s * 0.46, B); c.lineTo(x - s * 0.1, y - s * 0.3);
+      c.lineTo(x + s * 0.22, B); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(x - s * 0.02, B); c.lineTo(x + s * 0.24, y - s * 0.14);
+      c.lineTo(x + s * 0.5, B); c.closePath(); c.fill();
+      c.restore();
+    },
+    '⚗': function (c, x, y, s, color) {          // 蒸馏瓶（法宝 / 祭炼）
+      const r = s * 0.25, cy = y + s * 0.13;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.3, s * 0.09);
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      c.beginPath(); c.arc(x, cy, r, 0, Math.PI * 2); c.stroke();          // 球部
+      c.beginPath(); c.moveTo(x - r * 0.55, cy - r * 0.78);                // 瓶颈两竖
+      c.lineTo(x - r * 0.55, y - s * 0.36); c.stroke();
+      c.beginPath(); c.moveTo(x + r * 0.55, cy - r * 0.78);
+      c.lineTo(x + r * 0.55, y - s * 0.36); c.stroke();
+      c.beginPath(); c.moveTo(x - r * 0.8, y - s * 0.36);                  // 瓶口
+      c.lineTo(x + r * 0.8, y - s * 0.36); c.stroke();
+      c.beginPath(); c.moveTo(x + r * 0.55, y - s * 0.3);                  // 斜导管
+      c.lineTo(x + s * 0.36, y - s * 0.42); c.stroke();
+      c.restore();
+    },
+    '⛏': function (c, x, y, s, color) {          // 镐（强化材料）
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.3, s * 0.1); c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x - s * 0.3, y + s * 0.4);                   // 柄
+      c.lineTo(x + s * 0.26, y - s * 0.26); c.stroke();
+      c.beginPath(); c.moveTo(x - s * 0.28, y - s * 0.04);                 // 弯头
+      c.quadraticCurveTo(x + s * 0.06, y - s * 0.44, x + s * 0.4, y - s * 0.12);
+      c.stroke(); c.restore();
+    },
+    '⚙': function (c, x, y, s, color) {          // 齿轮（设置）
+      const R = s * 0.44, r = s * 0.3;
+      c.save(); c.fillStyle = color;
+      c.beginPath();
+      for (let i = 0; i < 16; i++) {                      // 16 点交替 → 8 个齿
+        const a = i * Math.PI / 8, d = i % 2 ? R : r;
+        const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      }
+      c.closePath(); c.fill();
+      c.globalCompositeOperation = 'destination-out';     // 中心轴孔
+      c.beginPath(); c.arc(x, y, s * 0.12, 0, Math.PI * 2); c.fill();
+      c.restore();
+    },
+    '⚡': function (c, x, y, s, color) {          // 闪电（速度 / 能量）
+      const w = s * 0.3, h = s * 0.42;
+      c.save(); c.fillStyle = color;
+      c.beginPath();
+      c.moveTo(x + w * 0.25, y - h); c.lineTo(x - w, y + h * 0.12);
+      c.lineTo(x - w * 0.05, y + h * 0.12); c.lineTo(x - w * 0.25, y + h);
+      c.lineTo(x + w, y - h * 0.12); c.lineTo(x + w * 0.05, y - h * 0.12);
+      c.closePath(); c.fill(); c.restore();
     },
   };
   CV.hasGlyph = function (str) {

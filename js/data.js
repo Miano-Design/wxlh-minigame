@@ -377,7 +377,7 @@ window.DATA = (function () {
     { id: 'W12', ico: '🪐', name: '蚀环远征', theme: 'mystic', desc: '魔多大军压境，黑暗侵蚀中土。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
       enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环幽灵', unlock: 'W11' },
     /* ---- 第二巡：转生 1 次开启 ---- */
-    { id: 'W13', ico: '❄', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '白女巫的冰封王座，永冬笼罩王国。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
+    { id: 'W13', ico: '❄️', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '白女巫的冰封王座，永冬笼罩王国。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
       enemies: '冰狼|雪魔|霜冻武士'.split('|'), elite: '冰宫禁卫', unlock: 'W12' },
     { id: 'W14', ico: '🏯', name: '灯阁试炼场', theme: 'god', desc: '灯阁亲自设下的试炼，规则由它书写。', hp: 7000, atk: 600, def: 500, mechanic: '随机规则：每回合变化', boss: '试炼执刑者', bossHp: [1125798, 2026437, 3602554],
       enemies: '试炼傀儡|规则执行体|灯阁幻影'.split('|'), elite: '灯阁代行者', unlock: 'W13' },
@@ -869,7 +869,7 @@ window.DATA = (function () {
     { id: 'sr_bl_cultivator', ico: '🍀', name: '修真·灵根血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 6 },
     { id: 'sr_bl_titan', ico: '🏔',    name: '泰坦·磐石血清', key: 'defPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '泰坦',   unlock: 7 },
     { id: 'sr_bl_tech', ico: '⚙',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 8 },
-    { id: 'sr_bl_psychic', ico: '☯',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 9 },
+    { id: 'sr_bl_psychic', ico: '☯️',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 9 },
     /* ---- 高阶血清（V9.6.138 新增）----
        起因（父亲大人定的原则）："各个功能都最好能跟着游戏进程一起发展，不然前期就满了，
        放在那里很占位置、感觉没啥用。" 原来 12 种血清**约 8 天就全喂满**，之后这件功能
@@ -1355,9 +1355,9 @@ window.DATA = (function () {
     { id: 'shendu', name: '神读咒', ico: '📖', key: 'spiritPct', rate: 0.004, max: 40, base: 16, step: 3, info: '精神（技能倍率）' },
     { id: 'tiegu',  name: '铁骨功', ico: '🦴', key: 'defPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队防御' },
     { id: 'liehuo', name: '烈火诀', ico: '🔥', key: 'atkPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队攻击' },
-    { id: 'hanshui', name: '寒水诀', ico: '❄', key: 'hpPct',    rate: 0.005, max: 50, base: 12, step: 3, info: '全队生命' },
+    { id: 'hanshui', name: '寒水诀', ico: '❄️', key: 'hpPct',    rate: 0.005, max: 50, base: 12, step: 3, info: '全队生命' },
     { id: 'leiting', name: '雷霆诀', ico: '⚡', key: 'spdPct',   rate: 0.004, max: 40, base: 15, step: 3, info: '全队速度' },
-    { id: 'wuxingtu', name: '五行图', ico: '☯', key: 'skillPct', rate: 0.004, max: 40, base: 15, step: 3, info: '技能伤害' },
+    { id: 'wuxingtu', name: '五行图', ico: '☯️', key: 'skillPct', rate: 0.004, max: 40, base: 15, step: 3, info: '技能伤害' },
     { id: 'mingmu', name: '明目术', ico: '👁', key: 'critPct',  rate: 0.002, max: 40, base: 18, step: 4, info: '暴击率' },
     { id: 'lifa',   name: '力煞诀', ico: '💪', key: 'critDmg',  rate: 0.006, max: 30, base: 24, step: 5, info: '暴击伤害' },
     { id: 'lingbo', name: '凌波步', ico: '🌊', key: 'evaPct',   rate: 0.002, max: 30, base: 24, step: 5, info: '闪避' },

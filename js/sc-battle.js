@@ -202,7 +202,7 @@
       /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
          等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
       case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text); break;
-      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻ 复活', CV.C.green, 1500); pushLog('♻ ' + f.text); break; }
+      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻️ 复活', CV.C.green, 1500); pushLog('♻️ ' + f.text); break; }
       case 'summon': pushLog('🕯 ' + f.text); break;
       case 'rule': pushLog('👁 ' + f.text); break;
       case 'nearDeath': floater(f.target, '⚠ 濒死', CV.C.gold); break;

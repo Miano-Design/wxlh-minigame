@@ -99,6 +99,40 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
   t('小游戏族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(mini));
 }
 
+/* ⑧ 「文本呈现型」符号必须自绘（V1.0.1 · 用血换的判据）
+   起因：画布的中文字体里**没有 ⚔ / ♜**，写进去就是豆腐块（父亲大人报过两次"乱码"）。
+   真判据不是"长得像不像 emoji"，而是 Unicode 的 **Emoji_Presentation**：
+     · 默认 **emoji 呈现**（⭐ ⏩ ❓ ⛵ ➕ ⚡ ✨ 以及所有 🌌🌊 之类）——
+       系统 emoji 字体里有它，画得出来（各平台可能彩色/黑白，但不缺字）。
+     · 默认 **文本呈现**（⚔ ♜ ★ ☆ ✓ ✗ ⬆ ❖ ♂ ♀ ❥ ⚠ 🛡 🗡 ⛰ ⚗ ⛏ ⚙ ♻ ☯ ❄）——
+       走**文本字体**，中文字体不覆盖 → **豆腐块**。
+   所以规矩是：这一批要么在 CV.GLYPHS 里自绘，要么紧跟一个 VS16（U+FE0F）强制转成 emoji 呈现。
+   两边都不是 → 报红。（这条尺子能抓住"以后往文案里随手加一个符号"的那类事故。） */
+{
+  const EPI = /\p{Extended_Pictographic}/u, EPR = /\p{Emoji_Presentation}/u, VS = '\uFE0F';
+  /* 中文字体一定覆盖的普通符号，不是 emoji 家族的"图形"——不该逼着自绘 */
+  const SAFE = new Set('↔←→↑↓↕×÷±≈≠≤≥∞※‰§¶†‡•·°′″'.split(''));
+  const cvSrc = fs.readFileSync(path.join(JS, 'cv.js'), 'utf8');
+  const gm = cvSrc.match(/CV\.GLYPHS = \{([\s\S]*?)\n  \};/);
+  const HAVE = new Set([...(gm ? gm[1] : '').matchAll(/^    '(.+?)':/gm)].map((x) => x[1]));
+  const bad = {};
+  for (const f of fs.readdirSync(JS).filter((x) => x.endsWith('.js'))) {
+    const s = fs.readFileSync(path.join(JS, f), 'utf8');
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (!EPI.test(ch) || EPR.test(ch)) continue;     // emoji 呈现型：有 emoji 字体就出
+      if (HAVE.has(ch) || SAFE.has(ch)) continue;      // 已自绘 / 字体覆盖的普通符号
+      if (s[i + 1] === VS) continue;                   // 已补 VS16：被强制转成 emoji 呈现
+      (bad[ch] = bad[ch] || new Set()).add(f);
+    }
+  }
+  const list = Object.entries(bad);
+  t('没有"会出豆腐块的文本呈现型符号"漏网（要把它们自绘，或者补 VS16）',
+    list.length === 0,
+    list.map(([ch, fs2]) => ch + ' U+' + ch.codePointAt(0).toString(16).toUpperCase() + '（在 ' + [...fs2].join(',') + '）').join(' · '));
+  t('自绘图标表非空且数量对得上（当前 24 个）', HAVE.size >= 24, '共 ' + HAVE.size + ' 个');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 console.log('结论：' + (fail === 0 ? '图标一对一，没有重复 ✓' : '有 ' + fail + ' 处重复/缺失 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;
