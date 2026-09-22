@@ -43,7 +43,9 @@
       if (pa !== pb) return pb - pa;
       if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
       if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
-      return S.chars[b].star - S.chars[a].star;
+      /* V1.0.1：四档全平时要有个**唯一兜底键** —— 否则顺序取决于 `Object.keys` 的
+         插入顺序，读档后会变，玩家看到的就是"排序又乱了"。详见网页版 ui.js 同一处。 */
+      return (S.chars[b].star - S.chars[a].star) || String(a).localeCompare(String(b));
     });
   };
   function listSorted() {

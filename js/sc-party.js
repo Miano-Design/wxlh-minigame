@@ -286,7 +286,14 @@
     const from = G.__swapFrom;
     /* V9.6.19（父亲大人）：换将列表的排序要**跟执灯者那边一样** ——
        直接复用 G.charSortDefault（那边是唯一实现），不再各排各的。 */
-    const own = (G.charSortDefault ? G.charSortDefault(Object.keys(S.chars)) : Object.keys(S.chars))
+    /* V1.0.1（父亲大人："队伍上阵选伙伴的列表排序规则丢了吗，现在又是乱排序"）：
+       这里原来是 `G.charSortDefault ? 排好的 : Object.keys(S.chars)` ——
+       一旦 G 上拿不到那个函数，**静默退化成"完全不排序"**（对象键顺序），
+       症状正好就是"排序规则丢了"。而且它不报错，所以尺子和开发期都发现不了。
+       改法：不留静默兜底 —— 共用实现真丢了就当场抛错（构建/冒烟立刻暴露），
+       绝不出现"看起来能跑、其实是乱序"这种半成品状态。 */
+    if (typeof G.charSortDefault !== 'function') throw new Error('排序实现缺失：G.charSortDefault');
+    const own = G.charSortDefault(Object.keys(S.chars))
       .filter((id) => id !== from && S.party.indexOf(id) < 0);
     U.card(function () {
       U.h3('换谁上阵', own.length + ' 名可选');
