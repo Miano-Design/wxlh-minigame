@@ -429,6 +429,57 @@ window.DATA = (function () {
     { id: 'W36', ico: '👑', name: '灯阁王座', theme: 'god', desc: '走到这里的人，才有资格问一句为什么。', hp: 48000, atk: 2570, def: 2380, mechanic: '规则改写：每 3 回合变换；全场压制', boss: '终焉·灯主', bossHp: [6144000, 11059200, 19660800],
       enemies: '王座侍者|终焉使者|另一个你'.split('|'), elite: '王座禁卫', unlock: 'W35' },
   ];
+
+  /* ================= 世界格底：五族色相 × 巡阶梯（V1.0.1） =================
+     背景（AI 视觉工程师会诊）：36 个世界卡的图标格**全是同一个底色 #232c42**，
+     玩家扫一眼列表分不出"这两个世界是一类吗"。而世界本来就分 5 个 theme
+     （bio 8 / ghost 9 / mystic 7 / tech 7 / god 5 = 36），theme 又已经映射到阵营
+     （dungeon.js 的 THEME_FACTION：bio→灰原 / ghost→幽都 / mystic→雾乡 / tech→锈港 / god→无阵营）。
+     所以直接用**世界自己的 theme** 当族，比借阵营更贴题（god 正好单独成第五族）。
+
+     ⚠️ 改判（视觉工程师自己纠正的）：原方案想给 36 个世界"36 个色相"——
+     但 52px 方块上人眼只能稳定分辨 8~12 个色相，36 个必然糊成一团。
+     改成 **5 个族色相 × 族内明度阶梯**：族内第 1/2/3/4 个世界各深一档（20/23/26/29%），
+     同族越靠后越沉，跨族一眼分得开。
+
+     ⚠️ 返回**十六进制**而不是 hsl()：微信小游戏的 canvas 对 hsl() 支持不稳，
+     两端要同一串颜色，就只能在数据层算好。 */
+  /* 这 5 组是**按色差算出来的**，不是随手挑的漂亮色：在 20% 明度的深底上，
+     任意两族的 RGB 距离最小 23（原来的第一版 mystic/god 只差 12，几乎同色）。
+     改色相前先跑一遍这个距离，别凭眼睛定。 */
+  const WORLD_THEME_HUE = {
+    bio:    { h: 138, s: 32 },   // 感染 / 生化 —— 苔绿
+    ghost:  { h: 265, s: 24 },   // 幽魂 / 灵异 —— 幽紫
+    mystic: { h: 12,  s: 32 },   // 秘术 / 古文明 —— 砖红
+    tech:   { h: 198, s: 32 },   // 机械 / 工业 —— 钢青
+    god:    { h: 52,  s: 34 },   // 神域 / 终局 —— 琥珀金
+  };
+  const hslToHex = (h, s, l) => {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const to = x => Math.round(255 * x).toString(16).padStart(2, '0');
+    return '#' + to(f(0)) + to(f(8)) + to(f(4));
+  };
+  /* 世界 → 格底色。第一次调用时把 36 个算好缓存起来（列表要一次画 36 张卡）。 */
+  const _worldTintCache = {};
+  function worldTint(worldId) {
+    if (_worldTintCache[worldId]) return _worldTintCache[worldId];
+    const i = WORLDS.findIndex(x => x.id === worldId);
+    if (i < 0) return '#232c42';                       // 认不出来就退回旧底色，不崩
+    const w = WORLDS[i];
+    const hue = WORLD_THEME_HUE[w.theme] || { h: 220, s: 20 };
+    /* 巡阶梯 = 族内第几个世界（1 起算）：
+         · 明度每往后一档 +1.8%，连续走、不封顶 —— 一族最多的 bio 有 8 个世界，
+           封顶到第 4 档的话后 5 个会变成**同一块颜色**（第一版就是这么错的）。
+         · 色相在 ±5° 里微旋，同族也不会两两撞色。
+       跨族靠色相拉开（最小 RGB 距离 23），族内靠明度微差 —— 这才是"一眼分得清族、细看分得清个"。 */
+    const nth = WORLDS.slice(0, i + 1).filter(x => x.theme === w.theme).length;
+    const l = 20 + (nth - 1) * 1.8;
+    const dh = ((nth - 1) % 3) * 5 - 5;
+    return (_worldTintCache[worldId] = hslToHex(hue.h + dh, hue.s, l));
+  }
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
     { id: 'hard',   name: '困难', mult: 1.8, rewardMult: 1.6 },
@@ -2354,6 +2405,7 @@ window.DATA = (function () {
     bloodlineSetKey, pctText, BLOODLINE_KEYS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
+    WORLD_THEME_HUE, worldTint,          // 世界格底：五族色相 × 族内明度阶梯
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
     EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,
