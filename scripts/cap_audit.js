@@ -126,6 +126,16 @@ row('坐骑', `${D.MOUNTS.length} 匹`, { points: D.MOUNTS.reduce((a, m) => a + 
 
 console.log(`=== 上限联动体检（样例存档：玩家 Lv.${LV} · 进度 W${String(TIER).padStart(2, '0')}）===`);
 console.log('  日收入（估）：' + ['points', 'otherworld', 'holy', 'exp', 'charExp', 'sectExp'].map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
+/* ═══ ⚠️ 口径警告（V1.0.1，游戏策划总监会诊查出）════════════════════════════
+   上面这行是**公式估算**（按当前进度的一条样例存档 × 各产线的理论日产量），
+   而 `longrun_sim` 报的是**实测**（真跑 30 / 90 天，靠 Core.tallyCur 记账）。
+   两者**不是一回事**，而且差得不小 —— 会诊那次实测：本文件 otherworld 约 1,759/天，
+   longrun_sim 90 天实测约 5,992/天，**差 3.4 倍**。
+   为什么差：公式只算了"挂机 + 扫荡 + 斗法台"三条，**漏了副本掉落、悬赏、深井、日常**。
+   **所以：下面那些"点满要几天"只能当数量级参考，不能当结论。**
+   要判断"这条线要多久"，用 `node scripts/longrun_sim.js 90` 的实测数。 */
+console.log('  ⚠ 以上为**公式估算**，与 longrun_sim 的实测口径不同（实测约高 3.4 倍）——'
+  + '判断"要几天"请以 longrun_sim 为准');
 console.log('');
 rows.forEach(x => console.log(x));
 
