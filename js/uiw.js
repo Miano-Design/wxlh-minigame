@@ -116,7 +116,9 @@
     const rowH = opt.btn ? Math.max(lh, btnH) : lh;
     if (opt.btn) {
       const bw = CV.measure(opt.btn.label, CV.FS.sm) + 20 * CV.SCALE;
-      U.btn(U.ix() + U.iw() - bw, U.y + (rowH - btnH) / 2, bw, btnH, opt.btn.label, 'ghost', opt.btn.id);
+      /* V1.0.1（开发自审会诊）：标题行的小按钮也要能进禁用态 —— 原来只传 id，
+         于是 `id: 条件 ? 'x' : ''` 那种写法在"条件不满足"时按钮**看着能点、却既没热区也没提示**。 */
+      U.btn(U.ix() + U.iw() - bw, U.y + (rowH - btnH) / 2, bw, btnH, opt.btn.label, 'ghost', opt.btn.id, opt.btn.dis);
     }
     const top = U.y;
     draw(() => {

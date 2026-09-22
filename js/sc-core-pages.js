@@ -93,7 +93,10 @@
         U.kv('✦ 圣洁晶石', (Core.S.cur.holy || 0) + ' / ' + au.cost.holy, (Core.S.cur.holy || 0) >= au.cost.holy ? CV.C.green : CV.C.dim);
         U.kv('◆ 异界结晶', (Core.S.cur.otherworld || 0) + ' / ' + au.cost.otherworld, (Core.S.cur.otherworld || 0) >= au.cost.otherworld ? CV.C.green : CV.C.dim);
         U.space(CV.SP[1]);
-        U.btnRow([{ label: '⚡ 提升灯阁权限', style: 'primary', id: (can && reqMet) ? 'auth_up' : '' }]);
+        /* V1.0.1（开发自审会诊）：`id: 条件 ? 'x' : ''` 会让按钮在条件不满足时
+           **保持可点的样子、却没有热区**（点了没反应、也没提示）。网页版这一颗是 `disabled`。
+           全项目同一批共 11 处，统一改成"id 照留、用 dis 进禁用态"。 */
+        U.btnRow([{ label: '⚡ 提升灯阁权限', style: 'primary', id: 'auth_up', dis: !(can && reqMet) }]);
       }
     });
     U.card(function () {
@@ -219,7 +222,7 @@
         U.kv('条件', n.req);
         if (!info.can && info.reqs && info.reqs.length) U.hint('未满足：' + info.reqs.join(' · '), 4 * CV.SCALE);
         U.space(CV.SP[1]);
-        U.btnRow([{ label: '突破铭刻', style: 'primary', id: info.can ? 'gl_unlock' : '' }]);
+        U.btnRow([{ label: '突破铭刻', style: 'primary', id: 'gl_unlock', dis: !info.can }]);
       }
     });
     U.card(function () {
@@ -250,8 +253,8 @@
       U.kv('孵化', '兽魂石 ' + st.eggs + ' 颗 · 每 ' + st.eggCost + ' 颗孵 1 只');
       U.space(CV.SP[1]);
       U.btnRow([
-        { label: '孵 1 只（🥚' + st.eggCost + '）', style: 'ghost', id: st.eggs >= st.eggCost ? 'beast_hatch1' : '' },
-        { label: '孵 10 只（🥚' + st.eggCost * 10 + '）', style: 'gold', id: st.eggs >= st.eggCost * 10 ? 'beast_hatch10' : '' },
+        { label: '孵 1 只（🥚' + st.eggCost + '）', style: 'ghost', id: 'beast_hatch1', dis: st.eggs < st.eggCost },
+        { label: '孵 10 只（🥚' + st.eggCost * 10 + '）', style: 'gold', id: 'beast_hatch10', dis: st.eggs < st.eggCost * 10 },
       ]);
     });
     U.card(function () {
@@ -367,7 +370,7 @@
       U.space(CV.SP[1]);
       U.btnRow([
         { label: lv >= D.BEAST_MAX_LV ? '已满级' : ('升 1 级（兽魂 ' + need + '）'), style: 'gold',
-          id: lv < D.BEAST_MAX_LV && soul >= need ? 'beast_up' : '' },
+          id: 'beast_up', dis: !(lv < D.BEAST_MAX_LV && soul >= need) },
         { label: Core.S.beast.active === beastDetailId ? '收回随行' : '设为随行', style: 'ghost', id: 'beast_setactive' },
       ]);
       U.hint('兽魂从哪来：重复孵到同一只就转成兽魂（越稀有给得越多）。', 4 * CV.SCALE);
@@ -409,7 +412,7 @@
         2 * CV.SCALE, can.ok ? CV.C.green : CV.C.gold);
       if (!can.ok && can.msg) U.hint(can.msg, 4 * CV.SCALE);
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '开始转生', style: 'primary', id: can.ok ? 'do_reincarn' : '' }]);
+      U.btnRow([{ label: '开始转生', style: 'primary', id: 'do_reincarn', dis: !can.ok }]);
     });
     U.card(function () {
       U.h3('永久天赋', '♾ ' + fmt(S.cur.rp || 0));

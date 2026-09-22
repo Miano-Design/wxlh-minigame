@@ -214,7 +214,7 @@
       const left = Core.sweepLeft();
       U.btnRow([{
         label: '⏩ 扫荡（可选关卡 · 今日剩余 ' + left + '/' + Core.sweepCap() + ' 次）',
-        style: left > 0 ? 'ghost' : 'ghost', id: left > 0 ? 'sweep_open' : '',
+        style: 'ghost', id: 'sweep_open', dis: left <= 0,
       }]);
     }
   });

@@ -147,10 +147,14 @@
   }
   /* V1.0.1（UI 设计师会诊）：异常状态 / Boss 二阶段这类"要看清一句话"的提示 0.9 秒读不完，
      允许传 ttl（网页版 js/ui.js 的 floater(..., ms) 是同一套口径，两边一起改）。 */
-  function floater(uid, text, color, ttl) {
+  function floater(uid, text, color, ttl, size) {
     const u = B.units[uid];
     if (!u) return;
-    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now(), ttl: ttl || D.BATTLE_GEOM.floatMs });
+    /* V1.0.1（开发自审会诊）：原来一律取 floatBase，于是**暴击在画布上不变大**，
+       而网页版 `.floater.crit` 是 17 —— 两端差一档，而且表里的 floatCrit 根本没被读过。
+       现在按类型传 size，与网页版同源。 */
+    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now(),
+      ttl: ttl || D.BATTLE_GEOM.floatMs, size: size || D.BATTLE_GEOM.floatBase });
     ensureFx();
   }
   /* 受击 / 出手：记一个时间戳，unitCard 按它算抖动与红闪 */
@@ -173,7 +177,8 @@
         B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
         B.shakePx = f.crit ? 3 * CV.SCALE : 1.5 * CV.SCALE;
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
-        floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : '#ff8080');
+        floater(f.target, (f.crit ? '暴击 ' : '-') + f.dmg, f.crit ? CV.C.gold : '#ff8080',
+          0, f.crit ? D.BATTLE_GEOM.floatCrit : D.BATTLE_GEOM.floatBase);
         B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
         if (f.healed) { const s = B.units[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); floater(f.source, '+' + f.healed, CV.C.green); } }
         if (f.killed) pushLog('💀 ' + nameOf(f.target) + ' 倒下');
@@ -436,7 +441,7 @@
         const alpha = 1 - p * p;
         CV.ctx.save();
         CV.ctx.globalAlpha = alpha;
-        const size = D.BATTLE_GEOM.floatBase * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）→ 收到二级 15
+        const size = (f.size || D.BATTLE_GEOM.floatBase) * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）；现在按类型取（暴击走 floatCrit＝一级 17）
         CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
         CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
         CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';

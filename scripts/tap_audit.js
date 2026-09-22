@@ -13,6 +13,42 @@ const fs = require('fs');
 const path = require('path');
 const JS = path.resolve(__dirname, '../js');
 
+/* ---- ⓪ 静态检查：按钮不许"看着能点、其实没热区" ----
+   V1.0.1（开发自审会诊）：本脚本原来只查**一个方向** —— 热区登记了、但没有处理器。
+   反过来那条缝一直敞着：`id: 条件 ? 'x' : ''` 这种写法在条件不满足时，
+   按钮**照样按常色画出来**（不是禁用态），而 `U.btn` 只在 `id && !dis` 时才登记热区
+   → 玩家看到一个能点的按钮，点下去既没反应也没提示。全项目同一批共 11 处。
+   口径：在按钮对象里，只要 `id` 是**三元表达式**且把空串当"关"这一支，就必须同时给出 `dis:`；
+   想让按钮变灰是唯一的正确做法（网页版这些位置全是 `disabled`）。
+   做坏试验：随便找一颗按钮把 `dis` 去掉 → 立刻报出来。 */
+{
+  const files = fs.readdirSync(JS).filter(f => /\.js$/.test(f));
+  const bad = [];
+  files.forEach(f => {
+    /* 先把注释剥掉：本文件自己的说明里就写着 `id: 条件 ? 'x' : ''` 这个反面样例，
+       不剥注释会把它自己报成违规（第一版就踩了）。 */
+    const src = fs.readFileSync(path.join(JS, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (t) => t.replace(/[^\n]/g, ' '));
+    const re = /id:\s*[^,\n]*\?\s*'[a-z_][a-z0-9_]*'\s*:\s*''/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const open = src.lastIndexOf('{', m.index);
+      const close = src.indexOf('}', m.index);
+      const chunk = open >= 0 && close > open ? src.slice(open, close) : src.slice(m.index, m.index + 200);
+      if (!/\bdis:/.test(chunk)) {
+        const line = src.slice(0, m.index).split('\n').length;
+        bad.push(f + ':' + line);
+      }
+    }
+  });
+  if (bad.length) {
+    console.log('=== ⓪ 静态：这些按钮写了空 id、却没给 dis（看着能点、点了没反应）===\n  ✗ ' + bad.join('\n  ✗ '));
+  } else {
+    console.log('=== ⓪ 静态：没有"看着能点、其实没热区"的按钮 ✓ ===');
+  }
+}
+
 const store = {};
 global.GameGlobal = global;
 global.window = global;

@@ -80,7 +80,7 @@
     const attrTop = U.y;
     const attrH = U.card(function () {
       U.h3('🎯 六维属性', '可用点数 ' + (S.player.attrPoints || 0),
-        { btn: { label: '↺ 重置', id: spentAttr > 0 ? 'attr_reset' : '' } });
+        { btn: { label: '↺ 重置', id: 'attr_reset', dis: spentAttr <= 0 } });
       const has = (S.player.attrPoints || 0) > 0;
       D.ATTR_META.forEach(function (a) {
         const n = (S.player.attrs && S.player.attrs[a.id]) || 0;
@@ -105,7 +105,7 @@
     /* ③ 技能 */
     U.card(function () {
       U.h3('⚡ ' + (S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'), '可用技能点 ' + (S.player.skillPoints || 0),
-        { btn: { label: '↺ 重置', id: spentSkill > 0 ? 'pskill_reset' : '' } });
+        { btn: { label: '↺ 重置', id: 'pskill_reset', dis: spentSkill <= 0 } });
       /* V9.6.117（排版层级 + 间距，父亲大人："技能的版面有问题，间距又贴在一起了"）：
          照网页版 `.skill-row` 一比一重排 —— 每条技能是**自己的一个面板**：
            · .skill-row：panel 底 / 圆角 10 / 内边距 10 / 条与条之间 8px

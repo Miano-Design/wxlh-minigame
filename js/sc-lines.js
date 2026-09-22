@@ -186,7 +186,7 @@
       U.kv('◆ 异界结晶', haveOw + ' / ' + c.otherworld, haveOw >= c.otherworld ? CV.C.green : CV.C.dim);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '🔥 祭炼到 Lv.' + (lv + 1), style: 'gold',
-        id: (haveMat >= c.matN && haveOw >= c.otherworld) ? 'fabao_refine_now' : '' }]);
+        id: 'fabao_refine_now', dis: !(haveMat >= c.matN && haveOw >= c.otherworld) }]);
     });
     U.card(function () {
       U.h3('佩戴');
@@ -294,7 +294,7 @@
       U.kv('◉ 点数', havePt + ' / ' + c.points, havePt >= c.points ? CV.C.green : CV.C.dim);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '🍖 喂养到 Lv.' + (lv + 1), style: 'gold',
-        id: (haveMat >= c.matN && havePt >= c.points) ? 'mount_feed_now' : '' }]);
+        id: 'mount_feed_now', dis: !(haveMat >= c.matN && havePt >= c.points) }]);
     });
     U.card(function () {
       U.h3('乘骑');
@@ -404,11 +404,20 @@
     head('斗法台');
     U.card(function () {
       U.h3('斗法台', '第 ' + st.floor + ' 台');   // V9.6.24：斗法台也是一直往上打，去掉历史最高
-      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶 + ◆ 异界结晶，输了退一台。', 2 * CV.SCALE);
+      /* V1.0.1（开发自审会诊）：这句原来写「拿 ◆ 异界结晶 + ◆ 异界结晶」——
+         同一种货币写两遍（原句是 ♜ 深井徽记，V9.6.134 并入结晶时**整段替换**换重了）。
+         网页版 `ui.js:2945` 只写一种，这里照它。 */
+      U.note('每天 ' + st.cap + ' 次机会，赢了升一台并拿 ◆ 异界结晶，输了退一台。', 2 * CV.SCALE);
       U.kv('今日剩余', st.left + ' / ' + st.cap);
       U.kv('本台奖励', '◆ ' + fmt(st.reward.otherworld), CV.C.gold);
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '挑战第 ' + st.floor + ' 台', style: 'primary', id: st.left > 0 ? 'arena_fight' : '' }]);
+      /* V1.0.1（开发自审会诊）：原来是 `id: st.left > 0 ? 'arena_fight' : ''` ——
+         次数用完时按钮**照样是能点的样子，却既没热区也没提示**（看着能点、点了没反应）。
+         网页版 `ui.js:2948` 是 `disabled` + 文案改成「今日次数已用完」，这里照它。 */
+      U.btnRow([{
+        label: st.left > 0 ? '挑战第 ' + st.floor + ' 台' : '今日次数已用完',
+        style: 'primary', id: 'arena_fight', dis: st.left <= 0,
+      }]);
     });
     U.card(function () {
       U.h3('本台守擂者');
