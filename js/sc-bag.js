@@ -208,6 +208,11 @@
       if (c.sel) {
         /* 网页版 .bg-slot.sel：红框 + 红色淡底（批量分解时"这件选中了"） */
         CV.round(x, y, cw, cw, CV.RADIUS, 'rgba(212,58,79,.2)', CV.C.accent);
+      } else if (c.rarity) {
+        /* V1.0.1（P2 第三步，AI 视觉工程师："道具/材料 43 件走**品质底框＋图形族**，不精绘 43 张"）：
+           有品质的道具（箱子、装备类）按品质色描边 —— 一眼看出档次，
+           而不用给每一件单独画图标（43 张图既做不完也没必要）。材料没有品质，保持原样。 */
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, rarColor(c.rarity), 2 * CV.SCALE);
       } else {
         CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
       }
@@ -290,7 +295,9 @@
       const stacks = Object.entries(S.items).filter(([k, n]) => n > 0 && (view === 'mat' ? isMat(k) : !isMat(k)));
       used = stacks.length;
       stacks.slice(0, cap).forEach(([k, n]) => {
-        cells.push({ id: 'item:' + k, name: (D.ITEMS[k] || {}).name || k, count: '×' + n });
+        /* V1.0.1（P2 第三步）：把道具的品质带进格子，下面按品质描边 */
+        cells.push({ id: 'item:' + k, name: (D.ITEMS[k] || {}).name || k, count: '×' + n,
+          rarity: (D.ITEMS[k] || {}).rarity || null });
       });
     }
     /* 筛选状态下**不补空格子**（网页版同款）：筛出 3 件武器后面还跟着 47 个空格，
