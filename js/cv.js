@@ -315,6 +315,18 @@
     if (lsOk && opt.ls) { try { c.letterSpacing = '0px'; } catch (e) {} }
   };
   CV.measure = function (str, size, bold) {
+    /* V1.0.1（父亲大人："主页二级界面滑动很卡，成长、成就这些基本都很卡"）：
+       `measureText` 是渲染里最贵的调用之一，而它**结果完全确定**（同字体同字号同文本 → 同宽度）。
+       加一层缓存：滑动时同一页要重绘几十次，第二帧起就全是命中，几乎不再碰 measureText。
+       上限 4000 条，超了整表清掉（不做 LRU —— 文本集合本来就有界，简单够用）。 */
+    const _ck = (bold ? 'b' : '') + size + '|' + str;
+    const _cv = _mwCache.get(_ck);
+    if (_cv !== undefined) return _cv;
+    const _ret = function (v) {
+      if (_mwCache.size > 4000) _mwCache.clear();
+      _mwCache.set(_ck, v);
+      return v;
+    };
     const c = CV.ctx;
     c.font = `${bold ? '600 ' : ''}${size}px ${CV.FONT}`;
     const raw = _md(str);
@@ -324,10 +336,11 @@
         if (!t) return;
         w += CV.GLYPHS[t] ? size : (function () { try { return c.measureText(t).width || 0; } catch (e) { return t.length * size * 0.9; } })();
       });
-      return w;
+      return _ret(w);
     }
-    try { return c.measureText(raw).width || 0; } catch (e) { return raw.length * size * 0.9; }
+    try { return _ret(c.measureText(raw).width || 0); } catch (e) { return _ret(raw.length * size * 0.9); }
   };
+  const _mwCache = new Map();
   /* 圆角矩形（网页版 .card：bg #111621 / 边 #232b3b / 圆角 10） */
   CV.round = function (x, y, w, h, r, fill, stroke, lw) {
     const c = CV.ctx;
@@ -366,12 +379,16 @@
   };
   /* 折行：按可用宽度断行（返回行数组，最多 maxLines 行，超出末行加省略号） */
   CV.wrap = function (str, maxW, size, maxLines) {
+    /* V1.0.1（性能）：原来是"每加一个字就把**整行**重新测一遍" —— O(n²)，
+       一段 50 字要 50 次 measureText，一页几十条就是几千次，而滑动时**每帧都重来**。
+       改成逐字宽度**累加**（O(n)），配合 CV.measure 的缓存，滑动的开销基本归零。 */
     const chars = _md(str).split('');
     const lines = [];
-    let line = '';
+    let line = '', w = 0;
     chars.forEach((ch) => {
-      if (CV.measure(line + ch, size) > maxW && line) { lines.push(line); line = ch; }
-      else line += ch;
+      const cw = CV.measure(ch, size);
+      if (w + cw > maxW && line) { lines.push(line); line = ch; w = cw; }
+      else { line += ch; w += cw; }
     });
     if (line) lines.push(line);
     if (maxLines && lines.length > maxLines) {
