@@ -138,7 +138,7 @@
     if (fxT) return;
     fxT = setInterval(function () {
       const now = Date.now();
-      const alive = (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || 900); })
+      const alive = (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || D.BATTLE_GEOM.floatMs); })
         || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
         || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; });
       if (!alive) { clearInterval(fxT); fxT = null; }
@@ -150,7 +150,7 @@
   function floater(uid, text, color, ttl) {
     const u = B.units[uid];
     if (!u) return;
-    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now(), ttl: ttl || 900 });
+    B.floaters.push({ uid, text, color: color || CV.C.gold, t: Date.now(), ttl: ttl || D.BATTLE_GEOM.floatMs });
     ensureFx();
   }
   /* 受击 / 出手：记一个时间戳，unitCard 按它算抖动与红闪 */
@@ -312,14 +312,14 @@
     const fullW = w - 6 * CV.SCALE;
     const bw = fullW * 0.7;
     const bx = x + 3 * CV.SCALE + (fullW - bw) / 2;
-    const by = y + av + 20 * CV.SCALE, bh = 5 * CV.SCALE;
+    const by = y + av + 20 * CV.SCALE, bh = D.BATTLE_GEOM.barHp * CV.SCALE;   // V1.0.1：与网页版同源（原 5）
     const pct = Math.max(0, Math.min(1, u.hp / u.maxHp));
     CV.round(bx, by, bw, bh, 3 * CV.SCALE, '#0d1120');
     if (pct > 0) CV.round(bx, by, bw * pct, bh, 3 * CV.SCALE, pct < 0.35 ? CV.C.accent : CV.C.green);
     CV.text(Math.round(pct * 100) + '%', cx, by + bh + 7 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     if (u.side === 'ally') {
       const en = B.energy[u.uid] || 0;
-      if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), 2.5 * CV.SCALE, 2, CV.C.gold);
+      if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), D.BATTLE_GEOM.barEn * CV.SCALE, 2, CV.C.gold);
     }
     return av + 30 * CV.SCALE + 10 * CV.SCALE;
   }
@@ -373,7 +373,7 @@
        所以每次调间距都要重新算一遍，还算错过一次。
        现在：**行高、排内间距、组间距三个常量**摆在这儿，行的 y 一律由行号推出来，
        中间那道组间距只在这一个地方出现 —— 以后调间距就是改一个数。 */
-    const AV = 50 * CV.SCALE;                     // 头像直径（敌我统一，与 unitCard 同源）
+    const AV = D.BATTLE_GEOM.av * CV.SCALE;       // 头像直径：与网页版同源（D.BATTLE_GEOM，V1.0.1）
     const CARD_H = AV + 40 * CV.SCALE;            // 一行占的高度 = 头像 + 名字 + 血条 + 百分比（与 unitCard 的返回值一致）
     const LOG_H = 150 * CV.SCALE;                 // 战斗日志卡占的高度（含外边距，留够 4 行，别让底部被裁）
     const SIDE_GAP = 14 * CV.SCALE;               // 同一组里两排之间（和网页版 .b-side gap 一致）
@@ -430,13 +430,13 @@
       (B.floaters || []).forEach(function (f) {
         const u = B.units[f.uid];
         if (!u || u._cx == null) return;
-        const p = Math.min(1, (Date.now() - f.t) / (f.ttl || 900));
+        const p = Math.min(1, (Date.now() - f.t) / (f.ttl || D.BATTLE_GEOM.floatMs));
         if (p >= 1) return;
-        const fy = u._top - 4 * CV.SCALE - 26 * CV.SCALE * p;
+        const fy = u._top - 4 * CV.SCALE - D.BATTLE_GEOM.floatRise * CV.SCALE * p;
         const alpha = 1 - p * p;
         CV.ctx.save();
         CV.ctx.globalAlpha = alpha;
-        const size = 14 * CV.SCALE;
+        const size = D.BATTLE_GEOM.floatBase * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）→ 收到二级 15
         CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = 'rgba(0,0,0,.75)';
         CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
         CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';

@@ -522,6 +522,32 @@ window.DATA = (function () {
     const hex = hslToHex(hue.h, Math.min(64, hue.s + 22), 66);
     return (_worldGlyphColorCache[theme] = /NaN|undefined/.test(hex) ? '#8ea3c8' : hex);
   }
+
+  /* ================= 战斗几何：两端同源的一张表（V1.0.1） =================
+     起因（UI 设计师会诊）：同一样东西两端各写各的数，且**两边各有自己的编外值** ——
+       头像直径 网页 54 / 小游戏 50（55 不是端问题，是两处各定义一次）
+       血条高   6 / 5      能量条高 3 / 2.5
+       飘字字号 网页 15·**19**·12 / 小游戏一律 **14**
+     ⚠️ 19 是"五级阶梯"之外的第七档（一级 17、二级 15、三级 13、四级 12、五级 11），
+        14 是第六档 —— **两端都编外了**，只是编外的位置不同。
+
+     口径（父亲大人 2026-09-22 拍板）：**「五级阶梯唯一」优先于「以网页版为准」**。
+     所以落法是分两类：
+       · 凡"字号"→ 一律回到五级里，网页版编外的那几处就是被顺过来的那一端；
+       · 凡"纯尺寸"（头像、条高、上升距离、时长）→ 不是阶梯问题，以网页版为准。
+     两端都从这张表取，`canvas_audit` 有一条断言比着看，谁再各写各的会当场报红。 */
+  const BATTLE_GEOM = {
+    av: 54,            // 头像直径          （原 网页 54 / 小游戏 50）
+    barHp: 6,          // 血条高            （原 6 / 5）
+    barEn: 3,          // 能量条高          （原 3 / 2.5）
+    floatBase: 15,     // 飘字基础字号 = 二级（小游戏原 14 → 编外第六档，收回来）
+    floatCrit: 17,     // 飘字暴击字号 = 一级（网页原 19 → 编外第七档，收回来）
+    floatSmall: 12,    // 飘字小字（miss / debuff）= 四级
+    floatRise: 34,     // 飘字上升距离       （原 网页 34 / 小游戏 26）
+    floatMs: 850,      // 飘字基础时长       （原 850 / 900）
+    floatLongMs: 1500, // 长版：异常状态这类要看清一句话的
+    floatCritMs: 1800, // 暴击 / Boss 阶段 / 复活
+  };
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
     { id: 'hard',   name: '困难', mult: 1.8, rewardMult: 1.6 },
@@ -2453,6 +2479,7 @@ window.DATA = (function () {
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     WORLD_THEME_HUE, worldTint,          // 世界格底：五族色相 × 族内明度阶梯
     FACTION_GLYPH, worldGlyphColor,      // 五族形状语言（色 + 形双重编码）
+    BATTLE_GEOM,                         // 战斗几何：两端同源（头像 / 条高 / 飘字字号与时长）
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
     EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,

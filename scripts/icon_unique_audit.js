@@ -133,6 +133,22 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
   t('自绘图标表非空且数量对得上（当前 24 个）', HAVE.size >= 24, '共 ' + HAVE.size + ' 个');
 }
 
+/* ⑨ 战斗几何两端同源（V1.0.1 · 父亲大人拍板的口径）
+   起因（UI 设计师会诊）：同一样东西两端各写各的数，而且**两端各有自己的编外字号**——
+   网页暴击飘字 19px（五级阶梯外第七档）、小游戏飘字一律 14px（第六档）。
+   口径：**「五级阶梯唯一」优先于「以网页版为准」** → 字号收进五级，纯尺寸以网页版为准。
+   落法：两端都从 `D.BATTLE_GEOM` 取（数据层一张表），这两条断言钉住"别再各写各的"。 */
+{
+  const mini = fs.readFileSync(path.resolve(JS, 'sc-battle.js'), 'utf8');
+  const css = fs.readFileSync(path.resolve(JS, '../../wxlh-game/css/style.css'), 'utf8');
+  t('小游戏战斗几何从 D.BATTLE_GEOM 取（头像 / 血条 / 能量条 / 飘字字号·上升·时长 六项都在）',
+    ['av', 'barHp', 'barEn', 'floatBase', 'floatRise', 'floatMs'].every((k) => mini.includes('D.BATTLE_GEOM.' + k)));
+  t('网页版暴击飘字不再用编外第七档（19px / 1.1875rem → 已收回一级 17px）',
+    !/\.floater\.crit[^}]*1\.1875rem/.test(css));
+  t('小游戏飘字不再写死 14（编外第六档）',
+    !/const size = 14 \* CV\.SCALE/.test(mini));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 console.log('结论：' + (fail === 0 ? '图标一对一，没有重复 ✓' : '有 ' + fail + ' 处重复/缺失 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;
