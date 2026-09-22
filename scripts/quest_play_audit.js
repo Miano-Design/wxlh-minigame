@@ -130,6 +130,7 @@ async function tapGuideAway(maxTaps) {
 
 /* ── 各步主线"那件事"怎么做（都用手点，不走后门） ── */
 async function doBattleStage(stageIdx) {
+  console.log('[Q] 进入 doBattleStage(' + stageIdx + ') page=' + page());
   /* 世界页上点第 stageIdx+1 关 → 打完 → 结算页点「下一关 / 返回」回到上一步 */
   const h = findHit(['stage:' + stageIdx, 'stage_grid']);
   if (!h) return { ok: false, why: '世界页上没有第 ' + (stageIdx + 1) + ' 关的热区' };
@@ -314,6 +315,17 @@ console.log('\n=== 主线真玩一遍（带引导、带真动作）===');
           mark(after2 > before2, '点「强化」真的强化了一次',
             (after2 > before2 ? '强化次数 ' + before2 + ' → ' + after2 : '**没强化成**（材料/点数不够？）'));
         }
+        continue;
+      }
+      /* V1.0.1：**补上 battle 分支** —— 这是那 9 处红报的根因。
+         以前点完关卡开打，下一轮 pageNow === 'battle' 没有对应处理，
+         落到下面"再点一次锚点"，而战斗页上当然找不到那个热区 → break，
+         **整个循环退出**，后面所有主线步骤全部作废（报"现在在 battle"）。
+         （旁边那个 doBattleStage() 本来是干这事的，但从没被接上，是死代码。） */
+      if (pageNow === 'battle') {
+        await wait(2600);                                    // 3 波 × 波次卡 1050ms
+        if (page() === 'battle') { tapId('dun_next') || tapId('battle_close'); await wait(400); }
+        if (page() === 'battle') { tapId('battle_close'); await wait(300); }
         continue;
       }
       /* 还没做完：这一步要的那颗（引导指着的，或引导表里写的锚点）再点一次 */
