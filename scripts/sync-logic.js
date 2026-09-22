@@ -22,8 +22,14 @@ const FILES = ['data.js', 'core.js', 'battle.js', 'dungeon.js'];
    谁看都以为"小游戏有两套界面"。现在只同步**小游戏真正会用**的东西 ——
    逻辑层 4 份 + 逻辑层的体检脚本；要审网页版的界面，回 ../wxlh-game 跑那边的同名脚本。 */
 /* 测试与体检脚本：只同步"纯逻辑层"的那几份。
-   balance_check / longrun_sim / world_curve 因为要 eval 网页版的 ui.js（界面层），
-   路径已经改成读 ../wxlh-game，属于小游戏自己的副本 —— 再同步会把那行路径覆盖掉，所以不同步。 */
+   V1.0.1（product_audit 会诊）：**原来小游戏这边还留着 balance_check / longrun_sim / world_curve
+   三份"路径改过的副本"**（它们要 eval 界面层，所以路径写成 ../wxlh-game/js/ui.js，进不了同步列表）。
+   不进同步列表 = 没人管 = 烂掉：`longrun_sim` 停在第 259 行（网页版已 417 行），
+   还在按砍掉的 8 货币时代打印，跑出来满屏 `❥ NaN · ▣ NaN · ♜ NaN`，
+   底下却报"✓ 全程没有 NaN" —— **一把给自己开绿灯的尺子比没有尺子更坏**。
+   已按本工程既有口径（路线 B：小游戏只留真正会用到的文件）**删掉这三份副本**：
+   数值口径一律回网页版跑（`cd ../wxlh-game && node scripts/longrun_sim.js [天数]`），
+   那边读的是同一份逻辑层 + 同一份界面层，测的还是同一件事，**不设第二份**。 */
 /* drop_table.js 是"纯逻辑层"的尺子（只读 data.js + dungeon.js，不碰界面），
    所以两边各留一份、跟着同步 —— 掉落表改完，网页版和小游戏看到的概率表必须是同一张。 */
 const CHECKS = ['test_game.js', 'cap_audit.js', 'drop_table.js', 'drop_audit.js', 'bloodline_audit.js'];

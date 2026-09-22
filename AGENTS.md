@@ -34,6 +34,12 @@
 | **画布 `save/restore`** | `battle_flow_audit` 里那条"数量配对"断言（**配错一个就会整块偏移**） |
 | 整体自审（最慢，各约 10 分钟） | `frame_audit`（画布帧）× `tap_audit`（交互死键） |
 
+> **数值口径的尺子不在本目录**：`balance_check` / `longrun_sim` / `world_curve`
+> 一律回网页版跑（`cd ../wxlh-game && node scripts/longrun_sim.js [天数]`）。
+> 这三份原来在本目录各有一份"路径改过的副本"，因为进不了 `sync-logic.js` 的同步列表而烂掉
+> （`longrun_sim` 停在 259 行、还在打印砍掉的旧货币、满屏 NaN 却报"没有 NaN"）——
+> V1.0.1 已删，**不许再拷一份回来**（不设第二份，见 `scripts/sync-logic.js` 顶部注释）。
+
 ## 四、命令
 
 - 上传体验版 + 推预览：`node scripts/release.js --desc "…"`（只推预览加 `--preview-only`）
