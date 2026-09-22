@@ -553,6 +553,34 @@ window.DATA = (function () {
     floatLongMs: 1500, // 长版：异常状态这类要看清一句话的
     floatCritMs: 1800, // 暴击 / Boss 阶段 / 复活
   };
+
+  /* ================= 主角名：只能从预设名单里选（V1.0.1 · 微信平台审核驳回后改） =================
+     背景：小游戏提审**被驳回**，理由是「游戏在用户自定义昵称等场景不具备过滤不当信息的机制，
+     要求接入微信内容安全 API（imgSecCheck / msgSecCheck）」。
+     我们原来确实有三处自由文本输入（开局起名 / 改名 / 新建主角），名字既显示也存档 ——
+     在审核眼里这就是「用户产生内容」。
+
+     两条路的取舍（父亲大人 2026-09-23：「这个先解决了」）：
+       A 接入内容安全 API —— 该接口要 access_token，**不能在客户端直调**，得养云函数或自建后端；
+         而本游戏是单机放置：名字不上传、不给别人看、没有排行榜 —— 为它养一套服务端不划算。
+       B 去掉自由输入，改成**从预设名单里选 / 随机** —— 零后端、立刻可过审，玩家仍能"换个名字"。
+     采用 B。以后真做排行榜或分享、需要在别处展示昵称时，再回来接 A。
+
+     ⚠️ 名单放**数据层**是为了两端同源：网页版与小游戏都从这一份取，不要再各写一份
+        （这个项目在"同一件事两份实现"上已经栽过好几次）。 */
+  const PROTAG_NAMES = [
+    '夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者',
+    '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊',
+    '灯下人', '拾灯者', '槐安', '长夜', '照野', '归鸦',
+  ];
+  /* 从名单里挑一个没被用过的；全都用过就按序循环（保证永远给得出名字）。
+     used 传当前已有的主角名数组。 */
+  function pickProtagName(used) {
+    const taken = Array.isArray(used) ? used : [];
+    const free = PROTAG_NAMES.filter(n => taken.indexOf(n) < 0);
+    if (free.length) return free[Math.floor(Math.random() * free.length)];
+    return PROTAG_NAMES[taken.length % PROTAG_NAMES.length];
+  }
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
     { id: 'hard',   name: '困难', mult: 1.8, rewardMult: 1.6 },
@@ -2496,6 +2524,7 @@ window.DATA = (function () {
     WORLD_THEME_HUE, worldTint,          // 世界格底：五族色相 × 族内明度阶梯
     FACTION_GLYPH, worldGlyphColor,      // 五族形状语言（色 + 形双重编码）
     BATTLE_GEOM,                         // 战斗几何：两端同源（头像 / 条高 / 飘字字号与时长）
+    PROTAG_NAMES, pickProtagName,         // 主角名（预设名单，无自由输入 · 平台审核要求）
     EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
     EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,

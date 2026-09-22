@@ -560,18 +560,17 @@
     CV.render();
   });
   CV.on('new_protag', function () {
-    if (!(G.wx && G.wx.showKeyboard)) { CV.toast('这台设备不支持键盘输入'); return; }
-    try {
-      if (G.wx.offKeyboardConfirm) G.wx.offKeyboardConfirm();
-      G.wx.onKeyboardConfirm(function (res) {
-        const nm = String((res && res.value) || '').trim();
-        if (!nm) { CV.toast('请输入名字'); return; }   // V9.6.90：与网页版同一句
-        const r = Core.createProtagonist(nm);
-        CV.toast(r.msg || (r.ok ? '已创建' : '创建失败'));
-        CV.render();
-      });
-      G.wx.showKeyboard({ defaultValue: '', maxLength: 12, multiple: false, confirmType: 'done', fail: function () { CV.toast('键盘没打开，再点一次'); } });
-    } catch (e) { CV.toast('键盘没打开，再点一次'); }
+    /* V1.0.1（微信平台审核驳回 · "用户自定义昵称"）：原来这里用 wx.showKeyboard 让玩家**自由输入**名字。
+       平台判定这属于"用户产生内容"，要求接入内容安全 API（imgSecCheck / msgSecCheck）——
+       而那两块要 access_token，**客户端调不了**，得养云函数或自建后端。
+       本游戏是单机放置：名字不上传、不展示给他人、没有排行榜，为它养一套服务端不划算。
+       所以改成**从数据层的预设名单里挑**（名单两端同源，见 wxlh-game/js/data.js 的 PROTAG_NAMES）：
+       玩家仍然能"新建一个主角、换一个名字"，但**不再产生自由文本** → 从根上不是 UGC。
+       以后真做排行榜 / 分享需要展示昵称时，再回来接内容安全 API。 */
+    const nm = D.pickProtagName();
+    const r = Core.createProtagonist(nm);
+    CV.toast(r.msg || (r.ok ? ('已创建：' + nm) : '创建失败'));
+    CV.render();
   });
   /* GM：一键补测试道具（V9.6.129） */
   CV.on('gm_eggs', function () {
