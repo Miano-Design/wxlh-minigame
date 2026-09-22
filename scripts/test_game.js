@@ -348,11 +348,12 @@ setParty(['C021']);
 
 // 18. 六维属性点
 {
-  Core.S.player.attrPoints = 0;
-  Core.addPlayerExp(0);
-  const lv0 = Core.S.player.level;
-  Core.S.player.exp = 0;
-  Core.addPlayerExp(D.EXP_TABLE[lv0] + 1);
+  /* V1.0.1：六维点从"每级 +3 累加"改成**状态函数**（可用 = 等级×3 − 已投入）之后，
+     这几条断言原来的假设（"升一级刚好 +3"）不成立了 —— 累计点数本来就该等于 等级×3。
+     这里把等级固定成 Lv.1 再来验，结果与前面的测试跑过多少级无关。 */
+  Core.S.player.level = 0; Core.S.player.exp = 0; Core.S.player.attrPoints = 0;
+  D.ATTR_META.forEach(a => { Core.S.player.attrs[a.id] = 0; });
+  Core.addPlayerExp(D.EXP_TABLE[0] + 1);                 // 升到 Lv.1（这一步会触发重算）
   t('升级获得属性点', Core.S.player.attrPoints === D.ATTR_POINTS_PER_LV);
   const atk0 = Core.effectivePlayerStats().atk;
   const r = Core.allocateAttr('muscle', 3);

@@ -331,7 +331,7 @@
        现在直接由调用方把**阵容区的真实下边界**（FIELD_BOTTOM）传进来：
        上边界 = 内容顶 0，字画在正中。 */
     CV.text(B.tip, CV.W / 2, areaBottom / 2,
-      { size: CV.FS.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });
+      { size: CV.TIER.t1, bold: true, align: 'center', color: 'rgba(233,236,242,' + alpha.toFixed(2) + ')' });   // V1.0.1：原来是死 token CV.FS.t1（不存在）→ 按兜底 13px 画，比网页版整整小两级
   }
 
   function drawBattle() {

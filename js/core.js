@@ -2261,9 +2261,27 @@ window.Core = (function () {
     while (S.player.level < D.PLAYER_MAX_LV && S.player.exp >= D.EXP_TABLE[S.player.level]) {
       S.player.exp -= D.EXP_TABLE[S.player.level];
       S.player.level++;
-      S.player.attrPoints = (S.player.attrPoints || 0) + D.ATTR_POINTS_PER_LV;
+      /* V1.0.1（游戏策划总监会诊查出）：六维点原来还是"每级 +3"的**累加**写法 ——
+         而技能点早在 V9.5.78 就改成了状态函数（见下面 skillPointsForLevel 的说明：
+         "转生会把等级重置回 Lv.0，累加写法会在重练时再发一遍"）。**六维漏改了。**
+         后果：每次转生重练都白拿 300 点，4 转生 = +2400，六维无上限。 */
     }
+    /* V1.0.1：这两个都要在 while **外面**重算 —— 技能点本来就在外面，
+       六维点我第一版写进了 while 里，于是"没升级就不重算"（test_game 立刻报红）。
+       两个都是"状态的函数"，任何一次经验变化后都该按当前等级算一遍。 */
+    attrPointsForLevel();
     S.player.skillPoints = skillPointsForLevel();   // V9.5.78：技能点按等级重算（见上面的说明）
+  }
+
+  /* 主角六维点：唯一算法（与技能点同一套思路）
+     V1.0.1：可用点 = min(当前等级, 上限) × 每级点数 − **已经点掉的**
+     写成状态的函数，而不是升级时累加 —— 转生 / GM 改等级 / 老档迁移都能自动算对。 */
+  function attrPointsForLevel() {
+    const lv = Math.min(S.player.level || 0, D.PLAYER_MAX_LV);
+    const total = lv * D.ATTR_POINTS_PER_LV;
+    const spent = D.ATTR_META.reduce((s, a) => s + ((S.player.attrs && S.player.attrs[a.id]) || 0), 0);
+    S.player.attrPoints = Math.max(0, total - spent);
+    return S.player.attrPoints;
   }
 
   /* ================= 主角技能点：唯一算法 =================
@@ -3258,7 +3276,13 @@ window.Core = (function () {
        所以转生后一路练回 Lv.100 也不会多出 100 点没处花的技能点。 */
     S.player.level = 0; S.player.exp = 0;
     S.player.skillPoints = skillPointsForLevel();
+    attrPointsForLevel();                 // V1.0.1：六维点也按等级重算（原来累加，重练会再发一遍）
     S.worlds = {};
+    /* V1.0.1（游戏策划总监会诊查出，**转生成了负收益事件**）：
+       这里原来只清 `S.worlds`，**`worldFirstClear` 留着** —— 于是转生后重打 12 个世界的
+       首通奖励**一点都拿不到**，✦ 从 326/天 掉到 54/天（−83%），灯阁权限（159 天）
+       转生后基本点不动。转生本来就是"重来一遍"，世界里的一次性奖励理应跟着重开。 */
+    S.worldFirstClear = {};
     unlockWorld('W01');
     S.corridor.floor = 1;
     save();
