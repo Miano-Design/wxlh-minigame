@@ -127,6 +127,48 @@
      CV.text / CV.measure 会自动识别：遇到这些字符就按图标宽（= 字号）走，其余照常排版。
      代价为零，调用点一行都不用改（页面里照旧写 '♜ 深井印记'）。 */
   CV.GLYPHS = {
+    /* ── 四种货币：从「文字字形」换成「矢量画法」（P2 素材立项第一步）────────────
+       V1.0.1（AI 视觉工程师会诊：192 个字形全靠 emoji —— 两端字形不同、部分平台出黑白轮廓、
+       不可着色、与暗色 UI 不同源；其中 ◉◆✦♾ 只是**装饰记号不是货币**，
+       "货币稀有度看反"那次误判就是它们直接造成的）。
+       按他的 ROI 建议：**只先做最高频的一批**（货币 4 个），不动其余 188 个。
+       四个形状刻意做成**互不相似**：圆中方孔 / 菱形切面 / 四角星 / 双环轮回。 */
+    '◉': function (c, x, y, s, color) {           // 点数 = 铜钱（外圆 + 方孔）
+      const r = s * 0.45;
+      c.save(); c.fillStyle = color;
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+      c.globalCompositeOperation = 'destination-out';
+      c.beginPath(); c.arc(x, y, r * 0.62, 0, Math.PI * 2); c.fill();
+      c.globalCompositeOperation = 'source-over';
+      const h = r * 0.42;
+      c.fillRect(x - h / 2, y - h / 2, h, h);
+      c.restore();
+    },
+    '◆': function (c, x, y, s, color) {           // 异界结晶 = 竖菱形 + 内切面
+      const w = s * 0.34, h = s * 0.46;
+      c.save(); c.fillStyle = color;
+      c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = Math.max(1, s * 0.05);
+      c.beginPath(); c.moveTo(x - w * 0.46, y - h * 0.46); c.lineTo(x + w * 0.46, y + h * 0.46); c.stroke();
+      c.restore();
+    },
+    '✦': function (c, x, y, s, color) {           // 圣洁晶石 = 四角星（细长十字）
+      const R = s * 0.48, r = s * 0.16;
+      c.save(); c.fillStyle = color; c.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 4, d = i % 2 ? r : R;
+        const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d;
+        i ? c.lineTo(px, py) : c.moveTo(px, py);
+      }
+      c.closePath(); c.fill(); c.restore();
+    },
+    '♾': function (c, x, y, s, color) {           // 转生点 = 双环（轮回）
+      const r = s * 0.22;
+      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.4, s * 0.12); c.lineCap = 'round';
+      c.beginPath(); c.arc(x - r, y, r, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(x + r, y, r, 0, Math.PI * 2); c.stroke();
+      c.restore();
+    },
     '♜': function (c, x, y, s, color) {           // x = 图标中心，y = 垂直中线
       const w = s * 0.86, h = s, L = x - w / 2, R = x + w / 2;
       const top = y - h * 0.42, bot = y + h * 0.42;
