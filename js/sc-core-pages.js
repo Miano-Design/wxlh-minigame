@@ -156,9 +156,9 @@
     const st = Core.realmState();
     U.begin(); head('境界渡劫');
     U.card(function () {
-      U.h3(st.curName || '未定血统', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶');
+      U.h3(st.curName || '未定命格', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶');
       U.kv('当前境界加成', '+' + (Core.realmBonusPct() * 100).toFixed(1) + '%', CV.C.gold);
-      if (!st.hasBloodline) { U.note('先去选一条血统（境界线跟着血统走）', 2 * CV.SCALE); return; }
+      if (!st.hasBloodline) { U.note('先去选一条命格（境界线跟着命格走）', 2 * CV.SCALE); return; }
       const nx = st.next;
       if (nx) {
         U.space(CV.SP[1]);
@@ -181,7 +181,7 @@
            小游戏原来这里什么都不画 —— 玩家看到一张空卡，只能猜"是不是卡了"。 */
         U.space(CV.SP[1]);
         U.h3('已至大圆满');
-        U.note('当前境界已是这条血统的终点。', 2 * CV.SCALE);
+        U.note('当前境界已是这条命格的终点。', 2 * CV.SCALE);
       }
     });
     /* 境界线：9 大境 × 4 小阶（网页版把整条线都列出来） */
@@ -359,7 +359,7 @@
       U.kv('等级', lv + ' / ' + D.BEAST_MAX_LV, lv >= D.BEAST_MAX_LV ? CV.C.gold : CV.C.text);
       U.kv('兽魂', soul + (lv >= D.BEAST_MAX_LV ? '' : '（升下一级需要 ' + need + '）'), soul >= need ? CV.C.green : CV.C.dim);
       const txt = Object.keys(pct || {}).map(function (k) {
-        return ({ atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', skillPct: '技能', evaPct: '闪避', dmgReduce: '减伤', lifesteal: '吸血', initEnergy: '开场能量', spiritPct: '精神' }[k] || k) + ' +' + (pct[k] < 1 ? Math.round(pct[k] * 100) + '%' : pct[k]);
+        return ({ atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', skillPct: '技能', evaPct: '闪避', dmgReduce: '减伤', lifesteal: '汲取', initEnergy: '开场能量', spiritPct: '精神' }[k] || k) + ' +' + (pct[k] < 1 ? Math.round(pct[k] * 100) + '%' : pct[k]);
       }).join(' · ');
       U.kv('当前加成', txt || '—', CV.C.green);
       U.space(CV.SP[1]);
@@ -404,7 +404,7 @@
     U.card(function () {
       U.h3('转生', '已转生 ' + (S.player.reincarnations || 0) + ' 次');
       U.note('会重置：玩家等级（回到 Lv.0）、残域世界进度、深井层数。', 2 * CV.SCALE);
-      U.note('会保留：伙伴（含等级与技能）、装备、主角技能与属性、血统、铭刻、天赋、全部货币。', 2 * CV.SCALE);
+      U.note('会保留：伙伴（含等级与技能）、装备、主角技能与属性、命格、铭刻、天赋、全部货币。', 2 * CV.SCALE);
       /* V9.6.142：三个条件并排塞进 kv 的右半边 → 「… · 灯芯Lv.0/…」被砍掉，
          玩家看不到第三个门槛。改成**整行说明**（占满宽度），三项一条不漏。 */
       U.hint('第 ' + ((S.player.reincarnations || 0) + 1) + ' 次转生条件：玩家 Lv.' + S.player.level + '/' + need.lv
@@ -435,7 +435,7 @@
     });
   });
   CV.on('do_reincarn', function () {
-    U.confirm('转生', '确定转生？等级、残域进度、深井层数会重置，换来永久天赋点（伙伴 / 装备 / 血统 / 铭刻 / 货币都保留）。', function () {
+    U.confirm('转生', '确定转生？等级、残域进度、深井层数会重置，换来永久天赋点（伙伴 / 装备 / 命格 / 铭刻 / 货币都保留）。', function () {
       const r = Core.reincarnate();
       CV.toast(r.msg || '已转生');
       CV.reset('home');

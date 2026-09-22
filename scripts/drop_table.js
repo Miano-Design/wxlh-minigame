@@ -136,7 +136,7 @@ console.log('\n=== ⑥ 四条装备线：各几套 · 从哪来 ===');
     + ' · SSR ' + JSON.stringify(lineShare('W10', 'SSR')));
   console.log('  ② 血统套装 ' + Object.keys(D.BLOODLINE_SETS).length + ' 套（第 ' + D.BLOODLINE_MIN_WORLD + ' 张图起，'
     + (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) + ' 张 × ' + (D.BLOODLINE_KEYS || []).length + ' 支血统各一套，2/4/6 件）'
-    + ' —— 名字带世界，如「' + D.BLOODLINE_SETS[D.bloodlineSetKey('W20', '血族')].name + '」');
+    + ' —— 名字带世界，如「' + D.BLOODLINE_SETS[D.bloodlineSetKey('W20', '绯红')].name + '」');
   console.log('     来源：和世界套装**同一台随机线**（野外掉落 + 装备箱），只是落点不同（见上面那行实测占比）；'
     + '穿戴要求同血统，**计件只认同一张图**的件');
   console.log('  ③ 血统神装 ' + Object.keys(D.GOD_SETS).length + ' 套（' + Object.values(D.GOD_SETS).map(s => s.name).join(' / ') + '，2/4/6 件）');

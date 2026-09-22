@@ -168,7 +168,7 @@ window.DATA = (function () {
     '刺客': 'assassin', '暗杀': 'assassin', '终极刺客': 'assassin',
     '剑士': 'saber', '剑修': 'saber', '法剑': 'saber', '终极剑修': 'saber',
     '辅助': 'support', '全能辅助': 'support', '增益': 'support', '法阵': 'support', '法阵大师': 'support',
-    '吸血': 'vampire', '吸血辅助': 'vampire',
+    '汲取': 'vampire', '汲取辅助': 'vampire',
   };
   const ROLE_WEIGHT = {
     warrior:    [1.5, 1.0, 1.1, 1.0, 0.5, 0.6],
@@ -203,7 +203,7 @@ window.DATA = (function () {
     ['C010', '苏黎', '雾乡', '修真', '法师', 'R', 35, 45, 48, 62, 82, 78],
     ['C011', '江寒', '幽都', '修真', '控制', 'R', 40, 45, 55, 75, 70, 85],
     ['C012', '陆沉', '锈港', '科技', '射手', 'R', 65, 52, 58, 80, 68, 40],
-    ['C013', '宁雪', '雾乡', '血族', '吸血', 'R', 60, 48, 70, 68, 55, 60],
+    ['C013', '宁雪', '雾乡', '绯红', '汲取', 'R', 60, 48, 70, 68, 55, 60],
     ['C014', '韩墨', '灰原', '泰坦', '坦克', 'R', 85, 72, 80, 42, 38, 32],
     ['C015', '林晚', '雾乡', '念动力', '治疗', 'R', 38, 50, 72, 58, 70, 88],
     ['C016', '赵恒', '锈港', '念动力', '辅助', 'R', 50, 65, 62, 55, 75, 58],
@@ -214,7 +214,7 @@ window.DATA = (function () {
     ['C021', '叶沉舟', '灰原', '狼人', '狂战', 'SR'],
     ['C022', '洛辰', '灰原', '狼人', '剑修', 'SR'],
     ['C023', '沈昭', '雾乡', '修真', '爆发法师', 'SR'],
-    ['C024', '林霜', '雾乡', '血族', '吸血辅助', 'SR'],
+    ['C024', '林霜', '雾乡', '绯红', '汲取辅助', 'SR'],
     ['C025', '顾言', '锈港', '科技', '狙击', 'SR'],
     ['C026', '白璃', '幽都', '修真', '控制', 'SR'],
     ['C027', '周启', '灰原', '泰坦', '重装', 'SR'],
@@ -223,13 +223,13 @@ window.DATA = (function () {
     ['C030', '唐若', '幽都', '修真', '精神爆发', 'SR'],
     ['C031', '霍青', '灰原', '泰坦', '反击坦克', 'SR'],
     ['C032', '江黎', '锈港', '科技', '无人机', 'SR'],
-    ['C033', '司空夜', '幽都', '血族', '刺客', 'SR'],
+    ['C033', '司空夜', '幽都', '绯红', '刺客', 'SR'],
     ['C034', '云深', '雾乡', '念动力', '增益', 'SR'],
     ['C035', '白曜', '灰原', '狼人', '近战输出', 'SR'],
     ['C036', '苏岚', '雾乡', '念动力', '治疗', 'SR'],
     ['C037', '叶辰', '雾乡', '修真', '火焰', 'SR'],
     ['C038', '顾宁', '幽都', '修真', '精神控制', 'SR'],
-    ['C039', '沈夜', '灰原', '血族', '暗杀', 'SSR'],
+    ['C039', '沈夜', '灰原', '绯红', '暗杀', 'SSR'],
     ['C040', '洛川', '灰原', '狼人', '剑修', 'SSR'],
     ['C041', '顾寒', '雾乡', '修真', '冰法', 'SSR'],
     ['C042', '林渊', '锈港', '科技', '重火力', 'SSR'],
@@ -237,13 +237,13 @@ window.DATA = (function () {
     ['C044', '江玄', '幽都', '修真', '控场', 'SSR'],
     ['C045', '宁无尘', '雾乡', '念动力', '法阵大师', 'SSR'],
     ['C046', '韩烬', '灰原', '狼人', '狂战', 'SSR'],
-    ['C047', '白夜', '幽都', '血族', '刺客', 'SSR'],
+    ['C047', '白夜', '幽都', '绯红', '刺客', 'SSR'],
     ['C048', '唐星', '锈港', '科技', '能量炮', 'SSR'],
     ['C049', '叶璃', '雾乡', '念动力', '圣愈', 'SSR'],
     ['C050', '顾长风', '灰原', '泰坦', '全能战士', 'SSR'],
     ['C051', '沈青', '雾乡', '修真', '元素大师', 'SSR'],
     ['C052', '林昭', '幽都', '修真', '精神支配', 'SSR'],
-    ['C053', '司夜', '幽都', '血族', '终极刺客', 'UR'],
+    ['C053', '司夜', '幽都', '绯红', '终极刺客', 'UR'],
     ['C054', '洛神', '雾乡', '狼人', '终极剑修', 'UR'],
     ['C055', '星尘', '锈港', '科技', '星舰炮手', 'UR'],
     ['C056', '白昼', '雾乡', '念动力', '终极治疗', 'UR'],
@@ -257,7 +257,7 @@ window.DATA = (function () {
     ['C063', '罗砚', '锈港', '科技', '射手', 'R'],
     ['C064', '钟离夏', '幽都', '修真', '控制', 'R'],
     ['C065', '孟岐', '雾乡', '念动力', '治疗', 'R'],
-    ['C066', '裴照', '灰原', '血族', '刺客', 'R'],
+    ['C066', '裴照', '灰原', '绯红', '刺客', 'R'],
     ['C067', '常凛', '灰原', '泰坦', '重装', 'R'],
     ['C068', '费霖', '雾乡', '修真', '法师', 'R'],
     ['C069', '闻笛', '幽都', '修真', '精神控制', 'R'],
@@ -265,13 +265,13 @@ window.DATA = (function () {
     ['C071', '施白', '锈港', '科技', '无人机', 'R'],
     ['C072', '邹玄', '灰原', '泰坦', '反击坦克', 'R'],
     ['C073', '戚晚', '雾乡', '狼人', '法剑', 'SR'],
-    ['C074', '安岐', '灰原', '血族', '吸血', 'SR'],
+    ['C074', '安岐', '灰原', '绯红', '汲取', 'SR'],
     ['C075', '凌肃', '幽都', '修真', '控场', 'SR'],
     ['C076', '祁越', '锈港', '科技', '狙击', 'SR'],
     ['C077', '席白露', '雾乡', '念动力', '群体治疗', 'SR'],
     ['C078', '严冬', '灰原', '狼人', '狂战', 'SR'],
     ['C079', '慕青梧', '雾乡', '修真', '冰法', 'SR'],
-    ['C080', '邵无咎', '幽都', '血族', '暗杀', 'SR'],
+    ['C080', '邵无咎', '幽都', '绯红', '暗杀', 'SR'],
     ['C081', '贺兰亭', '灰原', '狼人', '近战输出', 'SR'],
     ['C082', '路蕤', '雾乡', '念动力', '全能辅助', 'SR'],
     ['C083', '封朗', '锈港', '科技', '重火力', 'SR'],
@@ -286,27 +286,27 @@ window.DATA = (function () {
     ['C092', '长孙烬', '雾乡', '修真', '元素大师', 'SSR'],
     ['C093', '巫马遥', '锈港', '科技', '星舰炮手', 'SSR'],
     ['C094', '公仪霜', '幽都', '修真', '精神支配', 'SSR'],
-    ['C095', '独孤曜', '灰原', '血族', '终极刺客', 'SSR'],
+    ['C095', '独孤曜', '灰原', '绯红', '终极刺客', 'SSR'],
     ['C096', '南宫霁', '雾乡', '念动力', '圣愈', 'SSR'],
     ['C097', '西门屠', '灰原', '狼人', '终极狂战', 'SSR'],
     ['C098', '夏侯岚', '雾乡', '念动力', '法阵大师', 'SSR'],
     ['C099', '东方既白', '锈港', '泰坦', '全能战士', 'SSR'],
-    ['C100', '百里昭', '幽都', '血族', '刺客', 'SSR'],
+    ['C100', '百里昭', '幽都', '绯红', '刺客', 'SSR'],
     ['C101', '呼延烈', '灰原', '狼人', '狂战', 'SSR'],
     ['C102', '慕容雪', '雾乡', '念动力', '全能辅助', 'SSR'],
     ['C103', '赫连霄', '雾乡', '修真', '爆发法师', 'SSR'],
     ['C104', '宇文澈', '锈港', '科技', '狙击', 'SSR'],
     ['C105', '完颜肃', '幽都', '修真', '控场', 'SSR'],
-    ['C106', '拓跋雪', '灰原', '血族', '吸血', 'SSR'],
+    ['C106', '拓跋雪', '灰原', '绯红', '汲取', 'SSR'],
     ['C107', '令狐照', '雾乡', '狼人', '剑修', 'SSR'],
     ['C108', '琴酒', '锈港', '科技', '重火力', 'SSR'],
-    ['C109', '柳生雪绪', '幽都', '血族', '终极刺客', 'UR'],
+    ['C109', '柳生雪绪', '幽都', '绯红', '终极刺客', 'UR'],
     ['C110', '藤原千影', '雾乡', '狼人', '终极剑修', 'UR'],
     ['C111', '黑田宗一', '灰原', '狼人', '终极狂战', 'UR'],
     ['C112', '苍井零', '锈港', '科技', '星舰炮手', 'UR'],
     ['C113', '九条凉', '雾乡', '念动力', '终极治疗', 'UR'],
     ['C114', '山吹时雨', '幽都', '念动力', '终极控制', 'UR'],
-    ['C115', '白河愁', '灰原', '血族', '终极刺客', 'UR'],
+    ['C115', '白河愁', '灰原', '绯红', '终极刺客', 'UR'],
     ['C116', '天草洋吾', '雾乡', '修真', '元素大师', 'UR'],
     ['C117', '零式', '锈港', '泰坦', '全能战士', 'UR', 'hidden'],
     ['C118', '无相', '幽都', '修真', '精神支配', 'UR', 'hidden'],
@@ -357,50 +357,50 @@ window.DATA = (function () {
        所以末段曲线的真正支撑是：装备档位（tier 21→36，武器攻击 +68%）+ 血统神装 + 转生天赋。
      敌人基准：普通怪 HP/ATK/DEF；精英 ×(2.4/1.5/1.4)；关卡倍率 1.13^(stage-1)；Hard ×1.8；Hell ×3.2 */
   const WORLDS = [
-    { id: 'W01', ico: '🧟', name: '菌毯巢穴', theme: 'bio',    desc: 'T病毒泄露的地下研究所，感染者游荡在蜂巢深处。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '菌毯母巢', bossHp: [92111, 165799, 294754],
-      enemies: ['感染研究员', '裂舌兽', '猎杀体α'], elite: '变异猎杀体', unlock: null },
-    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '废弃空间站被甲壳生物占据，黑暗里全是黏液与尾刺。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；流血', boss: '潜影之后', bossHp: [112580, 202644, 360255],
+    { id: 'W01', ico: '🦠', name: '菌毯巢穴', theme: 'bio',    desc: '泄漏事故封了这家研究所，感染体把走廊筑成了蜂巢。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '菌毯母巢', bossHp: [92111, 165799, 294754],
+      enemies: ['感染研究员', '裂舌兽', '捕食体α'], elite: '变异捕食体', unlock: null },
+    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '废弃空间站被甲壳生物占据，黑暗里全是黏液与尾刺。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；裂伤', boss: '潜影之后', bossHp: [112580, 202644, 360255],
       enemies: ['伏面虫', '工蜂甲虫', '战甲虫'], elite: '禁卫甲虫', unlock: 'W01' },
-    { id: 'W03', ico: '👻', name: '怨声旧宅', theme: 'ghost',  desc: '踏入这栋房子的人，都会被怨念缠上。', hp: 1250, atk: 135, def: 110, mechanic: '恐惧：降低攻击；诅咒', boss: '怨声核心', bossHp: [133049, 239488, 425756],
-      enemies: ['怨念残影', '白衣怨灵', '黑猫怨灵'], elite: '阁楼厉鬼', unlock: 'W02' },
+    { id: 'W03', ico: '🚪', name: '怨声旧宅', theme: 'ghost',  desc: '踏入这栋房子的人，都会被怨念缠上。', hp: 1250, atk: 135, def: 110, mechanic: '恐惧：降低攻击；诅咒', boss: '怨声核心', bossHp: [133049, 239488, 425756],
+      enemies: ['怨念残影', '白衣游影', '黑猫游影'], elite: '阁楼怨影', unlock: 'W02' },
     { id: 'W04', ico: '🏺', name: '机关地宫', theme: 'mystic', desc: '黄沙之下的法老陵墓，亡灵守卫永不眠。', hp: 1500, atk: 180, def: 130, mechanic: '陷阱：随机眩晕；复活', boss: '地宫石卫', bossHp: [163752, 294754, 524008],
-      enemies: '木乃伊战士|沙暴怨灵|圣甲虫群'.split('|'), elite: '祭司亡灵', unlock: 'W03' },
-    { id: 'W05', ico: '🚢', name: '无归客轮', theme: 'ghost',  desc: '死亡名单上的游轮，意外接踵而至。', hp: 1750, atk: 205, def: 150, mechanic: '即死判定：低概率直接重伤', boss: '终结舵手', bossHp: [194456, 350021, 622259],
-      enemies: '溺水亡魂|甲板幻影|船舱幽影'.split('|'), elite: '死亡使者', unlock: 'W04' },
-    { id: 'W06', ico: '🛰', name: '轨道残骸带', theme: 'tech',   desc: '轨道战争白热化，机械军团碾压一切。', hp: 2200, atk: 260, def: 190, mechanic: '护盾：开场获得护盾；远程炮击', boss: '轨道主控', bossHp: [235394, 423710, 753261],
+      enemies: '木乃伊战士|沙暴游影|圣甲虫群'.split('|'), elite: '祭司亡灵', unlock: 'W03' },
+    { id: 'W05', ico: '🚢', name: '无归客轮', theme: 'ghost',  desc: '这艘船的旅客名单上，全是没能下船的人。', hp: 1750, atk: 205, def: 150, mechanic: '濒死判定：每场最多一次，把你打到剩 1 点血', boss: '终结舵手', bossHp: [194456, 350021, 622259],
+      enemies: '溺水亡魂|甲板幻影|船舱幽影'.split('|'), elite: '终结使者', unlock: 'W04' },
+    { id: 'W06', ico: '🛰', name: '轨道废土带', theme: 'tech',   desc: '轨道战争打到最后一刻，机械军团仍在这条带上巡游。', hp: 2200, atk: 260, def: 190, mechanic: '护盾：开场获得护盾；远程炮击', boss: '轨道主控', bossHp: [235394, 423710, 753261],
       enemies: '机械步兵|悬浮炮台|歼灭机甲'.split('|'), elite: '轨道毁灭者', unlock: 'W05' },
-    { id: 'W07', ico: '💤', name: '酣眠迷境', theme: 'ghost',  desc: '在梦里被杀死，现实中也会死去。', hp: 2500, atk: 240, def: 220, mechanic: '睡眠：概率无法行动；幻觉', boss: '酣眠之主', bossHp: [286567, 515820, 917014],
-      enemies: '梦境傀儡|锈爪梦魔|呓语幽灵'.split('|'), elite: '噩梦编织者', unlock: 'W06' },
+    { id: 'W07', ico: '💤', name: '酣眠迷境', theme: 'ghost',  desc: '在梦里被留下的人，现实里也没醒过来。', hp: 2500, atk: 240, def: 220, mechanic: '睡眠：概率无法行动；幻觉', boss: '酣眠之主', bossHp: [286567, 515820, 917014],
+      enemies: '梦境傀儡|锈爪梦魔|呓语游影'.split('|'), elite: '噩梦编织者', unlock: 'W06' },
     { id: 'W08', ico: '🌫', name: '哑雾小镇', theme: 'ghost',  desc: '浓雾中的小镇，雾界随时降临。', hp: 2900, atk: 280, def: 250, mechanic: '浓雾：命中-15%', boss: '雾猎者', bossHp: [347974, 626353, 1113517],
-      enemies: '雾中人影|钩索巨影|白面护工'.split('|'), elite: '雾界行刑者', unlock: 'W07' },
-    { id: 'W09', ico: '🐉', name: '巨兽孤屿', theme: 'bio',  desc: '被唤醒的史前霸主，视人类为猎物。', hp: 3400, atk: 320, def: 270, mechanic: '撕裂：流血；群体攻击', boss: '暴君巨兽', bossHp: [419616, 755308, 1342770],
+      enemies: '雾中人影|钩索巨影|白面护工'.split('|'), elite: '雾界裁决者', unlock: 'W07' },
+    { id: 'W09', ico: '🐉', name: '巨兽孤屿', theme: 'bio',  desc: '被唤醒的史前霸主，视人类为猎物。', hp: 3400, atk: 320, def: 270, mechanic: '撕裂：裂伤；群体攻击', boss: '暴君巨兽', bossHp: [419616, 755308, 1342770],
       enemies: '迅猛龙|双脊龙|翼龙'.split('|'), elite: '棘背龙', unlock: 'W08' },
-    { id: 'W10', ico: '🧫', name: '毒沼深处', theme: 'bio',    desc: '沼泽深处的巨蟒已变异成灾厄。', hp: 3800, atk: 350, def: 300, mechanic: '中毒：持续掉血；缠绕', boss: '毒沼巨口', bossHp: [501492, 902685, 1604774],
-      enemies: '毒沼蟒|沼泽鳄|吸血水蛭'.split('|'), elite: '变异森蚺', unlock: 'W09' },
-    { id: 'W11', ico: '⛵', name: '骷帆船坞', theme: 'mystic', desc: '月光下的诅咒船员，永远无法安息。', hp: 4300, atk: 390, def: 330, mechanic: '召唤亡灵；吸血', boss: '骷帆船长', bossHp: [603837, 1086907, 1932279],
-      enemies: '骷髅水手|诅咒炮手|腐尸船员'.split('|'), elite: '骷帆大副', unlock: 'W10' },
-    { id: 'W12', ico: '🪐', name: '蚀环远征', theme: 'mystic', desc: '魔多大军压境，黑暗侵蚀中土。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
-      enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环幽灵', unlock: 'W11' },
+    { id: 'W10', ico: '🧫', name: '瘴沼深处', theme: 'bio',    desc: '沼泽深处的巨蟒已变异成灾厄。', hp: 3800, atk: 350, def: 300, mechanic: '中毒：持续掉血；缠绕', boss: '瘴沼巨口', bossHp: [501492, 902685, 1604774],
+      enemies: '瘴沼蟒|沼泽鳄|沼泽水蛭'.split('|'), elite: '变异森蚺', unlock: 'W09' },
+    { id: 'W11', ico: '⛵', name: '幽帆船坞', theme: 'mystic', desc: '月光下，那批船员的船始终没能靠岸。', hp: 4300, atk: 390, def: 330, mechanic: '召唤旧船员；汲取', boss: '幽帆船长', bossHp: [603837, 1086907, 1932279],
+      enemies: '幽帆水手|铁壳炮手|锈帆船员'.split('|'), elite: '幽帆大副', unlock: 'W10' },
+    { id: 'W12', ico: '🪐', name: '蚀环远征', theme: 'mystic', desc: '黑色的潮水从环带那头压过来，地图正在一寸寸褪色。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
+      enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环游影', unlock: 'W11' },
     /* ---- 第二巡：转生 1 次开启 ---- */
-    { id: 'W13', ico: '❄️', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '白女巫的冰封王座，永冬笼罩王国。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
+    { id: 'W13', ico: '❄️', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '坐上去的人把整个王国冻住了，春天再没到过。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
       enemies: '冰狼|雪魔|霜冻武士'.split('|'), elite: '冰宫禁卫', unlock: 'W12' },
-    { id: 'W14', ico: '🏯', name: '灯阁试炼场', theme: 'god', desc: '灯阁亲自设下的试炼，规则由它书写。', hp: 7000, atk: 600, def: 500, mechanic: '随机规则：每回合变化', boss: '试炼执刑者', bossHp: [1125798, 2026437, 3602554],
+    { id: 'W14', ico: '🏯', name: '灯阁试炼场', theme: 'god', desc: '灯阁亲自设下的试炼，规则由它书写。', hp: 7000, atk: 600, def: 500, mechanic: '随机规则：每回合变化', boss: '试炼裁决者', bossHp: [1125798, 2026437, 3602554],
       enemies: '试炼傀儡|规则执行体|灯阁幻影'.split('|'), elite: '灯阁代行者', unlock: 'W13' },
-    { id: 'W15', ico: '🏰', name: '血月旧堡', theme: 'ghost', desc: '每逢血月，古堡的宴会就会重新开始。', hp: 8500, atk: 680, def: 570, mechanic: '吸血：敌人攻击回复自身；血月强化', boss: '血月侯爵', bossHp: [1350958, 2431724, 4323065],
-      enemies: '血仆|蝙蝠群|猎魔人残影'.split('|'), elite: '古堡管家', unlock: 'W14' },
+    { id: 'W15', ico: '🏰', name: '绯月旧堡', theme: 'ghost', desc: '每逢绯月，古堡的宴会就会重新开始。', hp: 8500, atk: 680, def: 570, mechanic: '汲取：敌人攻击回复自身；绯月强化', boss: '绯月侯爵', bossHp: [1350958, 2431724, 4323065],
+      enemies: '绯仆|蝙蝠群|猎魔人残影'.split('|'), elite: '古堡管家', unlock: 'W14' },
     { id: 'W16', ico: '🌊', name: '沉海废墟', theme: 'bio', desc: '海底沉睡着不该被唤醒的东西。', hp: 10200, atk: 770, def: 650, mechanic: '水压：每回合全队掉血；触手缠绕', boss: '沉海之主', bossHp: [1621150, 2918069, 5187678],
       enemies: '深渊潜者|巨型章鱼|珊瑚傀儡'.split('|'), elite: '遗迹祭司', unlock: 'W15' },
     { id: 'W17', ico: '🔔', name: '蜂群主控', theme: 'tech', desc: '所有联网的东西，现在只听它一个。', hp: 12200, atk: 870, def: 740, mechanic: '无人机群：群体攻击；电磁干扰', boss: '蜂群主脑', bossHp: [1945380, 3501683, 6225214],
-      enemies: '哨戒机兵|电磁猎犬|数据幽灵'.split('|'), elite: '核心守卫', unlock: 'W16' },
+      enemies: '哨戒机兵|电磁猎犬|数据游影'.split('|'), elite: '核心守卫', unlock: 'W16' },
     { id: 'W18', ico: '🏚', name: '白墙疗养院', theme: 'ghost', desc: '这间医院的病历上，写满了你的名字。', hp: 14600, atk: 980, def: 840, mechanic: '幻觉：概率攻击队友；死亡复活', boss: '白衣院长', bossHp: [2334456, 4202019, 7470257],
-      enemies: '无影护士|手术怨灵|病房幻影'.split('|'), elite: '重症监护者', unlock: 'W17' },
+      enemies: '白衣护工|手术残响|病房幻影'.split('|'), elite: '重症监护者', unlock: 'W17' },
     /* ---- 第三巡：转生 2 次开启 ---- */
-    { id: 'W19', ico: '🌌', reincarn: 2, name: '星骸坟场', theme: 'tech', desc: '无数文明在这里终结，残骸还在呼吸。', hp: 17500, atk: 1110, def: 960, mechanic: '星骸护盾；轨道扫射', boss: '星骸巨兽', bossHp: [2801347, 5042423, 8964308],
-      enemies: '星舰残魂|虚空掠夺者|机械残骸'.split('|'), elite: '坟场拾荒者', unlock: 'W18' },
+    { id: 'W19', ico: '🌌', reincarn: 2, name: '星骸遗址', theme: 'tech', desc: '无数文明在这里终结，星骸还在呼吸。', hp: 17500, atk: 1110, def: 960, mechanic: '星骸护盾；轨道扫射', boss: '星骸巨兽', bossHp: [2801347, 5042423, 8964308],
+      enemies: '星舰残响|虚空掠夺者|机械残壳'.split('|'), elite: '遗址拾荒者', unlock: 'W18' },
     { id: 'W20', ico: '🧭', name: '灯阁回廊', theme: 'god', desc: '灯阁第一次把门开给你。走进去的人，回来都换了名字。', hp: 21000, atk: 1250, def: 1090, mechanic: '规则轮转：每 4 回合变换；灯影压制', boss: '回廊守望者', bossHp: [3361616, 6050908, 10757170],
       enemies: '侍灯者|规则残响|镜中之你'.split('|'), elite: '执灯代行', unlock: 'W19' },
     { id: 'W21', ico: '🎭', name: '无声戏院', theme: 'ghost', desc: '幕布拉开，台下坐满了不鼓掌的观众。', hp: 22100, atk: 1310, def: 1140, mechanic: '静默：攻击附带恐惧；护幕', boss: '终场演员', bossHp: [3536000, 6364800, 11315200],
-      enemies: '提线伶人|默剧幽灵|鼓掌的手'.split('|'), elite: '后台主管', unlock: 'W20' },
+      enemies: '提线伶人|默剧游影|鼓掌的手'.split('|'), elite: '后台主管', unlock: 'W20' },
     { id: 'W22', ico: '🪶', name: '锈蚀方舟', theme: 'tech', desc: '最后一艘方舟停在轨道上，舱里全是不该活下来的东西。', hp: 23300, atk: 1370, def: 1200, mechanic: '锈壳护盾；电磁干扰', boss: '方舟主机', bossHp: [3728000, 6710400, 11929600],
       enemies: '锈蚀机兵|舱壁猎犬|导航残魂'.split('|'), elite: '方舟守门人', unlock: 'W21' },
     { id: 'W23', ico: '🕳', name: '巢母产房', theme: 'bio', desc: '这里的每一声啼哭，都有三条舌头。', hp: 24500, atk: 1430, def: 1260, mechanic: '感染：攻击附带中毒；召唤幼体', boss: '巢母', bossHp: [3920000, 7056000, 12544000],
@@ -408,28 +408,28 @@ window.DATA = (function () {
     { id: 'W24', ico: '🕯', name: '灰烬圣所', theme: 'mystic', desc: '香灰底下压着前一任执灯者的名字。', hp: 25800, atk: 1500, def: 1320, mechanic: '腐化：降低防御；焚香灼烧', boss: '灰袍祭司', bossHp: [4128000, 7430400, 13209600],
       enemies: '灰烬信徒|焚香者|无名执灯者'.split('|'), elite: '圣所执事', unlock: 'W23' },
     /* ---- 第四巡：转生 3 次开启 ---- */
-    { id: 'W25', ico: '🔮', reincarn: 3, name: '镜界法庭', theme: 'god', desc: '判决书上写的是你的死法。', hp: 27200, atk: 1570, def: 1390, mechanic: '规则轮转；镜面幻觉', boss: '镜面法官', bossHp: [4352000, 7833600, 13926400],
+    { id: 'W25', ico: '🔮', reincarn: 3, name: '镜界法庭', theme: 'god', desc: '判决书上写着的，是你最后的名字。', hp: 27200, atk: 1570, def: 1390, mechanic: '规则轮转；镜面幻觉', boss: '镜面法官', bossHp: [4352000, 7833600, 13926400],
       enemies: '律令执行体|镜中证人|无罪之影'.split('|'), elite: '庭上执行官', unlock: 'W24' },
     { id: 'W26', ico: '🧪', name: '零号实验舱', theme: 'tech', desc: '实验记录最后一页，只写了两个字：成功。', hp: 28600, atk: 1640, def: 1460, mechanic: '培养护盾；轨道扫射', boss: '零号样本', bossHp: [4576000, 8236800, 14643200],
       enemies: '失败样本|培养舱守卫|研究员残影'.split('|'), elite: '项目负责人', unlock: 'W25' },
-    { id: 'W27', ico: '💀', name: '百鬼夜行', theme: 'ghost', desc: '灯笼亮起来的时候，街上的人全都不是人。', hp: 30100, atk: 1710, def: 1530, mechanic: '召唤恶鬼；吸血', boss: '提灯鬼王', bossHp: [4816000, 8668800, 15411200],
-      enemies: '灯笼鬼|无面行者|夜巡恶鬼'.split('|'), elite: '百鬼之首', unlock: 'W26' },
+    { id: 'W27', ico: '🪔', name: '长明夜行', theme: 'ghost', desc: '灯笼亮起时，街上的每张脸都藏在灯影下面。', hp: 30100, atk: 1710, def: 1530, mechanic: '召唤夜影；汲取', boss: '提灯之主', bossHp: [4816000, 8668800, 15411200],
+      enemies: '灯笼影|无面行者|夜巡游影'.split('|'), elite: '夜行之首', unlock: 'W26' },
     { id: 'W28', ico: '🌿', name: '活体森林', theme: 'bio', desc: '树会呼吸，也记得你砍过谁。', hp: 31700, atk: 1790, def: 1610, mechanic: '中毒：持续掉血；藤蔓缠绕', boss: '森之心', bossHp: [4950000, 8910000, 15840000],
-      enemies: '绞杀藤|腐叶兽|树语者'.split('|'), elite: '林中之主', unlock: 'W27' },
+      enemies: '缚身藤|腐叶兽|树语者'.split('|'), elite: '林中之主', unlock: 'W27' },
     { id: 'W29', ico: '⛰', name: '第九碑陵', theme: 'mystic', desc: '碑上刻着九个名字。第八个是你。', hp: 33400, atk: 1870, def: 1690, mechanic: '诅咒：降低防御；碑灵复活', boss: '碑陵守誓者', bossHp: [5050000, 9090000, 16160000],
       enemies: '碑灵|守誓卫士|第九个名字'.split('|'), elite: '碑陵司命', unlock: 'W28' },
     { id: 'W30', ico: '🔥', name: '熔芯之炉', theme: 'tech', desc: '炉火不能停。停了，它就会醒。', hp: 35200, atk: 1960, def: 1780, mechanic: '灼烧：持续掉血；炉温强化', boss: '熔芯核心', bossHp: [5190000, 9342000, 16608000],
       enemies: '熔渣机兵|炉心兽|过载体'.split('|'), elite: '炉前工头', unlock: 'W29' },
     /* ---- 终巡：转生 4 次开启 ---- */
     { id: 'W31', ico: '🌟', reincarn: 4, name: '哭墙回音', theme: 'ghost', desc: '你喊什么，它就还你什么。', hp: 37100, atk: 2050, def: 1860, mechanic: '幻觉：概率攻击队友；诅咒', boss: '回音之主', bossHp: [5340000, 9612000, 17088000],
-      enemies: '回声幽魂|哭墙残影|另一个你'.split('|'), elite: '墙内之物', unlock: 'W30' },
+      enemies: '回声游影|哭墙残影|另一个你'.split('|'), elite: '墙内之物', unlock: 'W30' },
     { id: 'W32', ico: '🧿', name: '万灯之座', theme: 'god', desc: '每一盏灯，都是一个文明的临终。', hp: 39000, atk: 2140, def: 1960, mechanic: '规则改写：每 3 回合变换；灯影压制', boss: '掌灯者', bossHp: [5500000, 9900000, 17600000],
       enemies: '守灯使|万灯之影|燃尽的执灯者'.split('|'), elite: '座前禁卫', unlock: 'W31' },
-    { id: 'W33', ico: '🌀', name: '吞噬环带', theme: 'bio', desc: '它不吃人，它吃"存在"。', hp: 41100, atk: 2240, def: 2060, mechanic: '撕裂：流血；吞噬护盾', boss: '吞噬之口', bossHp: [5655000, 10179000, 18096000],
+    { id: 'W33', ico: '🌀', name: '吞噬环带', theme: 'bio', desc: '它不吃人，它吃"存在"。', hp: 41100, atk: 2240, def: 2060, mechanic: '撕裂：裂伤；吞噬护盾', boss: '吞噬之口', bossHp: [5655000, 10179000, 18096000],
       enemies: '噬形体|虚空孢|遗忘者'.split('|'), elite: '环带之心', unlock: 'W32' },
     { id: 'W34', ico: '⏩', name: '时序废墟', theme: 'tech', desc: '这里的钟，全都指着同一个时刻。', hp: 43300, atk: 2350, def: 2160, mechanic: '冰冻：无法行动；时序加速', boss: '时之守望', bossHp: [5820000, 10476000, 18624000],
       enemies: '锈钟机偶|逆行者|秒针兵'.split('|'), elite: '钟塔管理员', unlock: 'W33' },
-    { id: 'W35', ico: '⚗', name: '九幽渡口', theme: 'mystic', desc: '渡船上的乘客，都已经死过一次了。', hp: 45600, atk: 2450, def: 2270, mechanic: '吸血：敌人攻击回复自身；摆渡', boss: '摆渡人', bossHp: [5983000, 10769400, 19145600],
+    { id: 'W35', ico: '⚗', name: '九幽渡口', theme: 'mystic', desc: '渡船上的乘客，都已经死过一次了。', hp: 45600, atk: 2450, def: 2270, mechanic: '汲取：敌人攻击回复自身；摆渡', boss: '摆渡人', bossHp: [5983000, 10769400, 19145600],
       enemies: '渡魂使|黄泉船工|无归客'.split('|'), elite: '渡口判官', unlock: 'W34' },
     { id: 'W36', ico: '👑', name: '灯阁王座', theme: 'god', desc: '走到这里的人，才有资格问一句为什么。', hp: 48000, atk: 2570, def: 2380, mechanic: '规则改写：每 3 回合变换；全场压制', boss: '终焉·灯主', bossHp: [6144000, 11059200, 19660800],
       enemies: '王座侍者|终焉使者|另一个你'.split('|'), elite: '王座禁卫', unlock: 'W35' },
@@ -644,19 +644,19 @@ window.DATA = (function () {
      血统套装 0.57~0.98 —— 见下面的模板；这是"高一些"，不是碾压）。
      ⚠ 刻意**不随世界变强**（跟世界套装一样是平表）：真正随世界涨的是装备基础值（tier）。
        如果按世界加系数，第 36 张图的血统套装会追平神话套装，那条终局线就废了。 */
-  const KIND_NAMES = { warrior: '战士', tank: '坦克', mage: '法师', ranger: '射手', assassin: '刺客', support: '辅助', healer: '治疗', controller: '控制', vampire: '血族' };
+  const KIND_NAMES = { warrior: '战士', tank: '坦克', mage: '法师', ranger: '射手', assassin: '刺客', support: '辅助', healer: '治疗', controller: '控制', vampire: '绯红' };
   const BLOODLINE_MIN_WORLD = 10;              // 第 10 张图起才有血统套装
-  const BLOODLINE_KEYS = ['狼人', '修真', '血族', '科技', '念动力', '泰坦'];   // 六支血统（= 六个定位）
+  const BLOODLINE_KEYS = ['狼人', '修真', '绯红', '科技', '念动力', '泰坦'];   // 六支血统（= 六个定位）
   const BLOOD_SET_TEMPLATE = {
     '狼人':   { b2: { atkPct: 0.11 }, b4: { atkPct: 0.11, critPct: 0.06 }, b6: { atkPct: 0.26, critDmg: 0.28, hpPct: 0.10 } },
     '修真':   { b2: { skillPct: 0.11 }, b4: { skillPct: 0.11, spiritPct: 0.10 }, b6: { skillPct: 0.30, spiritPct: 0.20, critDmg: 0.18 } },
-    '血族':   { b2: { critPct: 0.08 }, b4: { atkPct: 0.10, lifesteal: 0.06 }, b6: { atkPct: 0.24, critDmg: 0.30, lifesteal: 0.08 } },
+    '绯红':   { b2: { critPct: 0.08 }, b4: { atkPct: 0.10, lifesteal: 0.06 }, b6: { atkPct: 0.24, critDmg: 0.30, lifesteal: 0.08 } },
     '科技':   { b2: { spdPct: 0.10 }, b4: { spdPct: 0.10, critPct: 0.08 }, b6: { spdPct: 0.20, critPct: 0.14, evaPct: 0.06 } },
     '念动力': { b2: { spiritPct: 0.10 }, b4: { atkPct: 0.12, spiritPct: 0.08 }, b6: { atkPct: 0.20, spiritPct: 0.20, hpPct: 0.15 } },
     '泰坦':   { b2: { hpPct: 0.12 }, b4: { defPct: 0.14, hpPct: 0.08 }, b6: { hpPct: 0.30, defPct: 0.26, resPct: 0.15 } },
   };
   /* 百分比效果 → 人话（套装文案由数值生成，不再手抄一遍，杜绝"写着有、实际没有"） */
-  const PCT_LABEL = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '异常抗性', lifesteal: '吸血', spiritPct: '精神' };
+  const PCT_LABEL = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击', critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '异常抗性', lifesteal: '汲取', spiritPct: '精神' };
   const pctText = (o) => Object.entries(o).map(([k, v]) => (PCT_LABEL[k] || k) + '+' + Math.round(v * 100) + '%').join('·');
   const BLOODLINE_SETS = {};                   // key = `${worldId}|${血统}` → 套装定义
   const BLOODLINE_SETS_BY_WORLD = {};          // worldId → { 血统: key }
@@ -683,7 +683,7 @@ window.DATA = (function () {
   /* 老档迁移表：旧"定位套装"→ 新"血统套装"。
      这只是给老存档找一条确定的落点（定位和血统本来不是一一对应），一次迁移、之后不再用。 */
   const LEGACY_KIND_SET = {
-    warrior: '狼人', saber: '狼人', tank: '泰坦', vampire: '血族', assassin: '血族',
+    warrior: '狼人', saber: '狼人', tank: '泰坦', vampire: '绯红', assassin: '绯红',
     ranger: '科技', mage: '修真', controller: '修真', support: '念动力', healer: '念动力',
   };
 
@@ -699,18 +699,18 @@ window.DATA = (function () {
   const SIGNATURE_EQUIPS = [
     { charId: 'C120', name: '代行之刃', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.18 }, { k: 'skillPct', v: 0.15 }], text: '灯阁代行者专属：本命飞剑（狼人·战士）' },
     { charId: 'C059', name: '元素咏叹', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.24 }, { k: 'critPct', v: 0.06 }], text: '楚衍专属：精神共鸣凝成的法珠（修真·法师）' },
-    { charId: 'C115', name: '血河刃',   slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'critDmg', v: 0.30 }], text: '白河愁专属：血族的极致一击（血族·刺客）' },
+    { charId: 'C115', name: '绯河刃',   slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'critDmg', v: 0.30 }], text: '白河愁专属：绯红的极致一击（绯红·刺客）' },
     { charId: 'C112', name: '星舰主炮', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.22 }, { k: 'critDmg', v: 0.22 }], text: '苍井零专属：重火力压制（科技·射手）' },
     { charId: 'C114', name: '心识之环', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.20 }, { k: 'spiritPct', v: 0.18 }], text: '山吹时雨专属：念动力的极致控制（念动力·辅助）' },
     { charId: 'C117', name: '磐岩壁垒', slot: 'weapon', affixes: [{ k: 'hpPct', v: 0.20 }, { k: 'defPct', v: 0.18 }], text: '零式专属：不动如山的壁垒（泰坦·肉盾）' },
   ];
   const EQUIP_NAMES = {
-    weapon:   { bio: ['聚合物军刀', '脉冲步枪', '血脉切割者'], ghost: ['镇魂铃', '驱邪短刃', '缚灵符剑'], mystic: ['秘银法杖', '圣光权杖', '咒纹长剑'], tech: ['磁轨枪', '粒子刀', '湮灭炮'], god: ['灯阁之刃', '终焉权杖', '试炼圣枪'] },
+    weapon:   { bio: ['聚合物军刀', '脉冲步枪', '基因剪切者'], ghost: ['镇魂铃', '驱邪短刃', '缚灵符剑'], mystic: ['秘银法杖', '圣光权杖', '咒纹长剑'], tech: ['磁轨枪', '粒子刀', '湮灭炮'], god: ['灯阁之刃', '终焉权杖', '试炼圣枪'] },
     armor:    { bio: ['防化作战服', '蜂巢护甲', '再生殖装'], ghost: ['符咒道袍', '怨念披风', '镇宅法衣'], mystic: ['秘陵铠甲', '圣甲护胸', '咒缚长袍'], tech: ['纳米装甲', '反应外骨骼', '相位护盾'], god: ['灯阁战甲', '终焉之袍', '试炼圣铠'] },
-    accessory:{ bio: ['血清注射器', '病毒样本', '血脉稳定环'], ghost: ['护身佛珠', '盐晶挂坠', '往生铜钱'], mystic: ['圣甲虫护符', '太阳金环', '安卡十字'], tech: ['战术目镜', '神经增幅器', '能量核心'], god: ['终焉徽记', '灯阁腕表', '试炼徽章'] },
+    accessory:{ bio: ['萃取器', '病毒样本', '共振稳定环'], ghost: ['护身佛珠', '盐晶挂坠', '往生铜钱'], mystic: ['圣甲虫护符', '太阳金环', '安卡十字'], tech: ['战术目镜', '神经增幅器', '能量核心'], god: ['终焉徽记', '灯阁腕表', '试炼徽章'] },
     head:     { bio: ['防毒面具', '战术头盔', '密封护目镜'], ghost: ['镇魂冠', '驱邪头巾', '符纸额带'], mystic: ['秘银头环', '圣光头盔', '咒纹面甲'], tech: ['战术头盔', '全息面罩', '神经头环'], god: ['灯阁之冕', '终焉头盔', '试炼面甲'] },
-    hands:    { bio: ['防化手套', '战术手套', '血脉臂铠'], ghost: ['缚灵手套', '符咒护腕', '镇魂臂甲'], mystic: ['秘银护手', '圣光手套', '咒纹臂环'], tech: ['磁力手套', '粒子臂铠', '能量护腕'], god: ['灯阁护手', '终焉臂铠', '试炼手套'] },
-    legs:     { bio: ['防化护腿', '战术军靴', '聚合物腿甲'], ghost: ['疾行符靴', '镇魂护腿', '怨灵绑腿'], mystic: ['秘银护腿', '圣光战靴', '咒纹腿甲'], tech: ['磁力战靴', '喷射腿甲', '幻影护腿'], god: ['灯阁战靴', '终焉护腿', '试炼腿甲'] },
+    hands:    { bio: ['防化手套', '战术手套', '动力臂铠'], ghost: ['缚灵手套', '符咒护腕', '镇魂臂甲'], mystic: ['秘银护手', '圣光手套', '咒纹臂环'], tech: ['磁力手套', '粒子臂铠', '能量护腕'], god: ['灯阁护手', '终焉臂铠', '试炼手套'] },
+    legs:     { bio: ['防化护腿', '战术军靴', '聚合物腿甲'], ghost: ['疾行符靴', '镇魂护腿', '游影绑腿'], mystic: ['秘银护腿', '圣光战靴', '咒纹腿甲'], tech: ['磁力战靴', '喷射腿甲', '幻影护腿'], god: ['灯阁战靴', '终焉护腿', '试炼腿甲'] },
   };
   /* ================= 血统套装/神装的装备名（V9.6.86） =================
      父亲大人："血统套装的装备名称也得血统适配，你不能一个射手拿着把斧头吧。"
@@ -722,17 +722,17 @@ window.DATA = (function () {
     '狼人': {
       weapon: ['破军刀', '斩铁剑', '狂澜巨剑'], head: ['战盔', '狼首兜鍪', '铁额护面'],
       armor: ['战甲', '鳞纹重铠', '狼纹胸甲'], hands: ['战腕', '铁护手', '碎骨拳套'],
-      legs: ['战靴', '铁胫护腿', '踏尘靴'], accessory: ['战旗', '兽牙坠', '血战令'],
+      legs: ['战靴', '铁胫护腿', '踏尘靴'], accessory: ['战旗', '兽牙坠', '狼纹战令'],
     },
     '修真': {
       weapon: ['灵纹法杖', '御灵长剑', '玄冰法剑'], head: ['道冠', '灵纹头环', '紫府冠'],
       armor: ['法袍', '云纹道衣', '灵光长袍'], hands: ['灵腕', '符咒护手', '凝气手环'],
       legs: ['云履', '踏云靴', '步虚履'], accessory: ['玉符', '灵珠', '太虚玉佩'],
     },
-    '血族': {
-      weapon: ['血匕', '影刺短刃', '猩红双匕'], head: ['暗影兜帽', '血纹面罩', '夜行头巾'],
-      armor: ['夜行皮甲', '暗纹劲装', '血纹战衣'], hands: ['缚影护手', '刺腕', '裂魂爪套'],
-      legs: ['疾行靴', '无声软履', '影踪护腿'], accessory: ['血坠', '獠牙饰', '夜鸦羽饰'],
+    '绯红': {
+      weapon: ['绯匕', '影刺短刃', '猩红双匕'], head: ['暗影兜帽', '绯纹面罩', '夜行头巾'],
+      armor: ['夜行皮甲', '暗纹劲装', '绯纹战衣'], hands: ['缚影护手', '刺腕', '裂魂爪套'],
+      legs: ['疾行靴', '无声软履', '影踪护腿'], accessory: ['绯坠', '獠牙饰', '夜鸦羽饰'],
     },
     '科技': {
       weapon: ['磁轨步枪', '脉冲狙击枪', '湮灭炮'], head: ['战术目镜', '弹道瞄具', '全息面罩'],
@@ -785,8 +785,8 @@ window.DATA = (function () {
       text: '2件:攻击+12%　4件:攻击+12%·生命+12%　6件:攻击+32%·生命+32%·防御+20%' },
     '修真':   { name: '修真神装', b2: { skillPct: 0.14 }, b4: { spiritPct: 0.20, skillPct: 0.12 }, b6: { skillPct: 0.36, atkPct: 0.20, critDmg: 0.30 },
       text: '2件:技能伤害+14%　4件:精神+20%·技能伤害+12%　6件:技能伤害+36%·攻击+20%·暴击伤害+30%' },
-    '血族':   { name: '血族神装', b2: { critPct: 0.08 }, b4: { atkPct: 0.18, lifesteal: 0.08 }, b6: { atkPct: 0.28, critDmg: 0.40, lifesteal: 0.10 },
-      text: '2件:暴击+8%　4件:攻击+18%·吸血+8%　6件:攻击+28%·暴击伤害+40%·吸血+10%' },
+    '绯红':   { name: '绯红神装', b2: { critPct: 0.08 }, b4: { atkPct: 0.18, lifesteal: 0.08 }, b6: { atkPct: 0.28, critDmg: 0.40, lifesteal: 0.10 },
+      text: '2件:暴击+8%　4件:攻击+18%·汲取+8%　6件:攻击+28%·暴击伤害+40%·汲取+10%' },
     '科技':   { name: '科技神装', b2: { spdPct: 0.15 }, b4: { critPct: 0.08, evaPct: 0.05 }, b6: { spdPct: 0.20, critPct: 0.12, skillPct: 0.25 },
       text: '2件:速度+15%　4件:暴击+8%·闪避+5%　6件:速度+20%·暴击+12%·技能伤害+25%' },
     '念动力': { name: '念动神装', b2: { spiritPct: 0.15 }, b4: { spiritPct: 0.12, atkPct: 0.12 }, b6: { spiritPct: 0.28, atkPct: 0.24, hpPct: 0.20 },
@@ -890,12 +890,12 @@ window.DATA = (function () {
     box_r: { icon: '📦', name: 'R装备箱', type: 'box', rarity: 'R', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 R 品质装备', src: '灯阁市集、游历奇遇' },
     box_sr: { icon: '🎁', name: 'SR装备箱', type: 'box', rarity: 'SR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SR 品质装备', src: '兑换大厅各店、每日任务、游历奇遇、药园' },
     box_ssr: { icon: '🧧', name: 'SSR装备箱', type: 'box', rarity: 'SSR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SSR 品质装备', src: '异界/深井商店、七日登录第 6 天' },
-    box_ur: { icon: '🗝', name: 'UR装备箱', type: 'box', rarity: 'UR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 UR 品质装备（档位＝你当前进度的世界，多为那一张图的套装）；10% 概率开出伙伴专属装备（UR，六支血统各一件）', src: '异界/深井商店（高阶货币）' },
+    box_ur: { icon: '🗝', name: 'UR装备箱', type: 'box', rarity: 'UR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 UR 品质装备（档位＝你当前进度的世界，多为那一张图的套装）；10% 概率开出伙伴专属装备（UR，六支命格各一件）', src: '异界/深井商店（高阶货币）' },
     /* V9.6.79（父亲大人："神装可以有购买，不过也得通关第二十个世界后才能购买，且只能购买装备箱，
        开箱也是概率掉落而已，装备箱也是随机装备箱，保底传说套装，但神装也是小概率出"）
        —— 血统神装箱：**只有它**能买到神话，而且买到的还是一个"箱"、开出来还得看运气。
        随机 = 部位随机、血统随机（和守关掉落同一条随机线），所以凑齐一套仍然要攒。 */
-    box_myth: { icon: '💎', name: '血统神装箱', type: 'box', rarity: 'MYTH', mythBox: true, use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '随机开出一件【传说】装备（档位＝你当前进度的世界套装），并有 15% 概率升格为【神话·血统神装】（部位与血统均随机）', src: '异界商店（通关残域第 20 个世界后解锁）' },
+    box_myth: { icon: '💎', name: '命格神装箱', type: 'box', rarity: 'MYTH', mythBox: true, use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '随机开出一件【传说】装备（档位＝你当前进度的世界套装），并有 15% 概率升格为【神话·命格神装】（部位与命格均随机）', src: '异界商店（通关残域第 20 个世界后解锁）' },
     /* V1.0.1（两轮修正，教训记在这里）：
        第一轮——原文写"副本 Boss（必掉）、精英（30%）、限时悬赏"，**数字是旧的**：
        V9.6.79 已把守关改成 10%、精英 5%（为了不让扫荡两天刷穿伴生体线）。
@@ -923,19 +923,19 @@ window.DATA = (function () {
        口径：`unlock: 0` = 开局就能炼；`unlock: N` = 通关第 N 张图（普通 12 关全清）后开放。
        前三种是开局线、不设门槛；通用二档从 W03 起，血统专属按血统从 W05 排到 W09 ——
        一条线跟着进度一段段开，而不是开服就把 12 张配方摊在玩家面前。 */
-    { id: 'sr_atk', ico: '💪',   name: '力量血清', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
-    { id: 'sr_def', ico: '🛡',   name: '护壁血清', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
-    { id: 'sr_hp', ico: '🧬',    name: '细胞血清', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
-    { id: 'sr_spd', ico: '⚡',   name: '神经血清', key: 'spdPct',   per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 900,  bloodline: null, unlock: 3 },
-    { id: 'sr_crit', ico: '🎯',  name: '感知血清', key: 'critPct',  per: 0.005, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 3 },
-    { id: 'sr_skill', ico: '🕊', name: '灵能血清', key: 'skillPct', per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 4 },
+    { id: 'sr_atk', ico: '💪',   name: '力量精华', key: 'atkPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
+    { id: 'sr_def', ico: '🛡',   name: '护壁精华', key: 'defPct',   per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
+    { id: 'sr_hp', ico: '🧬',    name: '细胞精华', key: 'hpPct',    per: 0.010, max: 40, mat: 'mat_t1', matN: 5, points: 450,  bloodline: null, unlock: 0 },
+    { id: 'sr_spd', ico: '⚡',   name: '神经精华', key: 'spdPct',   per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 900,  bloodline: null, unlock: 3 },
+    { id: 'sr_crit', ico: '🎯',  name: '感知精华', key: 'critPct',  per: 0.005, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 3 },
+    { id: 'sr_skill', ico: '🕊', name: '灵能精华', key: 'skillPct', per: 0.010, max: 30, mat: 'mat_t2', matN: 4, points: 1050,  bloodline: null, unlock: 4 },
     // 血统专属（对标同类的"门派专属丹"）：只有对应血统能用，单次更强、上限更低
-    { id: 'sr_bl_vampire', ico: '🩸',  name: '血族·饕餮血清', key: 'atkPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '血族',   unlock: 5 },
-    { id: 'sr_bl_werewolf', ico: '🐺', name: '狼人·狂化血清', key: 'hpPct',    per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '狼人',   unlock: 5 },
-    { id: 'sr_bl_cultivator', ico: '🍀', name: '修真·灵根血清', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 6 },
-    { id: 'sr_bl_titan', ico: '🏔',    name: '泰坦·磐石血清', key: 'defPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '泰坦',   unlock: 7 },
-    { id: 'sr_bl_tech', ico: '⚙',     name: '科技·超频血清', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 8 },
-    { id: 'sr_bl_psychic', ico: '☯️',  name: '念动·超感血清', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 9 },
+    { id: 'sr_bl_vampire', ico: '🌹',  name: '绯红·饕餮精华', key: 'atkPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '绯红',   unlock: 5 },
+    { id: 'sr_bl_werewolf', ico: '🐺', name: '狼人·狂化精华', key: 'hpPct',    per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '狼人',   unlock: 5 },
+    { id: 'sr_bl_cultivator', ico: '🍀', name: '修真·灵根精华', key: 'skillPct', per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '修真', unlock: 6 },
+    { id: 'sr_bl_titan', ico: '🏔',    name: '泰坦·磐石精华', key: 'defPct',   per: 0.030, max: 20, mat: 'mat_t3', matN: 3, points: 1800, bloodline: '泰坦',   unlock: 7 },
+    { id: 'sr_bl_tech', ico: '⚙',     name: '科技·超频精华', key: 'spdPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '科技',   unlock: 8 },
+    { id: 'sr_bl_psychic', ico: '☯️',  name: '念动·超感精华', key: 'evaPct',   per: 0.030, max: 20, mat: 'mat_t4', matN: 2, points: 2700, bloodline: '念动力', unlock: 9 },
     /* ---- 高阶血清（V9.6.138 新增）----
        起因（父亲大人定的原则）："各个功能都最好能跟着游戏进程一起发展，不然前期就满了，
        放在那里很占位置、感觉没啥用。" 原来 12 种血清**约 8 天就全喂满**，之后这件功能
@@ -944,19 +944,19 @@ window.DATA = (function () {
     /* 图标用"同色系方块"这一套：一档是具象图标（💪🛡🧬…），二档是纯色块 ——
        一眼就能分出"这是高阶那一种"，而且和已有的 75 个图标完全不撞
        （icon_unique_audit 会核，重复了就报错）。 */
-    { id: 'sr2_atk', ico: '🟥', name: '力量血清·高阶', key: 'atkPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
-    { id: 'sr2_def', ico: '🟦', name: '护壁血清·高阶', key: 'defPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
-    { id: 'sr2_hp', ico: '🟩',  name: '细胞血清·高阶', key: 'hpPct',    per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
-    { id: 'sr2_spd', ico: '🟨', name: '神经血清·高阶', key: 'spdPct',   per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 15000, bloodline: null, unlock: 18 },
-    { id: 'sr2_crit', ico: '🟪', name: '感知血清·高阶', key: 'critPct', per: 0.012, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 18 },
-    { id: 'sr2_skill', ico: '🟫', name: '灵能血清·高阶', key: 'skillPct', per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 20 },
+    { id: 'sr2_atk', ico: '🟥', name: '力量精华·高阶', key: 'atkPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_def', ico: '🟦', name: '护壁精华·高阶', key: 'defPct',   per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_hp', ico: '🟩',  name: '细胞精华·高阶', key: 'hpPct',    per: 0.025, max: 16, mat: 'mat_t4', matN: 3, points: 9000,  bloodline: null, unlock: 15 },
+    { id: 'sr2_spd', ico: '🟨', name: '神经精华·高阶', key: 'spdPct',   per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 15000, bloodline: null, unlock: 18 },
+    { id: 'sr2_crit', ico: '🟪', name: '感知精华·高阶', key: 'critPct', per: 0.012, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 18 },
+    { id: 'sr2_skill', ico: '🟫', name: '灵能精华·高阶', key: 'skillPct', per: 0.025, max: 12, mat: 'mat_t5', matN: 2, points: 17000, bloodline: null, unlock: 20 },
     /* 血统专属的高阶：只有对应血统能用，所以给得比通用更狠、也更贵 */
-    { id: 'sr2_bl_vampire', ico: '🔴', name: '血族·饕餮血清·高阶', key: 'atkPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '血族',   unlock: 22 },
-    { id: 'sr2_bl_werewolf', ico: '🟠', name: '狼人·狂化血清·高阶', key: 'hpPct',    per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '狼人',   unlock: 22 },
-    { id: 'sr2_bl_cultivator', ico: '🟡', name: '修真·灵根血清·高阶', key: 'skillPct', per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '修真', unlock: 24 },
-    { id: 'sr2_bl_titan', ico: '🟢', name: '泰坦·磐石血清·高阶', key: 'defPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 30000, bloodline: '泰坦',   unlock: 26 },
-    { id: 'sr2_bl_tech', ico: '🔵', name: '科技·超频血清·高阶', key: 'spdPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '科技',   unlock: 28 },
-    { id: 'sr2_bl_psychic', ico: '🟣', name: '念动·超感血清·高阶', key: 'evaPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '念动力', unlock: 30 },
+    { id: 'sr2_bl_vampire', ico: '🔴', name: '绯红·饕餮精华·高阶', key: 'atkPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '绯红',   unlock: 22 },
+    { id: 'sr2_bl_werewolf', ico: '🟠', name: '狼人·狂化精华·高阶', key: 'hpPct',    per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '狼人',   unlock: 22 },
+    { id: 'sr2_bl_cultivator', ico: '🟡', name: '修真·灵根精华·高阶', key: 'skillPct', per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 26000, bloodline: '修真', unlock: 24 },
+    { id: 'sr2_bl_titan', ico: '🟢', name: '泰坦·磐石精华·高阶', key: 'defPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 3, points: 30000, bloodline: '泰坦',   unlock: 26 },
+    { id: 'sr2_bl_tech', ico: '🔵', name: '科技·超频精华·高阶', key: 'spdPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '科技',   unlock: 28 },
+    { id: 'sr2_bl_psychic', ico: '🟣', name: '念动·超感精华·高阶', key: 'evaPct',   per: 0.045, max: 10, mat: 'mat_t5', matN: 4, points: 34000, bloodline: '念动力', unlock: 30 },
   ];
   const serumById = {};
   SERUMS.forEach(s => {
@@ -970,7 +970,7 @@ window.DATA = (function () {
       type: 'serum',
       serum: { key: s.key, per: s.per, max: s.max, bloodline: s.bloodline },
       where: 'character',
-      use: `背包里点这张卡，选一名${s.bloodline ? `「${s.bloodline}」血统的` : ''}伙伴喂下；支持 1 / 10 / 全部`,
+      use: `背包里点这张卡，选一名${s.bloodline ? `「${s.bloodline}」命格的` : ''}伙伴喂下；支持 1 / 10 / 全部`,
       desc: `${tag}${SERUM_KEYS[s.key] || s.key} 永久 +${(s.per * 100).toFixed(1)}%（每人最多 ${s.max} 支）`,
       src: '炼化台：用装备强化材料 + 点数炼化',
     };
@@ -989,7 +989,7 @@ window.DATA = (function () {
   const CURRENCY_INFO = {
     points:     { use: '日常全都用它——建筑升级、普通招募、灯阁市集、故事商店、药园播种、驯服坐骑、法宝购买、背包扩容',
                   gain: '挂机、副本战斗、扫荡、任务、通关奖励、深井、斗法台（产量最多，随便花）' },
-    otherworld: { use: '养成 + 高级招募——装备强化、秘术阁、法宝祭炼、高级招募，以及技能升级、血统升级、铭刻、深井商店',
+    otherworld: { use: '养成 + 高级招募——装备强化、秘术阁、法宝祭炼、高级招募，以及技能升级、命格升级、铭刻、深井商店',
                   gain: '分解装备、副本战斗、扫荡、Boss 战、悬赏、斗法台、深井（产量中等，够用但不宽裕）' },
     holy:       { use: '只买最贵的东西——限定招募（定向 UP、50 抽保底当期 UP）、灯阁权限投资',
                   gain: '主线任务、通关奖励、登录奖励、限时悬赏（产量最稀，别乱花）' },
@@ -1030,19 +1030,19 @@ window.DATA = (function () {
     ] },
     { id: 'equip', title: '③ 装备与强化', body: [
       '装备 6 种品质：普通 / 精良 / 稀有 / 史诗 / 传说 / **神话**，品质越高基础值和词条越多。',
-      '神话（血统神装）：残域第 21 张图起，**守关 Boss** 才有概率掉；六套各对应一支血统（狼人/修真/血族/科技/念动力/泰坦），' +
-      '只有**同血统的人**穿得上，凑齐 2/4/6 件各有一档效果——末段想继续变强，就靠给主力一人配齐一套。',
-      '血统神装箱：通关**第 20 个世界**后，异界商店才会上架（39000 异界结晶）。开出来保底是【传说】，' +
-      '15% 概率升格成【神话·血统神装】——部位与血统都随机，所以凑套仍然要攒。',
+      '神话（命格神装）：残域第 21 张图起，**守关 Boss** 才有概率掉；六套各对应一支命格（狼人/修真/绯红/科技/念动力/泰坦），' +
+      '只有**同命格的人**穿得上，凑齐 2/4/6 件各有一档效果——末段想继续变强，就靠给主力一人配齐一套。',
+      '命格神装箱：通关**第 20 个世界**后，异界商店才会上架（39000 异界结晶）。开出来保底是【传说】，' +
+      '15% 概率升格成【神话·命格神装】——部位与命格都随机，所以凑套仍然要攒。',
       '掉落的档位跟着世界走：W01~W02 只出精良、W03~W05 才有稀有、W06 起出史诗、W10 之后才见传说；' +
       '同一种货，守关比精英好一档、精英比杂兵好一档，困难/地狱再各抬一档（但抬不破本段上限）。',
       '主角和每名伙伴都是 6 个槽位：武器 / 头部 / 胸甲 / 手部 / 腿部 / 饰品，六个部位都能穿。',
       '强化最高 +20，消耗对应等级的强化材料（不够时用点数代用）+ 异界结晶；强化失败不会降级。',
       '材料按强化等级分 5 档：+0~4 基础金属、+5~9 强化合金、+10~14 异界合金、+15~19 虚空晶体、+20 灯阁残片。',
       'T4/T5 材料从 W04 / W05 之后的精英和 Boss 掉；通关 W04 / W06 后商店也会上架，不用死刷。',
-      '世界套装 2 / 4 / 6 件激活额外效果（6 件效果要全身同一世界的套装）；血统套装也是 2 / 4 / 6 件，' +
-      '第 10 张图起**每张图都有六支血统各自的套装**，只有同血统的人穿得上、而且只认同一张图的件；' +
-      '血统神装（神话）2 / 4 / 6 件，规矩一样但只有神话档才有。',
+      '世界套装 2 / 4 / 6 件激活额外效果（6 件效果要全身同一世界的套装）；命格套装也是 2 / 4 / 6 件，' +
+      '第 10 张图起**每张图都有六支命格各自的套装**，只有同命格的人穿得上、而且只认同一张图的件；' +
+      '命格神装（神话）2 / 4 / 6 件，规矩一样但只有神话档才有。',
       '装备都在**背包 → 装备**那一栏（道具和装备分开占格子）：重复装备可以「批量分解」换成异界结晶；不想被分解的点详情里的 🔒 锁上。',
       /* V9.5.91（父亲大人）：按钮从队伍页搬到了角色/伙伴详情的装备栏，这句说明跟着改，
          并把新规则一次说清楚——只从没穿的里挑、不抢别人身上的。 */
@@ -1062,11 +1062,11 @@ window.DATA = (function () {
       '顶栏那四颗是**从左到右越来越难得**：◉ 点数最常见、◆ 结晶次之、✦ 晶石最稀，♾ 转生点不按天产、只在转生时结算。',
       '高级货币除了抽卡，还有一条长线出口——「🔑 灯阁权限」（见第 ⑪ 章）：投进去就永久生效，转生也不清空。',
     ] },
-    { id: 'gene', title: '⑤ 血统与铭刻', body: [
-      '**血统就是定位**：狼人=战士、修真=法师、血族=刺客、科技=射手、念动力=辅助、泰坦=肉盾。'
-      + '伙伴卡上写的就是血统；他的技能、套装、境界线全跟着这一支走，不用再记第二套“职业”的说法。',
-      '伙伴的血统是固定的；主角开局就选一次血统，选完不能改——因为**境界线跟着血统走**（见第 ⑬ 章）。',
-      '血统升级消耗异界结晶 + 点数，提升幅度很大，是中期主要成长线。',
+    { id: 'gene', title: '⑤ 命格与铭刻', body: [
+      '**命格就是定位**：狼人=战士、修真=法师、绯红=刺客、科技=射手、念动力=辅助、泰坦=肉盾。'
+      + '伙伴卡上写的就是命格；他的技能、套装、境界线全跟着这一支走，不用再记第二套“职业”的说法。',
+      '伙伴的命格是固定的；主角开局就选一次命格，选完不能改——因为**境界线跟着命格走**（见第 ⑬ 章）。',
+      '命格升级消耗异界结晶 + 点数，**命格满 50 级**封顶；提升幅度很大，是中期主要成长线。',
       '铭刻 20 阶，靠通关进度 + 玩家等级 + 异界结晶解锁，每阶全队属性加成。',
     ] },
     { id: 'corridor', title: '⑥ 深井与转生', body: [
@@ -1127,15 +1127,15 @@ window.DATA = (function () {
       '**游历奇遇**：挂机路上会不定时冒一次随机奇遇（在线、离线都算），有捡材料、遇前辈、挖矿脉、得招募令等。攒满会挂在首页「游历」那一段的进度条上，**不会过期丢东西**，回来点一下就行。',
       '入口：首页「养成」那一组里的「灯阁评级」「秘术阁」，游历奇遇在首页「游历」那一组的进度条上，点名字就是完整面板。',
     ] },
-    { id: 'bloodline', title: '⑬ 血统与境界线：换了血统就换了一套境界', body: [
-      '境界不是一条所有人共用的阶梯，而是**跟着血统走**：选了血族，你就是血奴→血仆→血卫→血将→血侯→血王→血皇→血帝→血祖；选了修真，才是炼气→筑基→金丹→元婴→化神→炼虚→合体→大乘→渡劫。',
-      '每条血统都是 9 大境 × 4 小阶（初期 / 中期 / 后期 / 大圆满），合计 36 阶。**第 1 阶就是这条线的第 1 境·初期**，不存在"凡体"这种还没入门的占位。',
-      '血统在开局就选（不可更改），所以境界线从进游戏那一刻就确定；选完之后，境界页显示的就是你这条线的全部 36 格。',
+    { id: 'bloodline', title: '⑬ 命格与境界线：换了命格就换了一套境界', body: [
+      '境界不是一条所有人共用的阶梯，而是**跟着命格走**：选了绯红，你就是初绯→绯影→绯卫→绯将→绯侯→绯王→绯皇→绯帝→绯祖；选了修真，才是炼气→筑基→金丹→元婴→化神→炼虚→合体→大乘→渡劫。',
+      '每条命格都是 9 大境 × 4 小阶（初期 / 中期 / 后期 / 大圆满），合计 36 阶。**第 1 阶就是这条线的第 1 境·初期**，不存在"凡体"这种还没入门的占位。',
+      '命格在开局就选（不可更改），所以境界线从进游戏那一刻就确定；选完之后，境界页显示的就是你这条线的全部 36 格。',
       '突破要两样东西：等级到线（每阶要求不同等级）+ 渡劫材料与点数。成功后主角全属性永久 +1.4%，满 36 阶合计 +50.4%。',
       '渡劫可能失败：失败只扣材料与点数，**等级不掉**，所以永远有下一次。',
       // V9.5.67（文案体检）：这句原来写"首页养成组里有「血统」和「境界渡劫」"——两个名字都不在那一组里，
       // 照着找会找不到。血统升级在主角卡/伙伴详情里，境界在「主页 → 养成 → 成长」里。
-      '入口：血统升级在「主页最上面的主角卡」和「执灯者 → 伙伴详情」里；境界渡劫在「主页 → 养成 → 成长 → 境界渡劫」。',
+      '入口：命格升级在「主页最上面的主角卡」和「执灯者 → 伙伴详情」里；境界渡劫在「主页 → 养成 → 成长 → 境界渡劫」。',
     ] },
     { id: 'beast', title: '⑭ 伴生体与五行克制', body: [
       '伴生体是第二条养成线：上阵 1 只，给**全队**加属性，主角也吃。',
@@ -1157,11 +1157,11 @@ window.DATA = (function () {
       '**斗法台**：单机没有真 PVP，所以做成"镜像擂台"——守擂者按你自己的队伍战力换算，台数越高越强。每天 5 次，赢了升一台拿 ◆ 异界结晶，输了退一台（保底第 1 台，永远不会卡死）。推图推不动的时候，这里是最稳的异界结晶来源。',
       /* V1.0.1（文案策划会诊）：实装 buyFabao 扣的是 **◉ 点数**，原文写 ◆ 异界结晶 ——
          货币种类写错，玩家会攒错钱。 */
-      '**法宝**：装备给的是数值，法宝给的是「效果」——吸血、开场能量、减伤、闪避这类平时很难堆的东西。花 ◉ 点数买，主角带 1 件，买了自动戴上，随时能换、能摘。它和装备、血统、铭刻互不冲突，是主角的第四条成长线。',
+      '**法宝**：装备给的是数值，法宝给的是「效果」——汲取、开场能量、减伤、闪避这类平时很难堆的东西。花 ◉ 点数买，主角带 1 件，买了自动戴上，随时能换、能摘。它和装备、命格、铭刻互不冲突，是主角的第四条成长线。',
       '入口：首页「养成」那一组的「药园」「斗法台」「法宝」，点名字就是完整面板。',
     ] },
     { id: 'mount', title: '⑰ 坐骑与求签', body: [
-      '**坐骑**和法宝是"一硬一软"的两条主角线：法宝给效果（吸血 / 开场能量 / 减伤），坐骑给**基础数值**（攻击 / 生命 / 防御 / 速度）。',
+      '**坐骑**和法宝是"一硬一软"的两条主角线：法宝给效果（汲取 / 开场能量 / 减伤），坐骑给**基础数值**（攻击 / 生命 / 防御 / 速度）。',
       '坐骑有一处和法宝不一样：**它是全队加成，伙伴也吃**。所以资源紧的时候先买坐骑，收益比只加主角一人的东西更划算。',
       '驯服坐骑要 ◉ 点数 + 强化材料，高阶坐骑另加 ◆ 异界结晶——这是点数、材料、结晶三条资源同时有出口的地方，也是背包里囤的材料不会变废的原因。',
       '同时只骑 1 匹，随时能换；换一匹数字立刻变，不用重练。',
@@ -1185,7 +1185,7 @@ window.DATA = (function () {
     skills: {
       s1: { name: '求生突刺', desc: '对单体造成 180% 伤害', cd: 3, type: 'dmg', mult: 1.8, target: 'enemy' },
       s2: { name: '潜能爆发', desc: '自身攻击+30%、暴击+15%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.3, critPct: 0.15, turns: 3 }, target: 'self' },
-      ult: { name: '血脉解放', desc: '对单体造成 400% 伤害并回复伤害 30% 的生命', type: 'dmg', mult: 4.0, lifesteal: 0.3, target: 'enemy' },
+      ult: { name: '命格解放', desc: '对单体造成 400% 伤害并回复伤害 30% 的生命', type: 'dmg', mult: 4.0, lifesteal: 0.3, target: 'enemy' },
       passive: { name: '执灯者直觉', desc: '闪避 +5%，铭刻每阶全属性额外 +3%' },
     },
   };
@@ -1214,10 +1214,10 @@ window.DATA = (function () {
       skillPct: 0.012, spiritPct: 0.006,
       realms: ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'],
     },
-    '血族': {
-      role: '刺客', desc: '爆发吸血。每级：攻击+1.2%、吸血+0.4%',
+    '绯红': {
+      role: '刺客', desc: '爆发汲取。每级：攻击+1.2%、汲取+0.4%',
       atkPct: 0.012, lifesteal: 0.004,
-      realms: ['血奴', '血仆', '血卫', '血将', '血侯', '血王', '血皇', '血帝', '血祖'],
+      realms: ['初绯', '绯影', '绯卫', '绯将', '绯侯', '绯王', '绯皇', '绯帝', '绯祖'],
     },
     '科技': {
       role: '射手', desc: '远程器械。每级：攻击+0.9%、暴击+0.5%',
@@ -1236,12 +1236,12 @@ window.DATA = (function () {
     },
   };
   /* 血统 → 战斗模板（战斗引擎按 kind 决定被动与攻击属性；现在 kind 由血统派生） */
-  const BLOODLINE_KIND = { '狼人': 'warrior', '修真': 'mage', '血族': 'assassin', '科技': 'ranger', '念动力': 'healer', '泰坦': 'tank' };
+  const BLOODLINE_KIND = { '狼人': 'warrior', '修真': 'mage', '绯红': 'assassin', '科技': 'ranger', '念动力': 'healer', '泰坦': 'tank' };
   /* 旧的细分定位（含剑修/控制/吸血鬼）→ 新血统。角色重分配只认这一张表。 */
   const LEGACY_KIND_BLOODLINE = {
     warrior: '狼人', saber: '狼人',
     tank: '泰坦',
-    assassin: '血族', vampire: '血族',
+    assassin: '绯红', vampire: '绯红',
     mage: '修真', controller: '修真',
     ranger: '科技',
     healer: '念动力', support: '念动力',
@@ -1261,7 +1261,7 @@ window.DATA = (function () {
     '狼人': {   // 战士：**通用近战**——剑修和狂战都在这支血统里，所以不写爪也不写剑
       s1: { name: '破军斩', desc: '对单体造成 170% 伤害，并无视 25% 防御、附加破防 2 回合', cd: 3, type: 'dmg', mult: 1.7, pierce: 0.25, status: { id: 'sunder', turns: 2 }, target: 'enemy' },
       s2: { name: '战意咆哮', desc: '自身攻击+25%、暴击+10%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.25, critPct: 0.10, turns: 3 }, target: 'self' },
-      ult: { name: '血战八方', desc: '对敌方全体造成 230% 伤害', type: 'dmg', mult: 2.3, target: 'allEnemies' },
+      ult: { name: '鏖战八方', desc: '对敌方全体造成 230% 伤害', type: 'dmg', mult: 2.3, target: 'allEnemies' },
       passive: { name: '战意', desc: '攻击 +10%；残血时再 +20%' },
     },
     '修真': {   // 法师：**通用法术**——修仙者与元素师都在这支血统里
@@ -1270,17 +1270,17 @@ window.DATA = (function () {
       ult: { name: '万法归宗', desc: '对敌方全体造成 260% 伤害', type: 'dmg', mult: 2.6, target: 'allEnemies' },
       passive: { name: '灵根', desc: '技能伤害 +12%' },
     },
-    '血族': {
+    '绯红': {
       s1: { name: '猩红汲取', desc: '对单体造成 170% 伤害，并吸取伤害 25% 的生命', cd: 3, type: 'dmg', mult: 1.7, lifesteal: 0.25, target: 'enemy' },
-      s2: { name: '血怒', desc: '自身攻击+25%、吸血+15%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.25, lifesteal: 0.15, turns: 3 }, target: 'self' },
-      ult: { name: '永夜血宴', desc: '对敌方全体造成 260% 伤害，并吸取伤害 20% 的生命', type: 'dmg', mult: 2.6, lifesteal: 0.2, target: 'allEnemies' },
-      passive: { name: '血族本能', desc: '吸血效果随血统等级提升；暴击率 +10%' },
+      s2: { name: '绯怒', desc: '自身攻击+25%、汲取+15%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.25, lifesteal: 0.15, turns: 3 }, target: 'self' },
+      ult: { name: '永夜绯宴', desc: '对敌方全体造成 260% 伤害，并吸取伤害 20% 的生命', type: 'dmg', mult: 2.6, lifesteal: 0.2, target: 'allEnemies' },
+      passive: { name: '绯红本能', desc: '汲取效果随命格等级提升；暴击率 +10%' },
     },
     '科技': {
       s1: { name: '磁轨狙击', desc: '对单体造成 185% 伤害（高暴击）', cd: 3, type: 'dmg', mult: 1.85, target: 'enemy' },
       s2: { name: '过载核心', desc: '自身攻击+30%、暴击+20%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.3, critPct: 0.2, turns: 3 }, target: 'self' },
       ult: { name: '湮灭炮击', desc: '对单体造成 450% 伤害（无视 30% 防御）', type: 'dmg', mult: 4.5, pierce: 0.3, target: 'enemy' },
-      passive: { name: '机械专精', desc: '暴击伤害 +25%（攻击与暴击随血统等级提升）' },
+      passive: { name: '机械专精', desc: '暴击伤害 +25%（攻击与暴击随命格等级提升）' },
     },
     '念动力': {  // 辅助：治疗 + 增益 + 控场（父亲大人：控制不单独成职业，谁都能带控制技能）
       s1: { name: '安抚之光', desc: '治疗生命最低的队友 200% 精神', cd: 3, type: 'heal', mult: 2.0, target: 'lowest' },
@@ -1325,7 +1325,7 @@ window.DATA = (function () {
      6 阶起每阶给"全属性 +0.8% → +0.5%"递减（15 阶合计约 +9.75%），
      成本 6250 起每阶 ×1.15（第 20 阶约 5 万血统结晶）—— 长线但追得上。 */
   const GENE_LOCK_NAMES = ['初醒', '强化', '突破', '超越', '完全解锁', '回响', '刻痕', '铭心', '贯脉',
-    '破妄', '凝神', '铸骨', '燃血', '登阶', '归元', '御虚', '承天', '弑神', '无相', '灯主'];
+    '破妄', '凝神', '铸体', '淬火', '登阶', '归元', '御虚', '承天', '凌绝', '无相', '灯主'];
   const GENE_LOCKS = (function () {
     const first5 = [
       /* V9.6.134：把要求写成**结构化的字段**（w = 要通关的世界、lv = 要到的等级），
@@ -1333,8 +1333,8 @@ window.DATA = (function () {
          于是 9.6.130 把铭刻扩到 20 阶之后，第 6 阶以后**永远点不动**（改一半的典型）。 */
       { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 3500 } },
       { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', w: 'W03', lv: 20, cost: { otherworld: 10500 } },
-      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道残骸带·普通', w: 'W06', lv: 40, cost: { otherworld: 28000 } },
-      { stage: 4, name: '超越', desc: '血统效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 70000 } },
+      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道废土带·普通', w: 'W06', lv: 40, cost: { otherworld: 28000 } },
+      { stage: 4, name: '超越', desc: '命格效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 70000 } },
       { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', w: 'W12', lv: 80, cost: { otherworld: 175000 } },
     ];
     const out = first5.slice();
@@ -1376,7 +1376,7 @@ window.DATA = (function () {
     // 离线上限按"每 10 级 +0.2 小时"给：50 级正好 +1 小时（跟铭刻 4h、灯阁权限 1h 凑成满配 +6h）
     { id: 'medical',  name: '医疗室',     base: 875,  desc: '每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时' },
     { id: 'workshop', name: '装备工坊',   base: 1125, desc: '每级：装备强化费用 -1%（最多-40%）' },
-    { id: 'geneLab',  name: '血统实验室', base: 1500, desc: '每级：血统升级费用 -1%（最多-40%）' },
+    { id: 'geneLab',  name: '命格实验室', base: 1500, desc: '每级：命格升级费用 -1%（最多-40%）' },
   ];
   const buildingCost = (id, lv) => {
     const b = BUILDINGS.find(x => x.id === id);
@@ -1423,10 +1423,10 @@ window.DATA = (function () {
     { id: 'juyun',  name: '聚运术', ico: '🍀', key: 'dropPct',  rate: 0.003, max: 30, base: 20, step: 4, info: '掉落概率' },
     { id: 'jingxin', name: '静心诀', ico: '🌙', key: 'offlinePct', rate: 0.003, max: 30, base: 20, step: 4, info: '离线效率' },
     // 补齐到 42 条：数值都很小，靠"永远还有下一级"撑长线
-    { id: 'xueqi',  name: '血气诀', ico: '🩸', key: 'lifesteal', rate: 0.001, max: 40, base: 22, step: 4, info: '吸血' },
+    { id: 'xueqi',  name: '汲元诀', ico: '🪷', key: 'lifesteal', rate: 0.001, max: 40, base: 22, step: 4, info: '汲取' },
     { id: 'shouyi', name: '守御术', ico: '⛰', key: 'resPct',    rate: 0.002, max: 40, base: 22, step: 4, info: '减伤' },
     { id: 'shendu', name: '神读咒', ico: '📖', key: 'spiritPct', rate: 0.004, max: 40, base: 16, step: 3, info: '精神（技能倍率）' },
-    { id: 'tiegu',  name: '铁骨功', ico: '🦴', key: 'defPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队防御' },
+    { id: 'tiegu',  name: '铁骨功', ico: '🦾', key: 'defPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队防御' },
     { id: 'liehuo', name: '烈火诀', ico: '🔥', key: 'atkPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队攻击' },
     { id: 'hanshui', name: '寒水诀', ico: '❄️', key: 'hpPct',    rate: 0.005, max: 50, base: 12, step: 3, info: '全队生命' },
     { id: 'leiting', name: '雷霆诀', ico: '⚡', key: 'spdPct',   rate: 0.004, max: 40, base: 15, step: 3, info: '全队速度' },
@@ -1435,7 +1435,7 @@ window.DATA = (function () {
     { id: 'lifa',   name: '力煞诀', ico: '💪', key: 'critDmg',  rate: 0.006, max: 30, base: 24, step: 5, info: '暴击伤害' },
     { id: 'lingbo', name: '凌波步', ico: '🌊', key: 'evaPct',   rate: 0.002, max: 30, base: 24, step: 5, info: '闪避' },
     { id: 'bishou', name: '闭守诀', ico: '🛡', key: 'resPct',   rate: 0.003, max: 30, base: 24, step: 5, info: '减伤' },
-    { id: 'xuelian', name: '血炼术', ico: '🧪', key: 'lifesteal', rate: 0.0015, max: 30, base: 26, step: 5, info: '吸血' },
+    { id: 'xuelian', name: '炼元术', ico: '🧪', key: 'lifesteal', rate: 0.0015, max: 30, base: 26, step: 5, info: '汲取' },
     { id: 'tianyan', name: '天眼通', ico: '🔭', key: 'critPct', rate: 0.0015, max: 30, base: 26, step: 5, info: '暴击率' },
     { id: 'dilong', name: '地龙诀', ico: '🐉', key: 'hpPct',    rate: 0.006, max: 30, base: 26, step: 5, info: '全队生命' },
     { id: 'jinzhong', name: '金钟罩', ico: '🔔', key: 'defPct', rate: 0.006, max: 30, base: 26, step: 5, info: '全队防御' },
@@ -1470,7 +1470,7 @@ window.DATA = (function () {
     { id: 'tv02', ico: '💧', name: '灵泉洗髓',   w: 12, desc: '一口灵泉，喝下去浑身通透。', effect: { points: 20 } },
     { id: 'tv03', ico: '📜', name: '残卷觅迹',   w: 10, desc: '捡到半卷功法残篇，勉强化进了修为里。', effect: { points: 2000, otherworld: 5 } },
     { id: 'tv04', ico: '🕳', name: '秘境裂隙',   w: 8,  desc: '空间裂开一道缝，里面的东西被你捞了出来。', effect: { otherworld: 40 } },
-    { id: 'tv05', ico: '🦴', name: '妖兽伏击',   w: 9,  desc: '一头低阶妖兽扑上来，被你随手拍死。', effect: { points: 1200, item: 'mat_t2' } },
+    { id: 'tv05', ico: '🐗', name: '妖兽伏击',   w: 9,  desc: '一头低阶妖兽扑上来，被你随手拍死。', effect: { points: 1200, item: 'mat_t2' } },
     { id: 'tv06', ico: '🧙', name: '前辈指点',   w: 7,  desc: '一位路过的老修士指点了两句，胜过苦修数日。', effect: { holy: 30 } },
     { id: 'tv07', ico: '💎', name: '晶石矿脉',   w: 5,  desc: '山壁里露出半截晶石矿脉。', effect: { otherworld: 90 } },
     { id: 'tv08', ico: '📦', name: '遗落行囊',   w: 9,  desc: '不知哪位同行者丢下的行囊。', effect: { item: 'exp_s' } },
@@ -1505,7 +1505,7 @@ window.DATA = (function () {
     { id: 'tv35', ico: '🗝', name: '无名钥匙',   w: 2,  desc: '一把没有锁孔的钥匙，你收进了怀里。', effect: { item: 'ticket_lim' } },
     { id: 'tv36', ico: '🎣', name: '潭底钓宝',   w: 2,  desc: '潭底钓上来一个沉甸甸的箱子。', effect: { item: 'box_ssr', points: 3000 } },
     { id: 'tv37', ico: '🏔', name: '云顶吐纳',   w: 2,  desc: '在云顶吐纳一场，灵气灌顶。', effect: { holy: 120, points: 4000 } },
-    { id: 'tv38', ico: '🧬', name: '血玉现世',   w: 2,  desc: '地里渗出一块血玉，握在手里发烫。', effect: { otherworld: 80 } },
+    { id: 'tv38', ico: '🧬', name: '赤玉现世',   w: 2,  desc: '地里渗出一块赤玉，握在手里发烫。', effect: { otherworld: 80 } },
     { id: 'tv39', ico: '🌕', name: '月华灌体',   w: 1,  desc: '月华落下来，把你整个人洗了一遍。', effect: { holy: 200, otherworld: 260, points: 6000 } },
     { id: 'tv40', ico: '🎇', name: '大道显化',   w: 1,  desc: '你眼前晃过一线大道，抓不住，但确实抓到了一把东西。', effect: { item: 'box_ur', holy: 300 } },
   ];
@@ -1532,7 +1532,7 @@ window.DATA = (function () {
   const GARDEN_PLOT_REQ = [
     { w: 'W09', name: '通关 巨兽孤屿·普通' },
     { w: 'W18', name: '通关 白墙疗养院·普通' },
-    { w: 'W27', name: '通关 百鬼夜行·普通' },
+    { w: 'W27', name: '通关 长明夜行·普通' },
     { w: 'W36', name: '通关 灯阁王座·普通' },
   ];
   const GARDEN = [
@@ -1608,7 +1608,7 @@ window.DATA = (function () {
      装备是"数值"，法宝是"效果"：每件法宝给一条特殊效果（开场能量、吸血、减伤…），
      主角带上 1 件。它对应参考图角色页右侧那排按钮里的"法宝"那一栏。 */
   const FABAO = [
-    { id: 'fb01', name: '噬魂珠', rarity: 'R',   cost: 1000,   eff: { lifesteal: 0.04 },                     desc: '吸血 +4%' },
+    { id: 'fb01', name: '噬魂珠', rarity: 'R',   cost: 1000,   eff: { lifesteal: 0.04 },                     desc: '汲取 +4%' },
     { id: 'fb02', name: '疾风符', rarity: 'R',   cost: 1000,   eff: { spdPct: 0.06 },                        desc: '速度 +6%' },
     { id: 'fb03', name: '玄铁盾', rarity: 'SR',  cost: 3750,  eff: { defPct: 0.10, dmgReduce: 0.03 },       desc: '防御 +10%、减伤 +3%' },
     { id: 'fb04', name: '聚灵幡', rarity: 'SR',  cost: 3750,  eff: { initEnergy: 25 },                      desc: '开场能量 +25' },
@@ -1625,7 +1625,7 @@ window.DATA = (function () {
     { id: 'fb14', name: '离火轮', rarity: 'SR',  cost: 4250,  eff: { atkPct: 0.08, skillPct: 0.06 }, desc: '攻击 +8%、技能伤害 +6%' },
     { id: 'fb15', name: '冰髓瓶', rarity: 'SR',  cost: 4000,  eff: { hpPct: 0.12, resPct: 0.02 },    desc: '生命 +12%、减伤 +2%' },
     { id: 'fb16', name: '风雷靴', rarity: 'SR',  cost: 4125,  eff: { spdPct: 0.10, evaPct: 0.04 },   desc: '速度 +10%、闪避 +4%' },
-    { id: 'fb17', name: '血玉环', rarity: 'SSR', cost: 13750, eff: { lifesteal: 0.06, atkPct: 0.06 }, desc: '吸血 +6%、攻击 +6%' },
+    { id: 'fb17', name: '赤玉环', rarity: 'SSR', cost: 13750, eff: { lifesteal: 0.06, atkPct: 0.06 }, desc: '汲取 +6%、攻击 +6%' },
     { id: 'fb18', name: '九幽幡', rarity: 'SSR', cost: 16250, eff: { skillPct: 0.16, critDmg: 0.20 }, desc: '技能伤害 +16%、暴击伤害 +20%' },
     { id: 'fb19', name: '金乌羽', rarity: 'SSR', cost: 16250, eff: { critPct: 0.06, critDmg: 0.25 },  desc: '暴击率 +6%、暴击伤害 +25%' },
     { id: 'fb20', name: '混沌钟', rarity: 'UR',  cost: 60000, eff: { defPct: 0.15, resPct: 0.08, hpPct: 0.15 }, desc: '防御 +15%、减伤 +8%、生命 +15%' },
@@ -1990,7 +1990,7 @@ window.DATA = (function () {
   // pct 里的每一项都会真的进属性计算（见 core 的 beastPct），说明也由同一份数据派生。
   const BEAST_PCT_NAME = {
     atkPct: '攻击', defPct: '防御', hpPct: '生命', spdPct: '速度',
-    critPct: '暴击率', skillPct: '技能伤害', lifesteal: '吸血', dmgReduce: '减伤',
+    critPct: '暴击率', skillPct: '技能伤害', lifesteal: '汲取', dmgReduce: '减伤',
   };
   const BEASTS = [
     { id: 'bs01', name: '铁脊狼',   rarity: 'N',   elem: '金', pct: { atkPct: 0.020 } },
@@ -2055,7 +2055,7 @@ window.DATA = (function () {
       /* V9.6.79：神话的唯一购买入口 —— **通关第 20 个世界**才上架，而且买的还是"箱"。
          定价按后期收入量过：后期异界结晶约 3400/天，25000 ≈ 一周多一点 ——
          是一件值得攒的东西，又不是随手就买（一箱 15% 出神话，凑一套要攒很久）。 */
-      { item: 'box_myth', name: '血统神装箱', price: 39000, stock: -1, req: { world: 'W20' } },
+      { item: 'box_myth', name: '命格神装箱', price: 39000, stock: -1, req: { world: 'W20' } },
       { item: 'mat_t2', name: '强化合金×10', price: 50, count: 10, stock: -1 },
       { item: 'mat_t3', name: '异界合金×5', price: 100, count: 5, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 300, count: 5, stock: -1, req: { world: 'W04' } },
@@ -2201,7 +2201,7 @@ window.DATA = (function () {
     { id: 'tasks',     name: '每日任务',   world: 'W01', stage: 4,  tip: '通关 菌毯巢穴·第4关 解锁' },
     { id: 'geneLock',  name: '铭刻',     world: 'W01', stage: 12, tip: '通关 菌毯巢穴·第12关 解锁' },
     { id: 'corridor',  name: '深井',   world: 'W01', stage: 12, tip: '通关 菌毯巢穴·第12关 解锁' },
-    { id: 'bloodline', name: '血统强化',   world: 'W02', stage: 1,  tip: '通关 潜影窟·第1关 解锁' },
+    { id: 'bloodline', name: '命格强化',   world: 'W02', stage: 1,  tip: '通关 潜影窟·第1关 解锁' },
     { id: 'reincarn',  name: '转生',       world: 'W03', stage: 12, tip: '通关 怨声旧宅·第12关 解锁' },
     { id: 'beast',     name: '伴生体',     world: 'W02', stage: 3,  tip: '通关 潜影窟·第3关 解锁' },
   ];
@@ -2267,9 +2267,9 @@ window.DATA = (function () {
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
     { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { points: 100 },
       check: S => S.corridor.floor >= 2 },
-    { id: 'q12', name: '新的恐怖', desc: '通关 潜影窟·第1关', reward: { otherworld: 50 }, unlock: 'bloodline',
+    { id: 'q12', name: '新的暗涌', desc: '通关 潜影窟·第1关', reward: { otherworld: 50 }, unlock: 'bloodline',
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[0] > 0 },
-    { id: 'q13', name: '血脉觉醒', desc: '升级 1 次血统（主角或伙伴）', reward: { points: 5000 },
+    { id: 'q13', name: '命格觉醒', desc: '升级 1 次命格（主角或伙伴）', reward: { points: 5000 },
       check: S => S.player.bloodlineLv >= 1 || Object.values(S.chars).some(c => c.bloodlineLv >= 1) },
     { id: 'q_realm', name: '境界渡劫', desc: '突破 1 小阶境界', reward: { points: 3000 },
       check: S => (S.player.realm || 0) >= 1 },

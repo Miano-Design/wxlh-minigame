@@ -92,9 +92,9 @@ t('升星（碎片从稀有度公共池扣）', Core.starUp('C021').ok && Core.S
 Core.addCur("otherworld", 5000);          // V9.6.134：技能芯片已并入异界结晶（×3.5）
 t('技能升级', Core.skillUp('C021', 0).ok);
 Core.addCur('otherworld', 280000);          // V9.6.134：血统结晶已并入异界结晶（×28）
-t('血统强化未解锁时被拒', Core.bloodlineUpgrade('C021').ok === false);
+t('命格强化未解锁时被拒', Core.bloodlineUpgrade('C021').ok === false);
 Core.S.unlocks.bloodline = true;   // 血统强化是通关 潜影窟·第1关 之后才开的线
-t('血统升级', Core.bloodlineUpgrade('C021').ok);
+t('命格升级', Core.bloodlineUpgrade('C021').ok);
 
 // 3. 属性计算
 const st = Core.effectiveStats('C021');
@@ -287,7 +287,7 @@ t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
   const r1 = Core.refineFabao('fb01');
   const e1 = Core.effectivePlayerStats().lifesteal || 0;
   t('法宝祭炼：等级 +1 且**效果真的放大**', r1.ok && Core.fabaoLv('fb01') === 1 && e1 > e0,
-    (r1.msg || '') + ' · 吸血 ' + (e0 * 100).toFixed(1) + '% → ' + (e1 * 100).toFixed(1) + '%');
+    (r1.msg || '') + ' · 汲取 ' + (e0 * 100).toFixed(1) + '% → ' + (e1 * 100).toFixed(1) + '%');
   t('法宝祭炼上限 15 级', D.FABAO_MAX_LV === 15, '上限 ' + D.FABAO_MAX_LV);
 }
 
@@ -333,10 +333,10 @@ setParty(['C021']);
   Core.S.player.level = 20;
   const after = Core.effectivePlayerStats();
   t('主角随玩家等级成长', after.atk > before.atk && after.hp > before.hp);
-  t('主角血统选择（开局必经，不受解锁限制）', Core.choosePlayerBloodline('狼人').ok);
+  t('主角命格选择（开局必经，不受解锁限制）', Core.choosePlayerBloodline('狼人').ok);
   Core.addCur('otherworld', 280000); Core.addCur('points', 1000000);
-  t('主角血统升级', Core.upgradePlayerBloodline().ok && Core.S.player.bloodlineLv === 1);
-  t('血统不可更改', !Core.choosePlayerBloodline('科技').ok);   // V9.6.86：原来用的「魔法」血统已删，那是假通过
+  t('主角命格升级', Core.upgradePlayerBloodline().ok && Core.S.player.bloodlineLv === 1);
+  t('命格不可更改', !Core.choosePlayerBloodline('科技').ok);   // V9.6.86：原来用的「魔法」血统已删，那是假通过
   const eq6 = Core.grantEquip('W01', 'SR', 'head');
   eq6.equip.set = null; eq6.equip.bloodSet = null; // 固定为普通装备，排除套装随机性
   t('头部装备主角可穿', Core.equipItem('@player', eq6.equip.uid));
@@ -373,11 +373,11 @@ setParty(['C021']);
 // 19. 血统：开局可觉醒（境界线跟着血统走），觉醒后不可更改
 {
   Core.S.player.level = 1; Core.S.player.bloodline = null; Core.S.player.bloodlineLv = 0;
-  t('Lv.1 就能觉醒血统', Core.choosePlayerBloodline('狼人').ok);
-  t('血统选定后不可更改', !Core.choosePlayerBloodline('血族').ok);
+  t('Lv.1 就能觉醒命格', Core.choosePlayerBloodline('狼人').ok);
+  t('命格选定后不可更改', !Core.choosePlayerBloodline('绯红').ok);
   t('狼人有自己的境界线', Core.realmState().curName === '兽崽初期' && D.BLOODLINES['狼人'].realms[0] === '兽崽');
-  t('每条血统都是 9 大境 × 4 小阶', Object.values(D.BLOODLINES).every(b => b.realms.length === 9) && D.REALM_STAGE_COUNT === 36);
-  t('血统不存在会被拒', !Core.choosePlayerBloodline('不存在的血统').ok);
+  t('每条命格都是 9 大境 × 4 小阶', Object.values(D.BLOODLINES).every(b => b.realms.length === 9) && D.REALM_STAGE_COUNT === 36);
+  t('命格不存在会被拒', !Core.choosePlayerBloodline('不存在的命格').ok);
 }
 
 // 20. 新建角色（多主角）
@@ -463,8 +463,8 @@ setParty(['C021']);
     return got === expect;
   })());
   t('未觉醒用通用技能', Core.protagonistSkills().s1.name === '求生突刺');
-  Core.S.player.bloodline = '血族';
-  t('觉醒后切换血统技能', Core.protagonistSkills().s1.name === '猩红汲取');
+  Core.S.player.bloodline = '绯红';
+  t('觉醒后切换命格技能', Core.protagonistSkills().s1.name === '猩红汲取');
   Core.S.player.bloodline = null;
 }
 
@@ -481,7 +481,7 @@ setParty(['C021']);
       else plain++;
     }
   }
-  t('SR装备含世界套装与血统套装', world > 100 && cls > 30);
+  t('SR装备含世界套装与命格套装', world > 100 && cls > 30);
   for (let i = 0; i < 100; i++) {
     const e = Core.grantEquip('W20', 'N');
     if (e.equip && (e.equip.set || e.equip.bloodSet)) plain = -999;
@@ -515,7 +515,7 @@ setParty(['C021']);
   const otherWith = Core.effectiveStats(other).atk;
   Core.S.equips['eqc3'].bloodSet = null; Core.S.equips['eqc4'].bloodSet = null;
   const otherWithout = Core.effectiveStats(other).atk;
-  t('血统套装按"穿对人"激活（狼人 2 件给攻击）', vampWith > vampWithout && otherWith === otherWithout);
+  t('命格套装按"穿对人"激活（狼人 2 件给攻击）', vampWith > vampWithout && otherWith === otherWithout);
   delete Core.S.equips['eqc1']; delete Core.S.equips['eqc2']; delete Core.S.equips['eqc3']; delete Core.S.equips['eqc4'];
   Core.S.equipped[vamp] = { weapon: null, armor: null, accessory: null };
   Core.S.equipped[other] = { weapon: null, armor: null, accessory: null };
@@ -523,21 +523,21 @@ setParty(['C021']);
 
 // 26. 穿戴规则（canEquip）：血统套装/神装限同血统、专属限本人、槽位限角色类型
 {
-  const vamp = D.characters.find(c => c.bloodline === '血族').id;
+  const vamp = D.characters.find(c => c.bloodline === '绯红').id;
   const tech = D.characters.find(c => c.bloodline === '科技').id;
   if (!Core.S.chars[vamp]) Core.addChar(vamp);
   if (!Core.S.chars[tech]) Core.addChar(tech);
   const bloodEq = { uid: 'x1', slot: 'weapon', bloodSet: '科技' };
-  t('科技套装科技血统可穿', Core.canEquip(tech, bloodEq) === true);
-  t('科技套装血族穿不上', Core.canEquip(vamp, bloodEq) === false);
+  t('科技套装科技命格可穿', Core.canEquip(tech, bloodEq) === true);
+  t('科技套装绯红穿不上', Core.canEquip(vamp, bloodEq) === false);
   if (!Core.S.player.bloodline) Core.choosePlayerBloodline('修真');   // 前面的用例可能换过档
   const myBl = Core.S.player.bloodline;
-  t('主角穿不上别的血统的套装', Core.canEquip('@player', { uid: 'x1b', slot: 'weapon', bloodSet: myBl === '科技' ? '血族' : '科技' }) === false);
-  t('主角穿自己血统的套装可以', !!myBl && Core.canEquip('@player', { uid: 'x2', slot: 'weapon', bloodSet: myBl }) === true, myBl || '(主角没选血统)');
+  t('主角穿不上别的命格的套装', Core.canEquip('@player', { uid: 'x1b', slot: 'weapon', bloodSet: myBl === '科技' ? '绯红' : '科技' }) === false);
+  t('主角穿自己命格的套装可以', !!myBl && Core.canEquip('@player', { uid: 'x2', slot: 'weapon', bloodSet: myBl }) === true, myBl || '(主角没选命格)');
   t('专属装备限本人', Core.canEquip(vamp, { uid: 'x3', slot: 'weapon', charId: tech }) === false && Core.canEquip(tech, { uid: 'x3', slot: 'weapon', charId: tech }) === true);
   t('招募角色也有头部槽（世界套装4/6件可达）', Core.canEquip(vamp, { uid: 'x4', slot: 'head' }) === true);
   t('主角六槽全开', Core.canEquip('@player', { uid: 'x5', slot: 'head' }) === true);
-  t('equipItem 拒绝血统对不上的套装', Core.equipItem(vamp, (Core.S.equips['x1'] = Object.assign({ name: 't', rarity: 'SR', enhance: 0, base: {}, affixes: [], set: null }, bloodEq), 'x1')) === false);
+  t('equipItem 拒绝命格对不上的套装', Core.equipItem(vamp, (Core.S.equips['x1'] = Object.assign({ name: 't', rarity: 'SR', enhance: 0, base: {}, affixes: [], set: null }, bloodEq), 'x1')) === false);
   delete Core.S.equips['x1'];
 }
 
@@ -787,9 +787,9 @@ setParty(['C021']);
   t('技能 Lv.0 起（三条都是 0）', (S.player.skillLv || []).length === 3 && S.player.skillLv.every(v => v === 0));
   t('建筑 0 级起', Object.values(S.buildings).every(v => v === 0));
   t('灯阁评级 Lv.0 起', S.sect.lv === 0);
-  t('血统 / 铭刻 / 权限 / 境界 都是 0 起', S.player.bloodlineLv === 0 && S.player.geneLock === 0 && S.auth === 0 && (S.player.realm || 0) === 0);
+  t('命格 / 铭刻 / 权限 / 境界 都是 0 起', S.player.bloodlineLv === 0 && S.player.geneLock === 0 && S.auth === 0 && (S.player.realm || 0) === 0);
   t('伙伴 Lv.0 起', (() => { Core.addChar('C021'); return S.chars.C021.lv === 0 && S.chars.C021.skillLv.every(v => v === 0); })());
-  t('开局就能选血统（门槛跟着等级口径一起降到 0）', (() => {
+  t('开局就能选命格（门槛跟着等级口径一起降到 0）', (() => {
     Core.newGame(); Core.setPlayerName('口径2');
     return Core.choosePlayerBloodline('修真').ok === true;
   })());
@@ -832,7 +832,7 @@ setParty(['C021']);
   t('跨天：斗法台次数恢复', Core.arenaState().left === D.ARENA_DAILY);
   t('跨天：求签可以再抽（昨天的签文作废）', Core.signState().canDraw && Core.signState().idlePct === 0);
   t('跨天：登录奖励可以再领', !!Core.loginReward());
-  t('跨天不会丢资产（点数与血统等级、装备都在）', Core.S.cur.points >= 12345 && Core.S.player.bloodlineLv === 3 && !!Core.S.equips.ux);
+  t('跨天不会丢资产（点数与命格等级、装备都在）', Core.S.cur.points >= 12345 && Core.S.player.bloodlineLv === 3 && !!Core.S.equips.ux);
 }
 {
   // ② 转生：该保留的保留、该重置的重置，都不能含糊
@@ -933,7 +933,7 @@ setParty(['C021']);
   Core.S.sect = { lv: NaN, exp: NaN };
   Core.migrate();
   t('脏档：未知伙伴被清掉', Core.S.chars['不存在的人'] === undefined && !!Core.S.chars.C021);
-  t('脏档：队伍里不留幽灵伙伴（否则渲染会崩）', Core.S.party.indexOf('不存在的人') < 0);
+  t('脏档：队伍里不留游影伙伴（否则渲染会崩）', Core.S.party.indexOf('不存在的人') < 0);
   t('脏档：未知道具被清掉', Core.S.items['不存在的道具'] === undefined && Core.S.items.exp_s === 3);
   t('脏档：非法装备被清掉、穿戴引用也跟着清', Core.S.equips.bad === undefined && !Core.S.equipped['@player'].weapon);
   t('脏档：NaN / 负数收敛成合法值', Number.isFinite(Core.S.cur.points) && Core.S.cur.points >= 0
@@ -1318,14 +1318,14 @@ setParty(['C021']);
 
 // 49. 血清（永久强化剂）：说明与实装同源 / 炼化 / 上限 / 血统限制 / 真的进属性
 {
-  Core.newGame(); Core.setPlayerName('血清');
-  t('新档自带血清字段', !!Core.S.serums);
-  t('血清表每项都有对应道具', D.SERUMS.every(s => {
+  Core.newGame(); Core.setPlayerName('精华');
+  t('新档自带精华字段', !!Core.S.serums);
+  t('精华表每项都有对应道具', D.SERUMS.every(s => {
     const it = D.ITEMS[D.SERUM_ITEM(s.id)];
     return it && it.type === 'serum' && it.serum && it.serum.key === s.key && it.serum.max === s.max;
   }));
-  t('血清文案从数据派生（攻击 +1.0%）', D.ITEMS['serum_sr_atk'].desc.indexOf('攻击 永久 +1.0%') >= 0);
-  t('血统血清文案带专属标记', D.ITEMS['serum_sr_bl_vampire'].desc.indexOf('【血族专属】') === 0);
+  t('精华文案从数据派生（攻击 +1.0%）', D.ITEMS['serum_sr_atk'].desc.indexOf('攻击 永久 +1.0%') >= 0);
+  t('命格精华文案带专属标记', D.ITEMS['serum_sr_bl_vampire'].desc.indexOf('【绯红专属】') === 0);
 
   t('材料不足时拒绝炼化', Core.craftSerum('sr_atk', 1).ok === false);
   Core.S.items.mat_t1 = 20; Core.S.cur.points = 5000;
@@ -1333,7 +1333,7 @@ setParty(['C021']);
   // 单价从数据表读，别写死——血清价改过一次（V9.5.70 整体压慢 ×1.5）
   t('炼化扣材料与点数', c1.ok && c1.count === 3 && Core.S.items.mat_t1 === 5
     && Core.S.cur.points === 5000 - D.SERUMS.find(x => x.id === 'sr_atk').points * 3);
-  t('炼化产出血清道具', (Core.S.items['serum_sr_atk'] || 0) === 3);
+  t('炼化产出精华道具', (Core.S.items['serum_sr_atk'] || 0) === 3);
   /* ⚠️ 这一条原来只是"点了返回 false"，而 sr_spd 现在有通关门槛（W03）——
      不先把 W03 打通的话，它是因为**没解锁**才 false，测不到"点数不足"这件事（假绿）。 */
   Core.S.worlds.W01 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
@@ -1346,7 +1346,7 @@ setParty(['C021']);
   Core.addChar(cid);
   const atkBefore = Core.effectiveStats(cid).atk;
   const r1 = Core.useSerum(cid, 'sr_atk', 2);
-  t('喂血清后属性真的变高', r1.ok && Core.effectiveStats(cid).atk > atkBefore);
+  t('喂精华后属性真的变高', r1.ok && Core.effectiveStats(cid).atk > atkBefore);
   t('服用支数写进存档', Core.serumTaken(cid, 'sr_atk') === 2);
 
   Core.S.items['serum_sr_atk'] = 999;
@@ -1354,30 +1354,30 @@ setParty(['C021']);
   t('一次最多吃到上限', capped.ok && Core.serumTaken(cid, 'sr_atk') === 40);
   t('达到上限后拒绝使用', Core.useSerum(cid, 'sr_atk', 1).ok === false);
 
-  t('血统不符时拒绝专属血清', Core.useSerum(cid, 'sr_bl_vampire', 1).ok === false);
-  const vamp = D.characters.find(c => c.bloodline === '血族');
+  t('命格不符时拒绝专属精华', Core.useSerum(cid, 'sr_bl_vampire', 1).ok === false);
+  const vamp = D.characters.find(c => c.bloodline === '绯红');
   Core.addChar(vamp.id);
   Core.S.chars[vamp.id].bloodlineLv = 1;
   Core.S.items['serum_sr_bl_vampire'] = 3;
   const okv = Core.useSerum(vamp.id, 'sr_bl_vampire', 3);
-  t('血统匹配后专属血清可用', okv.ok && Core.serumTaken(vamp.id, 'sr_bl_vampire') === 3);
+  t('命格匹配后专属精华可用', okv.ok && Core.serumTaken(vamp.id, 'sr_bl_vampire') === 3);
 
   const pAtk = Core.effectivePlayerStats().atk;
   Core.S.items['serum_sr_atk'] = 5;
   const pr = Core.useSerum('@player', 'sr_atk', 5);
-  t('主角也能服血清并涨属性', pr.ok && Core.effectivePlayerStats().atk > pAtk);
+  t('主角也能服精华并涨属性', pr.ok && Core.effectivePlayerStats().atk > pAtk);
 
   // 战力必须跟着动（防止"属性涨了、战力没算"），而且"只是持有道具"不算数
   Core.S.serums[cid]['sr_atk'] = 0;
   Core.S.items['serum_sr_atk'] = 10;
   const p0 = Core.power(cid);
-  t('只是持有血清不影响战力', Core.power(cid) === p0);
+  t('只是持有精华不影响战力', Core.power(cid) === p0);
   Core.useSerum(cid, 'sr_atk', 10);
-  t('喂下血清后战力跟着涨', Core.power(cid) > p0);
+  t('喂下精华后战力跟着涨', Core.power(cid) > p0);
 
   /* V9.6.138：血清配方按通关进度开 —— `unlock` 这个字段以前**根本没人读**（写了没做）。
      这一段放在血清用例的**最后**：它要 newGame 一个干净档，插在中间会把上面那些状态冲掉。 */
-  Core.newGame(); Core.setPlayerName('血清门槛');
+  Core.newGame(); Core.setPlayerName('精华门槛');
   Core.S.items.mat_t1 = 99; Core.S.items.mat_t2 = 99; Core.S.items.mat_t4 = 99;
   Core.S.cur.points = 9999999;
   t('unlock:0 的配方开局就能炼', Core.craftSerum('sr_atk', 1).ok);
@@ -1392,7 +1392,7 @@ setParty(['C021']);
   ['W01', 'W02', 'W03'].forEach(w => { Core.S.worlds[w] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } }; });
   t('通关 W03 后二档配方开放', Core.craftSerum('sr_spd', 1).ok);
   t('高阶仍然锁着（要 W15）', !Core.craftSerum('sr2_atk', 1).ok);
-  t('血清分成两档：一档 12 + 高阶 12', D.SERUMS.length === 24 && D.SERUMS.filter(s => s.id.indexOf('sr2_') === 0).length === 12);
+  t('精华分成两档：一档 12 + 高阶 12', D.SERUMS.length === 24 && D.SERUMS.filter(s => s.id.indexOf('sr2_') === 0).length === 12);
   t('高阶那一档单价更高、上限更低', D.SERUMS.filter(s => s.id.indexOf('sr2_') === 0)
     .every(s2 => { const s1 = D.SERUMS.find(x => x.id === s2.id.replace('sr2_', 'sr_')); return !!s1 && s2.points > s1.points && s2.max < s1.max; }));
 }
@@ -1533,9 +1533,9 @@ setParty(['C021']);
   t('等级不够不能渡劫', Core.attemptRealm().ok === false);
   Core.S.player.level = 10;
   // V8.1：血统改成开局就选，但"没血统就没有境界线"——所以这里先补上血统
-  t('没选血统不能渡劫', Core.attemptRealm().ok === false);
-  t('Lv.1 就能选血统（境界线跟着血统走）', Core.choosePlayerBloodline('修真').ok);
-  t('选完血统境界线从第 1 境开始', Core.realmState().curName === '炼气初期' && Core.realmState().hasBloodline);
+  t('没选命格不能渡劫', Core.attemptRealm().ok === false);
+  t('Lv.1 就能选命格（境界线跟着命格走）', Core.choosePlayerBloodline('修真').ok);
+  t('选完命格境界线从第 1 境开始', Core.realmState().curName === '炼气初期' && Core.realmState().hasBloodline);
   const atk0 = Core.effectivePlayerStats().atk;
   // 用 D.REALMS 里的真实消耗做断言，不写死数值：境界改成 36 小阶之后，
   // 单阶消耗本来就会跟着表走（旧版用例把 6/10 这样的快照值当常量，改表必假报警）
@@ -1561,7 +1561,7 @@ setParty(['C021']);
       const src = fs.readFileSync(path.join('js', f), 'utf8');
       return /REALMS\[[^\]]*\]\.(name|full)|\bnx\.full\b|\bnext\.full\b|\.nextName\s*\)\s*\|\|\s*[A-Za-z_$][\w$]*\.full/.test(src);
     });
-    t('境界显示名一律走 realmName(血统, 阶)，界面不直接读渡劫表的 name/full',
+    t('境界显示名一律走 realmName(命格, 阶)，界面不直接读渡劫表的 name/full',
       offenders.length === 0, offenders.join('、') || '干净');
   }
   t('36 阶加成总量≈旧 10 境的 +50%', Math.abs(D.REALMS.length * D.REALM_PCT - 0.5) < 0.02);
@@ -2370,14 +2370,14 @@ setParty(['C021']);
   Core.newGame(); Core.setPlayerName('删档前'); Core.choosePlayerBloodline('修真');
   Core.save();
   Core.wipeSave();
-  t('删档后内存里也是全新档（血统 / 等级 / 资源都归零）',
+  t('删档后内存里也是全新档（命格 / 等级 / 资源都归零）',
     !Core.S.player.bloodline && Core.S.player.level === 0 && (Core.S.cur.points || 0) === 0,
-    '血统「' + Core.S.player.bloodline + '」· 等级 ' + Core.S.player.level + ' · 点数 ' + Core.S.cur.points);
+    '命格「' + Core.S.player.bloodline + '」· 等级 ' + Core.S.player.level + ' · 点数 ' + Core.S.cur.points);
   const r = Core.choosePlayerBloodline('科技');
-  t('删档后能重新选血统（不会被上一局的选择锁住）', r.ok && Core.S.player.bloodline === '科技',
+  t('删档后能重新选命格（不会被上一局的选择锁住）', r.ok && Core.S.player.bloodline === '科技',
     r.ok ? '已选 ' + Core.S.player.bloodline : '被拒：' + r.msg);
   Core.newGame();                                   // 真实流程：删档 → 回到开局 → 开始新游戏
-  t('开始新游戏后又能选了（新档血统为空）', !Core.S.player.bloodline);
+  t('开始新游戏后又能选了（新档命格为空）', !Core.S.player.bloodline);
   Core.choosePlayerBloodline('科技');
   Core.setPlayerName('删档后');
   Core.save();
@@ -2633,7 +2633,7 @@ setParty(['C021']);
       return r.frames.filter(f => f.type === 'status').map(f => f.status);
     };
     t('W01「感染」会给玩家挂中毒，并且帧里看得见', statusesIn('W01').includes('poison'));
-    t('W09「撕裂」流血看得见', statusesIn('W09').includes('bleed'));
+    t('W09「撕裂」裂伤看得见', statusesIn('W09').includes('bleed'));
     t('W12「腐化」破防看得见', statusesIn('W12').includes('sunder'));
     t('W13「冰冻」看得见', statusesIn('W13').includes('freeze'));
 
@@ -2748,17 +2748,17 @@ setParty(['C021']);
     const q = Core.bloodlineQuote('@player');
     const b0 = Core.S.cur.otherworld, p0 = Core.S.cur.points;
     Core.upgradePlayerBloodline();
-    t('主角血统：报价 == 实扣（含血统实验室折扣）',
+    t('主角命格：报价 == 实扣（含命格实验室折扣）',
       q.otherworld === b0 - Core.S.cur.otherworld && q.points === p0 - Core.S.cur.points,
       `报价 ◆${q.otherworld}/◉${q.points}`);
-    t('血统报价确实打了折（实验室 40 级 = -40%）', q.discount === 0.4);
+    t('命格报价确实打了折（实验室 40 级 = -40%）', q.discount === 0.4);
   }
   {
     Core.addChar('C021'); Core.S.chars.C021.bloodlineLv = 10;
     const q = Core.bloodlineQuote('C021');
     const b0 = Core.S.cur.otherworld, p0 = Core.S.cur.points;
     Core.bloodlineUpgrade('C021');
-    t('伙伴血统：报价 == 实扣（含折扣）',
+    t('伙伴命格：报价 == 实扣（含折扣）',
       q.otherworld === b0 - Core.S.cur.otherworld && q.points === p0 - Core.S.cur.points);
   }
 }
@@ -2967,26 +2967,26 @@ setParty(['C021']);
    ② 11 个剑修角色的 kind 是 'saber'，而 KIND_NAMES 里没有这一项。
    两个都不会报错，只是"悄悄少一块加成"。所以这里把"每个角色身上的枚举值都必须在表里"钉死。 */
 {
-  t('每个角色的血统都在血统表里', D.characters.every(c => !!D.BLOODLINES[c.bloodline]),
+  t('每个角色的命格都在命格表里', D.characters.every(c => !!D.BLOODLINES[c.bloodline]),
     D.characters.filter(c => !D.BLOODLINES[c.bloodline]).map(c => c.name).join(',') || '✓');
   t('每个角色的阵营都在阵营表里（不再有"支援"这种表外值）',
     D.characters.every(c => D.FACTIONS.indexOf(c.faction) >= 0),
     D.characters.filter(c => D.FACTIONS.indexOf(c.faction) < 0).map(c => c.name + ':' + c.faction).join(',') || '✓');
   t('每个角色的战斗模板都在 ATK_ATTR / 表里认得出',
     D.characters.every(c => c.kind && D.BLOODLINE_KIND[c.bloodline] === c.kind),
-    '血统与战斗模板必须一一对应');
+    '命格与战斗模板必须一一对应');
   /* 血统 = 定位：一支血统只能有一种战斗模板，六支血统的人数与高稀有度都要够玩家挑 */
   const kindSet = {};
   D.characters.forEach(c => { kindSet[c.bloodline] = kindSet[c.bloodline] || new Set(); kindSet[c.bloodline].add(c.kind); });
-  t('每支血统只有一种战斗模板（血统就是定位）',
+  t('每支命格只有一种战斗模板（命格就是定位）',
     Object.values(kindSet).every(st => st.size === 1), JSON.stringify(Object.entries(kindSet).map(([k, v]) => k + ':' + [...v])));
   const urCount = {};
   D.characters.forEach(c => { if (c.rarity === 'UR') urCount[c.bloodline] = (urCount[c.bloodline] || 0) + 1; });
-  t('每支血统都有 ≥2 个 UR（想练哪支都有能追的目标）',
+  t('每支命格都有 ≥2 个 UR（想练哪支都有能追的目标）',
     Object.keys(D.BLOODLINES).every(bl => (urCount[bl] || 0) >= 2), JSON.stringify(urCount));
   const ssrCount = {};
   D.characters.forEach(c => { if (c.rarity === 'SSR') ssrCount[c.bloodline] = (ssrCount[c.bloodline] || 0) + 1; });
-  t('每支血统都有 ≥2 个 SSR', Object.keys(D.BLOODLINES).every(bl => (ssrCount[bl] || 0) >= 2), JSON.stringify(ssrCount));
+  t('每支命格都有 ≥2 个 SSR', Object.keys(D.BLOODLINES).every(bl => (ssrCount[bl] || 0) >= 2), JSON.stringify(ssrCount));
   /* 名字不能撞车：完全重名 0，且不能出现"一个名字是另一个的前缀"（零 / 零式那种） */
   const names = D.characters.map(c => c.name);
   t('伙伴没有完全重名', new Set(names).size === names.length);
@@ -2995,12 +2995,12 @@ setParty(['C021']);
     return true;
   })());
   /* 血统套装的装备名要配血统（射手不能开出斧头） */
-  t('每支血统都有自己的一套装备名（射手出枪、肉盾出盾）',
+  t('每支命格都有自己的一套装备名（射手出枪、肉盾出盾）',
     Object.keys(D.BLOODLINES).every(bl => {
       const n = D.BLOODLINE_EQUIP_NAMES[bl];
       return n && n.weapon && n.weapon.length >= 2;
     }));
-  t('血统套装的武器名不会串血统（科技=枪炮，不出现"镇魂铃"）',
+  t('命格套装的武器名不会串命格（科技=枪炮，不出现"镇魂铃"）',
     D.BLOODLINE_EQUIP_NAMES['科技'].weapon.every(x => /枪|炮|弩|刃/.test(x)));
 }
 
@@ -3055,14 +3055,14 @@ setParty(['C021']);
    （V9.6.82 父亲大人："血统套装太少了，就第 10 个世界后每个世界都有对应的血统套装，
      数值比世界套装高一些，套装激活都按 2/4/6 算。"） */
 {
-  t('血统套装是"每张图 × 每支血统"各一套（' + (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) + ' 张 × 6 支）',
+  t('命格套装是"每张图 × 每支命格"各一套（' + (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) + ' 张 × 6 支）',
     Object.keys(D.BLOODLINE_SETS).length === (D.WORLDS.length - D.BLOODLINE_MIN_WORLD + 1) * 6,
     Object.keys(D.BLOODLINE_SETS).length + ' 套');
-  t('第 10 张图之前没有血统套装（W09 取不到，W10 取得到）',
-    !D.bloodlineSetKey('W09', '血族') && !!D.bloodlineSetKey('W10', '血族'));
+  t('第 10 张图之前没有命格套装（W09 取不到，W10 取得到）',
+    !D.bloodlineSetKey('W09', '绯红') && !!D.bloodlineSetKey('W10', '绯红'));
 
   /* 掉落实测：W09 一件血统件都不出；W10 起才出，而且带上世界出处 */
-  Core.newGame(); Core.setPlayerName('血统套装'); Core.choosePlayerBloodline('血族');
+  Core.newGame(); Core.setPlayerName('命格套装'); Core.choosePlayerBloodline('绯红');
   Core.S.bag.eqCap = 99999;
   let w9 = 0, w10 = 0, tagged = 0;
   for (let i = 0; i < 1200; i++) {
@@ -3071,8 +3071,8 @@ setParty(['C021']);
     const b = Core.grantEquip('W10', 'SSR').equip;
     if (b && b.bloodSet) { w10++; if (b.bloodWorld === 'W10') tagged++; }
   }
-  t('第 9 张图掉不出血统套装', w9 === 0, w9 + ' 件');
-  t('第 10 张图起掉血统套装，且标着世界出处', w10 > 100 && tagged === w10, w10 + ' 件 / 带出处 ' + tagged);
+  t('第 9 张图掉不出命格套装', w9 === 0, w9 + ' 件');
+  t('第 10 张图起掉命格套装，且标着世界出处', w10 > 100 && tagged === w10, w10 + ' 件 / 带出处 ' + tagged);
 
   /* 数值：同世界的血统套装三档总量要**高于**世界套装 */
   const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
@@ -3080,15 +3080,15 @@ setParty(['C021']);
   for (let n = D.BLOODLINE_MIN_WORLD; n <= D.WORLDS.length; n++) {
     const wid = D.WORLDS[n - 1].id;
     const ws = D.SETS[wid];
-    const bs = D.BLOODLINE_SETS[D.bloodlineSetKey(wid, '血族')];
+    const bs = D.BLOODLINE_SETS[D.bloodlineSetKey(wid, '绯红')];
     if (sum(bs.b2) + sum(bs.b4) + sum(bs.b6) <= sum(ws.b2) + sum(ws.b4) + sum(ws.b6)) higher = false;
   }
-  t('每个世界的血统套装数值都高于同世界的世界套装', higher);
+  t('每个世界的命格套装数值都高于同世界的世界套装', higher);
 
   /* 计件规则：**同一张图 + 同一支血统**才算一套 —— 两张图的件不能拼成一套 */
-  const mkB = (uid, wid) => { Core.S.equips[uid] = { uid, name: '血族·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '血族', bloodWorld: wid }; };
-  Core.newGame(); Core.setPlayerName('计件'); Core.choosePlayerBloodline('血族');
-  const vamp2 = D.characters.find(c => c.bloodline === '血族').id;
+  const mkB = (uid, wid) => { Core.S.equips[uid] = { uid, name: '绯红·测试', slot: 'weapon', rarity: 'SR', enhance: 0, base: { atk: 100 }, affixes: [], set: null, bloodSet: '绯红', bloodWorld: wid }; };
+  Core.newGame(); Core.setPlayerName('计件'); Core.choosePlayerBloodline('绯红');
+  const vamp2 = D.characters.find(c => c.bloodline === '绯红').id;
   Core.addChar(vamp2);
   mkB('b1', 'W20'); mkB('b2', 'W20'); mkB('b3', 'W21'); mkB('b4', 'W21');
   Core.S.equips.b3.slot = 'accessory'; Core.S.equips.b4.slot = 'head';
@@ -3098,9 +3098,9 @@ setParty(['C021']);
   /* 两张图各 2 件 → 各自够 2 件档（两个 b2 都吃到），但**没有**4 件档 ——
      effectiveStats 会把命中过的套装 key 列出来，直接看它最准 */
   const keys = Object.keys(st2.sets || {}).filter(k => k.indexOf('blood:') === 0);
-  t('血统套装按"同一张图"计件：两张图各 2 件 → 两个 2 件档（不是一套 4 件）',
-    keys.length === 2 && st2.sets['blood:W20|血族'] === 2 && st2.sets['blood:W21|血族'] === 2,
-    keys.join(' / ') || '(没命中任何血统套装)');
+  t('命格套装按"同一张图"计件：两张图各 2 件 → 两个 2 件档（不是一套 4 件）',
+    keys.length === 2 && st2.sets['blood:W20|绯红'] === 2 && st2.sets['blood:W21|绯红'] === 2,
+    keys.join(' / ') || '(没命中任何命格套装)');
 }
 
 /* ---- 伙伴专属装备：六支血统各一件、不重复、基础值跟进度（V9.6.83） ---- */
@@ -3111,7 +3111,7 @@ setParty(['C021']);
     byBlood[c.bloodline] = (byBlood[c.bloodline] || 0) + 1;
   });
   t('伙伴专属正好 6 件', D.SIGNATURE_EQUIPS.length === 6, D.SIGNATURE_EQUIPS.length + ' 件');
-  t('六支血统各一件、没有重复（念动力也有）',
+  t('六支命格各一件、没有重复（念动力也有）',
     Object.keys(byBlood).length === 6 && Object.values(byBlood).every(n => n === 1),
     JSON.stringify(byBlood));
   /* 每一位都必须是**本血统最强**的那一位（六维和最大） */
@@ -3124,7 +3124,7 @@ setParty(['C021']);
     const top = sameBl.slice().sort((a, b) => (ORD[a.rarity] ?? 9) - (ORD[b.rarity] ?? 9) || tot(b) - tot(a))[0];
     if (top.id !== me.id) { best = false; worst = me.name + ' 不是' + me.bloodline + '最强（应给 ' + top.name + '）'; }
   });
-  t('专属都绑在本血统最强的伙伴身上', best, worst);
+  t('专属都绑在本命格最强的伙伴身上', best, worst);
 
   Core.newGame(); Core.setPlayerName('专属'); Core.choosePlayerBloodline('修真');
   Core.S.bag.eqCap = 999;

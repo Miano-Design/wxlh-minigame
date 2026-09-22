@@ -25,7 +25,7 @@
   const GEAR_EFF_LABEL = {
     atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率',
     critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '减伤',
-    dmgReduce: '减伤', lifesteal: '吸血', spiritPct: '精神', initEnergy: '开场能量',
+    dmgReduce: '减伤', lifesteal: '汲取', spiritPct: '精神', initEnergy: '开场能量',
   };
   /* 百分比留一位小数 —— 祭炼一级 +5%，4% 会点出 4.2% 这种数，取整就看不出差别了 */
   function gearEffText(o) {

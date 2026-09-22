@@ -23,7 +23,7 @@
     const rows = [
       ['攻击', fmt(st.atk)], ['防御', fmt(st.def)], ['生命', fmt(st.hp)], ['速度', fmt(st.spd)],
       ['暴击', pc(st.crit)], ['暴击伤害', '×' + G.fmtMul(st.critDmg || 2)], ['闪避', pc(st.eva)],
-      ['吸血', pc(st.lifesteal)],
+      ['汲取', pc(st.lifesteal)],
     ];
     const red = Math.min(0.6, (st.resPct || 0) + (st.dmgReduce || 0));
     rows.push(['减伤', pc(red)]);                                       // 网页版这一行永远在（0% 也显示）
@@ -63,7 +63,7 @@
       const tw = CV.measure(tag, CV.FS.sm) + 12 * CV.SCALE;
       CV.round(tx + nw + 8 * CV.SCALE, top + 6 * CV.SCALE, tw, 18 * CV.SCALE, CV.RADIUS_SM, null, 'rgba(230,182,76,.4)');
       CV.text(tag, tx + nw + 8 * CV.SCALE + tw / 2, top + 15 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
-      CV.text('Lv.' + S.player.level + '（玩家等级）· ' + (S.player.bloodline ? S.player.bloodline + '血统 Lv.' + S.player.bloodlineLv : '未选血统'),
+      CV.text('Lv.' + S.player.level + '（玩家等级）· ' + (S.player.bloodline ? S.player.bloodline + '命格 Lv.' + S.player.bloodlineLv : '未选命格'),
         tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text('铭刻 ' + (gl > 0 ? D.GENE_LOCKS[gl - 1].name : '未解锁') + ' · 六维待分 ' + (S.player.attrPoints || 0) + ' 点',
         tx, top + 52 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
@@ -104,7 +104,7 @@
 
     /* ③ 技能 */
     U.card(function () {
-      U.h3('⚡ ' + (S.player.bloodline ? S.player.bloodline + '血统技能' : '技能'), '可用技能点 ' + (S.player.skillPoints || 0),
+      U.h3('⚡ ' + (S.player.bloodline ? S.player.bloodline + '命格技能' : '技能'), '可用技能点 ' + (S.player.skillPoints || 0),
         { btn: { label: '↺ 重置', id: 'pskill_reset', dis: spentSkill <= 0 } });
       /* V9.6.117（排版层级 + 间距，父亲大人："技能的版面有问题，间距又贴在一起了"）：
          照网页版 `.skill-row` 一比一重排 —— 每条技能是**自己的一个面板**：
@@ -166,17 +166,17 @@
 
     /* ⑤ 血统 */
     U.card(function () {
-      U.h3('🩸 血统', S.player.bloodline ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒');
+      U.h3('🧬 命格', S.player.bloodline ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒');
       if (S.player.bloodline) {
         U.hint(S.player.bloodline + '：' + (D.BLOODLINES[S.player.bloodline] || {}).desc, 2 * CV.SCALE);
         U.space(CV.SP[1]);
         if (blCost) {
-          U.btnRow([{ label: '血统升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
+          U.btnRow([{ label: '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
         } else {
           U.hint('已满级', 2 * CV.SCALE);
         }
       } else if (S.player.level < D.BLOODLINE_UNLOCK_LV) {
-        U.note('🔒 主角 Lv.' + D.BLOODLINE_UNLOCK_LV + ' 觉醒血统（当前 Lv.' + S.player.level + '）', 2 * CV.SCALE);
+        U.note('🔒 主角 Lv.' + D.BLOODLINE_UNLOCK_LV + ' 觉醒命格（当前 Lv.' + S.player.level + '）', 2 * CV.SCALE);
       } else {
         Object.keys(D.BLOODLINES).forEach(function (id) {
           const bl = D.BLOODLINES[id];
@@ -198,7 +198,7 @@
 
     /* ⑦ 属性面板 */
     U.card(function () {
-      U.h3('📊 属性面板', '装备 / 血统 / 境界 / 铭刻都已算进来');
+      U.h3('📊 属性面板', '装备 / 命格 / 境界 / 铭刻都已算进来');
       statRows(st).forEach(function (r) { U.kv(r[0], r[1]); });
     });
     /* ⑧ 修改名字（网页版主角详情最后一张卡） */

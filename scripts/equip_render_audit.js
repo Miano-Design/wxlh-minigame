@@ -57,10 +57,10 @@ let pass = 0, fail = 0;
 const t = (name, cond, extra) => { if (cond) pass++; else fail++; console.log((cond ? '  ✓ ' : '  ✗ ') + name + (extra ? '  → ' + extra : '')); };
 
 /* 造一个"打到第 20 张图、主角血族"的存档，然后各造一件装备 */
-Core.newGame(); Core.setPlayerName('装备体检'); Core.choosePlayerBloodline('血族');
+Core.newGame(); Core.setPlayerName('装备体检'); Core.choosePlayerBloodline('绯红');
 Core.S.bag.eqCap = 999999;
 Core.S.worlds.W20 = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
-const vamp = D.characters.find((c) => c.bloodline === '血族').id;
+const vamp = D.characters.find((c) => c.bloodline === '绯红').id;
 Core.addChar(vamp);
 Core.S.party = ['@player', vamp, null, null, null];
 
@@ -85,7 +85,7 @@ function pickItem(pred, rarity, n) {
 console.log('=== 装备详情页：四种装备都要把该画的卡画出来 ===');
 {
   const world = pickItem(e => !!e.set, 'SSR');
-  const blood = pickItem(e => e.bloodSet === '血族' && e.bloodWorld === 'W20', 'SSR');
+  const blood = pickItem(e => e.bloodSet === '绯红' && e.bloodWorld === 'W20', 'SSR');
   const myth = pickItem(e => !!e.godSet, 'MYTH');
   const sig = Core.grantSignatureEquip(0).equip;
 
@@ -94,14 +94,14 @@ console.log('=== 装备详情页：四种装备都要把该画的卡画出来 ==
 
   /* 关键：血统套装 —— 这一条就是 V9.6.84 抓到的那个"静默不画" */
   const tb = drawEq(blood.uid);
-  t('血统套装：套装卡画出来了（不是空白）', /血统套装/.test(tb) && /·/.test(tb));
-  t('血统套装：名字取的是**这张图**的那一套', new RegExp(D.BLOODLINE_SETS[D.bloodlineSetKey('W20', '血族')].name).test(tb),
+  t('命格套装：套装卡画出来了（不是空白）', /命格套装/.test(tb) && /·/.test(tb));
+  t('命格套装：名字取的是**这张图**的那一套', new RegExp(D.BLOODLINE_SETS[D.bloodlineSetKey('W20', '绯红')].name).test(tb),
     (tb.match(/\S*·\S*套装/) || ['(没有)'])[0]);
-  t('血统套装：写了"同一张图"的计件规矩', /同一张图/.test(tb));
-  t('血统套装：4 件 / 6 件两档都列出来了', /4件:/.test(tb) && /6件:/.test(tb));
+  t('命格套装：写了"同一张图"的计件规矩', /同一张图/.test(tb));
+  t('命格套装：4 件 / 6 件两档都列出来了', /4件:/.test(tb) && /6件:/.test(tb));
 
   const tm = drawEq(myth.uid);
-  t('血统神装：画出了神装套装卡', /血统神装/.test(tm) && /6件:/.test(tm), (tm.match(/血统神装/) || ['(没有)'])[0]);
+  t('命格神装：画出了神装套装卡', /命格神装/.test(tm) && /6件:/.test(tm), (tm.match(/命格神装/) || ['(没有)'])[0]);
 
   const ts = drawEq(sig.uid);
   t('专属装备：写明了限本人', /专属/.test(ts), (ts.match(/专属[^|]*/) || ['(没有)'])[0]);

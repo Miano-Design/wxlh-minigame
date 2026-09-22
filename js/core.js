@@ -356,6 +356,21 @@ window.Core = (function () {
       if (e.bloodSet && BL_RENAME[e.bloodSet]) e.bloodSet = BL_RENAME[e.bloodSet];
       if (e.godSet && BL_RENAME[e.godSet]) e.godSet = BL_RENAME[e.godSet];
     });
+    /* 2026-09-23（文案策划 · 备案改名：血族 → 绯红）：
+       血统的 id **就是它的中文名**，所以"改个词"等于换 id —— 老存档里的
+       S.player.bloodline / equip.bloodSet / equip.godSet 可能还是「血族」，
+       不迁移就是"主角没命格 + 套装永远凑不齐"。装备名里的前缀（血族·／血族神装·）
+       一起换，免得背包里新旧名字混着看。跑过一次存档里就没有「血族」了，天然只迁移一次。 */
+    const BL_RENAME_V2 = { '血族': '绯红' };
+    if (S.player && BL_RENAME_V2[S.player.bloodline]) S.player.bloodline = BL_RENAME_V2[S.player.bloodline];
+    Object.values(S.equips || {}).forEach(e => {
+      if (!e) return;
+      if (e.bloodSet && BL_RENAME_V2[e.bloodSet]) e.bloodSet = BL_RENAME_V2[e.bloodSet];
+      if (e.godSet && BL_RENAME_V2[e.godSet]) e.godSet = BL_RENAME_V2[e.godSet];
+      if (typeof e.name !== 'string') return;
+      if (e.name.indexOf('血族神装·') === 0) e.name = '绯红神装·' + e.name.slice(5);
+      else if (e.name.indexOf('血族·') === 0) e.name = '绯红·' + e.name.slice(3);
+    });
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});
@@ -912,7 +927,7 @@ window.Core = (function () {
   // 使用：喂给某名角色（或主角 '@player'）
   function useSerum(charId, serumId, n = 1) {
     const sd = D.serumById[serumId];
-    if (!sd) return { ok: false, msg: '没有这支血清' };
+    if (!sd) return { ok: false, msg: '没有这支精华' };
     const itemId = D.SERUM_ITEM(serumId);
     const have = S.items[itemId] || 0;
     if (have < 1) return { ok: false, msg: '道具不足' };
@@ -921,8 +936,8 @@ window.Core = (function () {
     if (!isPlayer && !S.chars[charId]) return { ok: false, msg: '未拥有该伙伴' };
     if (sd.bloodline) {
       const bl = isPlayer ? S.player.bloodline : (base && base.bloodline);
-      if (!bl) return { ok: false, msg: `该伙伴还没觉醒血统，先觉醒「${sd.bloodline}」再用` };
-      if (bl !== sd.bloodline) return { ok: false, msg: `只有「${sd.bloodline}」血统能用这支血清` };
+      if (!bl) return { ok: false, msg: `该伙伴还没觉醒命格，先觉醒「${sd.bloodline}」再用` };
+      if (bl !== sd.bloodline) return { ok: false, msg: `只有「${sd.bloodline}」命格能用这支精华` };
     }
     S.serums[charId] = S.serums[charId] || {};
     const taken = S.serums[charId][serumId] || 0;
@@ -1020,13 +1035,13 @@ window.Core = (function () {
     const base = D.charById[charId];
     if (!c) return { ok: false, msg: '未拥有该伙伴' };
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
-    if (c.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
+    if (c.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '命格已满级' };
     const q = bloodlineQuote(charId);            // 与界面同一份报价（已含血统实验室折扣）
     const cost = { otherworld: q.otherworld, points: q.points };
     if (!spend(cost)) return { ok: false, msg: '异界结晶或点数不足' };
     c.bloodlineLv++;
     save();
-    return { ok: true, msg: `${base.bloodline}血统 Lv.${c.bloodlineLv}` };
+    return { ok: true, msg: `${base.bloodline}命格 Lv.${c.bloodlineLv}` };
   }
   function geneLockInfo() {
     const cur = S.player.geneLock;
@@ -1240,27 +1255,27 @@ window.Core = (function () {
     return Math.round(st.atk * 2 + st.def + st.hp * 0.2 + st.spd * 3);
   }
   function choosePlayerBloodline(id) {
-    if (!D.BLOODLINES[id]) return { ok: false, msg: '血统不存在' };
-    if (S.player.bloodline) return { ok: false, msg: '血统一旦选择不可更改' };
-    if (S.player.level < D.BLOODLINE_UNLOCK_LV) return { ok: false, msg: `主角 Lv.${D.BLOODLINE_UNLOCK_LV} 才能觉醒血统（当前 Lv.${S.player.level}）` };
+    if (!D.BLOODLINES[id]) return { ok: false, msg: '命格不存在' };
+    if (S.player.bloodline) return { ok: false, msg: '命格一旦选择不可更改' };
+    if (S.player.level < D.BLOODLINE_UNLOCK_LV) return { ok: false, msg: `主角 Lv.${D.BLOODLINE_UNLOCK_LV} 才能觉醒命格（当前 Lv.${S.player.level}）` };
     S.player.bloodline = id;
     save();
-    return { ok: true, msg: `已觉醒${id}血统，境界线开启：${D.realmName(id, 0)} 起` };
+    return { ok: true, msg: `已觉醒${id}命格，境界线开启：${D.realmName(id, 0)} 起` };
   }
   // 当前血统的 36 阶全览（境界页整条展示用）
   function realmChainOf(bloodlineId) { return D.realmChain(bloodlineId || S.player.bloodline); }
   function upgradePlayerBloodline() {
-    if (!S.player.bloodline) return { ok: false, msg: '尚未选择血统' };
+    if (!S.player.bloodline) return { ok: false, msg: '尚未选择命格' };
     // 解锁门禁：血统"强化"要通关 潜影窟·第1关 才开（与 D.UNLOCKS 的说明同源；
     // 起步时的"选血统"不受限——那是开局必经的一步）
     if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
-    if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '血统已满级' };
+    if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '命格已满级' };
     const q = bloodlineQuote('@player');         // 与界面同一份报价（已含血统实验室折扣）
     const cost = { otherworld: q.otherworld, points: q.points };
     if (!spend(cost)) return { ok: false, msg: "异界结晶或点数不足" };
     S.player.bloodlineLv++;
     save();
-    return { ok: true, msg: `血统 Lv.${S.player.bloodlineLv}` };
+    return { ok: true, msg: `命格 Lv.${S.player.bloodlineLv}` };
   }
   function teamPower() {
     // 上阵 5 格里就有主角本人（'@player'），所以这里按人算，别再单独加一次主角战力
@@ -2376,7 +2391,7 @@ window.Core = (function () {
     S.altPlayers.push(snapshotProtagonist());
     restoreProtagonist(freshProtagonist(name));
     save();
-    return { ok: true, msg: `新主角「${name}」已创建，天赋与血统从 Lv.1 重新选` };
+    return { ok: true, msg: `新主角「${name}」已创建，天赋与命格从 Lv.1 重新选` };
   }
   function switchProtagonist(altIndex) {
     const alt = S.altPlayers[altIndex];
@@ -3568,7 +3583,7 @@ window.Core = (function () {
   function realmBonusPct() { return (S.player.realm || 0) * D.REALM_PCT; }
   function attemptRealm() {
     const st = realmState();
-    if (!st.hasBloodline) return { ok: false, msg: '先选定血统——境界线跟着血统走，没血统就没有境界' };
+    if (!st.hasBloodline) return { ok: false, msg: '先选定命格——境界线跟着命格走，没命格就没有境界' };
     if (!st.next) return { ok: false, msg: '已经到达最终境界' };
     if (!st.levelOk) return { ok: false, msg: `先升到 Lv.${st.next.lv}（当前 Lv.${S.player.level}）` };
     if (st.haveMat < st.matN) {

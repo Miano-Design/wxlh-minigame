@@ -161,9 +161,9 @@
       const rw = CV.measure(ch.rarity, CV.FS.f1, true);
       CV.text(CV.fit(nm(id), U.iw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
       CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, ls: -1 });
-      CV.text(ch.bloodline + '血统 · ' + ch.faction, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+      CV.text(ch.bloodline + '命格 · ' + ch.faction, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       /* V9.6.129：显示**该稀有度的通用碎片**（不再是他一个人攒的） */
-      CV.text('Lv.' + c.lv + ' · ' + ch.rarity + ' 碎片 ' + Core.shardPoolOf(ch.rarity) + ' · 血统 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+      CV.text('Lv.' + c.lv + ' · ' + ch.rarity + ' 碎片 ' + Core.shardPoolOf(ch.rarity) + ' · 命格 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
       CV.text('战力', U.ix() + U.iw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + h;
@@ -178,7 +178,7 @@
           { label: '无损换将', style: 'gold', id: 'swap' },
           { label: '下阵', style: 'ghost', id: 'off' },
         ]);
-        U.hint('无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，血统对不上、别人专属这类穿不了的会留在他身上。', 4 * CV.SCALE);
+        U.hint('无损换将：新上阵的继承他的等级；身上的装备能穿就一起转过去，命格对不上、别人专属这类穿不了的会留在他身上。', 4 * CV.SCALE);
       });
     }
 
@@ -214,9 +214,9 @@
     /* ④ 血统（等级 + 升级） */
     const blCost = c.bloodlineLv < D.BLOODLINE_MAX ? D.bloodlineCost(c.bloodlineLv) : null;
     U.card(function () {
-      U.h3('🩸 ' + ch.bloodline + '血统', 'Lv.' + c.bloodlineLv + ' / ' + D.BLOODLINE_MAX);
+      U.h3('🧬 ' + ch.bloodline + '命格', 'Lv.' + c.bloodlineLv + ' / ' + D.BLOODLINE_MAX);
       U.btnRow([{
-        label: blCost ? '血统升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
+        label: blCost ? '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
         style: 'ghost', id: blCost ? 'blup' : 'noop',
       }]);
     });
@@ -271,7 +271,7 @@
     /* ⑦ 属性面板（照网页版：装备/血统/星级都算进来） */
     const st = Core.effectiveStats(id);
     U.card(function () {
-      U.h3('📊 属性面板', '装备 / 血统 / 星级都已算进来');
+      U.h3('📊 属性面板', '装备 / 命格 / 星级都已算进来');
       [['攻击', st.atk], ['防御', st.def], ['生命', st.hp], ['速度', st.spd],
         ['暴击率', (st.crit * 100).toFixed(1) + '%'], ['暴击伤害', (G.fmtMul(st.critDmg)) + '×'],
         ['闪避', ((st.eva || 0) * 100).toFixed(1) + '%'], ['技能伤害', ((st.skillMult || 1) * 100).toFixed(0) + '%']]
@@ -302,7 +302,7 @@
   CV.on('lv1', () => { const r = Core.levelUp(cur, 1); CV.toast(r.msg); CV.render(); });
   CV.on('lv10', () => { const r = Core.levelUp(cur, 10); CV.toast(r.msg); CV.render(); });
   CV.on('reborn', function () {
-    U.confirm('伙伴重生', '把「' + nm(cur) + '」重置回 Lv.0，返还 ' + fmt(Core.expSpentOn(cur)) + ' 伙伴经验（点数不返还）。星级 / 血统 / 装备 / 血清都不动。', function () {
+    U.confirm('伙伴重生', '把「' + nm(cur) + '」重置回 Lv.0，返还 ' + fmt(Core.expSpentOn(cur)) + ' 伙伴经验（点数不返还）。星级 / 命格 / 装备 / 精华都不动。', function () {
       const r = Core.rebornChar(cur);
       CV.toast(r.msg || '已重生');
       CV.render();

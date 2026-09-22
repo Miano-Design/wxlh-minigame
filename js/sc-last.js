@@ -24,7 +24,7 @@
   CV.register('refine', function () {
     const S = Core.S;
     U.begin(); head('⚗️ 炼化台');
-    U.hint('血清是永久强化剂：喂给某名伙伴后永久加属性，每人每种有上限。血统血清只有对应血统能用——先觉醒血统，再决定喂给谁。', 0);
+    U.hint('精华是永久强化剂：喂给某名伙伴后永久加属性，每人每种有上限。命格精华只有对应命格能用——先觉醒命格，再决定喂给谁。', 0);
     U.space(CV.SP[1]);
     D.SERUMS.forEach(function (s) {
       const itemId = D.SERUM_ITEM(s.id);
@@ -66,7 +66,7 @@
           + '　（现有 ' + matName + ' ' + haveMat + ' · ◉ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, CV.C.dim, lw);
         const ownTop = U.y + 4 * CV.SCALE;
         U.draw(function () {
-          CV.text('已有血清 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8,
+          CV.text('已有精华 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8,
             { size: CV.FS.xs, color: own ? CV.C.green : CV.C.dim });
         });
         U.y = ownTop + CV.FS.xs * 1.6;
@@ -459,12 +459,12 @@
         const rowTop = U.y;
         const h = U.listRow({
           t1: p.name + (p.current ? '（当前）' : ''),
-          t2: 'Lv.' + p.level + ' · ' + (p.bloodline ? (p.bloodline + '血统 Lv.' + p.bloodlineLv) : '未觉醒血统'),
+          t2: 'Lv.' + p.level + ' · ' + (p.bloodline ? (p.bloodline + '命格 Lv.' + p.bloodlineLv) : '未觉醒命格'),
           rightW: p.current ? 0 : (bw + 10 * CV.SCALE),
         });
         if (!p.current) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, '切换', 'ghost', 'switch_alt:' + p.altIndex);
       });
-      U.hint('新建主角从 Lv.0 开始，可体验不同血统路线；世界进度、货币、队伍不受影响', CV.SP[1]);
+      U.hint('新建主角从 Lv.0 开始，可体验不同命格路线；世界进度、货币、队伍不受影响', CV.SP[1]);
       U.space(CV.SP[1]);
       U.btnRow([{ label: '➕ 新建主角', style: 'ghost', id: 'new_protag' }], undefined, U.BTN_SM);
     });
@@ -872,7 +872,7 @@
     });
     U.card(function () {
       U.h3('本层守卫');
-      U.kv(e.name, e.isBoss ? '👹 Boss' : e.isElite ? '精英' : '普通');
+      U.kv(e.name, e.isBoss ? '🔱 Boss' : e.isElite ? '精英' : '普通');
       U.kv('HP', fmt(e.hp));
       U.kv('攻击', fmt(e.atk));
       U.kv('防御', fmt(e.def));

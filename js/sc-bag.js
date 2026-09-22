@@ -25,7 +25,7 @@
      V9.6.8（父亲大人）：分类保留，但去掉「普通」和「SSR+」——
      "普通"跟"全部"几乎重合；"SSR+"原来挂在部位那行末尾，七个部位 + 它挤到第三行、孤零零一个。 */
   // 血统神装（神话）单独一枚 —— 末段玩家会攒一整队，混在"全部"里翻不出来（V9.6.76，与网页版同口径）
-  const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['blood', '血统套装'], ['god', '血统神装'], ['sig', '专属']];
+  const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['blood', '命格套装'], ['god', '命格神装'], ['sig', '专属']];
   const EQ_SLOTS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
   let eqCat = 'all', eqSlot = 'all';
   /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字） */
@@ -397,8 +397,8 @@
       U.kv('评分', String(Core.equipScore(eq)), CV.C.gold);
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
-      if (gs) U.kv('血统神装', '仅限' + eq.godSet + '血统装备（穿戴者血统要对得上）');
-      if (cs) U.kv('血统套装', '仅限' + eq.bloodSet + '血统 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套');
+      if (gs) U.kv('命格神装', '仅限' + eq.godSet + '命格装备（穿戴者命格要对得上）');
+      if (cs) U.kv('命格套装', '仅限' + eq.bloodSet + '命格 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套');
       U.kv('分解可得', '◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3));
     });
     U.card(function () {
@@ -446,14 +446,14 @@
         /* V9.6.16（父亲大人）：这行解释多余 —— 件数是 0/3、效果一条条都列着，不用再解释一遍。 */
       });
     };
-    if (gs) mkSetCard('血统神装', gs.name, gs.text, wornOf(eq.godSet, 'godSet'), 6);
+    if (gs) mkSetCard('命格神装', gs.name, gs.text, wornOf(eq.godSet, 'godSet'), 6);
     else if (cs) {
       // 血统套装按「同一张图 + 同一支血统」计件（V9.6.83），不能再只比血统名
       const bcnt = owner ? Object.keys(S.equipped[owner] || {}).filter(function (sl) {
         const u = S.equipped[owner][sl];
         return u && S.equips[u] && S.equips[u].bloodSet === eq.bloodSet && S.equips[u].bloodWorld === eq.bloodWorld;
       }).length : 0;
-      mkSetCard('血统套装', cs.name, cs.text, bcnt, 6);
+      mkSetCard('命格套装', cs.name, cs.text, bcnt, 6);
     }
     else if (set) mkSetCard('套装', set.name, set.text, wornOf(eq.set, 'set'), 6);
     U.card(function () {
@@ -595,7 +595,7 @@
       U.begin();
       U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
       U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
-      U.hint('这支血清的数据不在了（可能刚换过存档）—— 回背包重新点一次就好。', 0);
+      U.hint('这支精华的数据不在了（可能刚换过存档）—— 回背包重新点一次就好。', 0);
       return;
     }
     const serumMax = sd.max || 0;
@@ -604,23 +604,23 @@
     const cnt = Math.max(1, Math.min(serumCount || 1, have));
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
-    CV.text('使用血清', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    CV.text('使用精华', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     U.note('选择要吃「' + (it.name || '') + ' ×' + cnt + '」的伙伴 —— 永久生效', 0);
     U.space(CV.SP[2]);
     /* 候选：主角 + 已拥有的伙伴，血统对得上才列出来 */
-    const rows = [{ id: '@player', name: (S.player.name || '主角'), sub: '主角 · ' + (S.player.bloodline || '未觉醒血统'), bl: S.player.bloodline || null }];
+    const rows = [{ id: '@player', name: (S.player.name || '主角'), sub: '主角 · ' + (S.player.bloodline || '未觉醒命格'), bl: S.player.bloodline || null }];
     Object.keys(S.chars).forEach(function (id) {
       const ch = D.charById[id];
       if (!ch) return;
       const c = S.chars[id];
       const bl = (c.bloodlineLv || 0) > 0 ? ch.bloodline : null;
-      rows.push({ id: id, name: ch.name, sub: 'Lv.' + c.lv + ' · ' + (bl || '未觉醒血统'), bl: bl });
+      rows.push({ id: id, name: ch.name, sub: 'Lv.' + c.lv + ' · ' + (bl || '未觉醒命格'), bl: bl });
     });
     const usable = rows.filter(function (r) { return !sd.bloodline || r.bl === sd.bloodline; });
     if (!usable.length) {
       U.card(function () {
-        U.hint('没有可用对象：这支血清只有「' + sd.bloodline + '」血统能用（先去伙伴页觉醒血统）', 4 * CV.SCALE);
+        U.hint('没有可用对象：这支精华只有「' + sd.bloodline + '」命格能用（先去伙伴页觉醒命格）', 4 * CV.SCALE);
       });
     } else {
       U.card(function () {
@@ -670,7 +670,7 @@
   }
   function eqTag(e) {
     if (e.charId) return '专属·' + (((D.charById || {})[e.charId] || {}).name || '?');
-    if (e.godSet) return ((D.GOD_SETS || {})[e.godSet] || {}).name || '血统神装';
+    if (e.godSet) return ((D.GOD_SETS || {})[e.godSet] || {}).name || '命格神装';
     if (e.bloodSet) { const bk = D.bloodlineSetKey ? D.bloodlineSetKey(e.bloodWorld, e.bloodSet) : null; return (bk && (D.BLOODLINE_SETS || {})[bk] ? D.BLOODLINE_SETS[bk].name : (e.bloodSet + '套装')); }
     if (e.set) return ((D.SETS || {})[e.set] || {}).name || '世界套装';
     return '普通';

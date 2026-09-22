@@ -21,7 +21,7 @@
         { t: '在这里，你将：' },
         { t: '🌀 进入残域执行探索任务' },
         { t: '👥 招募伙伴，组建五人小队（主角必上阵）' },
-        { t: '🧬 解锁血统与铭刻，突破极限' },
+        { t: '🧬 解锁命格与铭刻，突破极限' },
         { t: '♾ 挑战深井，寻找离开的方法' },
         { t: '' },
         { t: '如果下一场探索真的会死，你会带谁进去？', bold: true },
@@ -81,7 +81,7 @@
   /* ================= ③ 选血统（网页版 bloodlineModal 的"未选"分支） ================= */
   CV.register('bloodline', function () {
     U.begin();
-    U.h3('选择血统', '选定后不可更改');                 // 网页版：标题右侧写"选定后不可更改"
+    U.h3('选择命格', '选定后不可更改');                 // 网页版：标题右侧写"选定后不可更改"
     U.y += CV.SP[1];
     Object.keys(D.BLOODLINES).forEach((id) => {
       const bl = D.BLOODLINES[id];
@@ -107,7 +107,7 @@
   });
   Object.keys(G.DATA.BLOODLINES).forEach(function (id) {
     CV.on('bl_pick:' + id, function () {
-      U.confirm('确认血统', '选择「' + id + '」后不可更改，境界线将从「' + D.realmName(id, 0) + '」开始。确定吗？', function () {
+      U.confirm('确认命格', '选择「' + id + '」后不可更改，境界线将从「' + D.realmName(id, 0) + '」开始。确定吗？', function () {
         const r = Core.choosePlayerBloodline(id);
         CV.toast(r.msg || '已觉醒');
         CV.reset('home');

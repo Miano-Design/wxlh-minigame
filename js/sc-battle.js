@@ -78,7 +78,7 @@
   /* V9.6.115（父亲大人）：结算自动进下一关的倒计时 8 秒 → **5 秒**（与网页版同一个值） */
   const AUTO_NEXT_SEC = 5;
   let uidSeq = 0;
-  const STATUS_TEXT = { poison: '中毒', burn: '燃烧', bleed: '流血', stun: '眩晕', freeze: '冰冻', weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '回复' };
+  const STATUS_TEXT = { poison: '中毒', burn: '燃烧', bleed: '裂伤', stun: '眩晕', freeze: '冰冻', weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '回复' };
 
   function clearTimer() {
     if (B.timer) { clearTimeout(B.timer); B.timer = null; }
@@ -181,7 +181,7 @@
           0, f.crit ? D.BATTLE_GEOM.floatCrit : D.BATTLE_GEOM.floatBase);
         B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
         if (f.healed) { const s = B.units[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); floater(f.source, '+' + f.healed, CV.C.green); } }
-        if (f.killed) pushLog('💀 ' + nameOf(f.target) + ' 倒下');
+        if (f.killed) pushLog('✗ ' + nameOf(f.target) + ' 倒下');
         break;
       }
       case 'dot': {
@@ -189,7 +189,7 @@
         hitFx(f.target);
         if (u) u.hp = Math.max(0, u.hp - f.dmg);
         floater(f.target, '-' + f.dmg, '#ff8080');
-        if (f.killed) pushLog('💀 ' + nameOf(f.target) + ' 倒下');
+        if (f.killed) pushLog('✗ ' + nameOf(f.target) + ' 倒下');
         break;
       }
       case 'heal': {

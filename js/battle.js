@@ -18,7 +18,7 @@ window.Battle = (function () {
   }
   const MECHANICS = {
     W01: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 2); }, note: '感染' },
-    W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭/流血' },
+    W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭/裂伤' },
     W03: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '恐惧' },
     W04: { onEnemyHit(t, fr) { if (Math.random() < 0.15) applyStatus(t, fr, 'stun', 1); }, bossRevive: true, note: '陷阱/复活' },
     /* 效果是"打到只剩 1 点血"（濒死），不是真的秒杀 —— 飘字也跟着叫"濒死"（V9.2 对齐）。
@@ -39,14 +39,14 @@ window.Battle = (function () {
     W08: { allyHitMod: -0.15, note: '浓雾' },
     W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂' },
     W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '中毒' },
-    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤/吸血' },
+    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤/汲取' },
     W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '腐化' },
     W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '冰冻' },
     W14: { randomRule: true, note: '随机规则' },
     /* W15~W20 的机制以前只写在世界表里、战斗引擎里根本没有（`MECHANICS[worldId] || {}` 直接落空），
        等于最后 6 个世界（180 关）是纯数值怪，但世界详情页照常写着"吸血 / 水压 / 幻觉…"。
        这里按世界表上的文案逐条补齐（V9.5）。 */
-    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '血月高悬：敌方攻击提升', note: '吸血/血月强化' },
+    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '绯月高悬：敌方攻击提升', note: '汲取/绯月强化' },
     W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '水压/触手缠绕' },
     W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '无人机群/电磁干扰' },
     W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉/死亡复活' },
@@ -62,7 +62,7 @@ window.Battle = (function () {
     W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '腐化/焚香灼烧' },
     W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '规则轮转/镜面幻觉' },
     W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '培养护盾/轨道扫射' },
-    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤恶鬼/吸血' },
+    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤夜影/汲取' },
     W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '中毒/藤蔓缠绕' },
     W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '诅咒/碑灵复活' },
     W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '灼烧/炉温强化' },
@@ -70,7 +70,7 @@ window.Battle = (function () {
     W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '规则改写/灯影压制' },
     W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.20, note: '撕裂/吞噬护盾' },
     W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '冰冻/时序加速' },
-    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '吸血/摆渡' },
+    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '汲取/摆渡' },
     W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
   };
 

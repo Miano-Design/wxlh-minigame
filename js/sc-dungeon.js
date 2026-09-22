@@ -9,7 +9,7 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA, Dun = G.Dungeon, BattleUI = G.BattleUI;
-  const ICON = { bio: '🧟', ghost: '👻', mystic: '🏺', tech: '🛰', god: '👁' };
+  const ICON = { bio: '🦠', ghost: '🕸', mystic: '🏺', tech: '🛰', god: '👁' };
   const DIFF_NAME = { normal: '普通', hard: '困难', hell: '地狱' };
 
   let view = { worldId: null, diff: 'normal' };
@@ -194,7 +194,7 @@
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
         CV.round(x, y, cw, cw, 10 * CV.SCALE, done ? '#1d2b22' : CV.C.panel2,
           done ? '#2f5b41' : (isBoss ? CV.C.accent : CV.C.line));
-        CV.text(isBoss ? '👹' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
+        CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
           { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
         if (isElite) CV.text('⚔', x + cw - 5 * CV.SCALE, y + 10 * CV.SCALE,
           { size: CV.FS.xs, align: 'right', color: CV.C.dim });   // .sc-mark：右上角、五级、85% 不透明度
@@ -205,8 +205,8 @@
       U.y = top + 3 * cw + 2 * gap;
     }
     /* V9.6.122：网页版关卡格下面有一行图例（hint mt2）——小游戏这边原来**没有**，
-       玩家看不出 ⚔ / 👹 是什么意思。文案照网页版原样。 */
-    U.hint('⚔ 精英关（更硬、掉得更好）· 👹 守关 Boss（打完开下一个世界）', 10 * CV.SCALE);
+       玩家看不出 ⚔ / 🔱 是什么意思。文案照网页版原样。 */
+    U.hint('⚔ 精英关（更硬、掉得更好）· 🔱 守关 Boss（打完开下一个世界）', 10 * CV.SCALE);
     // 扫荡
     const canSweep = st && st.stages[diff].some((s) => s > 0);
     if (canSweep) {
