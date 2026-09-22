@@ -22,6 +22,7 @@
       line: '#232b3b', line2: '#333e55', lineSoft: 'rgba(255,255,255,.05)',
       text: '#e9edf6', text2: '#b6bfd0', dim: '#7a849b',
       accent: '#d43a4f', accent2: '#97273a', gold: '#e6b64c',
+      goldDeep: '#8a6a1e',
       green: '#56c894', blue: '#6ec6ff', red: '#d43a4f',
     },
     /* 下面这几组数值在 setup() 里按网页版的根字号等比缩放：
@@ -430,6 +431,36 @@
     const t = String(str == null ? '' : str);
     for (const k in CV.GLYPHS) if (t.indexOf(k) >= 0) return true;
     return false;
+  };
+  /* ---------- 命格主题（V1.1 · 2026-09-23）----------
+     六套锚色 / 六形印记 / 九级灯梯**全部从数据层取**（D.BLOOD_THEME / BLOOD_GLYPH / BLOOD_LAMP）——
+     画布这端不许再写一套 hex，否则又是"改一边忘一边"。与网页版同一份表、同一套规则。
+       · CV.blLamp(bl, realm)：这一境界上的灯色（**色只走 4 级**，第 5 大境封顶，之后交给光晕）
+       · CV.blGlyph(bl, cx, cy, s, color)：命格印记（第六套形状语言，与五族族形同一套规则，
+         归一化 0~1 顶点表直接乘尺寸，两端同一个形状）
+     两个都**只画**，不改任何数值。 */
+  CV.blLamp = function (bl, realm) {
+    const row = (G.DATA && G.DATA.BLOOD_LAMP) ? G.DATA.BLOOD_LAMP[bl] : null;
+    if (!row || !row.length) return CV.C.gold;
+    const per = ((G.DATA.REALM_TIERS && G.DATA.REALM_TIERS.length) || 4);
+    const k = Math.min(row.length - 1, Math.max(0, Math.floor((realm || 0) / per)));
+    return row[k];
+  };
+  CV.blGlyph = function (bl, cx, cy, s, color) {
+    const pts = (G.DATA && G.DATA.BLOOD_GLYPH) ? G.DATA.BLOOD_GLYPH[bl] : null;
+    if (!pts || !pts.length) return 0;
+    const c = CV.ctx;
+    c.save();
+    c.fillStyle = color || CV.C.text;
+    c.beginPath();
+    pts.forEach(function (p, i) {
+      const px = cx - s / 2 + p[0] * s, py = cy - s / 2 + p[1] * s;
+      if (i) c.lineTo(px, py); else c.moveTo(px, py);
+    });
+    c.closePath();
+    c.fill();
+    c.restore();
+    return s;
   };
   /* 货币符号 → 专属色（从货币表来，别处不许再手写颜色）。
      晚一点挂：data.js 先加载，这里只是把表读出来缓存一份。 */

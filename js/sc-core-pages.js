@@ -156,7 +156,21 @@
     const st = Core.realmState();
     U.begin(); head('境界渡劫');
     U.card(function () {
-      U.h3(st.curName || '未定命格', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶');
+      /* 命格主题（V1.1）：这一屏就是"灯"的落点之一 —— 标题 + 标题行右端的印记 + 境界条
+         三处都走本命格的灯色（与网页版同一形、同一色、同一条进度）。 */
+      const lamp = st.hasBloodline ? CV.blLamp(st.bloodline, st.realm) : null;
+      const ty = U.y;
+      U.h3(st.curName || '未定命格', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶', lamp ? { color: lamp } : null);
+      if (lamp) U.draw(function () { CV.blGlyph(st.bloodline, U.ix() + U.iw() - 8 * CV.SCALE, ty + CV.FS.f1 * 1.3 / 2, 14 * CV.SCALE, lamp); });
+      if (lamp) {
+        const bh = 4 * CV.SCALE, by = U.y;
+        const pct = Math.max(0, Math.min(1, st.realm / D.REALM_STAGE_COUNT));
+        U.draw(function () {
+          CV.round(U.ix(), by, U.iw(), bh, bh / 2, CV.C.line);
+          if (pct > 0) CV.round(U.ix(), by, Math.max(bh, U.iw() * pct), bh, bh / 2, lamp);
+        });
+        U.y = by + bh + CV.SP[1];
+      }
       U.kv('当前境界加成', '+' + (Core.realmBonusPct() * 100).toFixed(1) + '%', CV.C.gold);
       if (!st.hasBloodline) { U.note('先去选一条命格（境界线跟着命格走）', 2 * CV.SCALE); return; }
       const nx = st.next;

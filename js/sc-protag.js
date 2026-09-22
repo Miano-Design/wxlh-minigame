@@ -166,9 +166,15 @@
 
     /* ⑤ 血统 */
     U.card(function () {
-      U.h3('🧬 命格', S.player.bloodline ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒');
+      /* 命格主题（V1.1）：标题走本命格的灯色，标题行右端挂本命格的印记 —— 与网页版同一形、同一色。
+         灯色跟的是**大境界**（第 5 大境封顶，之后交给光晕）。 */
+      const pbl = S.player.bloodline;
+      const lamp = pbl ? CV.blLamp(pbl, Core.realmState().realm) : null;
+      const ty = U.y;
+      U.h3('🧬 命格', pbl ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒', lamp ? { color: lamp } : null);
+      if (lamp) U.draw(function () { CV.blGlyph(pbl, U.ix() + U.iw() - 8 * CV.SCALE, ty + CV.FS.f1 * 1.3 / 2, 14 * CV.SCALE, lamp); });
       if (S.player.bloodline) {
-        U.hint(S.player.bloodline + '：' + (D.BLOODLINES[S.player.bloodline] || {}).desc, 2 * CV.SCALE);
+        U.hint(S.player.bloodline + '（' + ((D.BLOOD_THEME[S.player.bloodline] || {}).name || '') + '）：' + (D.BLOODLINES[S.player.bloodline] || {}).desc, 2 * CV.SCALE);
         U.space(CV.SP[1]);
         if (blCost) {
           U.btnRow([{ label: '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);

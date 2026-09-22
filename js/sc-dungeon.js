@@ -9,7 +9,9 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA, Dun = G.Dungeon, BattleUI = G.BattleUI;
-  const ICON = { bio: '🦠', ghost: '🕸', mystic: '🏺', tech: '🛰', god: '👁' };
+  /* 2026-09-23 备案自查：ghost 兜底原来是 🕸（蛛网）、god 兜底是 👁（悬空眼球）——
+     两个都是"恐怖"同源意象，与网页版一起换成 🪞 / 🥇。这五个只是兜底（36 个世界都有 ico）。 */
+  const ICON = { bio: '🦠', ghost: '🪞', mystic: '🏺', tech: '🛰', god: '🥇' };
   const DIFF_NAME = { normal: '普通', hard: '困难', hell: '地狱' };
 
   let view = { worldId: null, diff: 'normal' };

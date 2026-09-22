@@ -397,8 +397,9 @@
       U.kv('评分', String(Core.equipScore(eq)), CV.C.gold);
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
-      if (gs) U.kv('命格神装', '仅限' + eq.godSet + '命格装备（穿戴者命格要对得上）');
-      if (cs) U.kv('命格套装', '仅限' + eq.bloodSet + '命格 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套');
+      /* 命格主题（V1.1）：命格套装与神装**不染色框**（框是稀有度的），名字走本命格的灯色 —— 与网页版同口径 */
+      if (gs) U.kv('命格神装', '仅限' + eq.godSet + '命格装备（穿戴者命格要对得上）', CV.blLamp(eq.godSet, Core.realmState().realm));
+      if (cs) U.kv('命格套装', '仅限' + eq.bloodSet + '命格 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套', CV.blLamp(eq.bloodSet, Core.realmState().realm));
       U.kv('分解可得', '◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3));
     });
     U.card(function () {
@@ -604,7 +605,10 @@
     const cnt = Math.max(1, Math.min(serumCount || 1, have));
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
-    CV.text('使用精华', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    /* 命格专属精华：这一屏走本命格的灯色 + 标题右端挂印记（与网页版同源） */
+    const serumLamp = sd.bloodline ? CV.blLamp(sd.bloodline, Core.realmState().realm) : null;
+    CV.text('使用精华', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center', color: serumLamp || CV.C.text });
+    if (serumLamp) U.draw(function () { CV.blGlyph(sd.bloodline, U.pad() + U.cw() - 8 * CV.SCALE, U.y + U.BTN_SM * CV.SCALE / 2, 14 * CV.SCALE, serumLamp); });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     U.note('选择要吃「' + (it.name || '') + ' ×' + cnt + '」的伙伴 —— 永久生效', 0);
     U.space(CV.SP[2]);

@@ -413,13 +413,15 @@
     h = h || U.BTN_H * CV.SCALE;
     const g = style === 'primary' ? CV.ctx.createLinearGradient(0, y, 0, y + h)
       : style === 'gold' ? CV.ctx.createLinearGradient(0, y, 0, y + h) : null;
-    if (style === 'primary') { g.addColorStop(0, '#c9364a'); g.addColorStop(1, CV.C.accent2); }
+    /* 主行动恒定金（V1.1 父亲大人拍板 + 创意总监复审）：红退回只管"危险 / 消耗 / 不可行"。
+       字用深墨 #0b0e15 —— 与网页版 .btn.primary 同一条渐变（--gold → --gold-deep）。 */
+    if (style === 'primary') { g.addColorStop(0, CV.C.gold); g.addColorStop(1, CV.C.goldDeep); }
     if (style === 'gold') { g.addColorStop(0, '#b98d2a'); g.addColorStop(1, '#87631a'); }
     const fill = g || (style === 'ghost' ? null : CV.C.panel2);
     /* V9.6.90：颜色一律 rgba()，**不许用 8 位 hex**（#RRGGBBAA）——
        微信画布对这个格式"部分支持/不稳定"，赋值失败时画布会**保持上一次的填充色**，
        表现就是"黑底黑字"（父亲大人最早报的那个毛病）。见 canvas_audit 的同名规则。 */
-    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? 'rgba(224,90,109,.25)' : style === 'gold' ? 'rgba(230,182,76,.27)' : CV.C.line2);
+    const line = style === 'ghost' ? CV.C.line : (style === 'primary' ? 'rgba(230,182,76,.33)' : style === 'gold' ? 'rgba(230,182,76,.27)' : CV.C.line2);
     draw(() => {
       if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
       /* 按下态：网页版 .btn:active 是 scale(.97) + 背景压暗一档。
@@ -434,7 +436,7 @@
       const lh = size * 1.25;
       lines.forEach(function (ln, i) {
         CV.text(ln, x + w / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh,
-          { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'gold' ? '#fdf3dc' : CV.C.text });
+          { size, bold: style === 'primary' || style === 'gold', align: 'center', color: style === 'primary' ? '#0b0e15' : style === 'gold' ? '#fdf3dc' : CV.C.text });
       });
       if (dis) CV.ctx.restore();
     });

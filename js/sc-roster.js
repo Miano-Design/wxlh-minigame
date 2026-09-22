@@ -161,7 +161,11 @@
       const rw = CV.measure(ch.rarity, CV.FS.f1, true);
       CV.text(CV.fit(nm(id), U.iw() - asz - rw - 60 * CV.SCALE, CV.FS.f1, true), tx + rw + 7 * CV.SCALE, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true });
       CV.text('★'.repeat(c.star) + '☆'.repeat(Math.max(0, maxStar - c.star)), tx, top + 34 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, ls: -1 });
-      CV.text(ch.bloodline + '命格 · ' + ch.faction, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+      /* 命格主题（V1.1）：这一行走本命格的灯色，行尾挂本命格的印记（与网页版同源） */
+      const blLine = ch.bloodline + '命格 · ' + ch.faction;
+      const blLamp = CV.blLamp(ch.bloodline, Core.realmState().realm);
+      CV.text(blLine, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: blLamp });
+      U.draw(function () { CV.blGlyph(ch.bloodline, tx + CV.measure(blLine, CV.FS.sm) + 7 * CV.SCALE, top + 50 * CV.SCALE, 11 * CV.SCALE, blLamp); });
       /* V9.6.129：显示**该稀有度的通用碎片**（不再是他一个人攒的） */
       CV.text('Lv.' + c.lv + ' · ' + ch.rarity + ' 碎片 ' + Core.shardPoolOf(ch.rarity) + ' · 命格 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
