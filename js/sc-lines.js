@@ -462,7 +462,7 @@
       U.h3('点灯', '每天免费 1 次');
       U.note('灯焰分五档（长明 → 微光），给当天的挂机加成，只算当天，隔天自动熄灭——上线先点一次灯，再看今天要打哪儿。', 2 * CV.SCALE);
       U.space(CV.SP[1]);
-      if (st.canDraw) U.btnRow([{ label: '🪔 点亮今日灯芯', style: 'gold', id: 'sign_draw' }]);
+      if (st.canDraw) U.btnRow([{ label: '🔆 点亮今日灯芯', style: 'gold', id: 'sign_draw' }]);
       else {
         U.note('今日灯焰：【' + (pick ? pick.tier : st.tier) + '】' + (pick ? ' ' + pick.text : ''), 2 * CV.SCALE);
         U.hint('今日挂机产出 +' + Math.round(st.idlePct * 100) + '%', 4 * CV.SCALE);

@@ -399,7 +399,19 @@ window.DATA = (function () {
       enemies: '瘴沼蟒|沼泽鳄|沼泽水蛭'.split('|'), elite: '变异森蚺', unlock: 'W09' },
     { id: 'W11', ico: '⛵', name: '幽帆船坞', theme: 'mystic', desc: '月光下，那批船员的船始终没能靠岸。', hp: 4300, atk: 390, def: 330, mechanic: '召唤旧船员；汲取', boss: '幽帆船长', bossHp: [603837, 1086907, 1932279],
       enemies: '幽帆水手|铁壳炮手|锈帆船员'.split('|'), elite: '幽帆大副', unlock: 'W10' },
-    { id: 'W12', ico: '🪐', name: '蚀环远征', theme: 'mystic', desc: '黑色的潮水从环带那头压过来，地图正在一寸寸褪色。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
+    /* 2026-09-23（AI 视觉工程师 · 图标时代自查，本轮第二次收紧）：
+       原来是"Emoji 12+ 必须登记"（登记＝允许上屏，提审前拿老机看一眼）。本轮把口径推到**不允许**：
+       **画布上的图标一律只用 Emoji 1.0（Unicode 6.0，2010）就有的字符** ——
+       因为微信小游戏的实际机型下限远低于我们测过的机器：Emoji 12 要 Android 10 / iOS 13.2，
+       Emoji 13 要 Android 11 / iOS 14.2，Emoji 14 要 Android 12 / iOS 15.4，
+       不够的机器上**画出来是豆腐块**，而且尺子验不出、只有真机看得见。
+       判据收成一句可自动化的：**字符码位 < U+1F900**（U+1F900 以上全是 2015 年之后新增的）。
+       本轮换掉的六个（数值 / id / 名称一个字没动，只换图标）：
+         W12 蚀环远征 🪐→☄️ · W22 锈蚀方舟 🪶→🚀 · W27 长明夜行 🪔→🌃
+         tv20 灵石碎块 🪨→🔹 · tv33 古镜照心 🪞→📀 · tv34 仙禽遗羽 🪶→🐦
+       另有"点灯"那颗功能图标 🪔→🔆、幽魂兜底 🪞→🌚（都在界面层，见 ui.js / sc-*.js）。
+       尺子在 wxlh-minigame/scripts/icon_unique_audit.js 第 ⑨ 条：**全库扫一遍，一个 Emoji 12+ 都不许有**。 */
+    { id: 'W12', ico: '☄️', name: '蚀环远征', theme: 'mystic', desc: '黑色的潮水从环带那头压过来，地图正在一寸寸褪色。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
       enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环游影', unlock: 'W11' },
     /* ---- 第二巡：转生 1 次开启 ---- */
     { id: 'W13', ico: '❄️', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '坐上去的人把整个王国冻住了，春天再没到过。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
@@ -426,7 +438,7 @@ window.DATA = (function () {
       enemies: '侍灯者|规则残响|镜中之你'.split('|'), elite: '执灯代行', unlock: 'W19' },
     { id: 'W21', ico: '🎭', name: '无声戏院', theme: 'ghost', desc: '幕布拉开，台下坐满了不鼓掌的观众。', hp: 22100, atk: 1310, def: 1140, mechanic: '静默：攻击附带恐惧；护幕', boss: '终场演员', bossHp: [3536000, 6364800, 11315200],
       enemies: '提线伶人|默剧游影|鼓掌的手'.split('|'), elite: '后台主管', unlock: 'W20' },
-    { id: 'W22', ico: '🪶', name: '锈蚀方舟', theme: 'tech', desc: '最后一艘方舟停在轨道上，舱里全是不该活下来的东西。', hp: 23300, atk: 1370, def: 1200, mechanic: '锈壳护盾；电磁干扰', boss: '方舟主机', bossHp: [3728000, 6710400, 11929600],
+    { id: 'W22', ico: '🚀', name: '锈蚀方舟', theme: 'tech', desc: '最后一艘方舟停在轨道上，舱里全是不该活下来的东西。', hp: 23300, atk: 1370, def: 1200, mechanic: '锈壳护盾；电磁干扰', boss: '方舟主机', bossHp: [3728000, 6710400, 11929600],
       enemies: '锈蚀机兵|舱壁猎犬|导航残魂'.split('|'), elite: '方舟守门人', unlock: 'W21' },
     /* 2026-09-23（文案策划 · 提审合规）：原「巢母产房」＋「每一声啼哭，都有三条舌头」——
        "产房 + 啼哭 + 三条舌头"是身体恐怖（异形那一类意象），踩"恐怖"类目。改成同一张图的"虫巢育卵"，
@@ -442,7 +454,7 @@ window.DATA = (function () {
       enemies: '律令执行体|镜中证人|无罪之影'.split('|'), elite: '庭上执行官', unlock: 'W24' },
     { id: 'W26', ico: '🧪', name: '零号实验舱', theme: 'tech', desc: '实验记录最后一页，只写了两个字：成功。', hp: 28600, atk: 1640, def: 1460, mechanic: '培养护盾；轨道扫射', boss: '零号样本', bossHp: [4576000, 8236800, 14643200],
       enemies: '失败样本|培养舱守卫|研究员残影'.split('|'), elite: '项目负责人', unlock: 'W25' },
-    { id: 'W27', ico: '🪔', name: '长明夜行', theme: 'ghost', desc: '灯笼亮起时，街上的每张脸都藏在灯影下面。', hp: 30100, atk: 1710, def: 1530, mechanic: '召唤夜影；汲取', boss: '提灯之主', bossHp: [4816000, 8668800, 15411200],
+    { id: 'W27', ico: '🌃', name: '长明夜行', theme: 'ghost', desc: '灯笼亮起时，街上的每张脸都藏在灯影下面。', hp: 30100, atk: 1710, def: 1530, mechanic: '召唤夜影；汲取', boss: '提灯之主', bossHp: [4816000, 8668800, 15411200],
       enemies: '灯笼影|无面行者|夜巡游影'.split('|'), elite: '夜行之首', unlock: 'W26' },
     { id: 'W28', ico: '🌿', name: '活体森林', theme: 'bio', desc: '树会呼吸，也记得你砍过谁。', hp: 31700, atk: 1790, def: 1610, mechanic: '中毒：持续掉血；藤蔓缠绕', boss: '森之心', bossHp: [4950000, 8910000, 15840000],
       enemies: '缚身藤|腐叶兽|树语者'.split('|'), elite: '林中之主', unlock: 'W27' },
@@ -1745,7 +1757,7 @@ window.DATA = (function () {
     { id: 'tv17', ico: '🌫', name: '雾中问路',   w: 9,  desc: '雾气里有人替你指了条近路。', effect: { points: 1600 } },
     { id: 'tv18', ico: '🏚', name: '废屋搜查',   w: 8,  desc: '一间塌了半边的屋子，柜子还没被人翻过。', effect: { points: 1100, item: 'exp_s' } },
     { id: 'tv19', ico: '🧭', name: '指路罗盘',   w: 7,  desc: '捡到一只还能转的罗盘，顺手记住了几条矿脉走向。', effect: { points: 2200, item: 'mat_t2' } },
-    { id: 'tv20', ico: '🪨', name: '灵石碎块',   w: 7,  desc: '山体裂缝里嵌着几块灵石碎块。', effect: { otherworld: 60 } },
+    { id: 'tv20', ico: '🔹', name: '灵石碎块',   w: 7,  desc: '山体裂缝里嵌着几块灵石碎块。', effect: { otherworld: 60 } },
     { id: 'tv21', ico: '🧙‍♂️', name: '隐士论道', w: 6,  desc: '一位隐士与你论了半日道。', effect: { points: 2600, otherworld: 8 } },
     { id: 'tv22', ico: '🌸', name: '花丛小憩',   w: 6,  desc: '在花丛里睡了一觉，醒来神清气爽。', effect: { points: 500, holy: 15 } },
     { id: 'tv23', ico: '🗡', name: '古战场拾遗', w: 5,  desc: '古战场上还能捡到没锈透的家伙。', effect: { item: 'mat_t3' } },
@@ -1761,9 +1773,12 @@ window.DATA = (function () {
     { id: 'tv30', ico: '🐺', name: '狼群围猎',   w: 3,  desc: '一群野狼围上来，被你反过来打了牙祭。', effect: { item: 'beast_egg', points: 1200 } },
     { id: 'tv31', ico: '🌠', name: '流星夜观',   w: 3,  desc: '一场流星雨，你对着星光把修为理顺了。', effect: { points: 6600, holy: 40 } },
     { id: 'tv32', ico: '🏯', name: '旧宗门遗址', w: 3,  desc: '一座废弃宗门，库房里还留着东西。', effect: { item: 'box_sr', points: 2400 } },
-    /* 同上：🧿（那只眼）换 🪞（古镜）—— 语义与图标终于对上；🪞 属 Emoji 13（见本轮审核隐患 §3）。 */
-    { id: 'tv33', ico: '🪞', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { otherworld: 30, points: 1800 } },
-    { id: 'tv34', ico: '🪶', name: '仙禽遗羽',   w: 2,  desc: '一根仙禽落羽，轻得像没有重量。', effect: { otherworld: 200, holy: 50 } },
+    /* 🧿（那只眼）→🪞（古镜）→📀：换了两轮才收敛。
+       🧿 的形状就是一只眼（复审风险）；🪞 语义对上了，但它是 Emoji 13（Android 11 / iOS 14.2 才画得出），
+       挪到没有那款字体的机器上就变豆腐块 —— 所以这一轮连同其余五个一起压到 Emoji 1.0 的字符上。
+       📀 仍是"一面照得见东西的圆盘"，语义没丢。 */
+    { id: 'tv33', ico: '📀', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { otherworld: 30, points: 1800 } },
+    { id: 'tv34', ico: '🐦', name: '仙禽遗羽',   w: 2,  desc: '一根仙禽落羽，轻得像没有重量。', effect: { otherworld: 200, holy: 50 } },
     { id: 'tv35', ico: '🗝', name: '无名钥匙',   w: 2,  desc: '一把没有锁孔的钥匙，你收进了怀里。', effect: { item: 'ticket_lim' } },
     { id: 'tv36', ico: '🎣', name: '潭底钓宝',   w: 2,  desc: '潭底钓上来一个沉甸甸的箱子。', effect: { item: 'box_ssr', points: 3000 } },
     { id: 'tv37', ico: '🏔', name: '云顶吐纳',   w: 2,  desc: '在云顶吐纳一场，灵气灌顶。', effect: { holy: 120, points: 4000 } },

@@ -10,6 +10,7 @@ require('./js/battle.js');
 require('./js/dungeon.js');
 require('./js/cv.js');           // canvas 界面框架（配色/字号/圆角全部取网页版 :root，并按 clamp 缩放）
 require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫格/按钮…每块对应网页版一个 CSS 类）
+require('./js/sc-splash.js');    // 开机首屏（主视觉）+ 选命格背影（V1.1.3）
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
 require('./js/sc-guide.js');     // 玩法指南 / 货币图鉴 / 游历奇遇
 require('./js/sc-home.js');      // 灯阁（首页）
@@ -127,6 +128,15 @@ if (hadSave && Core.S.retiredRefundPending) {
     CV.toast('治疗剂 / 强化剂已下架，背包里剩的按原价退回：◈ ' + gotRefund.toLocaleString(), 4200);
   }, 600);
 }
+/* 冷启动首屏（V1.1.3 · 创意总监 H5）：见 js/sc-splash.js。
+   两条位置上的讲究，都是实测出来的：
+     ① 必须在**第一次 CV.reset 之前** —— 它是一层覆盖绘制，第一帧就该在画面上；
+        顺序反了玩家会先看到一帧黑屏；
+     ② 必须排在**上面那几行 `pendingBoot.push(...)` 之后** ——
+        首屏自己会渲染一帧，那一帧里 coachFor 会跑一次；开机弹窗要是还没入队，
+        "弹窗没清完就不弹引导"那道闸就形同虚设：开场引导会先占住屏幕，
+        把离线收益 / 七日登录永远堵在队列里（本单实测踩到过，boot_audit 当场报红 6 条）。 */
+if (CV.splash) CV.splash(1500);
 if (hadSave) {
   if (!Core.S.player.name) CV.reset('create');
   else if (!Core.S.player.bloodline) CV.reset('bloodline');

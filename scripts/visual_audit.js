@@ -18,6 +18,8 @@
      ⑦ 命格主题：小游戏取的是数据层同一张表（锚色 + 现算灯梯）
      ⑧ 金底按钮：与网页版同一套令牌 ＋ 白字两端过 AA
                   ＋ **画布取色不许写成字符串**（V1.1.2 抓到的那类"不报不崩、颜色全错"）
+     ⑨ 冷启动与主视觉（V1.1.3）：首屏在位（且**顺序**对：在开机弹窗入队之后、第一次 CV.reset 之前）
+                  ＋ 首帧不可能是黑的 ＋ 选命格页的印记与灯色两端都在
 
    只读脚本，不写任何东西。要加色 → 先登记进 CV.C，再引用。
 */
@@ -253,6 +255,54 @@ console.log('\n=== ⑧ 金底按钮：一套底 ＋ 白字，两端都过 AA（V
     quoted.length ? quoted.join(',') : '全库 ' + files.length + ' 个 js 文件，0 处带引号的令牌串');
 }
 
+console.log('\n=== ⑨ 冷启动与主视觉：首屏在位 ＋ 首帧不黑 ＋ 选命格的印记与灯色（V1.1.3）===');
+{
+  const gameSrc = fs.readFileSync(path.resolve(__dirname, '../game.js'), 'utf8');
+  const splash = read('sc-splash.js');
+  const start = read('sc-start.js');
+  const uiwSrc = read('uiw.js');
+  const webUi = fs.readFileSync(path.resolve(WEB, 'js/ui.js'), 'utf8');
+  const webCss = fs.readFileSync(path.resolve(WEB, 'css/style.css'), 'utf8');
+
+  /* ① 首屏在位，而且**顺序**对。
+     顺序错过的坑本轮真踩了：把 CV.splash() 放在 `pendingBoot.push(...)` 之前，
+     首屏自己那一帧渲染会让 coachFor 先跑 —— 开场引导占住屏幕，
+     离线收益 / 七日登录永远排在队列里进不来（boot_audit 当场红 6 条）。
+     这一条就是那次事故的锁。 */
+  const iPush = gameSrc.indexOf("pendingBoot.push({ kind: 'login' })");
+  const iSplash = gameSrc.indexOf('CV.splash(');
+  const iReset = gameSrc.indexOf("CV.reset('create')");
+  t('① 开机首屏在位，且排在"开机弹窗入队之后、第一次 CV.reset 之前"',
+    iPush >= 0 && iSplash >= 0 && iReset >= 0 && iPush < iSplash && iSplash < iReset,
+    '入队 @' + iPush + ' · 首屏 @' + iSplash + ' · 第一次 reset @' + iReset);
+  /* ② 首帧不可能是黑的：天空渐变先铺、图没到还有灯晕兜底 */
+  t('② 首帧不可能是黑的（先铺天空渐变；底图没到就画那盏灯的灯晕）',
+    /const sky = c\.createLinearGradient/.test(splash) && /if \(!cover\(c, 1, 0\.5\)\)/.test(splash)
+    && /createRadialGradient/.test(splash));
+  /* ③ 底图只有一张，而且是母版的导出物 —— 不许在 canvas 里再手画一遍提灯者 */
+  const png = path.resolve(JS, '../icons/主视觉-提灯入残域.png');
+  t('③ 首屏底图用的是栅格化出来的那张 PNG（由网页版同名 SVG 母版导出）',
+    fs.existsSync(png) && /icons\/主视觉-提灯入残域\.png/.test(splash),
+    fs.existsSync(png) ? 'PNG ' + Math.round(fs.statSync(png).size / 1024) + 'KB' : '缺文件');
+  t('③ 画布这端**没有第二份美术定义**（首屏里不许出现手写的顶点表）',
+    !/\[\s*0\.\d+\s*,\s*0\.\d+\s*\]/.test(splash) && !/polygon/i.test(splash));
+  /* ④ 选命格页：印记 ＋ 灯色，两端都在（这是创意总监 B3 那条的锁） */
+  t('④ 小游戏"选命格"页有印记（CV.blGlyph）与本命格灯色（CV.blLamp）',
+    /CV\.blGlyph\(id,/.test(start) && /CV\.blLamp\(id, 0\)/.test(start)
+    && /color: lamp/.test(start) && /line: CV\.a\(lamp/.test(start));
+  t('④ 网页版"选命格"页同样有（blGlyph ＋ bl-scope）—— 两端同源，谁少了当场报',
+    /blGlyph\(id, 18\)/.test(webUi) && /card bl-scope anim-mark-in/.test(webUi));
+  t('④ 印记顶点表两端共用一份数据层（都从 D.BLOOD_GLYPH 取，谁都没自己写一套顶点）',
+    /DATA\.BLOOD_GLYPH/.test(read('cv.js')) && /D\.BLOOD_GLYPH/.test(webUi)
+    && !/\[\s*0\.\d+\s*,\s*0\.\d+\s*\]/.test(start));
+  /* ⑤ 选命格的背影：两端都挂上了主视觉（网页版 .bl-veil / 画布 CV.veilPage） */
+  t('⑤ 选命格的背影两端都挂上了主视觉（网页 .bl-veil / 画布 CV.veilPage("bloodline")）',
+    /bl-veil/.test(webCss) && /CV\.veilPage\('bloodline'/.test(splash));
+  /* ⑥ 通用件真的支持这两件事（不然页面写了也不生效） */
+  t('⑥ U.h3 支持标题前置印记（opt.glyph）、U.card 支持自定义描边（opt.line）',
+    /opt\.glyph/.test(uiwSrc) && /opt\.line/.test(uiwSrc) && /glyph\.bl/.test(uiwSrc));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
-console.log('结论：' + (fail === 0 ? '小游戏端八节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
+console.log('结论：' + (fail === 0 ? '小游戏端九节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

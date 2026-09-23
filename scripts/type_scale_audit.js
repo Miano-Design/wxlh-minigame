@@ -96,7 +96,10 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
   const css = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
   /* 画布侧的"出字口子"——全项目都从这几个口子出字，所以查它们就等于查了全项目 */
   const rules = [
-    ['卡片标题 h3 = 二级', /U\.h3 = function[\s\S]{0,2200}?size: CV\.FS\.f1/.test(uiw)],
+    /* V1.1.3：窗口 2200 → 4000 —— 与下面 kv 那条同一个病因（尺子过期，不是代码退化）：
+       给 U.h3 补了"标题前置印记"（opt.glyph）的注释与实现之后，第一条 `size: CV.FS.f1`
+       被推到 2200 字之外，尺子就误报"不符合层级"。h3 的标题字号**一个字没动**。 */
+    ['卡片标题 h3 = 二级', /U\.h3 = function[\s\S]{0,4000}?size: CV\.FS\.f1/.test(uiw)],
     ['标题右侧小字 .sub = 四级', /const subRight[\s\S]{0,400}?size: CV\.FS\.(sm|md)/.test(uiw)],
     ['注释 hint = 四级', /U\.hint = function[^\n]*CV\.FS\.(sm|md)/.test(uiw)],
     ['次要说明 note = 四级', /U\.note = function[^\n]*CV\.FS\.md/.test(uiw)],

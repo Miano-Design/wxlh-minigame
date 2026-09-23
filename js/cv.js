@@ -882,6 +882,13 @@
     bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
     c.fillStyle = bgGrad;
     c.fillRect(0, 0, CV.W, CV.H);
+    /* 页面底图（V1.1.3）：有些页要一张**整屏的底**（现在只有"选命格"＝主视觉的背影）。
+       画在背景色之后、内容与顶栏之前，而且是**屏幕坐标**（不受内容层的裁剪/滚动影响）。
+       页面自己用 CV.veilPage('页面名', 画法) 登记一次，渲染时按当前页名取。 */
+    {
+      const veil = CV.veils && CV.veils[CV.top().name];
+      if (veil) { try { veil(c); } catch (e) {} }
+    }
     c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
     c.beginPath(); c.rect(0, 0, CV.W, CV.H); c.clip();
     if (CV.top().name === 'battle') CV.battleHead((CV.top().opts && CV.top().opts.title) || '战斗');
@@ -935,6 +942,9 @@
        既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */
     if (CV.pageOverlay) CV.pageOverlay();
     CV.drawToasts();
+    /* 最顶层覆盖（V1.1.3）：开机首屏走这里 —— 它要盖住**一切**（包括 toast），
+       因为它代表的是"游戏还没开机完成"。见 js/sc-splash.js。 */
+    if (CV.topOverlay) { try { CV.topOverlay(); } catch (e) {} }
     } finally {
       /* 外层的还原也必须无条件执行（顶栏 / 吸顶条 / 覆盖层任何一处抛错都不能把坐标系留给下一帧） */
       c.restore();
@@ -1134,6 +1144,9 @@
     };
     wx.onTouchStart((e) => {
       const p = toW(e);
+      /* 开机首屏（V1.1.3）：它盖在页面上，这一下**不往下传** ——
+         不然玩家点一下首屏，底下那颗「签订灯阁契约」就被顺手点掉了。抬手时才结束首屏。 */
+      if (CV.splashActive && CV.splashActive()) { CV.pressed = null; downY = p.y; lastY = p.y; moved = false; return; }
       downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
       startScroll = CV.scroll || 0;
       stopMomentum();
@@ -1201,6 +1214,7 @@
     wx.onTouchEnd((e) => {
       const p = toW(e);
       clearGrabTimer();
+      if (CV.splashActive && CV.splashActive()) { if (CV.splashSkip) CV.splashSkip(); return; }
       /* 松手时"手里拿着东西"，且这一下就是抓着的手势：
          落点在哪一格 —— 换到那一格；落回自己或空白 —— 手里继续拿着（等下一下拖动或点选，
          网页版就是这套规矩：松在空白处不会掉出去，还能移到别处再放）。

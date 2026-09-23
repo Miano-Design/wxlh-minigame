@@ -92,7 +92,11 @@
        高度不再随内容涨缩。 */
     const minH = (opt && opt.minH) ? opt.minH * CV.SCALE : 0;
     const h = Math.max(inner + padY * 2, minH);
-    if (h > 4) CV.card(U.pad(), top, U.cw(), h);
+    /* opt.line：卡片描边的颜色（V1.1.3 加）。
+       用途是**命格卡**：网页版 `.bl-scope { border-color: var(--t-line2) }` ——
+       六张命格卡的边框各走本命格的暗档。canvas 这端原来 CV.card 只吃默认描边，
+       于是"选命格"页在小游戏里是六张一模一样的灰卡（网页版是六种颜色的卡）。 */
+    if (h > 4) CV.card(U.pad(), top, U.cw(), h, (opt && opt.line) ? { line: opt.line } : null);
     U.y = top + padY; content();
     U.inCard = outer;
     U.y = top + h + CV.SP[2];
@@ -105,6 +109,13 @@
   U.h3 = function (title, sub, opt) {
     opt = opt || {};
     /* opt.btn = { label, id }：标题行右侧的小按钮（网页版 .card h3 .hbtn，和标题/小字同一中线） */
+    /* opt.glyph = { bl, color, size }：标题**前面**挂一枚命格印记（V1.1.3 加）。
+       网页版的命格卡标题是 `blGlyph(id,18) + 名字`，印记在名字左边；
+       小游戏原来只能把印记画在标题行右端（主角页那几处就是这么画的，因为右边没有按钮），
+       而"选命格"页右边是「觉醒」按钮 —— 挤不下，于是那一页干脆没有印记。
+       现在按网页版的位置画：竖条 → 印记 → 名字，右边的按钮不动。 */
+    const glyph = opt.glyph || null;
+    const gs = glyph ? (glyph.size || CV.ICO) * CV.SCALE : 0;
     /* V9.6.118（父亲大人："技能的重置和下面加点的框还是贴的很近"）：
        网页版的 .hbtn 是 **2.125rem = 34px** 高，而 h3 是 flex 行 —— 行高会被按钮撑到 34px，
        再吃 10px 下边距，下面第一块才起步。画布这边原来只画了 26px 的按钮、
@@ -126,12 +137,15 @@
       const g = CV.ctx.createLinearGradient(0, cy - 6.5, 0, cy + 6.5);
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, CV.C.goldDeep);
       CV.round(U.ix(), cy - 6.5, bar, 13, CV.RADIUS_CHIP,  g);
+      /* 印记：与左边的金色竖条同一中线（顶点表来自 data.js:BLOOD_GLYPH，两端共用一份） */
+      if (glyph) CV.blGlyph(glyph.bl, U.ix() + bar + gap + gs / 2, cy, gs, glyph.color || CV.C.text);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
       /* V9.6.142：标题原来**一律**按 `iw - 120` 截断 —— 哪怕这一行既没有小字也没有按钮
          （玩法指南那些章标题就是这么被砍成「⑸ 血统与境界线：换了血统就换了…」的）。
          现在只有真的有右侧内容时才让位；只有标题时占满整行。 */
-      const titleMax = (opt.btn || sub) ? (U.iw() - 120) : (U.iw() - bar - gap - 4 * CV.SCALE);
-      CV.text(CV.fit(title, titleMax, CV.FS.f1, true), U.ix() + bar + gap, cy,
+      const titleMax = ((opt.btn || sub) ? (U.iw() - 120) : (U.iw() - bar - gap - 4 * CV.SCALE))
+        - (gs ? gs + 4 * CV.SCALE : 0);
+      CV.text(CV.fit(title, titleMax, CV.FS.f1, true), U.ix() + bar + gap + (gs ? gs + 4 * CV.SCALE : 0), cy,
         { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text, ls: 0.2 });   // .card h3 letter-spacing .2px
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });

@@ -169,38 +169,82 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
     !/const size = 14 \* CV\.SCALE/.test(mini));
 }
 
-/* ⑨ 「图标的时代」白名单（V1.1.2）
-   每个 emoji 都是**某一年**才进 Unicode 的 —— 系统 emoji 字体里没有它，画出来就是豆腐块。
-   版本越新，画得出来的系统越少：Emoji 12（2019）要 Android 10 / iOS 13.2，
-   Emoji 13（2020）要 Android 11 / iOS 14.2，Emoji 14（2021）要 Android 12 / iOS 15.4。
-   规矩：**新字符一律登记**（登记＝写明它出现在哪、备选是什么、换机验证过没有），没登记的当场报红 ——
-   免得下一次又有人随手加一个 🪷 进去。
-   ⚠️ 登记 ≠ 免除：这 5 个（E12 ×2 · E13 ×3）提审前都要拿一台老安卓 / 老 iPhone 看一眼，
-   出豆腐块就按"备选"一栏换（备选都是 Emoji 1.0 时代的字符，2015 年前的机器也有）。 */
+/* ⑨ 「图标的时代」：最新那一档字符**一个都不许有** ＋ 老一档逐个登记（V1.1.3）
+   ----------------------------------------------------------------------------------------------
+   上一版（V1.1.2）是"**登记制**"：Emoji 12+ 只要在表里登记过就放行，提审前拿老机看一眼。
+   登记制救不了它要救的那件事：
+     · 不够新的机器上画出来是**豆腐块**（方框里一个问号），而且**尺子验不出、只有真机看得见**；
+     · "提审前看一眼"是个**没有兜底的承诺** —— 通道一断（这一轮就是断的）就没人看，
+       承诺过期、风险留下。这次那 5 个字符能活过一整轮，就是这么活下来的。
+
+   本轮的判据分两档（**故意不搞成"一律 Emoji 1.0"** —— 那条线会把 🧬🧩🧪🥇 这二十几个
+   2016–2018 年的常用字符一起判死，等于为了躲一个未验证的风险去删一堆在用的语义图标）：
+
+     ① **硬线（报红）**：U+1FA70–U+1FAFF（Symbols and Pictographs Extended-A，Unicode 12.0 起）
+        整个区**一处都不许有**。它的满编就是 2019 年之后新增的那一批：
+        Emoji 12 要 Android 10 / iOS 13.2，Emoji 13 要 Android 11 / iOS 14.2，Emoji 14 要 Android 12 / iOS 15.4。
+        上一轮那 6 个（🪐🪔🪶🪨🪞🪷）全落在这个区里 —— 所以这一条正好是它们的**归零锁**。
+     ② **登记（软）**：U+1F900–U+1FA6F 里在用的字符逐个登记（Unicode 版本 ＋ 需要的系统）。
+        这一档是 2016–2018 年的（Emoji 3.0–11.0），落地要求 Android 8 / iOS 11.1 上下；
+        **我没有能力验证真实机型分布**（通道断，见本单回单"不确定"），所以它不进硬线，
+        只登记在册、让人一眼看得到"还有哪些老字符"。
+
+   本轮换掉的六处（数据层 6 ＋ 界面层 2）：
+     W12 🪐→☄️ · W22 🪶→🚀 · W27 🪔→🌃 · tv20 🪨→🔹 · tv33 🪞→📀 · tv34 🪶→🐦
+     · 点灯功能图标 🪔→🔆 · 幽魂兜底 🪞→🌚（数值 / id / 名称一个字没动）
+   扫的是**两个仓的 js 全量、且先剥注释** —— 上一版的表只数了 data.js 的 `ico:` 字段，
+   于是漏掉了写在界面代码里的 🪞（幽魂兜底）和 🪔（点灯）。 */
 {
-  const REG = {
-    '\u{1FA90}': 'Emoji 12 · W12 蚀环远征（行星环）',
-    '\u{1FA94}': 'Emoji 12 · W27 长明夜行（油灯）',
-    '\u{1FAB6}': 'Emoji 13 · W22 锈蚀方舟 + tv34 仙禽遗羽（羽毛）｜备选 🕊️ / 🛶',
-    '\u{1FAA8}': 'Emoji 13 · tv20 灵石碎块（石头）｜备选 ⛰️ / 🔹',
-    '\u{1FA9E}': 'Emoji 13 · tv33 古镜照心（镜子）｜备选 📀 / 🎐',
-  };
-  const src = fs.readFileSync(path.join(JS, 'data.js'), 'utf8');
-  const used = new Map();
-  for (const m of src.matchAll(/(?:ico|icon):\s*['"]([^'"]*)['"]/gu)) {
-    for (const ch of m[1]) {
+  const stripC = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1 ');
+  const files = [];
+  [JS, path.resolve(JS, '../../wxlh-game/js')].forEach((dir) => {
+    fs.readdirSync(dir).filter((f) => f.endsWith('.js')).forEach((f) => files.push(path.join(dir, f)));
+  });
+  const banned = {}, regd = {};
+  files.forEach((p) => {
+    const s = stripC(fs.readFileSync(p, 'utf8'));
+    for (const ch of s) {
       const cp = ch.codePointAt(0);
-      if (cp >= 0x1FA70 && cp <= 0x1FAFF) used.set(ch, (used.get(ch) || 0) + 1);
+      if (cp < 0x1F900 || cp > 0x1FAFF) continue;
+      if (cp >= 0x1FA70) {
+        const key = ch + ' U+' + cp.toString(16).toUpperCase();
+        (banned[key] = banned[key] || new Set()).add(path.basename(p));
+      } else {
+        (regd[ch] = regd[ch] || new Set()).add(path.basename(p));
+      }
     }
-  }
-  const unknown = [...used.keys()].filter((ch) => !(ch in REG));
-  t('没有"未登记的新时代图标"（Emoji 12+ 一律登记在册，免得又混进一个豆腐块）',
-    unknown.length === 0,
-    unknown.length ? '未登记：' + unknown.map((c) => c + ' U+' + c.codePointAt(0).toString(16).toUpperCase()).join(' · ')
-      : [...used.entries()].map(([c, n]) => c + '×' + n).join(' ') + ' —— 全部登记在册');
-  const stale = Object.keys(REG).filter((ch) => !used.has(ch));
-  t('登记表没有"已经换掉的陈旧登记"', stale.length === 0,
-    stale.length ? '可删：' + stale.join(' ') : '登记表和实际用法对得上');
+  });
+  const list = Object.entries(banned);
+  t('硬线：Emoji 12+ 那一档（U+1FA70–U+1FAFF）在两端一处都没有',
+    list.length === 0,
+    list.length ? list.map(([k, fs2]) => k + '（' + [...fs2].join(',') + '）').join(' · ')
+      : '两个仓 ' + files.length + ' 个 js 文件扫完，0 处 Extended-A 字符（6 个全换掉了）');
+  /* 登记表只列"确实在用的"，空登记会自己报出来 */
+  const REG = {
+    '🥇': 'Emoji 3.0（Unicode 9.0, 2016）· 神域兜底 · 需 Android 7 / iOS 10.2',
+    '🥋': 'Emoji 3.0（Unicode 9.0, 2016）· 斗法台 · 需 Android 7 / iOS 10.2',
+    '🥚': 'Emoji 3.0（Unicode 9.0, 2016）· 兽魂蛋 · 需 Android 7 / iOS 10.2',
+    '🧙': 'Emoji 5.0（Unicode 10.0, 2017）· 隐士/道士 · 需 Android 8 / iOS 11.1',
+    '🧘': 'Emoji 5.0（Unicode 10.0, 2017）· 闭关 · 同上',
+    '🧩': 'Emoji 5.0（Unicode 10.0, 2017）· 铭刻 · 同上',
+    '🧭': 'Emoji 5.0（Unicode 10.0, 2017）· 罗盘 · 同上',
+    '🧪': 'Emoji 5.0（Unicode 10.0, 2017）· 实验舱 · 同上',
+    '🧫': 'Emoji 5.0（Unicode 10.0, 2017）· 瘴沼 · 同上',
+    '🧬': 'Emoji 5.0（Unicode 10.0, 2017）· 命格 / 铭刻（**用得最重的一个**）· 同上',
+    '🧱': 'Emoji 5.0（Unicode 10.0, 2017）· 建设 · 同上',
+    '🧊': 'Emoji 5.0（Unicode 10.0, 2017）· 寒潭 · 同上',
+    '🧧': 'Emoji 5.0（Unicode 10.0, 2017）· 红包 · 同上',
+    '🧍': 'Emoji 5.0（Unicode 10.0, 2017）· 站位 · 同上',
+    '🧑': 'Emoji 5.0（Unicode 10.0, 2017）· 主角 · 同上',
+    '🦠': 'Emoji 11（Unicode 11.0, 2018）· W01 黏液巢穴 · 需 Android 9 / iOS 12.1',
+    '🦾': 'Emoji 11（Unicode 11.0, 2018）· 机械件 · 同上',
+  };
+  const unreg = Object.keys(regd).filter((ch) => !(ch in REG));
+  const stale = Object.keys(REG).filter((ch) => !(ch in regd));
+  t('软线：老一档（U+1F900–U+1FA6F）在用的字符全部登记在册（写明 Unicode 版本与需要的系统）',
+    unreg.length === 0 && stale.length === 0,
+    (unreg.length ? '未登记：' + unreg.join(' · ') : '')
+    + (stale.length ? '｜登记表里的陈旧项：' + stale.join(' ') : (unreg.length ? '' : Object.keys(regd).length + ' 个全部在册')));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

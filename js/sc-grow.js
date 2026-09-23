@@ -39,7 +39,7 @@
         desc: '每天 ' + D.ARENA_DAILY + ' 次镜像擂台，守擂者按你的战力换算，赢一场升一台拿 ◆ 异界结晶' },
       { act: 'open_mount', unlock: null, ico: '🐎', name: '坐骑', cur: '已驯服 ' + Core.mountState().own.length + ' / ' + D.MOUNTS.length + ' 匹',
         desc: '花 ◉ 点数 + 材料驯服，全队（含伙伴）永久加数值；同时只骑 1 匹，随时换' },
-      { act: 'open_sign', unlock: null, ico: '🪔', name: '点灯',
+      { act: 'open_sign', unlock: null, ico: '🔆', name: '点灯',
         cur: Core.signState().canDraw ? '今日还没点灯' : ('今日【' + Core.signState().tier + '】'),
         desc: '每天免费点一次灯，灯焰给当天的挂机加成 + 一笔硬通货，隔天自动失效' },
       { act: 'open_realm', unlock: null, ico: '🌌', name: '境界渡劫',

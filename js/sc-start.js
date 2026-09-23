@@ -85,6 +85,16 @@
     U.y += CV.SP[1];
     Object.keys(D.BLOODLINES).forEach((id) => {
       const bl = D.BLOODLINES[id];
+      /* V1.1.3（创意总监 B3：这一页**两端不同源**）：
+         网页版 `js/ui.js:3304` 那张卡是 `bl-scope`（边框走本命格的暗档）＋ 名字前面挂印记 `blGlyph(id,18)`，
+         而小游戏这一页只有标题和三行小字 —— 没有印记、也没有灯色。
+         于是"选命格 ＝ 点亮你那盏灯"这件事，**恰好在要送审的那一端看不见**（六灯同框缺席）。
+         现在补齐，取值全部从数据层来（第一盏灯＝锚色本人）：
+           · 灯色  CV.blLamp(id, 0) → D.BLOOD_LAMP[id][0]（＝BLOOD_THEME[id].lamp，与网页版 --t-lamp 同源）
+           · 印记  CV.blGlyph(id, …) → D.BLOOD_GLYPH[id]（顶点表只有一份，两端共用）
+           · 边框  从同一盏灯派一个 α（`CV.a(lamp,.38)`）——
+             网页版那一档是 --t-line2 的六个 hex，canvas 这端不再手抄一遍第二张表。 */
+      const lamp = CV.blLamp(id, 0) || CV.C.text;   // 取不到就退回正文色，绝不画出 undefined
       U.card(function () {
         /* V9.6.96（父亲大人报"选科技进去变修真"）：
            这位用户的操作路径查不出代码问题（当前代码选科技就是科技，有端到端取证），
@@ -95,14 +105,18 @@
         const cardTop = U.y - CV.SP[2];        // 卡片外框上沿（U.card 的上下内边距 = SP[2]）
         /* V9.6.142：血统说明原来塞在标题右边的窄位里 → 「狼人近战输出。每级：攻击+1.2%、…」被砍。
            改成**标题行只放名字 + 觉醒按钮**，说明和境界线各占一整行 —— 一字不丢。 */
-        U.h3(id, '', { btn: { label: '觉醒', id: 'bl_pick:' + id } });
+        U.h3(id, '', {
+          color: lamp,                                     // 名字走本命格的灯色（网页版 .bl-title）
+          glyph: { bl: id, color: lamp, size: CV.ICO },    // 印记在名字左边（网页版 blGlyph(id,18)；画布走 CV.ICO 令牌）
+          btn: { label: '觉醒', id: 'bl_pick:' + id },
+        });
         U.hint(bl.desc, 2 * CV.SCALE);
         /* V9.6.142：境界线那串名字走 kv（右边只能占约 62% 宽）→ 被砍成「兽崽 → 幼狼 → …」。
            改成**整行小字**（占满宽度），六条血统的完整境界线都看得见。 */
         U.hint('境界线：' + bl.realms.join(' → '), 2 * CV.SCALE);
         U.hint('每大境分初期 / 中期 / 后期 / 大圆满，共 ' + D.REALM_STAGE_COUNT + ' 阶。', 2 * CV.SCALE);
         if (!U.dry) CV.hit('bl_pick:' + id, U.pad(), cardTop, U.cw(), U.y - cardTop);
-      });
+      }, { line: CV.a(lamp, .38) });
     });
   });
   Object.keys(G.DATA.BLOODLINES).forEach(function (id) {
