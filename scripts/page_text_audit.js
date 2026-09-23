@@ -395,9 +395,19 @@ const COMPLIANCE_TEXT = [
      香火 · 开光 · 超度 · 辟邪 · 驱魔 · 转世 · 投胎。整批已换成"冷 / 旧 / 静"的中性词表
      （沉 · 静默 · 净尘 · 束纹 · 沉纹 · 旧纹 · 灰纹 · 守宅 · 轻行 · 霜晶），见 data.js 的 EQUIP_NAMES。
      ⚠️ 故意不锁：「咒 / 符」单字（诅咒 / 咒纹 / 字符串会误报）、「香」（灯烛意象与"一炷香"量词）、
-     「幽都 / 黄泉 / 亡灵 / 魂 / 灵 / 祭司」（玄幻类型词，总监定案保留）。 */
+     「幽都 / 魂 / 灵 / 祭司」（玄幻类型词，暂留；「幽都」与「九幽渡口 / 九幽幡」已进
+     `data.js` 注释里的"待父亲大人拍板"清单，见网页版 `copy_audit` 同一张表）。 */
   [/求签|抽签|签文|占卜|算命|测字|卜卦|卦象|风水|吉凶|大吉|上吉|中吉|小吉|末吉|镇魂|缚灵|驱邪|镇宅|往生|符咒|符纸|符箓|灵符|玉符|佛珠|道袍|道冠|道衣|道观|道士|法事|香火|开光|超度|辟邪|驱魔|转世|投胎/,
     '封建迷信：求签 / 占卜 / 吉凶档位，以及宗教器物与科仪词（符咒 · 佛珠 · 道袍 · 镇魂 · 缚灵 · 驱邪 · 镇宅 · 往生）'],
+
+  /* 2026-09-23 三轮（合规岗体检报告 R6 · 文案策划落地；父亲大人已同意）：
+     **「陵墓 / 碑陵 / 碑灵 / 亡灵 / 亡魂 / 残魂 / 渡魂 / 黄泉 / 冥界 / 忘川」不再"保留"** ——
+     依据是微信小游戏特别规范 **2.4.1（不得表现出恐怖的环境或场景）＋ 6.1.3（封建迷信）**，
+     是明文基准条款，不依赖父亲大人的偏好。上一轮「W04/W05/W22/W29/W35 属玄幻类型词、保留不改」
+     的判据**已被推翻** —— 下一轮别再翻回去（沿革见 `data.js` W04 上的注释）。
+     锁的是**成词形态**（照「咒 / 符」那条的老规矩，不锁单字碎词，免得变成天天误报的尺子）。 */
+  [/陵墓|碑陵|碑灵|亡灵|亡魂|残魂|渡魂|黄泉|冥界|忘川/,
+    '冥界 / 陵墓语汇：小游戏特别规范 2.4.1（恐怖环境）＋ 6.1.3（封建迷信）—— 2026-09-23 合规岗体检 R6 起不再保留'],
 ];
 {
   const EXPLAIN = /不再|不存在|没有这种|早就|以前|过去|旧版|已删|下架|不该再/;
@@ -517,6 +527,28 @@ expect('party', partyIds.map((id) => Core.charName(id)), '队伍（上阵名）'
 expect('keji', D.KEJI.map((k) => k.name), '秘术阁（每条线）');
 expect('garden', ['第 1 块'], '药园（地块）');
 expect('sign', D.SIGNS.map((s) => s.tier), '点灯（灯焰档位）');
+
+/* ---------- ③ 适龄提示（2026-09-23 · 文案策划 · 合规岗体检报告 R4） ----------
+   依据：微信小游戏特别规范 **6.1（未成年人保护）** —— 全库原本 0 处「适龄」。
+   两边都钉，就是规矩里那条"**网页版有、画布必须有**"的对表断言（小游戏 canvas 少了东西
+   不报错、不崩溃，只是"少了那一件"，本项目栽过 ≥6 次）。断的是**缺了就红**，不是"多了才红"。 */
+{
+  const AGE_BADGE = '适龄提示：12 周岁以上';
+  const AGE_FULL = '本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。';
+  let ageBad = 0;
+  const g = drawPage('settings');
+  if (!g || !has(g, '适龄提示')) { ageBad++; console.log('  ✗ 设置与存档页没画出「适龄提示」（合规岗 R4）'); }
+  if (!g || !has(g, AGE_FULL)) { ageBad++; console.log('  ✗ 设置页的适龄提示少了全文那句：' + AGE_FULL); }
+  const splashSrc = fs.readFileSync(path.join(JS, 'sc-splash.js'), 'utf8');
+  if (splashSrc.indexOf(AGE_BADGE) < 0) { ageBad++; console.log('  ✗ 首屏（sc-splash.js）没有「' + AGE_BADGE + '」'); }
+  const WEB = path.resolve(JS, '../../wxlh-game');
+  const webHtml = fs.existsSync(path.join(WEB, 'index.html')) ? fs.readFileSync(path.join(WEB, 'index.html'), 'utf8') : '';
+  const webUi = fs.existsSync(path.join(WEB, 'js/ui.js')) ? fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8') : '';
+  if (webHtml.indexOf(AGE_BADGE) < 0) { ageBad++; console.log('  ✗ 网页版首屏（index.html 的 #boot）没有同一条「' + AGE_BADGE + '」'); }
+  if (webUi.indexOf(AGE_FULL) < 0) { ageBad++; console.log('  ✗ 网页版设置弹窗没有同一条全文（两端不同源）'); }
+  if (!ageBad) console.log('  适龄提示两端同源（首屏短标识 ＋ 设置页全文）✓');
+  fails += ageBad;
+}
 
 const totalBad = fails + badText + retiredHits;
 console.log(`\n${totalBad === 0 ? '结论：每一页画出来的内容都对得上数据、也没有退役的旧名字 ✓'

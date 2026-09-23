@@ -476,6 +476,12 @@
       U.space(CV.SP[1]);
       U.btnRow([{ label: '重跑新手引导', style: 'ghost', id: 'reset_coach' }]);
     });
+    /* 2026-09-23（文案策划 · 合规岗体检报告 R4）：适龄提示 —— 微信小游戏特别规范 6.1（未成年人保护）。
+       首屏（sc-splash.js）那一条是短标识，这里放全文；文案与网页版 ui.js 的设置弹窗逐字一致。 */
+    U.card(function () {
+      U.h3('适龄提示');
+      U.hint('本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。', CV.SP[1]);
+    });
     U.card(function () {
       U.h3('危险区');
       U.btnRow([{ label: '删除当前进度，重新开始', style: 'ghost', id: 'wipe_save' }], undefined, U.BTN_SM);

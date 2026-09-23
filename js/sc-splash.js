@@ -118,6 +118,11 @@
     CV.text('灯芯燃起中…', cx, by + 22 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: CV.C.dim });
     if (G.GAME_VER) CV.text('残域灯阁 V' + G.GAME_VER, cx, CV.H - CV.safeBottom - 24 * CV.SCALE,
       { size: CV.FS.sm, align: 'center', color: CV.dim });
+    /* 2026-09-23（文案策划 · 合规岗体检报告 R4）：适龄提示 —— 微信小游戏特别规范 6.1（未成年人保护）。
+       首屏就得看见（游戏开始**之前**），所以跟游戏名同一屏；文案与网页版 index.html 的 #boot 逐字一致，
+       全文版在「设置与存档」最后一栏。 */
+    CV.text('适龄提示：12 周岁以上', cx, CV.H - CV.safeBottom - 42 * CV.SCALE,
+      { size: CV.FS.xs, align: 'center', color: CV.C.dim });
     c.restore();
   }
 

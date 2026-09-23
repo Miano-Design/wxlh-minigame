@@ -490,19 +490,26 @@
     const k = Math.min(row.length - 1, Math.max(0, Math.floor((realm || 0) / per)));
     return row[k];
   };
+  /* 印记 = 一枚徽记的**若干块**（V1.1.4）：t=0 主体（实心）· t=1 内芯（同色 .55）· t=2 刻痕（同色 .30）——
+     与网页版 js/ui.js:blGlyph 的 `<polygon fill-opacity>` 是**同一套调子**（这里走 CV.a()）。
+     顶点表只有一份（D.BLOOD_GLYPH），两端谁都不许自己写第二套形状。 */
+  const BL_TONE = [1, .55, .30];
   CV.blGlyph = function (bl, cx, cy, s, color) {
-    const pts = (G.DATA && G.DATA.BLOOD_GLYPH) ? G.DATA.BLOOD_GLYPH[bl] : null;
-    if (!pts || !pts.length) return 0;
-    const c = CV.ctx;
+    const g = (G.DATA && G.DATA.BLOOD_GLYPH) ? G.DATA.BLOOD_GLYPH[bl] : null;
+    if (!g || !g.parts || !g.parts.length) return 0;
+    const c = CV.ctx, base = color || CV.C.text;
     c.save();
-    c.fillStyle = color || CV.C.text;
-    c.beginPath();
-    pts.forEach(function (p, i) {
-      const px = cx - s / 2 + p[0] * s, py = cy - s / 2 + p[1] * s;
-      if (i) c.lineTo(px, py); else c.moveTo(px, py);
+    g.parts.forEach(function (part) {
+      const a = BL_TONE[part.t] === undefined ? 1 : BL_TONE[part.t];
+      c.fillStyle = a >= 1 ? base : CV.a(base, a);
+      c.beginPath();
+      part.p.forEach(function (p, i) {
+        const px = cx - s / 2 + p[0] * s, py = cy - s / 2 + p[1] * s;
+        if (i) c.lineTo(px, py); else c.moveTo(px, py);
+      });
+      c.closePath();
+      c.fill();
     });
-    c.closePath();
-    c.fill();
     c.restore();
     return s;
   };
@@ -861,6 +868,31 @@
     /* 战斗页也是整屏接管：网页版战斗遮罩盖住了顶栏和底栏，这里同样不画标准顶栏/底栏，
        由战斗页自己画"标题 / 速度 / 撤离"那一条（V9.5.93）。 */
     const chromeless = ['welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
+    /* V1.1.4（2026-09-23 父亲大人："改完选血统那里滑动不了了" · P0）：
+       `chromeless` 这一张名单只管一件事 —— **要不要画顶栏/底栏**（纯视觉）。
+       可在下面算 `CV.maxScroll` 时，它被当成了第二件事用："一屏定版、不参与滚动"。
+       两张名单**并不重合**，混用就把"选命格"一起锁死了：
+
+         选命格页内容是**六张卡纵向排开**（V9.6.96 的注释写着"六张卡纵向排开要滚很远"），
+         contentH 比可视高度高出 190~720px（随机型），这一页**本来就靠滚**。
+         实测（探针：假 canvas + 真 CV.render）：
+           390×844：内容 1081 · 可视 758 · 本该有 333px 可滚 → 实际 maxScroll ＝ **0**
+           320×568：内容 1244 · 可视 526 → 实际 0；430×932：内容 1081 · 可视 890 → 实际 0
+         表现就是父亲大人那句"滑动不了了"：**手指能拖，页面纹丝不动**，
+         后四张命格永远点不到（每一张卡的「觉醒」还在卡里）。
+
+       所以这里把两件事拆开：
+         · `chromeless` ＝ 不画顶栏/底栏（**名单不动**，视觉口径保持原样）；
+         · `SCROLL_LOCKED` ＝ 真正"一屏定版、位置按窗口高算死、不许滚"的那几页 ——
+           目前**只有战斗页**（敌方两排 / 我方两排 / 撤离速度 / 战斗日志都是按 H 算死的，
+           V1.0.1 父亲大人报"战斗界面能上下滑动"要的就是它不滚）。
+       其余页面（含开局三步）一律按内容自然算：不到一屏 → 自然是 0（V9.6.7 那条不许
+       "还能多拉一截"的口径不变），超过一屏 → 该滚就滚。
+
+       尺子：scripts/scroll_fit_audit.js —— 「内容高过一屏 ⇒ maxScroll 必须 > 0」逐页断言，
+       并且在选命格页真跑一遍触摸拖拽（滚得动、到得了底、第六张卡点得到）。 */
+    const SCROLL_LOCKED = ['battle'];
+    const scrollLocked = SCROLL_LOCKED.indexOf(CV.top().name) >= 0;
     /* V9.6.29（父亲大人："战斗撤离后出来的界面，下面的导航栏出画了"）：
        战斗页是整屏接管，会把 NAV_H 清成 0；但**以前只有清、没有恢复** ——
        于是打完/撤离回到普通页，底栏还按 H-0 画，整条掉到屏幕外。
@@ -922,10 +954,11 @@
     const viewH = CV.H - CV.TOP - (chromeless ? 0 : CV.NAV_H) - CV.safeBottom - 8;
     const bottom = CV.contentH - 20;        // contentH 里那 20 是给"滚到底"留的尾白，量的时候要减掉
     /* V1.0.1（父亲大人："现在战斗界面可以上下滑动，你调整一下，不要上下滑动"）：
-       战斗页和开局那几页（chromeless）是**一屏固定版面** —— 里面每一个元素
-       （敌方两排 / 我方两排 / 撤离速度 / 战斗日志）的位置都是按窗口高度算死的，
-       本来就不该参与滚动。这里把它们（也只有它们）的可滚量恒定为 0。 */
-    CV.maxScroll = chromeless ? 0 : (bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]));
+       战斗页是**一屏固定版面** —— 里面每一个元素（敌方两排 / 我方两排 / 撤离速度 /
+       战斗日志）的位置都是按窗口高度算死的，本来就不该参与滚动，可滚量恒 0。
+       V1.1.4 更正：这里以前判的是 `chromeless`，而那张名单里还带着"选命格"（见上面 SCROLL_LOCKED
+       那段）—— 于是**该滚的那一页被一起锁死了**。现在只锁真正的一屏定版页。 */
+    CV.maxScroll = scrollLocked ? 0 : (bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]));
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
        页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
