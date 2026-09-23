@@ -365,6 +365,66 @@ const RETIRED_TEXT = [
   if (!ret2) console.log('  源码里也没有退役的旧名字（含引导表 / 弹窗文案）✓');
   retiredHits += ret2;
 }
+/* ②-c 备案合规禁词（2026-09-23 · 文案策划）：与网页版 `copy_audit` 第 ⑩ 节**同一张表、同一个口径**。
+   为什么小游戏这边也要有：这套东西已经被驳回过两次（2026-09-15 点名「血腥 / 恐怖」，
+   2026-09-23 抓到「赌坊手气」「巢母产房 + 每一声啼哭，都有三条舌头」）——
+   而画布上的字**网页版那把尺子看不见**（它只读 HTML 与 data.js 的字符串，看不见 canvas 画出来的内容）。
+   两处都扫：① **画出来的**（所有已注册页面 render 一遍，抓真的落到 fillText 的字，含 sc-guide 的游历列表）；
+             ② **源码**（引导表 / 弹窗文案这类"只在特定时机才画"的字，光渲染抓不全）。
+   故意不锁：血量 / 血条 / 掉血这类通用术语（父亲大人已拍板不动），以及魂 / 亡 / 骸 / 骨 / 恐惧 / 诅咒
+   （玄幻通用词，属第二梯队，锁了只会天天误报）。详见网页版那把尺子的注释。 */
+const COMPLIANCE_TEXT = [
+  [/赌|手气|押注|下注|梭哈|荷官|筹码|赔率|抽水|老虎机|博彩|彩票|翻本|庄家/,
+    '赌博 / 赌场：微信小游戏明令禁止，本项目提审被点名的类目'],
+  [/鬼|尸|骷髅|殡|灵异|啼哭|产房|舌头|恐怖|惊悚|吊死|自缢|绞死/,
+    '恐怖：平台点名的六类之一（身体恐怖 / 灵异 / 惊悚意象都算）'],
+  [/血腥|鲜血|血迹|血肉|血泊|割喉|斩首|屠戮/,
+    '血腥：血字头的**画面**词（血量 / 血条这类术语不在此列）'],
+  [/抽烟|香烟|吸烟|喝酒|酗酒|烈酒|毒品|吸毒|鸦片|大麻/,
+    '不良诱导：烟 / 酒 / 毒'],
+  [/T病毒|魔多|中土|白女巫|哭墙|猎魔人|生化危机|纳尼亚/,
+    '侵权 IP / 真实场所专名：拿别人的作品名或真实宗教场所当自己的设定'],
+];
+{
+  const EXPLAIN = /不再|不存在|没有这种|早就|以前|过去|旧版|已删|下架|不该再/;
+  let cmp = 0;
+  /* ① 画出来的字 */
+  Object.keys(CV.panels || {}).forEach((name) => {
+    const got = drawPage(name);
+    if (!got) return;
+    const stream = got.join('');
+    COMPLIANCE_TEXT.forEach(([re, why]) => {
+      const m = stream.match(re);
+      if (!m) return;
+      const at = stream.indexOf(m[0]);
+      if (EXPLAIN.test(stream.slice(Math.max(0, at - 24), at + m[0].length + 24))) return;
+      cmp++;
+      console.log(`  ✗ ${name} 页画着备案禁词「${m[0]}」（${why}）`);
+    });
+  });
+  /* ② 源码（剥注释 —— 注释里必须能写"以前叫赌坊""产房那条已经改掉"这类留档说明） */
+  const strip2 = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:\\])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+  let cmpSrc = 0;
+  fs.readdirSync(JS).filter((f) => f.endsWith('.js')).forEach((f) => {
+    let text = '';
+    try { text = strip2(fs.readFileSync(path.join(JS, f), 'utf8')); } catch (e) { return; }
+    COMPLIANCE_TEXT.forEach(([re, why]) => {
+      const g = new RegExp(re.source, 'g');
+      let m;
+      while ((m = g.exec(text))) {
+        const around = text.slice(Math.max(0, m.index - 24), m.index + m[0].length + 24);
+        if (EXPLAIN.test(around)) continue;
+        cmpSrc++; cmp++;
+        console.log(`  ✗ ${f} 的文案里还写着备案禁词「${m[0]}」（${why}）`);
+      }
+    });
+  });
+  if (!cmp) console.log('  画出来的字与源码里都没有平台点名的六类禁词 ✓（赌 / 恐怖 / 血腥画面词 / 烟酒毒 / 侵权 IP）');
+  retiredHits += cmp;
+}
+
 let fails = 0;
 
 function expect(page, list, label) {
