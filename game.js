@@ -28,7 +28,7 @@ require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → �
 
 const CV = globalThis.CV, Core = globalThis.Core, G = globalThis;
 /* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
-globalThis.GAME_VER = '1.0.3';
+globalThis.GAME_VER = '1.0.4';
 /* V1.0.2（多账号调试自审时在 Console 里抓到的）：
    这一行原来是**裸调用** —— 冷启动时 jsbridge 还没就绪，wx.getWindowInfo() 会抛
    「[jsbridge] invoke getSystemInfo fail: jsbridge not ready」。

@@ -3,8 +3,14 @@
    起因（创意总监《三维度审核》H5）：
      ① 「冷启动无加载态」—— 开机的第一帧画布上什么都没画（**纯黑**），
         而这正是玩家（和审核员）看到的第一眼；
-     ② 主视觉 `icons/主视觉-提灯入残域.svg` 从落地那天起**代码零引用** ——
+     ② 主视觉从落地那天起**代码零引用** ——
         "提灯入残域"那盏灯从来没上过任何一张屏（网页版这一轮也一起挂上了，见 index.html）。
+   V1.1.5（父亲大人："主视觉换成真图"）：底图换成 Flow 出的真图
+   `icons/主视觉-提灯入残域-暗调.jpg`（896×1200 · 3:4 · 533KB），**两端同一张、字节一致**
+   （网页版 `css/style.css` 的 `#boot::before` / `.bl-veil::before` 用的是同一个文件名，
+   尺子 mv_audit 第 ⑧ 条把两端文件名钉在一起）。
+   原来用的 `icons/主视觉-提灯入残域.png`（SVG 母版栅格化，1080×1920）已随本次换图删除 ——
+   底图只留一张，不留"同一件美术两份定义"。
 
    这一份干两件事：
      · 开机首屏：主视觉满屏铺 ＋ 游戏名（**活字**）＋ 一条来回走的灯芯（加载态）＋ 版本号，
@@ -15,15 +21,17 @@
    三条规矩：
      · **图片里没有一个字**，标题一律活字（`残域灯阁` 必须与备案名一字不差）；
      · 首帧不可能是黑的：底图没加载完时先铺天空渐变 ＋ 灯晕 ＋ 标题；
-     · 底图**只有这一张**：它是 SVG 母版栅格化出来的产物（工具 tools/mv_raster.py），
-       不许在 canvas 里再手画一遍提灯者 —— 同一件美术两份定义，改一边忘一边，本项目踩过 ≥6 次。
+     · 底图**只有这一张**（真图 jpg）：不许在 canvas 里再手画一遍提灯者 ——
+       同一件美术两份定义，改一边忘一边，本项目踩过 ≥6 次。
+     · 3:4 的图在 9:16 画布上 `cover` 会横向裁掉约 25%（每边 12.5%）：提灯者与那盏灯在
+       画面 57% 上，裁不掉；纵向没有溢出，所以取中与取中偏下在竖屏上等价（横向才生效）。
    ================================================================================== */
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV;
   if (!CV) return;
 
-  const SRC = 'icons/主视觉-提灯入残域.png';
+  const SRC = 'icons/主视觉-提灯入残域-暗调.jpg';
   let img = null, imgOk = false;
   try {
     if (G.wx && typeof G.wx.createImage === 'function') {
@@ -116,8 +124,12 @@
     const kw = bw * 0.4;
     CV.round(bx + (bw - kw) * t, by, kw, bh, CV.RADIUS_CHIP, CV.C.gold);
     CV.text('灯芯燃起中…', cx, by + 22 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: CV.C.dim });
+    /* V1.1.5 笔误修正：这里原来写的是 `CV.dim`（**少了一个 .C**）。
+       CV.dim 是 undefined → CV.text 里 `c.fillStyle = opt.color || CV.C.text` 取的是
+       `CV.C.text`（正文近白 #e9edf6），于是版本号这一行一直是**近白**的，
+       和它上面那行 --dim 的"灯芯燃起中…"不同色。文案岗查出来过、一直没动，这次一起修。 */
     if (G.GAME_VER) CV.text('残域灯阁 V' + G.GAME_VER, cx, CV.H - CV.safeBottom - 24 * CV.SCALE,
-      { size: CV.FS.sm, align: 'center', color: CV.dim });
+      { size: CV.FS.sm, align: 'center', color: CV.C.dim });
     /* V1.0.3（AI 视觉工程师 · 提审硬要求）：这里原来还有一行适龄提示 —— 删掉了。
        原因：首屏只停 1.5 秒、还能点一下跳过，**一闪而过不叫"显著"**（网页版那边同一处也是这么删的）。
        适龄提示现在住在**常驻的合规闸**上（js/sc-start.js 的两页，点一下能看全文），

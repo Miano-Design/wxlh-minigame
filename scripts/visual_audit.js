@@ -283,11 +283,13 @@ console.log('\n=== ⑨ 冷启动与主视觉：首屏在位 ＋ 首帧不黑 ＋
   t('② 首帧不可能是黑的（先铺天空渐变；底图没到就画那盏灯的灯晕）',
     /const sky = c\.createLinearGradient/.test(splash) && /if \(!cover\(c, 1, 0\.5\)\)/.test(splash)
     && /createRadialGradient/.test(splash));
-  /* ③ 底图只有一张，而且是母版的导出物 —— 不许在 canvas 里再手画一遍提灯者 */
-  const png = path.resolve(JS, '../icons/主视觉-提灯入残域.png');
-  t('③ 首屏底图用的是栅格化出来的那张 PNG（由网页版同名 SVG 母版导出）',
-    fs.existsSync(png) && /icons\/主视觉-提灯入残域\.png/.test(splash),
-    fs.existsSync(png) ? 'PNG ' + Math.round(fs.statSync(png).size / 1024) + 'KB' : '缺文件');
+  /* ③ 底图只有一张（V1.1.5 起是**真图 jpg**）—— 不许在 canvas 里再手画一遍提灯者。
+     换图同时把这条尺子也换了：原来它钉的是"由 SVG 母版栅格化出来的 PNG"，
+     那一份已随本次换图删除（同一件美术不留两份定义）。 */
+  const mv = path.resolve(JS, '../icons/主视觉-提灯入残域-暗调.jpg');
+  t('③ 首屏底图用的是那张真图 jpg（两端同一张）',
+    fs.existsSync(mv) && /icons\/主视觉-提灯入残域-暗调\.jpg/.test(splash),
+    fs.existsSync(mv) ? 'JPG ' + Math.round(fs.statSync(mv).size / 1024) + 'KB' : '缺文件');
   t('③ 画布这端**没有第二份美术定义**（首屏里不许出现手写的顶点表）',
     !/\[\s*0\.\d+\s*,\s*0\.\d+\s*\]/.test(splash) && !/polygon/i.test(splash));
   /* ④ 选命格页：印记 ＋ 灯色，两端都在（这是创意总监 B3 那条的锁） */
@@ -305,6 +307,18 @@ console.log('\n=== ⑨ 冷启动与主视觉：首屏在位 ＋ 首帧不黑 ＋
   /* ⑥ 通用件真的支持这两件事（不然页面写了也不生效） */
   t('⑥ U.h3 支持标题前置印记（opt.glyph）、U.card 支持自定义描边（opt.line）',
     /opt\.glyph/.test(uiwSrc) && /opt\.line/.test(uiwSrc) && /glyph\.bl/.test(uiwSrc));
+  /* ⑦ 两端**同一张图**（V1.1.5 父亲大人："两端用同一张"）。
+     尺子不再各查各的：把两边代码里写的主视觉文件名抠出来、逐字比 ——
+     换图时只改一端（或两端改了但文件名不一致）当场红。
+     这一条是"两端同源"那条纪律（小游戏开发纪律 §3）在主视觉上的具体化。 */
+  const nameOf = (s) => {
+    /* 只看**不带注释**的代码：注释里出现的老文件名（本次换图就留了不少）不算引用 */
+    const m = stripComments(s).match(/icons\/主视觉-提灯入残域[^'"\s)]*/g);
+    return m ? m[0] : '';
+  };
+  const mine = nameOf(splash), theirs = nameOf(webCss);
+  t('⑦ 两端底图是**同一个文件**（画布 SRC 与网页版 CSS url() 逐字相同）',
+    !!mine && mine === theirs, mine ? '两端都用 ' + mine : '画布侧没找到主视觉引用');
 }
 
 console.log('\n=== ⑩ 开机合规闸：忠告 / 适龄／著作权人必须**常驻、读得清、两端同源**（V1.0.3 · 提审硬要求）===');
