@@ -451,25 +451,26 @@
   });
   CV.on('arena_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); });
 
-  /* ---------- 求签 ---------- */
+  /* ---------- 点灯（原「求签」，V1.0.1 改壳） ----------
+     壳换成灯阁的语义，**权重 / 奖励 / 挂机加成 / 每日免费一个字没动**（创意总监 H1，父亲大人在案）。 */
   CV.register('sign', function () {
     const st = Core.signState();
     const pick = st.pick;
     U.begin();
-    head('求签');
+    head('点灯');
     U.card(function () {
-      U.h3('求签', '每天免费 1 次');
-      U.note('签文分五档（大吉 → 末吉），给当天的挂机加成，只算当天，隔天自动失效——上线先求一签，再看今天要打哪儿。', 2 * CV.SCALE);
+      U.h3('点灯', '每天免费 1 次');
+      U.note('灯焰分五档（长明 → 微光），给当天的挂机加成，只算当天，隔天自动熄灭——上线先点一次灯，再看今天要打哪儿。', 2 * CV.SCALE);
       U.space(CV.SP[1]);
-      if (st.canDraw) U.btnRow([{ label: '🎋 摇 一 签', style: 'gold', id: 'sign_draw' }]);
+      if (st.canDraw) U.btnRow([{ label: '🪔 点亮今日灯芯', style: 'gold', id: 'sign_draw' }]);
       else {
-        U.note('今日已求：【' + (pick ? pick.tier : st.tier) + '】' + (pick ? ' ' + pick.text : ''), 2 * CV.SCALE);
+        U.note('今日灯焰：【' + (pick ? pick.tier : st.tier) + '】' + (pick ? ' ' + pick.text : ''), 2 * CV.SCALE);
         U.hint('今日挂机产出 +' + Math.round(st.idlePct * 100) + '%', 4 * CV.SCALE);
       }
-      U.hint('累计求签 ' + st.total + ' 次 · 每天 0 点重置', 6 * CV.SCALE);
+      U.hint('累计点灯 ' + st.total + ' 次 · 每天 0 点重置', 6 * CV.SCALE);
     });
     U.card(function () {
-      U.h3('五档签文', '能摇到哪一档在摇之前就知道');
+      U.h3('五档灯焰', '能点到哪一档，点之前就知道');
       D.SIGNS.forEach(function (s) {
         const top = U.y, h = 52 * CV.SCALE;
         const tw = CV.measure(s.tier, CV.FS.xs) + 12 * CV.SCALE;
@@ -488,7 +489,7 @@
   });
   CV.on('sign_draw', function () {
     const r = Core.drawSign();
-    CV.toast(r.msg || '已求签');
+    CV.toast(r.msg || '已点灯');
     CV.render();
   });
 })();

@@ -383,7 +383,14 @@ const COMPLIANCE_TEXT = [
   [/抽烟|香烟|吸烟|喝酒|酗酒|烈酒|毒品|吸毒|鸦片|大麻/,
     '不良诱导：烟 / 酒 / 毒'],
   [/T病毒|魔多|中土|白女巫|哭墙|猎魔人|生化危机|纳尼亚/,
-    '侵权 IP / 真实场所专名：拿别人的作品名或真实宗教场所当自己的设定'],
+   '侵权 IP / 真实场所专名：拿别人的作品名或真实宗教场所当自己的设定'],
+  /* V1.0.1（文案策划 · 提审合规；创意总监《三维度审核》H1 点名"审核隐患里最硬的一条"）：
+     求签 / 五档吉凶 / 占卜式签文 —— 国版游戏审核反复点名的**封建迷信**类目。
+     原「求签」系统已改壳为「点灯」（权重与奖励一个字没动），这里钉住旧壳不许回来。
+     ⚠️ 只锁"求签 / 签文 / 吉凶档位 / 占卜词"，**不锁「签」这个单字** ——
+     「签订灯阁契约」「标签」都在正常用，按单字锁只会得到一把天天报假警的尺子。 */
+  [/求签|抽签|签文|占卜|算命|测字|卜卦|风水|吉凶|大吉|上吉|中吉|小吉|末吉/,
+    '封建迷信：求签 / 占卜 / 吉凶档位是平台反复点名的类目（本项目已改壳为"点灯"）'],
 ];
 {
   const EXPLAIN = /不再|不存在|没有这种|早就|以前|过去|旧版|已删|下架|不该再/;
@@ -405,7 +412,13 @@ const COMPLIANCE_TEXT = [
   /* ② 源码（剥注释 —— 注释里必须能写"以前叫赌坊""产房那条已经改掉"这类留档说明） */
   const strip2 = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:\\])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length));
+    .replace(/(^|[^:\\])\/\/[^\n]*/g, (m, p1) => p1 + ' '.repeat(m.length - p1.length))
+    /* V1.0.1（文案策划 · 提审合规）：**旧值映射表**（存档迁移键）整段摘掉再扫 ——
+       形如 `const SIGN_RENAME = { '大吉': '长明', … };` 的键是"玩家老存档里的旧值"，
+       只在 `if (X[old]) X = 新值` 里做比较用，**永远不进玩家眼睛**；而它们必须原样留着，
+       不然老档迁不过来（见 save_migrate_audit 的 old_sign_words 那条）。
+       摘的只有这一种形状（`*_RENAME` / `*RENAME*` 的单行对象），别当成"给文案开后门"。 */
+    .replace(/\bconst\s+\w*RENAME\w*\s*=\s*\{[^}]*\}\s*;/g, ' ');
   let cmpSrc = 0;
   fs.readdirSync(JS).filter((f) => f.endsWith('.js')).forEach((f) => {
     let text = '';
@@ -421,7 +434,7 @@ const COMPLIANCE_TEXT = [
       }
     });
   });
-  if (!cmp) console.log('  画出来的字与源码里都没有平台点名的六类禁词 ✓（赌 / 恐怖 / 血腥画面词 / 烟酒毒 / 侵权 IP）');
+  if (!cmp) console.log('  画出来的字与源码里都没有平台点名的禁词 ✓（赌 / 恐怖 / 血腥画面词 / 烟酒毒 / 侵权 IP / 封建迷信）');
   retiredHits += cmp;
 }
 
@@ -496,7 +509,7 @@ expect('party', partyIds.map((id) => Core.charName(id)), '队伍（上阵名）'
 }
 expect('keji', D.KEJI.map((k) => k.name), '秘术阁（每条线）');
 expect('garden', ['第 1 块'], '药园（地块）');
-expect('sign', D.SIGNS.map((s) => s.tier), '求签（签档）');
+expect('sign', D.SIGNS.map((s) => s.tier), '点灯（灯焰档位）');
 
 const totalBad = fails + badText + retiredHits;
 console.log(`\n${totalBad === 0 ? '结论：每一页画出来的内容都对得上数据、也没有退役的旧名字 ✓'

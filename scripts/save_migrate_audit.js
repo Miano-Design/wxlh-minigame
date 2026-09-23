@@ -109,6 +109,12 @@ if (process.argv[2] === '--case') {
     s.party = ['C001', null, null, null, null];
     return s;
   };
+  /* ③c V1.0.1 改壳（求签 → 点灯）：老档里存着**旧档位名**（大吉 / 上吉…）。
+     档位名是**存进存档的值**，不迁移就会出现"面板写着【大吉】、灯焰文案却是空的"。
+     这份档刻意把 sign 写成改壳前的样子（今天已点、档位＝大吉）。 */
+  mk.old_sign_words = () => Object.assign(mk.old_missing_blocks(), {
+    sign: { date: Core.dailyDate(), tier: '大吉', idlePct: 0.3, drawn: 1 },
+  });
   /* ④ 存档损坏（手改坏 / 存盘写一半断电） */
   mk.broken_json = () => '{ "v": 5, "player": { "name": "断' ;
   /* ⑤ 来自**更高版本**的存档（玩家先装了新版，又回到旧版） */
@@ -173,6 +179,15 @@ if (process.argv[2] === '--case') {
   say(miss.length === 0, '新系统字段全部补齐（不再是 undefined）', miss.length ? '缺：' + miss.join(',') : need.length + ' 项齐全');
   say(S.recruit && S.recruit.pity && S.recruit.pity.advanced && typeof S.recruit.pity.advanced.ssr === 'number', '深层字段也补齐了（recruit.pity.advanced.ssr）');
   say(S.travel && typeof S.travel.bankSec === 'number', '挂机/游历的计时字段补齐');
+  /* V1.0.1 改壳（求签 → 点灯）：档位名是**存进存档的值**，旧档必须被迁移。
+     老档（改壳前）存的是大吉 / 上吉…，只改壳不迁移 = 面板显示【大吉】而文案是空的。 */
+  if (name === 'old_sign_words') {
+    say(S.sign.tier === '长明', '旧档位名（大吉）被迁移成新档位名（长明）', String(S.sign.tier));
+    const st = Core.signState();
+    say(!!st.pick && st.pick.tier === '长明', '面板还能取到对应的灯焰文案（不是空白）', st.pick ? st.pick.tier : '(取不到)');
+    say(S.sign.idlePct === 0.3 && S.sign.drawn === 1 && Core.signIdleMult() > 1,
+      '挂机加成与已点次数原样保留（改壳不许动数值）', '+' + Math.round(S.sign.idlePct * 100) + '% · 已点 ' + S.sign.drawn + ' 次');
+  }
   say(S.v === 5, '版本号被写成当前版本', 'v=' + S.v);
   /* 读进来之后**每一页都要画得出来**（读档崩页面＝玩家进不去游戏） */
   const pages = (CV.panels ? Object.keys(CV.panels) : []);
@@ -194,7 +209,7 @@ if (process.argv[2] === '--case') {
 
 /* ==================== 主进程：逐个跑 ==================== */
 console.log('\n=== 存档兼容体检（更新不许要求玩家删档）===');
-const cases = ['old_missing_blocks', 'older_version', 'old_party4', 'ancient_save', 'broken_json', 'future_version'];
+const cases = ['old_missing_blocks', 'older_version', 'old_party4', 'old_sign_words', 'ancient_save', 'broken_json', 'future_version'];
 let okAll = true;
 cases.forEach((c) => { if (!runCase(c)) okAll = false; });
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

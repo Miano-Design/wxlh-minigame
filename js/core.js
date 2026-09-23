@@ -64,7 +64,7 @@ window.Core = (function () {
          lvMap = { id → 等级 }；0 级＝刚买到时的原始效果 */
       fabao: { own: [], on: null, lvMap: {} },
       mount: { own: [], on: null, lvMap: {} },   // 坐骑（V9.6.130：lvMap = 喂养等级）
-      sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 求签（对标"SignItem"）：今天的签文与挂机加成
+      sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 点灯（原「求签」，对标"SignItem"）：今天的灯焰与挂机加成
       worlds: {},           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
       worldFirstClear: {},  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
       /* V9.6.113：新档一出生就带这个标记 —— "旧版把 C001 当主角占位"那段迁移只该对**很老的档**跑。
@@ -371,6 +371,13 @@ window.Core = (function () {
       if (e.name.indexOf('血族神装·') === 0) e.name = '绯红神装·' + e.name.slice(5);
       else if (e.name.indexOf('血族·') === 0) e.name = '绯红·' + e.name.slice(3);
     });
+    /* 2026-09-23（文案策划 · 提审合规；创意总监《三维度审核》H1）：求签 → **点灯** 改壳。
+       档位名（大吉/上吉/中吉/小吉/末吉 → 长明/炽光/明光/柔光/微光）**就是存进存档的值** ——
+       `signState().pick` 是拿 `S.sign.tier` 去 `D.SIGNS` 里找同名的，不迁移就会出现
+       "今天的面板写着【大吉】但灯焰文案是空的"。跑过一次存档里就没有旧档位名了，天然只迁移一次。
+       只翻名字，不动 weight / gain / idlePct / date / drawn。 */
+    const SIGN_RENAME = { '大吉': '长明', '上吉': '炽光', '中吉': '明光', '小吉': '柔光', '末吉': '微光' };
+    if (S.sign && SIGN_RENAME[S.sign.tier]) S.sign.tier = SIGN_RENAME[S.sign.tier];
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});
@@ -2880,9 +2887,11 @@ window.Core = (function () {
     Object.entries(bonus).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
   }
 
-  /* ================= 求签（对标《道友修仙》的求签） =================
-     每天免费摇一次签：签文分五档，给当天的挂机加成 + 一点硬通货。
-     它解决的是"每天上线第一件事点哪里"——先求一签，再看今天要干嘛。 */
+  /* ================= 点灯（原「求签」，对标《道友修仙》的 SignItem） =================
+     每天免费点亮一次灯芯：灯焰分五档，给当天的挂机加成 + 一点硬通货。
+     它解决的是"每天上线第一件事点哪里"——先点灯，再看今天要干嘛。
+     V1.0.1 改壳（创意总监 H1）：对外一律叫"点灯"，函数名与字段名（drawSign / signState /
+     S.sign）**一个都没改** —— 它们不进玩家眼睛，改它们等于白担一次存档风险。 */
   function signState() {
     if (!S.sign) S.sign = { date: '', tier: '', idlePct: 0, drawn: 0 };
     const today = dailyDate();
@@ -2897,17 +2906,17 @@ window.Core = (function () {
   }
   function drawSign() {
     const st = signState();
-    if (!st.canDraw) return { ok: false, msg: '今天已经求过签了，明天再来' };
+    if (!st.canDraw) return { ok: false, msg: '今天的灯已经点过了，明天再来' };
     const s = D.rollSign();
     S.sign = { date: dailyDate(), tier: s.tier, idlePct: s.idlePct, drawn: (S.sign.drawn || 0) + 1 };
-    S.stats.signDraws = (S.stats.signDraws || 0) + 1;   // 主线「求签」用（drawn 只记今天）
+    S.stats.signDraws = (S.stats.signDraws || 0) + 1;   // 主线「点灯」用（drawn 只记今天）
     applyRewardObj(s.gain);
     S.stats.signs = (S.stats.signs || 0) + 1;
-    task('sign1', 1);           // 每日任务：求签 1 次
+    task('sign1', 1);           // 每日任务：点灯 1 次
     save();
-    return { ok: true, sign: s, msg: `求得【${s.tier}】：${s.text}` };
+    return { ok: true, sign: s, msg: `点亮【${s.tier}】：${s.text}` };
   }
-  // 今日签文的挂机加成：只加成当天，隔天自动失效（按日期判定，不做定时器）
+  // 今日灯焰的挂机加成：只加成当天，隔天自动失效（按日期判定，不做定时器）
   function signIdleMult() {
     if (!S.sign || S.sign.date !== dailyDate()) return 1;
     return 1 + (S.sign.idlePct || 0);

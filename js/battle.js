@@ -370,11 +370,16 @@ window.Battle = (function () {
           boss.spd *= 1.2;
           frames.push({ type: 'phase', boss: boss.uid, phase: 30, text: `${boss.name} 狂暴了！` });
         }
+        /* 2026-09-23（文案策划 · 提审合规；创意总监《三维度审核》H2 点名，父亲大人在案）：
+           这里原来叫「被召唤的亡灵」——"亡灵"是冥界语汇，而这行字**玩家每场都看得见**
+           （会召唤的 Boss 有三张图：W11 幽帆船坞 / W23 巢母孵化间 / W27 长明夜行）。
+           召唤物是**世界无关**的：船坞召的是旧船员、孵化间召的是幼体、夜行召的是夜影，
+           所以名字必须中性 —— 改成「爪牙」。同轮 W35 那句死亡描写一起清（见 data.js 的同名注释）。 */
         if (mech.bossSummon && !boss.summoned && ratio <= 0.5) {
           boss.summoned = true;
-          const add = makeEnemyUnit({ name: '被召唤的亡灵', hp: Math.round(boss.maxHp * 0.25), atk: boss.atk * 0.6, def: boss.def * 0.6, spd: 50 });
+          const add = makeEnemyUnit({ name: '被召唤的爪牙', hp: Math.round(boss.maxHp * 0.25), atk: boss.atk * 0.6, def: boss.def * 0.6, spd: 50 });
           enemies.push(add); all.push(add);
-          frames.push({ type: 'summon', enemy: publicUnit(add), text: `${boss.name} 召唤了亡灵！` });
+          frames.push({ type: 'summon', enemy: publicUnit(add), text: `${boss.name} 召唤了爪牙！` });
         }
       }
       if (!checkEnd()) break;

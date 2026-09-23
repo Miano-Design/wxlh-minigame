@@ -360,13 +360,29 @@ window.DATA = (function () {
           末段每张图才敢按 HP +5.3% / 攻 +4.6% 往上走（16 张共 ×2.29 / ×2.06）。
        所以末段曲线的真正支撑是：装备档位（tier 21→36，武器攻击 +68%）+ 血统神装 + 转生天赋。
      敌人基准：普通怪 HP/ATK/DEF；精英 ×(2.4/1.5/1.4)；关卡倍率 1.13^(stage-1)；Hard ×1.8；Hell ×3.2 */
+  /* 2026-09-23（文案策划 · 提审合规；创意总监《三维度审核》H3 落地，父亲大人在案）：
+     「菌毯」是 StarCraft 虫族 creep 的**官方中译**，「潜影之后」贴着异形皇后那一套原型 ——
+     W01 / W02 两个世界连在一起看，就是**一整套别人的 bio 世界**。处置：
+       · 菌毯巢穴 / 菌毯母巢 → **黏液巢穴 / 黏液母巢**（同义改写，不指向任何一家）；
+       · 潜影之后 → **潜影母虫**（把"皇后"拆回一只普通的大虫子）。
+     **保留**"虫巢 / 卵 / 幼体 / 感染"这一整套 —— 那是生化题材的**通用原型**，不是谁家的专名；
+     换掉它等于把 W01 / W02 / W23 三个世界的设定一起推翻，收益为零。
+     数值、id、机制一个字没动。 */
   const WORLDS = [
-    { id: 'W01', ico: '🦠', name: '菌毯巢穴', theme: 'bio',    desc: '泄漏事故封了这家研究所，感染体把走廊筑成了蜂巢。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '菌毯母巢', bossHp: [92111, 165799, 294754],
+    { id: 'W01', ico: '🦠', name: '黏液巢穴', theme: 'bio',    desc: '泄漏事故封了这家研究所，感染体把走廊筑成了蜂巢。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '黏液母巢', bossHp: [92111, 165799, 294754],
       enemies: ['感染研究员', '裂舌兽', '捕食体α'], elite: '变异捕食体', unlock: null },
-    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '废弃空间站被甲壳生物占据，黑暗里全是黏液与尾刺。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；裂伤', boss: '潜影之后', bossHp: [112580, 202644, 360255],
+    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '废弃空间站被甲壳生物占据，黑暗里全是黏液与尾刺。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；裂伤', boss: '潜影母虫', bossHp: [112580, 202644, 360255],
       enemies: ['伏面虫', '工蜂甲虫', '战甲虫'], elite: '禁卫甲虫', unlock: 'W01' },
     { id: 'W03', ico: '🚪', name: '怨声旧宅', theme: 'ghost',  desc: '踏入这栋房子的人，都会被怨念缠上。', hp: 1250, atk: 135, def: 110, mechanic: '恐惧：降低攻击；诅咒', boss: '怨声核心', bossHp: [133049, 239488, 425756],
       enemies: ['怨念残影', '白衣游影', '黑猫游影'], elite: '阁楼怨影', unlock: 'W02' },
+    /* 2026-09-23（创意总监《三维度审核》第三轮定案，父亲大人在案）：
+       「冥界 / 死亡语汇」按**同屏聚簇**分两档，不按词表一刀切 ——
+         · **清（2 处）**：战斗日志里那个被召唤物的名字（`battle.js`，玩家每场都看得见）、
+           W35 那句「都已经死过一次了」（下面 W35 的 desc）；
+         · **留（4 处，正式决策、不是漏改）**：W04 法老陵墓 / 亡灵守卫 / 祭司亡灵、W05 溺水亡魂、
+           W22 导航残魂、W29 第九碑陵 / 碑灵 —— 它们是**怪物与地名的类型词**，被盗墓 / 深海 /
+           方舟题材包住，属玄幻通用语汇；动一处要连机制名 + 精英名 + 尺子锚点一起改，代价大于收益。
+       ⚠️ 下一轮**不要**把这四处再当"漏改"报一遍。 */
     { id: 'W04', ico: '🏺', name: '机关地宫', theme: 'mystic', desc: '黄沙之下的法老陵墓，亡灵守卫永不眠。', hp: 1500, atk: 180, def: 130, mechanic: '陷阱：随机眩晕；复活', boss: '地宫石卫', bossHp: [163752, 294754, 524008],
       enemies: '木乃伊战士|沙暴游影|圣甲虫群'.split('|'), elite: '祭司亡灵', unlock: 'W03' },
     { id: 'W05', ico: '🚢', name: '无归客轮', theme: 'ghost',  desc: '这艘船的旅客名单上，全是没能下船的人。', hp: 1750, atk: 205, def: 150, mechanic: '濒死判定：每场最多一次，把你打到剩 1 点血', boss: '终结舵手', bossHp: [194456, 350021, 622259],
@@ -414,7 +430,9 @@ window.DATA = (function () {
       enemies: '锈蚀机兵|舱壁猎犬|导航残魂'.split('|'), elite: '方舟守门人', unlock: 'W21' },
     /* 2026-09-23（文案策划 · 提审合规）：原「巢母产房」＋「每一声啼哭，都有三条舌头」——
        "产房 + 啼哭 + 三条舌头"是身体恐怖（异形那一类意象），踩"恐怖"类目。改成同一张图的"虫巢育卵"，
-       机制（感染 / 召唤幼体）与所有数值一个字没动。 */
+       机制（感染 / 召唤幼体）与所有数值一个字没动。
+       （同日创意总监 H3 定案：「巢母 / 卵 / 幼体」属**通用**生化原型、不是谁家的专名，**保留**；
+       被拆掉的只是"菌毯"与"潜影之后"那两个贴着别家作品的专名，见 W01 上面的注释。） */
     { id: 'W23', ico: '🕳', name: '巢母孵化间', theme: 'bio', desc: '这里的每一颗卵，都跟着同一个节拍在跳。', hp: 24500, atk: 1430, def: 1260, mechanic: '感染：攻击附带中毒；召唤幼体', boss: '巢母', bossHp: [3920000, 7056000, 12544000],
       enemies: '初生体|哺育者|黏菌仆从'.split('|'), elite: '孵化间守卫', unlock: 'W22' },
     { id: 'W24', ico: '🕯', name: '灰烬圣所', theme: 'mystic', desc: '香灰底下压着前一任执灯者的名字。', hp: 25800, atk: 1500, def: 1320, mechanic: '腐化：降低防御；焚香灼烧', boss: '灰袍祭司', bossHp: [4128000, 7430400, 13209600],
@@ -447,7 +465,11 @@ window.DATA = (function () {
       enemies: '噬形体|虚空孢|遗忘者'.split('|'), elite: '环带之心', unlock: 'W32' },
     { id: 'W34', ico: '⏩', name: '时序废墟', theme: 'tech', desc: '这里的钟，全都指着同一个时刻。', hp: 43300, atk: 2350, def: 2160, mechanic: '冰冻：无法行动；时序加速', boss: '时之守望', bossHp: [5820000, 10476000, 18624000],
       enemies: '锈钟机偶|逆行者|秒针兵'.split('|'), elite: '钟塔管理员', unlock: 'W33' },
-    { id: 'W35', ico: '⚗', name: '九幽渡口', theme: 'mystic', desc: '渡船上的乘客，都已经死过一次了。', hp: 45600, atk: 2450, def: 2270, mechanic: '汲取：敌人攻击回复自身；摆渡', boss: '摆渡人', bossHp: [5983000, 10769400, 19145600],
+    /* 2026-09-23（创意总监定案 · 文案策划落地）：W35 是"一章五点同框"的冥界聚簇
+       （九幽渡口 + 渡魂使 + 黄泉船工 + 摆渡人 + 一句死亡描写），按聚簇判据**只清这句描写**；
+       地名「九幽渡口」与两个小怪名（渡魂使 / 黄泉船工）判为**玄幻通用语汇，保留**（见 W04 上的决策注释）。
+       新句「换了名字」与 W25 的「判决书上写着的，是你最后的名字」同一套意象，世界观的连续性没断。 */
+    { id: 'W35', ico: '⚗', name: '九幽渡口', theme: 'mystic', desc: '渡船上的乘客，都已经换了名字。', hp: 45600, atk: 2450, def: 2270, mechanic: '汲取：敌人攻击回复自身；摆渡', boss: '摆渡人', bossHp: [5983000, 10769400, 19145600],
       enemies: '渡魂使|黄泉船工|无归客'.split('|'), elite: '渡口判官', unlock: 'W34' },
     { id: 'W36', ico: '👑', name: '灯阁王座', theme: 'god', desc: '走到这里的人，才有资格问一句为什么。', hp: 48000, atk: 2570, def: 2380, mechanic: '规则改写：每 3 回合变换；全场压制', boss: '终焉·灯主', bossHp: [6144000, 11059200, 19660800],
       enemies: '王座侍者|终焉使者|另一个你'.split('|'), elite: '王座禁卫', unlock: 'W35' },
@@ -1305,7 +1327,7 @@ window.DATA = (function () {
       '天赋分四支：永恒之躯（生命/防御/减伤）、无限能源（精神/技能/开场能量）、超维神经（速度/暴击/先制）、灯阁恩赐（挂机/经验/掉落）。每支点满 6200 转生点，量力而行。',
     ] },
     { id: 'daily', title: '⑦ 每天必做的五件事', body: [
-      '1. 先求一签（首页「养成」→「日常」→「求签」）：签文给当天的挂机加成，先求再挂最划算。',
+      '1. 先点灯（首页「养成」→「日常」→「点灯」）：灯焰给当天的挂机加成，先点再挂最划算。',
       '2. 领挂机收益（挂满越久收益越多，离线也有）。',
       '3. 用掉每日免费招募（普通池每天 3 次、每次隔 10 分钟；高级池每天 1 次，都在池子的「单抽」按钮上）。',
       '4. 做完每日任务 + 全部完成奖励（任务面板）。',
@@ -1387,16 +1409,18 @@ window.DATA = (function () {
       '**法宝**：装备给的是数值，法宝给的是「效果」——汲取、开场能量、减伤、闪避这类平时很难堆的东西。花 ◉ 点数买，主角带 1 件，买了自动戴上，随时能换、能摘。它和装备、命格、铭刻互不冲突，是主角的第四条成长线。',
       '入口：首页「养成」那一组的「药园」「斗法台」「法宝」，点名字就是完整面板。',
     ] },
-    { id: 'mount', title: '⑰ 坐骑与求签', body: [
+    { id: 'mount', title: '⑰ 坐骑与点灯', body: [
       '**坐骑**和法宝是"一硬一软"的两条主角线：法宝给效果（汲取 / 开场能量 / 减伤），坐骑给**基础数值**（攻击 / 生命 / 防御 / 速度）。',
       '坐骑有一处和法宝不一样：**它是全队加成，伙伴也吃**。所以资源紧的时候先买坐骑，收益比只加主角一人的东西更划算。',
       '驯服坐骑要 ◉ 点数 + 强化材料，高阶坐骑另加 ◆ 异界结晶——这是点数、材料、结晶三条资源同时有出口的地方，也是背包里囤的材料不会变废的原因。',
       '同时只骑 1 匹，随时能换；换一匹数字立刻变，不用重练。',
       /* 2026-09-23（文案策划 · 提审合规）：原句「看今天的手气」——"手气"是博彩用词表的常客，
-         求签本身是免费的每日加成，没必要沾这个词。换成"运气"，语义不变。 */
-      '**求签**是每天上线第一件事：摇一签看今天的运气。签文分大吉 / 上吉 / 中吉 / 小吉 / 末吉五档，给**当天的挂机加成**（+6% ~ +30%）和一笔硬通货。',
-      '签文只算当天，隔天自动失效，所以"今天上线先求一签再挂机"是最划算的顺序。摇之前面板上就写着五档各多少概率，不用猜。',
-      '入口：首页「养成」组的「坐骑」、首页「养成」→「日常」组的「求签」。',
+         点灯本身是免费的每日加成，没必要沾这个词。当天先改成"运气"。
+         V1.0.1 改壳（创意总监 H1）：整个系统从「求签」改成「点灯」——占卜 / 求签是平台
+         反复点名的封建迷信类目，这一课连着档位名（大吉→长明…）一起改，机制一字未动。 */
+      '**点灯**是每天上线第一件事：点亮今天的灯芯，看灯焰有多亮。灯焰分长明 / 炽光 / 明光 / 柔光 / 微光五档，给**当天的挂机加成**（+6% ~ +30%）和一笔硬通货。',
+      '灯焰只算当天，隔天自动熄灭，所以"今天上线先点一次灯再挂机"是最划算的顺序。点之前面板上就写着五档各多少概率，不用猜。',
+      '入口：首页「养成」组的「坐骑」、首页「养成」→「日常」组的「点灯」。',
     ] },
   ];
 
@@ -1560,7 +1584,7 @@ window.DATA = (function () {
       /* V9.6.134：把要求写成**结构化的字段**（w = 要通关的世界、lv = 要到的等级），
          `req` 只留给人看。以前 core.geneLockInfo 读的是两个写死的 5 元数组 ——
          于是 9.6.130 把铭刻扩到 20 阶之后，第 6 阶以后**永远点不动**（改一半的典型）。 */
-      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 菌毯巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 3500 } },
+      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 黏液巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 3500 } },
       { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', w: 'W03', lv: 20, cost: { otherworld: 10500 } },
       { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道废土带·普通', w: 'W06', lv: 40, cost: { otherworld: 28000 } },
       { stage: 4, name: '超越', desc: '命格效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 70000 } },
@@ -1906,19 +1930,26 @@ window.DATA = (function () {
   const mountById = id => MOUNTS.find(m => m.id === id) || null;
   const MOUNT_PCT_NAME = { atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率', skillPct: '技能伤害' };
 
-  /* ================= 求签（对标《道友修仙》的求签 / SignItem） =================
-     每天免费摇一次签，签文分五档（大吉→末吉），给当日的挂机加成 + 一点硬通货。
-     它解决的问题是"每天上线第一件事点哪里"——先求一签，再看今天要干嘛。 */
-  /* 签文（V9.6.144）：五档各带一个"当天挂机加成" + 一笔硬通货。
+  /* ================= 点灯（原「求签」，对标《道友修仙》的求签 / SignItem） =================
+     2026-09-23（文案策划 · 提审合规；创意总监《三维度审核》H1 点名，父亲大人在案）：
+     **改壳不改数** —— 「求签」＋ 五档「大吉 / 上吉 / 中吉 / 小吉 / 末吉」＋ 占卜式签文
+     是国版游戏审核历史上反复点名的**封建迷信**类目（比"亡灵"更硬）。原系统不删，
+     把壳换成灯阁自己的语义：**点灯**。
+     ⚠️ 边界：**weight（权重）/ gain（奖励）/ idlePct / 系统 id / 每日免费 / 字段名一个都没动**，
+     只换了系统名、档位名、文案、按钮、说明。改完的对外读法：
+     "每天点一次灯，看今天的灯焰有多亮 —— 灯焰越亮，当天的挂机加成越高"。
+     ⚠️ `tier` 是**存进存档的字段**（S.sign.tier），所以名字换了必须迁移老档：
+     见 `core.js` 的 `SIGN_RENAME`（大吉→长明…）。改档位名时**一定要同时改那里**。 */
+  /* 灯焰（V9.6.144 / V1.0.1 改壳）：五档各带一个"当天挂机加成" + 一笔硬通货。
      ⚠️ 这里原来每条都写着 `days: 1` —— 但**全仓没有一行读它**：有效期是 core.drawSign()
      里按"日期 = 今天"算出来的（跨天作废），数据里那个字段是早期"签文能挂好几天"设计的遗骸。
      留着会误导后人以为改这个数字就能调有效期，所以删掉，把口径写在注释里。 */
   const SIGNS = [
-    { id: 'sg1', tier: '大吉', weight: 4,  text: '紫气东来，今日诸事皆宜。',   gain: { holy: 60, otherworld: 126 }, idlePct: 0.30 },
-    { id: 'sg2', tier: '上吉', weight: 10, text: '云开见月，所行皆顺。',       gain: { holy: 40, otherworld: 84 },  idlePct: 0.22 },
-    { id: 'sg3', tier: '中吉', weight: 22, text: '平顺之日，稳中有进。',       gain: { holy: 25, otherworld: 52 },  idlePct: 0.15 },
-    { id: 'sg4', tier: '小吉', weight: 30, text: '小有收获，宜守不宜攻。',     gain: { holy: 15, otherworld: 31 },  idlePct: 0.10 },
-    { id: 'sg5', tier: '末吉', weight: 34, text: '谋事在人，今日宜稳扎稳打。', gain: { holy: 8,  otherworld: 15 },  idlePct: 0.06 },
+    { id: 'sg1', tier: '长明', weight: 4,  text: '灯芯透亮，今日一路通明。',   gain: { holy: 60, otherworld: 126 }, idlePct: 0.30 },
+    { id: 'sg2', tier: '炽光', weight: 10, text: '灯焰稳当，做什么都顺。',     gain: { holy: 40, otherworld: 84 },  idlePct: 0.22 },
+    { id: 'sg3', tier: '明光', weight: 22, text: '灯火平常，稳中有进。',       gain: { holy: 25, otherworld: 52 },  idlePct: 0.15 },
+    { id: 'sg4', tier: '柔光', weight: 30, text: '灯光柔和，小有收获。',       gain: { holy: 15, otherworld: 31 },  idlePct: 0.10 },
+    { id: 'sg5', tier: '微光', weight: 34, text: '灯焰微弱，稳着来就好。',     gain: { holy: 8,  otherworld: 15 },  idlePct: 0.06 },
   ];
   function rollSign() {
     const total = SIGNS.reduce((a, s) => a + s.weight, 0);
@@ -2338,7 +2369,7 @@ window.DATA = (function () {
     { id: 'recruit1', name: '招募 1 次', target: 1, reward: { holy: 20 } },
     { id: 'dungeon1', name: '完成 1 次副本', target: 1, reward: { points: 100 } },
     { id: 'item1',    name: '使用 1 个道具', target: 1, reward: { points: 500 } },
-    { id: 'sign1',    name: '求签 1 次', target: 1, reward: { points: 600 } },
+    { id: 'sign1',    name: '点灯 1 次', target: 1, reward: { points: 600 } },
     { id: 'arena1',   name: '斗法台守擂 1 次', target: 1, reward: { otherworld: 40 } },
   ];
   const DAILY_ALL_REWARD = { points: 5000, otherworld: 50, holy: 20, item: 'ticket_normal' };
@@ -2432,13 +2463,13 @@ window.DATA = (function () {
 
   /* ================= 功能解锁（随关卡进度） ================= */
   const UNLOCKS = [
-    { id: 'recruit',   name: '招募伙伴', world: 'W01', stage: 1,  tip: '通关 菌毯巢穴·第1关 解锁' },
-    { id: 'shop',      name: '兑换大厅',   world: 'W01', stage: 2,  tip: '通关 菌毯巢穴·第2关 解锁' },
-    { id: 'enhance',   name: '装备强化',   world: 'W01', stage: 3,  tip: '通关 菌毯巢穴·第3关 解锁' },
-    { id: 'buildings', name: '基地建设',   world: 'W01', stage: 4,  tip: '通关 菌毯巢穴·第4关 解锁' },
-    { id: 'tasks',     name: '每日任务',   world: 'W01', stage: 4,  tip: '通关 菌毯巢穴·第4关 解锁' },
-    { id: 'geneLock',  name: '铭刻',     world: 'W01', stage: 12, tip: '通关 菌毯巢穴·第12关 解锁' },
-    { id: 'corridor',  name: '深井',   world: 'W01', stage: 12, tip: '通关 菌毯巢穴·第12关 解锁' },
+    { id: 'recruit',   name: '招募伙伴', world: 'W01', stage: 1,  tip: '通关 黏液巢穴·第1关 解锁' },
+    { id: 'shop',      name: '兑换大厅',   world: 'W01', stage: 2,  tip: '通关 黏液巢穴·第2关 解锁' },
+    { id: 'enhance',   name: '装备强化',   world: 'W01', stage: 3,  tip: '通关 黏液巢穴·第3关 解锁' },
+    { id: 'buildings', name: '基地建设',   world: 'W01', stage: 4,  tip: '通关 黏液巢穴·第4关 解锁' },
+    { id: 'tasks',     name: '每日任务',   world: 'W01', stage: 4,  tip: '通关 黏液巢穴·第4关 解锁' },
+    { id: 'geneLock',  name: '铭刻',     world: 'W01', stage: 12, tip: '通关 黏液巢穴·第12关 解锁' },
+    { id: 'corridor',  name: '深井',   world: 'W01', stage: 12, tip: '通关 黏液巢穴·第12关 解锁' },
     { id: 'bloodline', name: '命格强化',   world: 'W02', stage: 1,  tip: '通关 潜影窟·第1关 解锁' },
     { id: 'reincarn',  name: '转生',       world: 'W03', stage: 12, tip: '通关 怨声旧宅·第12关 解锁' },
     { id: 'beast',     name: '伴生体',     world: 'W02', stage: 3,  tip: '通关 潜影窟·第3关 解锁' },
@@ -2462,7 +2493,7 @@ window.DATA = (function () {
       check: S => (S.stats.profileViews || 0) >= 1 },
     { id: 'q01b', name: '熟悉战斗', desc: '打完第 1 场战斗', reward: { points: 1000 },
       check: S => S.stats.battles >= 1 },
-    { id: 'q02', name: '初临蜂巢', desc: '通关 菌毯巢穴·第1关', reward: { holy: 100 }, unlock: 'recruit',
+    { id: 'q02', name: '初临蜂巢', desc: '通关 黏液巢穴·第1关', reward: { holy: 100 }, unlock: 'recruit',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[0] > 0 },
     { id: 'q03', name: '第一位同伴', desc: '招募 1 次伙伴', reward: { points: 2000 },
       check: S => S.stats.recruits >= 1 },
@@ -2473,7 +2504,7 @@ window.DATA = (function () {
        可第 4 关之前**没有任何 ◆ 收入**（世界首通奖励要打完整个世界才发）——
        于是"强化 1 次装备"这一步卡死，后面整条主线跟着停。
        这一步正好是解锁强化的那一步，奖励里补上 ◆，玩家拿到钥匙的同时拿到开门的那点钱。 */
-    { id: 'q05', name: '一路推进', desc: '通关 菌毯巢穴·第4关', reward: { points: 3000, otherworld: 30 }, unlock: 'shop,enhance,buildings,tasks',
+    { id: 'q05', name: '一路推进', desc: '通关 黏液巢穴·第4关', reward: { points: 3000, otherworld: 30 }, unlock: 'shop,enhance,buildings,tasks',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[3] > 0 },
     { id: 'q07', name: '第一次强化', desc: '强化 1 次装备', reward: { points: 3000 },
       check: S => S.stats.enhances >= 1 },
@@ -2488,7 +2519,7 @@ window.DATA = (function () {
       check: S => (S.fabao && S.fabao.own || []).length >= 1 },
     { id: 'q_garden', name: '药园', desc: '在药园种 1 次地', reward: { points: 1500 },
       check: S => (S.garden || []).some(p => p) },
-    { id: 'q_sign', name: '求签', desc: '求 1 次签', reward: { points: 50 },
+    { id: 'q_sign', name: '点灯', desc: '点 1 次灯', reward: { points: 50 },
       check: S => (S.stats.signDraws || 0) >= 1 },
     { id: 'q_arena', name: '斗法台', desc: '打赢 1 场斗法台', reward: { otherworld: 50 },
       check: S => S.arena && S.arena.best >= 2 },       // best 从 1 起，≥2 就是赢过一场
@@ -2501,7 +2532,7 @@ window.DATA = (function () {
     { id: 'q_bounty', name: '限时悬赏', desc: '领 1 次悬赏奖励', reward: { points: 2000 },
       check: S => Object.keys((S.bounty && S.bounty.claimed) || {}).length >= 1 },
     /* ---- 里程碑：世界守关 / 深井 / 血统 / 境界 / 转生 ---- */
-    { id: 'q10', name: '蜂巢之主', desc: '击杀 菌毯母巢（第12关）', reward: { holy: 200, otherworld: 100 }, unlock: 'geneLock,corridor',
+    { id: 'q10', name: '蜂巢之主', desc: '击杀 黏液母巢（第12关）', reward: { holy: 200, otherworld: 100 }, unlock: 'geneLock,corridor',
       check: S => S.worlds.W01 && S.worlds.W01.stages.normal[11] > 0 },
     { id: 'q11', name: '深井的呼唤', desc: '通关 深井·第1层', reward: { points: 100 },
       check: S => S.corridor.floor >= 2 },
@@ -2516,7 +2547,7 @@ window.DATA = (function () {
       check: S => Object.keys((S.beast && S.beast.owned) || {}).length >= 1 },
     { id: 'q_codex', name: '灯录', desc: '领 1 次灯录里程碑奖励', reward: { points: 3000 },
       check: S => ((S.codex && S.codex.claimed) || []).length >= 1 },
-    { id: 'q14', name: '潜影之后', desc: '通关 潜影窟·第12关', reward: { holy: 300, otherworld: 200 },
+    { id: 'q14', name: '潜影母虫', desc: '通关 潜影窟·第12关', reward: { holy: 300, otherworld: 200 },
       check: S => S.worlds.W02 && S.worlds.W02.stages.normal[11] > 0 },
     { id: 'q15', name: '执灯者之路', desc: '通关 怨声旧宅·第12关', reward: { holy: 500 }, unlock: 'reincarn',
       check: S => S.worlds.W03 && S.worlds.W03.stages.normal[11] > 0 },

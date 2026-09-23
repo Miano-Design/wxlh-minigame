@@ -36,7 +36,7 @@
     { key: 'tut_blk2', page: 'home', target: 'grid:grow',
       text: '② 养成区：13 条养成线都在这排格子里 —— 队伍、成长、秘术阁、法宝、药园、坐骑、炼化台… 前期不用全点，缺什么补什么；每条点进去都会有它自己的说明。' },
     { key: 'tut_blk3', page: 'home', target: 'grid:daily',
-      text: '③ 日常区：每天该做的事 —— 限时悬赏、每日任务、成就、求签，还有招募和兑换。 有红点的就是"有东西可领"，别让它亮着。' },
+      text: '③ 日常区：每天该做的事 —— 限时悬赏、每日任务、成就、点灯，还有招募和兑换。 有红点的就是"有东西可领"，别让它亮着。' },
     { key: 'tut_blk4', page: 'home', target: ['claim_quest', 'goto_quest'], enter: true,
       text: '详细怎么玩，跟着主线走就行 —— 每点一次「去完成」，我都会带你做那一步。 下面这条就是主线：做完一步回来领奖励，接着下一步。' },
   ];
@@ -132,7 +132,7 @@
     party: '队伍', corridor: '深井', protag: '主角详情', buildings: '基地建设',
     recruit: '招募伙伴', tasks: '任务', shop: '兑换大厅', genelock: '铭刻',
     beast: '伴生体', reincarn: '转生天赋', keji: '秘术阁', fabao: '法宝',
-    mount: '坐骑', garden: '药园', arena: '斗法台', sign: '求签', refine: '炼化台',
+    mount: '坐骑', garden: '药园', arena: '斗法台', sign: '点灯', refine: '炼化台',
     bounty: '限时悬赏', idlelines: '挂机分工',
   };
   /* V9.6.112（父亲大人："第一关的指引打完之后出来还是第一关的指引"）：
@@ -221,7 +221,7 @@
     q_keji:    { page: 'keji',      s: ['keji_up:*'],      t: '秘术阁：每条点一下按 ◆ 异界结晶升级、立刻永久生效。先挑一条主修的堆。' },
     q_fabao:   { page: 'fabao',     s: ['fabao_buy:*'],    t: '法宝：花 ◉ 点数买一件，「带上」它。给的是效果（汲取 / 开场能量 / 减伤），不是数值。' },
     q_garden:  { page: 'garden',    s: ['garden_plant:*'], t: '药园：空地上种一次，过一段时间回来收（不收就一直长着）。' },
-    q_sign:    { page: 'sign',      s: ['sign_draw'],      t: '求签：每天免费摇一次，签文给当天的挂机加成 + 一点硬通货。' },
+    q_sign:    { page: 'sign',      s: ['sign_draw'],      t: '点灯：每天免费点一次，灯焰给当天的挂机加成 + 一点硬通货。' },
     q_arena:   { page: 'arena',     s: ['arena_fight'],    t: '斗法台：每天 5 次，赢了升一台拿 ◆ 异界结晶，输了退一台。' },
     q_mount:   { page: 'mount',     s: ['mount_buy:*'],    t: '坐骑：花 ◉ 点数驯服一匹，「乘骑」它给全队加属性。' },
     q_realm:   { page: 'realm',     s: ['realm_try'],      t: '境界渡劫：攒够材料就突破一小阶，全属性永久上涨；失败只扣材料、等级不掉。' },
@@ -271,7 +271,7 @@
     ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性；养成线里最省事的一条。'],
     ['garden',   ['garden_plant:*'],  '药园：空地上种，过一段时间回来收 —— 不收就一直长着，别忘了。'],
     ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ 异界结晶，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
-    ['sign',     ['sign_draw'],       '求签：每天免费摇一次，签文给**当天**的挂机加成 + 一点硬通货。'],
+    ['sign',     ['sign_draw'],       '点灯：每天免费点一次，灯焰给**当天**的挂机加成 + 一点硬通货。'],
     ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼精华，精华喂给伙伴是**永久**加成（每人每种有上限）。'],
     ['bounty',   ['bounty_claim:*'],  '限时悬赏：到点作废、达成才有奖励；四条全部结束后可以开新一期。'],
     ['idlelines',['pickleader:*'],    '挂机分工：4 条产线各派 1 名领队，领队战力越高产出越高；没派领队的产线不产出。'],
@@ -616,7 +616,7 @@
       ['open_bounty', '限时悬赏', null, null, bountyDot],
       ['open_tasks', '每日任务', null, 'tasks', taskDot],
       ['open_ach', '成就', null, null, achDot],
-      ['open_sign', '求签', null, null, signReady],
+      ['open_sign', '点灯', null, null, signReady],
       ['open_recruit', '招募伙伴', null, 'recruit', freeDot],
       ['open_shop', '兑换大厅', null, 'shop'],
     ].filter((x) => !x[3] || Core.isUnlocked(x[3])));

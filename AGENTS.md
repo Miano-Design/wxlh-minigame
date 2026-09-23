@@ -10,7 +10,7 @@
 | | 路径 | 说明 |
 |---|---|---|
 | 网页版（**唯一标准**） | `../wxlh-game/` | 仓库 `Miano-Design/wxlh-game`（private） |
-| 小游戏 | 本目录 | AppID `wx69e989a1d09967aa`，账号「残域灯阁」；**无远端、只本地 commit** |
+| 小游戏 | 本目录 | AppID **`wx61631124a2f9084b`**（父亲大人 2026-09-23 亲口确认；`project.config.json:3` 一直是这个，是本档案此前记错成 wx69e989…），账号「残域灯阁」；**无远端、只本地 commit** |
 
 - 逻辑层（`data.js` / `core.js` / `battle.js` / `dungeon.js`）**只有一份真相**，住在 `../wxlh-game/js/`；
   改完跑 `node scripts/sync-logic.js` 单向同步过来。

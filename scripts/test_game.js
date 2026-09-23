@@ -820,7 +820,7 @@ setParty(['C021']);
   Core.S.recruit.free = { date: OLD, normal: { used: 3, at: 0 }, advanced: { used: 1, at: 0 } };
   Core.S.sweep = { date: OLD, count: 60, bonus: 0 };
   Core.S.arena = { floor: 7, best: 7, date: OLD, used: 5 };
-  Core.S.sign = { date: OLD, tier: '大吉', idlePct: 0.3, drawn: 1 };
+  Core.S.sign = { date: OLD, tier: '长明', idlePct: 0.3, drawn: 1 };
   Core.S.login.lastClaim = OLD;
   Core.S.cur.points = 12345;
   Core.S.player.bloodlineLv = 3;
@@ -830,7 +830,7 @@ setParty(['C021']);
   t('跨天：免费抽次数恢复', Core.freeState('normal').left === 3 && Core.freeState('advanced').left === 1);
   t('跨天：扫荡次数恢复满', Core.sweepLeft() === Core.sweepCap());
   t('跨天：斗法台次数恢复', Core.arenaState().left === D.ARENA_DAILY);
-  t('跨天：求签可以再抽（昨天的签文作废）', Core.signState().canDraw && Core.signState().idlePct === 0);
+  t('跨天：点灯可以再点（昨天的灯焰作废）', Core.signState().canDraw && Core.signState().idlePct === 0);
   t('跨天：登录奖励可以再领', !!Core.loginReward());
   t('跨天不会丢资产（点数与命格等级、装备都在）', Core.S.cur.points >= 12345 && Core.S.player.bloodlineLv === 3 && !!Core.S.equips.ux);
 }
@@ -2065,22 +2065,39 @@ setParty(['C021']);
   t('没驯服的不能骑', !Core.wearMount('mt07').ok);
   t('能下坐骑', Core.wearMount(null).ok && !Core.mountState().on);
 
-  // 求签：每天 1 次、给了真实奖励、当天挂机加成、隔天可再抽
+  // 点灯（原「求签」，V1.0.1 改壳）：每天 1 次、给了真实奖励、当天挂机加成、隔天可再点
   Core.newGame();
   const s0 = Core.signState();
-  t('求签初始可抽', s0.canDraw && s0.drawn === 0);
-  t('五档签文', D.SIGNS.length === 5);
-  t('每档签都有文案/权重/加成', D.SIGNS.every(s => s.tier && s.text && s.weight > 0 && s.idlePct > 0 && Object.keys(s.gain).length));
+  t('点灯初始可点', s0.canDraw && s0.drawn === 0);
+  t('五档灯焰', D.SIGNS.length === 5);
+  t('每档灯焰都有文案/权重/加成', D.SIGNS.every(s => s.tier && s.text && s.weight > 0 && s.idlePct > 0 && Object.keys(s.gain).length));
+  /* V1.0.1（文案策划 · 提审合规）：改壳边界 —— **权重与奖励一个字都不许动**。
+     这条把改壳前的真实数字钉住：4/10/22/30/34，+30%/+22%/+15%/+10%/+6%。 */
+  t('五档权重与挂机加成还是改壳前那一套（改壳不许动数值）',
+    D.SIGNS.map(s => s.weight).join(',') === '4,10,22,30,34'
+    && D.SIGNS.map(s => Math.round(s.idlePct * 100)).join(',') === '30,22,15,10,6'
+    && D.rollSign().tier && D.SIGNS.reduce((a, s) => a + s.weight, 0) === 100);
+  /* 档位名是**存进存档的字段**（S.sign.tier）：老档里的旧名字必须被迁移，
+     否则面板会显示「今日灯焰：【大吉】」而灯焰文案是空的。 */
+  t('老档迁移：旧档位名「大吉」→「长明」（面板还能取到灯焰文案）', (() => {
+    const keep = Core.S.sign;
+    Core.S.sign = { date: Core.dailyDate(), tier: '大吉', idlePct: 0.3, drawn: 1 };
+    Core.migrate();
+    const st = Core.signState();
+    const ok = Core.S.sign.tier === '长明' && !!st.pick && st.pick.tier === '长明';
+    Core.S.sign = keep;          // 还原：下面还要测"今天第一次点灯"
+    return ok;
+  })());
   const idle0 = Core.idleRates().pointsPerMin;
   const d1 = Core.drawSign();
-  t('求签成功', d1.ok && !!d1.sign);
-  t('求签给了硬通货', Object.keys(d1.sign.gain).every(k => (Core.S.cur[k] || 0) > 0));
-  t('当天不能再求', !Core.drawSign().ok && !Core.signState().canDraw);
-  t('签文当天的挂机产出更高', Core.idleRates().pointsPerMin > idle0);
-  t('跨天自动失效、可以再求', (() => { Core.S.sign.date = '2000-01-01'; return Core.signState().canDraw && Core.signIdleMult() === 1; })());
-  t('累计求签数会涨', Core.S.stats.signs >= 1);
-  t('求签会推进每日任务', (Core.S.tasks.daily.sign1 || 0) >= 1);
-  t('每日任务里多了求签与斗法台', D.DAILY_TASKS.some(t2 => t2.id === 'sign1') && D.DAILY_TASKS.some(t2 => t2.id === 'arena1'));
+  t('点灯成功', d1.ok && !!d1.sign);
+  t('点灯给了硬通货', Object.keys(d1.sign.gain).every(k => (Core.S.cur[k] || 0) > 0));
+  t('当天不能再点', !Core.drawSign().ok && !Core.signState().canDraw);
+  t('灯焰当天的挂机产出更高', Core.idleRates().pointsPerMin > idle0);
+  t('跨天自动失效、可以再点', (() => { Core.S.sign.date = '2000-01-01'; return Core.signState().canDraw && Core.signIdleMult() === 1; })());
+  t('累计点灯数会涨', Core.S.stats.signs >= 1);
+  t('点灯会推进每日任务', (Core.S.tasks.daily.sign1 || 0) >= 1);
+  t('每日任务里多了点灯与斗法台', D.DAILY_TASKS.some(t2 => t2.id === 'sign1') && D.DAILY_TASKS.some(t2 => t2.id === 'arena1'));
   t('斗法台会推进每日任务', (() => {
     Core.newGame();
     Core.arenaSettle(true);
@@ -3025,8 +3042,8 @@ setParty(['C021']);
   D.DAILY_TASKS.forEach(x => { Core.S.tasks.daily[x.id] = x.target; });
   twice('每日任务单条连点两次不会重复领', () => Core.claimTask(D.DAILY_TASKS[0].id));
   twice('每日任务一键连点两次不会重复领', () => Core.claimAllTasks());
-  /* ③ 求签 / 登录奖励（都是"每天一次"） */
-  twice('求签连点两次不会重复给', () => Core.drawSign(), () => Core.S.sign);
+  /* ③ 点灯 / 登录奖励（都是"每天一次"） */
+  twice('点灯连点两次不会重复给', () => Core.drawSign(), () => Core.S.sign);
   twice('登录奖励连点两次不会重复给', () => Core.loginReward(), () => Core.S.login);
   /* ④ 转生：第二次必须失败（等级已归零） */
   Core.S.player.level = D.PLAYER_MAX_LV; Core.S.player.geneLock = D.GENE_LOCKS.length; Core.S.buildings.core = 40;
