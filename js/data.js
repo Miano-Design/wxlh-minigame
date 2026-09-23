@@ -423,7 +423,10 @@ window.DATA = (function () {
     /* ---- 终巡：转生 4 次开启 ---- */
     { id: 'W31', ico: '🌟', reincarn: 4, name: '哭墙回音', theme: 'ghost', desc: '你喊什么，它就还你什么。', hp: 37100, atk: 2050, def: 1860, mechanic: '幻觉：概率攻击队友；诅咒', boss: '回音之主', bossHp: [5340000, 9612000, 17088000],
       enemies: '回声游影|哭墙残影|另一个你'.split('|'), elite: '墙内之物', unlock: 'W30' },
-    { id: 'W32', ico: '🧿', name: '万灯之座', theme: 'god', desc: '每一盏灯，都是一个文明的临终。', hp: 39000, atk: 2140, def: 1960, mechanic: '规则改写：每 3 回合变换；灯影压制', boss: '掌灯者', bossHp: [5500000, 9900000, 17600000],
+    /* 2026-09-23 二审核自查（AI 视觉工程师）：原 ico 是 🧿（护身符，画出来就是「一只眼」）——
+       上一轮已经把 👁（悬空眼球）换掉了，这只眼是**同一意象**的最后一个源头，换 💡（灯）。
+       万灯之座 / 掌灯者本来就该是一盏灯，而且 💡 是 Emoji 1.0 时代的字符（老机型不缺字）。 */
+    { id: 'W32', ico: '💡', name: '万灯之座', theme: 'god', desc: '每一盏灯，都是一个文明的临终。', hp: 39000, atk: 2140, def: 1960, mechanic: '规则改写：每 3 回合变换；灯影压制', boss: '掌灯者', bossHp: [5500000, 9900000, 17600000],
       enemies: '守灯使|万灯之影|燃尽的执灯者'.split('|'), elite: '座前禁卫', unlock: 'W31' },
     { id: 'W33', ico: '🌀', name: '吞噬环带', theme: 'bio', desc: '它不吃人，它吃"存在"。', hp: 41100, atk: 2240, def: 2060, mechanic: '撕裂：裂伤；吞噬护盾', boss: '吞噬之口', bossHp: [5655000, 10179000, 18096000],
       enemies: '噬形体|虚空孢|遗忘者'.split('|'), elite: '环带之心', unlock: 'W32' },
@@ -517,15 +520,41 @@ window.DATA = (function () {
     tech:   [[0.06, 0.06], [0.94, 0.06], [0.94, 0.94], [0.06, 0.94]],
     god:    [[0.5, 0], [0.627, 0.373], [1, 0.5], [0.627, 0.627], [0.5, 1], [0.373, 0.627], [0, 0.5], [0.373, 0.373]],
   };
-  /* 形状的颜色：跟格底**同一色相、但亮得多**（66% 明度）——
-     这样角标既属于这个族，又不会和格底糊在一起。 */
+  /* 形状的颜色：跟格底**同一色相**，亮度**按这一格现算** ——
+     判据不是"看着亮"，而是 **对本格底 ≥3:1**（WCAG 2.1 非文本对比度下限 = 基准）。
+     V1.1.2（AI 视觉工程师 · 二轮对比度自查）：原来固定 L=66%，跟格底 18→50 的明度阶梯一交叉，
+     36 格里 **13 格掉到 3:1 以下**（最差 W31 `#81619e` × `#a280d0` = **1.58**）——
+     族形糊在格底上，"色 + 形"的色觉兜底只剩"色"了。
+     现在：格底浅 → 角标走深版；格底深 → 走亮版；两版都不够再往端点走一档。
+     不传 worldId 的调用（兜底路径 / 图例）保持旧口径（L=66），行为不变。 */
+  const _wcagLum = (hex) => {
+    const h = String(hex).replace('#', '');
+    const ch = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const _wcagContrast = (a, b) => {
+    const x = _wcagLum(a), y = _wcagLum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
   const _worldGlyphColorCache = {};
-  function worldGlyphColor(theme) {
-    if (_worldGlyphColorCache[theme]) return _worldGlyphColorCache[theme];
+  function worldGlyphColor(theme, worldId) {
+    const key = theme + '|' + (worldId || '-');
+    if (_worldGlyphColorCache[key]) return _worldGlyphColorCache[key];
     const hue = WORLD_THEME_HUE[theme];
     if (!hue || !isFinite(hue.h) || !isFinite(hue.s)) return '#8ea3c8';
-    const hex = hslToHex(hue.h, Math.min(64, hue.s + 22), 66);
-    return (_worldGlyphColorCache[theme] = /NaN|undefined/.test(hex) ? '#8ea3c8' : hex);
+    const s = Math.min(64, hue.s + 22);
+    let hex;
+    if (worldId && WORLDS.some((x) => x.id === worldId)) {
+      const bg = worldTint(worldId);
+      /* 亮版优先（深格底最多）；浅格底上亮版会糊，一路试到端点 */
+      const cands = [80, 12, 92, 6].map((l) => hslToHex(hue.h, s, l)).filter((v) => !/NaN|undefined/.test(v));
+      hex = cands.find((v) => _wcagContrast(v, bg) >= 3)
+        || cands.slice().sort((a, b) => _wcagContrast(b, bg) - _wcagContrast(a, bg))[0];
+    } else {
+      hex = hslToHex(hue.h, s, 66);
+    }
+    return (_worldGlyphColorCache[key] = /NaN|undefined/.test(hex) ? '#8ea3c8' : hex);
   }
 
   /* ================= 命格主题（视觉层 · 2026-09-23）=================
@@ -1604,7 +1633,10 @@ window.DATA = (function () {
     { id: 'juyun',  name: '聚运术', ico: '🍀', key: 'dropPct',  rate: 0.003, max: 30, base: 20, step: 4, info: '掉落概率' },
     { id: 'jingxin', name: '静心诀', ico: '🌙', key: 'offlinePct', rate: 0.003, max: 30, base: 20, step: 4, info: '离线效率' },
     // 补齐到 42 条：数值都很小，靠"永远还有下一级"撑长线
-    { id: 'xueqi',  name: '汲元诀', ico: '🪷', key: 'lifesteal', rate: 0.001, max: 40, base: 22, step: 4, info: '汲取' },
+    /* 2026-09-23（AI 视觉工程师）：汲元诀原 ico 是 🪷（Emoji **14**，2021）——
+       要 Android 12 / iOS 15.4 才画得出，老机型上是豆腐块（尺子验不出，真机才看得见）。换 🍵（Emoji 1.0）。
+       没换 💧：那是「灵泉洗髓」的图标，宁可跨表也不撞同一个形状。 */
+    { id: 'xueqi',  name: '汲元诀', ico: '🍵', key: 'lifesteal', rate: 0.001, max: 40, base: 22, step: 4, info: '汲取' },
     { id: 'shouyi', name: '守御术', ico: '⛰', key: 'resPct',    rate: 0.002, max: 40, base: 22, step: 4, info: '减伤' },
     { id: 'shendu', name: '神读咒', ico: '📖', key: 'spiritPct', rate: 0.004, max: 40, base: 16, step: 3, info: '精神（技能倍率）' },
     { id: 'tiegu',  name: '铁骨功', ico: '🦾', key: 'defPct',   rate: 0.005, max: 50, base: 12, step: 3, info: '全队防御' },
@@ -1683,7 +1715,8 @@ window.DATA = (function () {
     { id: 'tv30', ico: '🐺', name: '狼群围猎',   w: 3,  desc: '一群野狼围上来，被你反过来打了牙祭。', effect: { item: 'beast_egg', points: 1200 } },
     { id: 'tv31', ico: '🌠', name: '流星夜观',   w: 3,  desc: '一场流星雨，你对着星光把修为理顺了。', effect: { points: 6600, holy: 40 } },
     { id: 'tv32', ico: '🏯', name: '旧宗门遗址', w: 3,  desc: '一座废弃宗门，库房里还留着东西。', effect: { item: 'box_sr', points: 2400 } },
-    { id: 'tv33', ico: '🧿', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { otherworld: 30, points: 1800 } },
+    /* 同上：🧿（那只眼）换 🪞（古镜）—— 语义与图标终于对上；🪞 属 Emoji 13（见本轮审核隐患 §3）。 */
+    { id: 'tv33', ico: '🪞', name: '古镜照心',   w: 3,  desc: '古镜里照出的是另一个自己，你和他对了一招。', effect: { otherworld: 30, points: 1800 } },
     { id: 'tv34', ico: '🪶', name: '仙禽遗羽',   w: 2,  desc: '一根仙禽落羽，轻得像没有重量。', effect: { otherworld: 200, holy: 50 } },
     { id: 'tv35', ico: '🗝', name: '无名钥匙',   w: 2,  desc: '一把没有锁孔的钥匙，你收进了怀里。', effect: { item: 'ticket_lim' } },
     { id: 'tv36', ico: '🎣', name: '潭底钓宝',   w: 2,  desc: '潭底钓上来一个沉甸甸的箱子。', effect: { item: 'box_ssr', points: 3000 } },

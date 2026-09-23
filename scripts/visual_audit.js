@@ -16,6 +16,8 @@
      ⑤ 品质框 v2：CV.qframe 在位 ＋ 角色卡真接上
      ⑥ 动效    ：受击 / 出手与网页版同值（基准 §5.2）
      ⑦ 命格主题：小游戏取的是数据层同一张表（锚色 + 现算灯梯）
+     ⑧ 金底按钮：与网页版同一套令牌 ＋ 白字两端过 AA
+                  ＋ **画布取色不许写成字符串**（V1.1.2 抓到的那类"不报不崩、颜色全错"）
 
    只读脚本，不写任何东西。要加色 → 先登记进 CV.C，再引用。
 */
@@ -210,6 +212,47 @@ console.log('\n=== ⑦ 命格主题：取的是数据层同一张表（V1.1.1）
     leak ? '串味 ' + leak + ' 处' : 'data.js 里只有平台中立色值（两端逐字节一致）');
 }
 
+console.log('\n=== ⑧ 金底按钮：一套底 ＋ 白字，两端都过 AA（V1.1.2 父亲大人）===');
+{
+  const web = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
+  const uiwSrc = read('uiw.js');
+  const lum = (hex) => {
+    const h = String(hex).replace('#', '');
+    const ch = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const cr = (a, b) => {
+    const x = lum(a), y = lum(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  const webVal = (name) => (web.match(new RegExp(name + '\\s*:\\s*(#[0-9a-fA-F]{3,8})')) || [])[1];
+  const cVal = (name) => (cBlock.match(new RegExp('\\b' + name + ":\\s*'(#[0-9a-fA-F]{3,8})'")) || [])[1];
+  /* ① 两端同一套值（网页版 :root ↔ 小游戏 CV.C） */
+  const trio = [['gold-btn', 'goldBtn'], ['gold-btn-deep', 'goldBtnDeep'], ['on-gold', 'onGold']];
+  const diffs = trio.filter(([w, c]) => !webVal('--' + w) || webVal('--' + w).toLowerCase() !== (cVal(c) || '').toLowerCase())
+    .map(([w, c]) => w + ' ' + webVal('--' + w) + ' / ' + cVal(c));
+  t('金底按钮那一套令牌两端同源（--gold-btn / --gold-btn-deep / --on-gold）',
+    diffs.length === 0, diffs.length ? diffs.join(' · ') : trio.map(([w, c]) => w + ' ' + cVal(c)).join(' · '));
+  /* ② 白字对渐变两端都 ≥4.5 */
+  const ink = cVal('onGold'), top = cVal('goldBtn'), deep = cVal('goldBtnDeep');
+  const c1 = ink && top ? cr(top, ink) : 0, c2 = ink && deep ? cr(deep, ink) : 0;
+  t('白字对渐变**上下两端**都 ≥4.5',
+    c1 >= 4.5 && c2 >= 4.5, '上端 ' + c1.toFixed(2) + ' · 下端 ' + c2.toFixed(2) + '（' + top + ' / ' + deep + ' 对 ' + ink + '）');
+  /* ③ 画布上两个金底按钮真的走这一套（不是只登记了没人用） */
+  t('U.btn 的 primary 与 gold 走同一套底与同一套字（画布上不再两副长相）',
+    /style === 'primary' \|\| style === 'gold'/.test(uiwSrc)
+    && /if \(goldBtn2\) \{ g\.addColorStop\(0, CV\.C\.goldBtn\)/.test(uiwSrc)
+    && /goldBtn2 \? CV\.C\.onGold : CV\.C\.text/.test(uiwSrc));
+  /* ④ 画布取色**不许写成字符串** —— 这一条是拿 62 处真事故换来的：
+     canvas 拿到 'CV.C.goldBtn' 这种认不出来的颜色时**不报不崩**，直接保留上一次的填充/描边色，
+     于是"尺子全绿、颜色全错"。上一轮的机械替换就是这么把 62 处引号一起写进去的。 */
+  const files = fs.readdirSync(JS).filter((f) => f.endsWith('.js'));
+  const quoted = files.filter((f) => /'CV\.[^']*'/.test(fs.readFileSync(path.join(JS, f), 'utf8')));
+  t('画布取色没有写成字符串（`\'CV.C.x\'` 一律不许有）', quoted.length === 0,
+    quoted.length ? quoted.join(',') : '全库 ' + files.length + ' 个 js 文件，0 处带引号的令牌串');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
-console.log('结论：' + (fail === 0 ? '小游戏端七节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
+console.log('结论：' + (fail === 0 ? '小游戏端八节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

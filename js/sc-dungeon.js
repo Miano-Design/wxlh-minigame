@@ -51,7 +51,7 @@
     CV.text(title, tx, titleCy, { size: CV.FS.f1, bold: true });
     if (tag) {
       const tagW = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE;
-      CV.round(tx + tw + 8 * CV.SCALE, titleCy - 9 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, 'CV.C.doneLine');
+      CV.round(tx + tw + 8 * CV.SCALE, titleCy - 9 * CV.SCALE, tagW, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.C.doneLine);
       CV.text(tag, tx + tw + 8 * CV.SCALE + tagW / 2, titleCy, { size: CV.FS.xs, color: CV.C.green, align: 'center' });
     }
     CV.text(CV.fit(sub, w - (tx - x) - 30 * CV.SCALE, CV.FS.sm), tx, blockTop + T1 + 2 * CV.SCALE + T2 / 2,
@@ -139,8 +139,9 @@
         { size: CV.DISP.d2, align: 'center' });
       const gs = 11 * CV.SCALE;
       if (D.FACTION_GLYPH[w.theme]) {
+        /* 角标亮度按**本格格底**现算（对本格底 ≥3:1 · V1.1.2）—— worldId 一定要传 */
         CV.poly(D.FACTION_GLYPH[w.theme], x + box - 3 * CV.SCALE - gs, top + 3 * CV.SCALE,
-          gs, D.worldGlyphColor(w.theme));
+          gs, D.worldGlyphColor(w.theme, w.id));
       }
       CV.text(CV.fit(w.name, U.iw() - box - 12 * CV.SCALE, CV.FS.f1, true),
         x + box + 10 * CV.SCALE, top + box / 2, { size: CV.FS.f1, bold: true, ls: 0.2 });
@@ -194,8 +195,8 @@
         const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
         const done = stars > 0;
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
-        CV.round(x, y, cw, cw, CV.RADIUS,  done ? 'CV.C.doneBg' : CV.C.panel2,
-          done ? 'CV.C.doneLine' : (isBoss ? CV.C.accent : CV.C.line));
+        CV.round(x, y, cw, cw, CV.RADIUS,  done ? CV.C.doneBg : CV.C.panel2,
+          done ? CV.C.doneLine : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
           { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
         if (isElite) CV.text('⚔', x + cw - 5 * CV.SCALE, y + 10 * CV.SCALE,
@@ -248,7 +249,7 @@
         const bx = U.pad() + c * (cw + gap), by = top + r * (cw + gap);
         const sel = x.i === sweepSel;
         CV.ctx.globalAlpha = 1;
-        CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? 'CV.C.doneBg' : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
+        CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? CV.C.doneBg : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
         CV.text(String(x.i + 1), bx + cw / 2, by + cw / 2 - 6 * CV.SCALE, { size: CV.FS.f1, bold: true, align: 'center', color: sel ? CV.C.gold : CV.C.text });
         CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
         CV.hit('ssel:' + x.i, bx, by, cw, cw);

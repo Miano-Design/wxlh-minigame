@@ -95,7 +95,7 @@
       if (isP) {
         const tw = CV.measure('上阵', CV.FS.xs) + 10 * CV.SCALE;   // .inparty：padding 1px 5px
         CV.round(cx + cw - tw - 3 * CV.SCALE, cy + 3 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.accent);
-        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: 'CV.C.white' });
+        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.white });
       }
       /* 头像 → 名字 → 星级 → 两行小字：每一行的中心都按"上一行结束处"往下推（网页版顺序） */
       const acx = cx + cw / 2;

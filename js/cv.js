@@ -38,7 +38,9 @@
       famBio: '#53a26b', famGhost: '#765d98', famMystic: '#a26353', famTech: '#538aa2', famGod: '#a49951',
       /* B 类 · 派生档（与网页版逐条同名同值） */
       goldDeep: '#8a6a1e', dangerText: '#e8626f', accent2: '#97273a',
-      goldBright: '#ffd76a', goldBtn: '#b98d2a', goldBtnDeep: '#87631a', cream: '#fdf3dc',
+      /* 金底按钮**唯一的一套**（V1.1.2 父亲大人：「金底的按钮都改成白色字」）：
+         渐变两端 ＋ 其上的字色，primary 与 gold 共用 —— 与网页版 --gold-btn / --gold-btn-deep / --on-gold 同值。 */
+      goldBright: '#ffd76a', goldBtn: '#8f6c1f', goldBtnDeep: '#735517', onGold: '#ffffff',
       exp: '#b8860b', hp: '#37b26c', hpH: '#5dd39e', hpLow: '#b23737',
       en: '#6a5ae0', enH: '#9d8cff', dmg: '#ff8080', debuff: '#c8a2ff',
       holy: '#ff9ecb', rp: '#7ee0a3',
@@ -201,7 +203,7 @@
       const w = s * 0.34, h = s * 0.46;
       c.save(); c.fillStyle = color;
       c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); c.fill();
-      c.strokeStyle = 'CV.a(CV.C.white, .55)'; c.lineWidth = Math.max(1, s * 0.05);
+      c.strokeStyle = CV.a(CV.C.white, .55); c.lineWidth = Math.max(1, s * 0.05);
       c.beginPath(); c.moveTo(x - w * 0.46, y - h * 0.46); c.lineTo(x + w * 0.46, y + h * 0.46); c.stroke();
       c.restore();
     },
@@ -684,8 +686,8 @@
     if (opt.line !== null) {
       const r = Math.min(opt.radius === undefined ? CV.RADIUS : opt.radius, w / 2, h / 2);
       CV.ctx.save();
-      CV.ctx.strokeStyle = 'CV.a(CV.C.white, .06)'; CV.ctx.lineWidth = 1;
-      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, 'CV.a(CV.C.white, .06)');
+      CV.ctx.strokeStyle = CV.a(CV.C.white, .06); CV.ctx.lineWidth = 1;
+      CV.round(x + 0.5, y + 0.5, w - 1, h - 1, Math.max(0, r - 0.5), null, CV.a(CV.C.white, .06));
       CV.ctx.restore();
     }
   };
@@ -952,7 +954,7 @@
     const ROW_H = 34, CHIP_H = 40, BAR_TOP = 2, BAR_BOTTOM = 10;
     const h = top + ROW_H + BAR_TOP + CHIP_H + BAR_BOTTOM;
     CV.TOP = h;
-    c.fillStyle = 'CV.a(CV.C.bg, .94)';
+    c.fillStyle = CV.a(CV.C.bg, .94);
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -971,7 +973,7 @@
     const name = CV.fit((S && S.player.name) || '执灯者', ROW_RIGHT - PAD - lw - 20 * CV.SCALE, CV.FS.f1, true);
     CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
     const nw = CV.measure(name, CV.FS.f1, true);
-    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, 'CV.a(CV.C.gold, .4)');
+    CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, CV.a(CV.C.gold, .4));
     CV.text(lvTxt, PAD + nw + 10 * CV.SCALE + lw / 2, ny, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
     /* 铭刻名（网页版 .genelock：11px 红字，只在解锁后出现） */
     if (S && S.player.geneLock > 0 && D && D.GENE_LOCKS && D.GENE_LOCKS[S.player.geneLock - 1]) {
@@ -1019,7 +1021,7 @@
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
     const y = CV.H - h;
-    c.fillStyle = 'CV.a(CV.C.bg2, .98)';
+    c.fillStyle = CV.a(CV.C.bg2, .98);
     c.fillRect(0, y, CV.W, h);
     const tabW = CV.W / CV.NAV_TABS.length;
     CV.NAV_TABS.forEach((t, i) => {
@@ -1057,7 +1059,7 @@
     const t = CV.toasts[0];
     const w = Math.min(CV.W - 40, CV.measure(t.msg, CV.FS.lg) + 32);
     const x = (CV.W - w) / 2, y = CV.TOP + 12;
-    CV.round(x, y, w, 34, CV.PILL,  'CV.a(CV.C.shade, .85)', CV.C.line);
+    CV.round(x, y, w, 34, CV.PILL,  CV.a(CV.C.shade, .85), CV.C.line);
     CV.text(t.msg, CV.W / 2, y + 17, { size: CV.FS.lg, align: 'center' });
   };
   /* V9.6.90：加了时长参数（网页版 toast(msg, ms) 同款）——

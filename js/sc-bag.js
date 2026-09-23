@@ -36,8 +36,8 @@
     list.forEach(function (t) {
       const on = cur === t[0];
       const w = CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE;
-      CV.round(x, top, w, h, CV.PILL,  on ? 'CV.a(CV.C.danger, .13)' : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? 'CV.C.white' : CV.C.dim });
+      CV.round(x, top, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? CV.C.white : CV.C.dim });
       CV.hit(prefix + t[0], x, top, w, h);
       x += w + gap;
     });
@@ -89,8 +89,8 @@
     CV.hitMode = 'screen';
     /* 和网页版 .batch-bar 一样带一层上投影（原来贴死的平色块，看着很"重"） */
     CV.ctx.save();
-    CV.ctx.shadowColor = 'CV.a(CV.C.shade, .45)'; CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
-    CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  'CV.a(CV.C.panel, .97)', CV.C.line);
+    CV.ctx.shadowColor = CV.a(CV.C.shade, .45); CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
+    CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  CV.a(CV.C.panel, .97), CV.C.line);
     CV.ctx.restore();
     /* 第一行：快选 N / R / SR + 清空 */
     let x = pad + 12 * CV.SCALE;
@@ -192,7 +192,7 @@
       const r = Math.floor(i / cols), col = i % cols;
       const x = U.ix() + col * (cw + gap), y = top + r * (cw + gap);
       if (c.empty) {
-        CV.round(x, y, cw, cw, CV.RADIUS, 'CV.a(CV.C.shade, .13)', CV.C.line);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.shade, .13), CV.C.line);
         return;
       }
       if (c.add) {
@@ -207,7 +207,7 @@
       }
       if (c.sel) {
         /* 网页版 .bg-slot.sel：红框 + 红色淡底（批量分解时"这件选中了"） */
-        CV.round(x, y, cw, cw, CV.RADIUS, 'CV.a(CV.C.danger, .2)', CV.C.accent);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.danger, .2), CV.C.accent);
       } else if (c.rarity) {
         /* V1.0.1（P2 第三步，AI 视觉工程师："道具/材料 43 件走**品质底框＋图形族**，不精绘 43 张"）：
            有品质的道具（箱子、装备类）按品质色描边 —— 一眼看出档次，

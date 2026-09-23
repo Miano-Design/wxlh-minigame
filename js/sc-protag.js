@@ -61,7 +61,7 @@
       const nw = CV.measure(Core.charName('@player'), CV.FS.f1, true);
       const tag = '执灯者本人';
       const tw = CV.measure(tag, CV.FS.sm) + 12 * CV.SCALE;
-      CV.round(tx + nw + 8 * CV.SCALE, top + 6 * CV.SCALE, tw, 18 * CV.SCALE, CV.RADIUS_SM, null, 'CV.a(CV.C.gold, .4)');
+      CV.round(tx + nw + 8 * CV.SCALE, top + 6 * CV.SCALE, tw, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.a(CV.C.gold, .4));
       CV.text(tag, tx + nw + 8 * CV.SCALE + tw / 2, top + 15 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
       CV.text('Lv.' + S.player.level + '（玩家等级）· ' + (S.player.bloodline ? S.player.bloodline + '命格 Lv.' + S.player.bloodlineLv : '未选命格'),
         tx, top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });

@@ -55,7 +55,7 @@
         /* 网页版只在**有券**时才画这一行（`tk && tk.n > 0`）；没券什么都不显示 */
         if (tk && tk.n > 0) {
           const txt = '🎫 ' + tkName + ' ×' + tk.n;
-          CV.round(U.ix(), U.y, U.iw(), rowH, CV.RADIUS_CHIP,  null, 'CV.a(CV.C.goldBright, .4)');
+          CV.round(U.ix(), U.y, U.iw(), rowH, CV.RADIUS_CHIP,  null, CV.a(CV.C.goldBright, .4));
           CV.text(CV.fit(txt, U.iw() - 16 * CV.SCALE, CV.FS.xs), U.ix() + 9 * CV.SCALE, U.y + rowH / 2,
             { size: CV.FS.xs, color: CV.C.text });
           U.y += rowH + 8 * CV.SCALE;
@@ -77,7 +77,7 @@
             const bh = 30 * CV.SCALE;
             CV.ctx.save();
             const grd = CV.ctx.createLinearGradient(U.ix(), 0, U.ix() + U.iw(), 0);
-            grd.addColorStop(0, 'CV.a(CV.C.goldBright, .13)'); grd.addColorStop(1, 'transparent');
+            grd.addColorStop(0, CV.a(CV.C.goldBright, .13)); grd.addColorStop(1, 'transparent');
             CV.round(U.ix(), U.y, U.iw(), bh, CV.RADIUS_CHIP,  grd);
             CV.round(U.ix(), U.y, 3 * CV.SCALE, bh, CV.RADIUS_CHIP,  CV.C.gold);
             CV.ctx.restore();
@@ -126,13 +126,13 @@
       /* 网页版：SSR/UR/MYTH 除了描边还有一圈柔光（box-shadow）—— 抽到好东西要看得出来 */
       if (['SSR', 'UR', 'MYTH'].indexOf(r.rarity) >= 0) {
         CV.round(x - 1.5 * CV.SCALE, y - 1.5 * CV.SCALE, cw + 3 * CV.SCALE, ch + 3 * CV.SCALE, CV.RADIUS,  null,
-          r.rarity === 'UR' ? 'CV.a(CV.C.rur, .35)' : (r.rarity === 'MYTH' ? 'CV.a(CV.C.goldBright, .4)' : 'CV.a(CV.C.rssr, .28)'), 3 * CV.SCALE);
+          r.rarity === 'UR' ? CV.a(CV.C.rur, .35) : (r.rarity === 'MYTH' ? CV.a(CV.C.goldBright, .4) : CV.a(CV.C.rssr, .28)), 3 * CV.SCALE);
       }
       CV.qframe(x, y, cw, ch, r.rarity, 12 * CV.SCALE, BAND);
       if (r.isUp) {
         const tw = CV.measure('UP', CV.FS.xs) + 10 * CV.SCALE;
         CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
-        CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: 'CV.C.sel' });
+        CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.sel });
       }
       const acx = x + cw / 2, acTop = y + PAD;
       CV.ctx.beginPath(); CV.ctx.arc(acx, acTop + AV / 2, AV / 2 - CV.SCALE, 0, Math.PI * 2);

@@ -97,6 +97,26 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
   const mini = fs.readFileSync(path.resolve(JS, 'sc-dungeon.js'), 'utf8');
   t('网页版族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(web));
   t('小游戏族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(mini));
+  /* ⑧（V1.1.2 新增）角标的"看得见"这一半：
+     角标亮度是按**本格格底**现算的（data.js:worldGlyphColor），所以 ①调用点必须把 worldId 传下去，
+     ②36 格全量算一遍，都得 ≥3:1（WCAG 2.1 非文本对比度下限 = 基准）。
+     旧口径固定 L=66%，与格底 18→50 的阶梯交叉后 **13 格不过**（最差 W31 = 1.58）——
+     族形糊在格底上，"色 + 形"的双重编码只剩"色"。 */
+  const lum = (hex) => {
+    const h = String(hex).replace('#', '');
+    const ch = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  t('两端的世界格角标都把 worldId 传下去（只传 theme 会退回旧亮度，浅格底上又糊）',
+    /worldGlyphColor\(theme, worldId\)/.test(web) && /glyphSvg\(w\.theme, w\.id\)/.test(web)
+    && /worldGlyphColor\(w\.theme, w\.id\)/.test(mini));
+  const lowContrast = (D.WORLDS || []).filter((w) => cr(D.worldTint(w.id), D.worldGlyphColor(w.theme, w.id)) < 3);
+  t('36 个世界的角标对本格底都 ≥3:1（旧口径 13 格不过）', lowContrast.length === 0,
+    lowContrast.length ? lowContrast.map((w) => w.id + ' ' + cr(D.worldTint(w.id), D.worldGlyphColor(w.theme, w.id)).toFixed(2)).join(' · ')
+      : '36/36 过；最差 ' + (D.WORLDS || []).map((w) => [w.id, cr(D.worldTint(w.id), D.worldGlyphColor(w.theme, w.id))])
+        .sort((a, b) => a[1] - b[1])[0].map((x, i) => (i ? (+x).toFixed(2) : x)).join(' '));
 }
 
 /* ⑧ 「文本呈现型」符号必须自绘（V1.0.1 · 用血换的判据）
@@ -147,6 +167,40 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
     !/\.floater\.crit[^}]*1\.1875rem/.test(css));
   t('小游戏飘字不再写死 14（编外第六档）',
     !/const size = 14 \* CV\.SCALE/.test(mini));
+}
+
+/* ⑨ 「图标的时代」白名单（V1.1.2）
+   每个 emoji 都是**某一年**才进 Unicode 的 —— 系统 emoji 字体里没有它，画出来就是豆腐块。
+   版本越新，画得出来的系统越少：Emoji 12（2019）要 Android 10 / iOS 13.2，
+   Emoji 13（2020）要 Android 11 / iOS 14.2，Emoji 14（2021）要 Android 12 / iOS 15.4。
+   规矩：**新字符一律登记**（登记＝写明它出现在哪、备选是什么、换机验证过没有），没登记的当场报红 ——
+   免得下一次又有人随手加一个 🪷 进去。
+   ⚠️ 登记 ≠ 免除：这 5 个（E12 ×2 · E13 ×3）提审前都要拿一台老安卓 / 老 iPhone 看一眼，
+   出豆腐块就按"备选"一栏换（备选都是 Emoji 1.0 时代的字符，2015 年前的机器也有）。 */
+{
+  const REG = {
+    '\u{1FA90}': 'Emoji 12 · W12 蚀环远征（行星环）',
+    '\u{1FA94}': 'Emoji 12 · W27 长明夜行（油灯）',
+    '\u{1FAB6}': 'Emoji 13 · W22 锈蚀方舟 + tv34 仙禽遗羽（羽毛）｜备选 🕊️ / 🛶',
+    '\u{1FAA8}': 'Emoji 13 · tv20 灵石碎块（石头）｜备选 ⛰️ / 🔹',
+    '\u{1FA9E}': 'Emoji 13 · tv33 古镜照心（镜子）｜备选 📀 / 🎐',
+  };
+  const src = fs.readFileSync(path.join(JS, 'data.js'), 'utf8');
+  const used = new Map();
+  for (const m of src.matchAll(/(?:ico|icon):\s*['"]([^'"]*)['"]/gu)) {
+    for (const ch of m[1]) {
+      const cp = ch.codePointAt(0);
+      if (cp >= 0x1FA70 && cp <= 0x1FAFF) used.set(ch, (used.get(ch) || 0) + 1);
+    }
+  }
+  const unknown = [...used.keys()].filter((ch) => !(ch in REG));
+  t('没有"未登记的新时代图标"（Emoji 12+ 一律登记在册，免得又混进一个豆腐块）',
+    unknown.length === 0,
+    unknown.length ? '未登记：' + unknown.map((c) => c + ' U+' + c.codePointAt(0).toString(16).toUpperCase()).join(' · ')
+      : [...used.entries()].map(([c, n]) => c + '×' + n).join(' ') + ' —— 全部登记在册');
+  const stale = Object.keys(REG).filter((ch) => !used.has(ch));
+  t('登记表没有"已经换掉的陈旧登记"', stale.length === 0,
+    stale.length ? '可删：' + stale.join(' ') : '登记表和实际用法对得上');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
