@@ -412,9 +412,21 @@ window.Core = (function () {
     dedupeEquips();
     S.player.bloodline = S.player.bloodline || null;
     S.player.bloodlineLv = S.player.bloodlineLv || 0;
-    // V9.5.83：老档里可能存着带 HTML 特殊字符的名字（名字会拼进界面模板）→ 读档时清一遍
-    S.player.name = cleanName(S.player.name);
-    (S.altPlayers || []).forEach(p => { if (p) p.name = cleanName(p.name); });
+    /* V9.5.83：老档里可能存着带 HTML 特殊字符的名字（名字会拼进界面模板）→ 读档时清一遍。
+       V1.0.1（2026-09-23 · 平台违规警告 · P0）：线上老档里**已经存着违规名**的情况也要清 ——
+       平台要求的就是【整改清除线上违规内容】，而玩家手机上的存档我们够不着，
+       只能在他下次开局读档时清掉。所以这里给一个兜底：白名单外的名字直接**换成预设名**，
+       而不是留空（留空会让界面显示成「主角」，玩家以为档坏了）。 */
+    /* ⚠️ 兜底**必须是确定性的** —— 第一版这里写了 D.pickProtagName()，而它内部调 Math.random()；
+       读档路径**多掷一次骰子**，后面所有依赖随机的模拟（战斗、掉落、测试）全错位，
+       test_game 当场红了 2 条（治疗者必杀次数那两条）。读档不是玩游戏，不能有随机副作用。
+       改成按原名长度在名单里取一个 —— 确定性、有变化、同名档每次进来结果一致。 */
+    const nameFallback = function (old) {
+      const n = String(old == null ? '' : old).length;
+      return D.PROTAG_NAMES[n % D.PROTAG_NAMES.length];
+    };
+    S.player.name = cleanName(S.player.name) || nameFallback(S.player.name);
+    (S.altPlayers || []).forEach(p => { if (p) p.name = cleanName(p.name) || nameFallback(p.name); });
     S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs || {});
     S.player.attrPoints = S.player.attrPoints || 0;
     /* V9.5.69：技能等级从 1 起改成 0 起。老档一次性把已点等级整体减 1（Lv.1→Lv.0），
@@ -509,8 +521,22 @@ window.Core = (function () {
      玩家把名字打成 `<img src=x onerror=…>` 就会被浏览器当真标签解析（自己的档自己搞坏，
      但界面会直接烂掉）。在这里把 HTML 特殊字符去掉，所有渲染点（现在和以后）都安全。 */
   const NAME_BAD = /[<>&"'`\\]/g;
+  /* V1.0.1（2026-09-23 · 微信平台违规警告 · P0 事故）
+     ────────────────────────────────────────────────────────────────
+     原来这里是**黑名单**清洗（拿 NAME_BAD 正则把坏字抠掉）。黑名单的问题很朴素：
+     **它永远列不全** —— 有人把政治敏感词输进了名字框（平台给的违规图示就是那三个字），
+     平台判【UGC 模块存在政治敏感内容】，限 **48 小时**整改，
+     逾期封禁「被搜索 / 分享 / 分享到朋友圈」能力。
+
+     改成**白名单**：名字必须是预设名单（PROTAG_NAMES）里那一个，否则一律拒绝。
+     白名单的好处是**可自证** —— 不在名单里的字符串，一个都进不来，不需要"想全所有敏感词"。
+
+     配合：起名/改名/新建主角三处的自由输入**全部去掉**（小游戏 sc-start.js 与 sc-last.js、
+     网页版同一个 modal），入口只剩【从名单里换一个】。 */
   function cleanName(n) {
-    return String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+    const s = String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+    if (!s) return '';
+    return D.PROTAG_NAMES.indexOf(s) >= 0 ? s : '';   // 不在白名单 → 返回空，调用方据此拒绝
   }
   function setPlayerName(name) {
     const clean = cleanName(name);

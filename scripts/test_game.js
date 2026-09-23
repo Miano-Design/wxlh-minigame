@@ -35,7 +35,7 @@ t('初始无招募角色', Object.keys(Core.S.chars).length === 0);
 // 上阵 5 格：0/1 前排、2/3/4 后排；主角本人（'@player'）就占一格
 t('开局上阵只有主角一人', Core.S.party.length === 5 && Core.S.party[0] === '@player' && Core.S.party.filter(Boolean).length === 1);
 t('主角未命名', Core.S.player.name === '');
-t('命名主角', Core.setPlayerName('测试者') && Core.charName('@player') === '测试者');
+t('命名主角', Core.setPlayerName(D.PROTAG_NAMES[0]) && Core.charName('@player') === D.PROTAG_NAMES[0]);
 t('主角独立属性', (() => { const st = Core.effectivePlayerStats(); return st.atk > 0 && st.hp > 0; })());
 // 组队助手：传要上阵的招募角色（最多 4 个），主角自动排进去（默认前排第一格）
 function setParty(ids, playerRow) {
@@ -383,12 +383,12 @@ setParty(['C021']);
 // 20. 新建角色（多主角）
 {
   const oldName = Core.S.player.name;
-  const r = Core.createProtagonist('第二世');
-  t('新建角色', r.ok && Core.S.player.name === '第二世' && Core.S.player.level === 0 && !Core.S.player.bloodline);
+  const r = Core.createProtagonist(D.PROTAG_NAMES[1]);
+  t('新建角色', r.ok && Core.S.player.name === D.PROTAG_NAMES[1] && Core.S.player.level === 0 && !Core.S.player.bloodline);
   t('旧角色保留', Core.protagonistList().length === 2 && Core.protagonistList()[1].name === oldName);
   Core.S.player.level = 5;
   t('切换角色', Core.switchProtagonist(0).ok && Core.S.player.name === oldName);
-  t('切回后等级还原', Core.switchProtagonist(0).ok && Core.S.player.name === '第二世' && Core.S.player.level === 5);
+  t('切回后等级还原', Core.switchProtagonist(0).ok && Core.S.player.name === D.PROTAG_NAMES[1] && Core.S.player.level === 5);
   Core.switchProtagonist(0); // 切回原主角
 }
 
@@ -422,7 +422,7 @@ setParty(['C021']);
 // 21b. 三池互相独立：道具池满了不影响材料池
 {
   Core.newGame();
-  Core.setPlayerName('分池');
+  Core.setPlayerName(D.PROTAG_NAMES[2]);
   Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);   // 清掉新手道具，只看分池行为
   Core.S.bag.itemCap = 1;
   Core.S.bag.matCap = 3;
@@ -617,7 +617,7 @@ setParty(['C021']);
 // 29. 回归：免费招募 / SSR 券必须计入主线与日常
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   const q3 = () => Core.mainQuestState().find(x => x.q.id === 'q03').done;
   t('免费招募前 q03 未完成', q3() === false);
   Core.freeRecruit();
@@ -632,7 +632,7 @@ setParty(['C021']);
 // 30. 回归：十连按折扣价整笔结算，不会扣了钱看不到结果
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   // V9.5.73：普通池十连价 45000 → 4500，边界跟着挪
   Core.S.cur.points = 4499;
   const poor = Core.recruitTen('normal');
@@ -659,7 +659,7 @@ setParty(['C021']);
 // 31. 回归：强化失败不许白吞材料
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   Core.S.unlocks.enhance = true;   // 装备强化是通关 菌毯巢穴·第3关 之后才开的线
   Core.addItem('mat_t1', 5);
   const eq = Core.grantEquip('W01', 'SR', 'weapon').equip;
@@ -689,7 +689,7 @@ setParty(['C021']);
 // 33. 回归：背包满时购买不扣钱
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);
   Core.S.bag.itemCap = 2;
   // 道具池占满 2 格（用两件**不是**货架第 0 位的东西，这样"买不到"才说明是容量问题）
@@ -707,7 +707,7 @@ setParty(['C021']);
 
 // 33b. 上限联动（V9.5.68 父亲大人问的："技能等级总数是不是应该跟等级一样"）
 {
-  Core.newGame(); Core.setPlayerName('上限');
+  Core.newGame(); Core.setPlayerName(D.PROTAG_NAMES[4]);
   const SKILL_BARS = 3;
   t('技能上限有单一出处', Array.isArray(D.SKILL_MAX_BY_INDEX) && D.SKILL_MAX_BY_INDEX.length === SKILL_BARS && D.SKILL_POINT_EVERY_LV >= 1);
   t('三条技能各有上限（35/35/30）', D.SKILL_MAX_BY_INDEX.join(',') === '35,35,30');
@@ -718,7 +718,7 @@ setParty(['C021']);
     return supply === need;
   })());
   t('升级真的按"每 N 级 1 点"发', (() => {
-    Core.newGame(); Core.setPlayerName('上限2');
+    Core.newGame(); Core.setPlayerName(D.PROTAG_NAMES[6]);
     let got = 0;
     for (let i = 0; i < 30; i++) {
       const before = Core.S.player.skillPoints || 0;
@@ -729,14 +729,14 @@ setParty(['C021']);
     return got === Math.floor(Core.S.player.level / D.SKILL_POINT_EVERY_LV);
   })());
   t('技能能升到上限、到顶才说已满级', (() => {
-    Core.newGame(); Core.setPlayerName('上限3');
+    Core.newGame(); Core.setPlayerName(D.PROTAG_NAMES[7]);
     Core.S.player.skillPoints = 999;
     let n = 0;
     while (Core.allocateSkill(0).ok && n < 50) n++;
     return Core.S.player.skillLv[0] === D.SKILL_MAX;
   })());
   t('伙伴技能上限与主角一致', (() => {
-    Core.newGame(); Core.setPlayerName('上限4');
+    Core.newGame(); Core.setPlayerName(D.PROTAG_NAMES[8]);
     Core.addChar('C021');
     Core.S.cur.otherworld = 9999999;
     let n = 0;
@@ -748,7 +748,7 @@ setParty(['C021']);
      界面上的价钱就是 SKILL_CHIP_COST[lv]（和小游戏同一份），这里锁住它真的只扣这么多 ——
      强化那边吃过一次亏（按钮写 1640、实扣 4640），技能这条线不能再来一次。 */
   t('技能升级：报价 == 实扣的异界结晶', (() => {
-    Core.newGame(); Core.setPlayerName('技能报价');
+    Core.newGame(); Core.setPlayerName(D.PROTAG_NAMES[9]);
     Core.addChar('C021');
     Core.S.cur.otherworld = 9999999;
     let ok = true;
@@ -948,7 +948,17 @@ setParty(['C021']);
   Core.newGame();
   t('起名就清洗：<img> 之类进不去', (() => { Core.setPlayerName('<img src=x onerror=boo>'); return Core.S.player.name.indexOf('<') < 0; })());
   t('起名清洗不影响正常名字', (() => { Core.setPlayerName('夜行者'); return Core.S.player.name === '夜行者'; })());
-  t('名字仍然限长 12 字', (() => { Core.setPlayerName('一二三四五六七八九十十一十二十三'); return Core.S.player.name.length === 12; })());
+  /* V1.0.1（2026-09-23 · 平台违规警告 · P0）：这条原来测【超长名字被截到 12 字】。
+     名字改成**白名单**之后（自由输入整条去掉了），超长名字会直接被拒 —— 所以这条
+     改成测**合规本身**：名单外的名字（超长的、随便起的、政治敏感的形态）一律拒绝，
+     只有预设名单里的才通过。这比原来的"截断"更强：它直接钉住了平台那条要求。 */
+  t('名字必须来自预设白名单（名单外一律拒绝）', (() => {
+    const tooLong = Core.setPlayerName('一二三四五六七八九十十一十二十三');   // 超长
+    const random  = Core.setPlayerName('随便起个名字试试');                    // 名单外
+    const ok      = Core.setPlayerName(D.PROTAG_NAMES[5]);
+    return tooLong === false && random === false && ok === true
+      && Core.charName('@player') === D.PROTAG_NAMES[5];
+  })());
   t('全是非法字符的名字会被拒绝', Core.setPlayerName('<<<>>>') === false);
 }
 
@@ -1052,7 +1062,7 @@ setParty(['C021']);
 // 35. 图鉴收集奖励
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   const ids = D.characters.slice(0, 5).map(c => c.id);
   ids.forEach(id => Core.addChar(id));
   const st = Core.codexState();
@@ -1069,7 +1079,7 @@ setParty(['C021']);
   /* V9.5.64 起新手补给自带一套 R 装备：这一例只关心「新掉的那件要被自动分解」，先清空 */
   Core.S.equips = {};
   Core.S.equipped['@player'] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   Core.S.settings.autoSellN = true;
   const before = Core.S.cur.otherworld;
   const res = Core.grantEquip('W01', 'N', 'weapon');
@@ -2322,7 +2332,7 @@ setParty(['C021']);
 // V9.5-1：新档渡劫后重开，境界不能被 ×4（旧档换算仍然只做一次）
 {
   Core.newGame();
-  Core.setPlayerName('回归');
+  Core.setPlayerName(D.PROTAG_NAMES[3]);
   Core.S.player.bloodline = '修真';
   t('新档建档时就把 realmScaled 落上（否则第一次读档会被 ×4）', Core.S.realmScaled === true);
   Core.S.player.level = 40;

@@ -62,19 +62,24 @@
 
   });
   CV.on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });
+  /* V1.0.1（2026-09-23 · 平台违规警告 · P0 事故，康康漏改的那一处）
+     ────────────────────────────────────────────────────────────────
+     原来这里弹微信键盘让玩家**自由输入**名字，`NAMES[nameIdx] = v` 输什么存什么。
+     有人输了政治敏感词 → 平台判【UGC 模块存在政治敏感内容】、
+     限 **48 小时**整改（截止 2026-09-25 08:38），逾期封禁「被搜索 / 分享 / 分享到朋友圈」能力。
+
+     **为什么上次没堵住**：V1.0.1 那次只改了 sc-last.js 的「新建主角」，
+     漏了**这一处开局起名** —— 而起名才是每个玩家必经的那一步。（这是康康的漏改，记在这儿。）
+
+     现在起名**只能从下面这份预设名单里选**：点名字 = 换一个，不再产生任何自由文本。
+     名单里也不含任何姓氏 + 名字的可组合结构（都是完整的固定词），从根上不可能拼出敏感词。
+
+     ⚠️ 别再把这里改回 showKeyboard：平台那条规范要的是「UGC 模块不得出现违规内容」，
+        而**去自由输入是唯一零成本且可自证的合规做法**（接内容安全 API 需要 access_token，
+        客户端直调不了，得养云函数 —— 单机游戏不值得）。 */
   CV.on('name_type', function () {
-    if (!(G.wx && G.wx.showKeyboard)) { CV.toast('这台设备不支持键盘输入'); return; }
-    try {
-      if (G.wx.onKeyboardConfirm) {
-        G.wx.onKeyboardConfirm(function (res) {
-          const v = String((res && res.value) || '').trim().slice(0, 12);
-          if (v) NAMES[nameIdx] = v;
-          try { G.wx.hideKeyboard({}); } catch (e) {}
-          CV.render();
-        });
-      }
-      G.wx.showKeyboard({ defaultValue: NAMES[nameIdx], maxLength: 12, multiple: false, confirmType: 'done', fail: function () {} });
-    } catch (e) { CV.toast('打开键盘失败'); }
+    nameIdx = (nameIdx + 1) % NAMES.length;   // 点名字框 = 换一个（原来是弹键盘）
+    CV.render();
   });
   CV.on('name_ok', () => { Core.setPlayerName(NAMES[nameIdx]); CV.reset('bloodline'); });
 
