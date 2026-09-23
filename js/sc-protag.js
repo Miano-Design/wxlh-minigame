@@ -270,19 +270,20 @@
     });
   });
   CV.on('rename', function () {
-    /* 网页版是一个居中小弹窗 + 输入框；小游戏用微信键盘改，改完写回存档 */
-    if (!(G.wx && G.wx.showKeyboard)) { CV.toast('这台设备不支持键盘输入'); return; }
-    try {
-      if (G.wx.onKeyboardConfirm) {
-        G.wx.onKeyboardConfirm(function (res) {
-          const v = String((res && res.value) || '').trim().slice(0, 12);
-          if (v) { Core.setPlayerName(v); CV.toast('名字已修改'); }
-          try { G.wx.hideKeyboard({}); } catch (e) {}
-          CV.render();
-        });
-      }
-      G.wx.showKeyboard({ defaultValue: Core.S.player.name, maxLength: 12, multiple: false, confirmType: 'done', fail: function () {} });
-    } catch (e) { CV.toast('打开键盘失败'); }
+    /* V1.0.1（2026-09-23 · 平台 UGC 违规警告 · P0）
+       ────────────────────────────────────────────────────────────────
+       这里原来是**第三处漏网**：小游戏的主角改名还在用 wx.showKeyboard 自由输入。
+       康康提审前体检时用 `grep showKeyboard` 数出来的 —— 前两处（起名页 sc-start.js、
+       新建主角 sc-last.js）当时都堵了，**这一处漏了**。
+       现在改成与另外两处同一规矩：**只能从灯阁名册里换**，点一下换下一个，不再有键盘。
+       ⚠️ 别再改回 showKeyboard —— 平台 5.18.2 点的就是【可任意输入敏感违规内容、无安全过滤】，
+          现在这个项目**一个自由输入口都不该有**（改名前请先 grep showKeyboard 与 <input> 确认）。 */
+    const names = D.PROTAG_NAMES;
+    let idx = Math.max(0, names.indexOf(Core.S.player.name));
+    idx = (idx + 1) % names.length;
+    const r = Core.setPlayerName(names[idx]);
+    CV.toast(r === false ? '这个名字不合规，再点一次' : ('已换为「' + names[idx] + '」'));
+    CV.render();
   });
   CV.on('autoeq_player', function () {
     const r = Core.autoEquipBest('@player');
