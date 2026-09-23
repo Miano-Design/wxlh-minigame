@@ -271,7 +271,11 @@ console.log('\n=== ⑨ 冷启动与主视觉：首屏在位 ＋ 首帧不黑 ＋
      这一条就是那次事故的锁。 */
   const iPush = gameSrc.indexOf("pendingBoot.push({ kind: 'login' })");
   const iSplash = gameSrc.indexOf('CV.splash(');
-  const iReset = gameSrc.indexOf("CV.reset('create')");
+  /* V1.0.3：第一次 reset 不再是 'create' —— 开机第一页换成了**合规闸**（notice）。
+     这里改成"第一次 CV.reset( 出现的位置"，闸门本身的位置与内容由下面 ⑩ 节钉。 */
+  /* 从首屏那一行往后找第一次 reset —— game.js 前面还有底栏页签的 CV.reset(t.id)（@2184），
+     那不是开机路径，会让这条断言凭空红。 */
+  const iReset = gameSrc.indexOf('CV.reset(', gameSrc.indexOf('CV.splash('));
   t('① 开机首屏在位，且排在"开机弹窗入队之后、第一次 CV.reset 之前"',
     iPush >= 0 && iSplash >= 0 && iReset >= 0 && iPush < iSplash && iSplash < iReset,
     '入队 @' + iPush + ' · 首屏 @' + iSplash + ' · 第一次 reset @' + iReset);
@@ -303,6 +307,62 @@ console.log('\n=== ⑨ 冷启动与主视觉：首屏在位 ＋ 首帧不黑 ＋
     /opt\.glyph/.test(uiwSrc) && /opt\.line/.test(uiwSrc) && /glyph\.bl/.test(uiwSrc));
 }
 
+console.log('\n=== ⑩ 开机合规闸：忠告 / 适龄／著作权人必须**常驻、读得清、两端同源**（V1.0.3 · 提审硬要求）===');
+{
+  /* 依据《微信小游戏平台运营规范》特别规范 2.6.2（忠告全文登载）/ 2.6.1（著作权人信息专门页）
+     / 6.1（适龄提示）。这一节钉四件事：
+       ① 开机**第一页**就是合规闸（不是欢迎、不是首页）；
+       ② 闸上真的画了忠告四句 ＋ 著作权人字段（缺了就红，不是"多了才红"）；
+       ③ 对比度：正文 --text2 对 --bg / --panel ≥4.5（旧版那一行是 dim＋1.5s 闪，实算 5.5 却一闪而过）；
+       ④ 两端同源：文案来自 data.js 的 COMPLIANCE，本端不许手抄原文。 */
+  const gameSrc = fs.readFileSync(path.resolve(__dirname, '../game.js'), 'utf8');
+  const splash = read('sc-splash.js');
+  const startSrc = read('sc-start.js');
+  /* 只看**开机那一段**（CV.splash 之后）的第一次 reset ——
+     game.js 前面还有底栏页签的 `CV.reset(t.id)`，那不是开机路径。 */
+  const bootPart = gameSrc.slice(gameSrc.indexOf('CV.splash('));
+  const iResetFirst = bootPart.indexOf('CV.reset(');
+  t('① 开机第一页就是合规闸（不是欢迎 / 不是首页）',
+    /CV\.reset\('notice'\)/.test(gameSrc) && iResetFirst >= 0
+    && bootPart.slice(iResetFirst, iResetFirst + 20).indexOf("'notice'") > 0,
+    '首屏之后的第一次 reset：' + bootPart.slice(iResetFirst, iResetFirst + 20).replace(/\s+/g, ' '));
+  t('① 出闸之后去哪一页是**算出来的**（欢迎 / 起名 / 选命格 / 首页四条路一条都不许丢）',
+    /NEXT_AFTER_NOTICE/.test(gameSrc) && /NEXT_AFTER_NOTICE/.test(startSrc));
+  t('① 合规闸那两页不画顶栏/底栏（游戏还没开始，那两样本身就是游戏界面）',
+    /'notice', 'copyright'/.test(cv), 'chromeless 名单');
+  t('② 闸上画了忠告全文（四句逐句画，文案取自 D.COMPLIANCE，不许手抄）',
+    /D\.COMPLIANCE\.healthAdvice/.test(startSrc));
+  t('② 闸上有著作权人信息专门页（字段取自 D.COMPLIANCE.ownerFields）',
+    /D\.COMPLIANCE\.ownerFields/.test(startSrc));
+  t('② 适龄徽标在闸上**两页都常驻**，并能点开全文',
+    (startSrc.match(/ageBadge\(\);/g) || []).length >= 2 && /age_more/.test(startSrc));
+  t('② 品牌首屏里不再夹合规文案（那一行 1.5s 一闪而过，就是被点名的那条）',
+    !/适龄提示/.test(stripComments(splash)));     // 注释里会写"适龄提示搬去哪了"，只查真画的文案
+  /* ③ 对比度：算出来，不靠看 */
+  const lum = (hex) => {
+    const h = String(hex).replace('#', '');
+    const ch = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((x) => (x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const tok = (name) => { const m = cv.match(new RegExp(name + ":\\s*'(#[0-9a-fA-F]{6})'")); return m ? m[1] : null; };
+  const t2 = tok('text2'), bg = tok('bg'), panel = tok('panel');
+  t('③ 忠告正文（CV.C.text2）对页面底（CV.C.bg）≥4.5',
+    !!t2 && !!bg && cr(t2, bg) >= 4.5, t2 && bg ? cr(t2, bg).toFixed(2) + ':1（' + t2 + ' on ' + bg + '）' : '取不到令牌');
+  t('③ 适龄徽标（CV.C.text2 对 CV.C.panel）≥4.5',
+    !!t2 && !!panel && cr(t2, panel) >= 4.5, t2 && panel ? cr(t2, panel).toFixed(2) + ':1' : '取不到令牌');
+  t('③ 闸上用的是 --text2 那一档（不是 dim —— 老首屏那行就是 dim）',
+    /CV\.C\.text2/.test(startSrc));
+  /* ④ 两端同源 */
+  t('④ 文案来自 data.js 的 COMPLIANCE（本端零手抄 —— 手抄＝改一处漏一处）',
+    /D\.COMPLIANCE/.test(startSrc) && !/抵制不良游戏/.test(startSrc));
+  /* ⑤ 设置页也留一份（进游戏之后还查得到，不用重开一次游戏） */
+  const last = read('sc-last.js');
+  t('⑤ 「设置与存档」里也留了忠告 ＋ 著作权人信息（同取自 COMPLIANCE）',
+    /D\.COMPLIANCE\.healthAdvice/.test(last) && /D\.COMPLIANCE\.ownerFields/.test(last));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
-console.log('结论：' + (fail === 0 ? '小游戏端九节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
+console.log('结论：' + (fail === 0 ? '小游戏端十节基准都在真代码里 ✓' : '有 ' + fail + ' 条没落到代码 ✗') + '\n');
 process.exitCode = fail ? 1 : 0;

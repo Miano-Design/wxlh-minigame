@@ -2908,6 +2908,48 @@ window.DATA = (function () {
     return w;
   }
 
+  /* ================= 开机合规文案（2026-09-23 · 提审硬要求） =================
+     依据《微信小游戏平台运营规范》特别规范：
+       · 2.6.2《健康游戏忠告》—— 必须在**游戏开始前**、画面的**显著位置全文登载**；
+       · 2.6.1 —— 在游戏开始前、《健康游戏忠告》**之后**设专门页面，
+                 标明游戏著作权人 / 出版服务单位 / 批准文号 / 出版物号等；
+       · 6.1 适龄提示 —— 要显著、可读（正文对比度 ≥4.5:1）。
+
+     三条合起来的落位 ＝ **开机合规闸**（网页版 ui.js:showComplianceGate
+     / 小游戏 sc-start.js 的 notice ＋ copyright 两页）：
+     品牌首屏之后、任何游戏界面与弹窗之前，**必须点「进入」才放行** ——
+     没有超时、没有自动淡出（原来那版首屏只停 0.5s／1.5s，一闪而过不算"显著位置全文登载"）。
+
+     ⚠️ 这一段是**法规原文**，不是文案：一字不许改、一句不许省、不许只放链接。
+        尺子：wxlh-game/scripts/copy_audit.js（合规段）＋ wxlh-minigame/scripts/page_text_audit.js。
+     两端同源：小游戏从 data.js 单向同步拿走（见 wxlh-minigame/scripts/sync-logic.js）。 */
+  const HEALTH_ADVICE = [
+    '抵制不良游戏，拒绝盗版游戏。',
+    '注意自我保护，谨防受骗上当。',
+    '适度游戏益脑，沉迷游戏伤身。',
+    '合理安排时间，享受健康生活。',
+  ];
+  const COMPLIANCE = {
+    healthTitle: '健康游戏忠告',
+    healthAdvice: HEALTH_ADVICE,
+    healthFull: HEALTH_ADVICE.join(''),          // 全文一条串（尺子逐字对表用）
+    ageBadge: '适龄提示：12 周岁以上',
+    ageFull: '本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。',
+    ownerTitle: '著作权人信息',
+    ownerNote: '依据《微信小游戏平台运营规范》特别规范 2.6.1，本页标明游戏著作权人与出版信息。',
+    /* 2.6.1 专门页的字段：**数组顺序 ＝ 页面顺序**。
+       值先留空 → 两端统一画成「待填」，由父亲大人一处填写、两端同时生效
+       （填哪几个字段、每个字段写什么，见本轮回单）。 */
+    ownerBlank: '待填',
+    ownerFields: [
+      { k: '游戏名称', v: '残域灯阁' },          // 备案名（已定），外显名必须与之一致
+      { k: '著作权人', v: '' },
+      { k: '出版服务单位', v: '' },
+      { k: '批准文号', v: '' },
+      { k: '出版物号', v: '' },
+    ],
+  };
+
   return {
     ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS, SHARD_RARITIES, GENE_LOCK_MAX, MOUNT_MAX_LV, MOUNT_LV_PCT, mountFeedCost, FABAO_MAX_LV, FABAO_LV_PCT, fabaoRefineCost,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
@@ -2952,6 +2994,7 @@ window.DATA = (function () {
     SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER, RETIRED_ITEMS, EARLY_GUARANTEE, earlyGuarantee,
     WEEKLY_TASKS, WEEKLY_ALL_REWARD, ACHIEVEMENTS,
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
+    COMPLIANCE,                                  // 开机合规：健康游戏忠告 / 适龄提示 / 著作权人信息（V1.0.3）
     corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,
     CORRIDOR_MARK_STEP, CORRIDOR_MARK_CAP, CORRIDOR_MARK_PCT,
     DROP_BLOCKS, dropBlockOf, rollEquipRarity, dropChancesOf, dropCapOf, matTierWeights,

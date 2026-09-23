@@ -27,16 +27,28 @@ window.Core = (function () {
 
   /* ================= 存档 ================= */
   const ATTR_ZERO = () => ({ muscle: 0, immune: 0, cell: 0, nerve: 0, intelligence: 0, spirit: 0 });
+  /* 天赋初值：四支天赋树各 0 级（分支键与 data.js 的 TALENTS 同源）。
+     和 ATTR_ZERO 放一起，是因为**"新档初值"必须只有一份定义** ——
+     以前它只写在 defaultState() 里，于是 createProtagonist() 走 freshProtagonist() 时
+     一个都没有，新建主角就继承了旧主角的天赋（V1.0.3 · 产品经理报的 P1）。 */
+  const TALENT_ZERO = () => ({ body: 0, energy: 0, nerve: 0, grace: 0 });
   // row：主角站前排还是后排（V8.3 新增）。默认前排——和旧存档的战场表现一致。
   /* V9.5.69（父亲大人）：**所有等级从 0 起算**——数字就是"已经升过几次"。
      主角 Lv.0 / 技能 Lv.0 / 建筑 0 级 / 评级 Lv.0 / 伴生体 0 级（血统、铭刻、境界、权限本来就是 0 起）。 */
   function freshProtagonist(name) {
-    return { name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0, attrs: ATTR_ZERO(), skillPoints: 0, skillLv: [0, 0, 0], row: 'front' };
+    /* 这一份就是**新档初值**的唯一定义：新档、新建主角、老档补字段都从这里取。
+       V1.0.3（产品经理报的 P1）：`realm / talents / reincarnations / geneLock` 原来
+       只写在 defaultState() 里，freshProtagonist 里一个都没有 —— 于是"新建主角"
+       拿到的是**旧主角**的境界 / 天赋 / 转生世数 / 铭刻阶数（实测：境界 12 阶 + 满天赋 + 转生 3 世，
+       新主角一出生就带着这些）。现在四样都归零，名单也补进了 PROTAGONIST_KEYS。 */
+    return { name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0,
+      attrs: ATTR_ZERO(), skillPoints: 0, skillLv: [0, 0, 0], row: 'front',
+      realm: 0, geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() };
   }
   function defaultState() {
     return {
       v: 5,
-      player: Object.assign(freshProtagonist('执灯者'), { geneLock: 0, reincarnations: 0, talents: { body: 0, energy: 0, nerve: 0, grace: 0 } }),
+      player: Object.assign(freshProtagonist('执灯者'), { geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() }),
       altPlayers: [],         // 新建的主角（体验不同血统），与当前主角可切换
       // V9.2：背包分三池（道具 / 材料 / 装备），各 50 格起、各自扩容
       bag: { itemCap: 50, itemExpands: 0, matCap: 50, matExpands: 0, eqCap: 50, eqExpands: 0 },
@@ -2426,18 +2438,39 @@ window.Core = (function () {
   }
 
   /* ================= 多主角（新建角色体验不同血统） ================= */
-  const PROTAGONIST_KEYS = ['name', 'level', 'exp', 'bloodline', 'bloodlineLv', 'attrPoints', 'attrs', 'skillPoints', 'skillLv'];
+  /* V1.0.3 · P1（产品经理报，改法照单执行）：
+     这一张名单原来只有 9 个字段，**漏掉 5 个"长得不像资料"的进度字段** ——
+       realm（境界）／talents（天赋）／reincarnations（转生世数）／geneLock（铭刻阶数）／row（站位）。
+     新建主角只重置名单里的 9 个，这 5 个**原样留在新主角身上**：
+     实测【境界 12 阶 + 满天赋 + 转生 3 世】时新建主角，新档一出生就带着旧主角的境界与天赋
+     （产品经理报的 P1：新主角 Lv.0，境界却已经不是 0）。
+     口径：新建主角**必须回到新档初值** —— 境界 0 / 天赋全 0 / 转生 0 世 / 铭刻 0 阶 / 站位前排。
+
+     ⚠️ 往里加字段时，**值不是标量的那几个必须在 snapshot/restore 里各拷一份**
+     （attrs / talents 是对象、skillLv 是数组）：直接传引用＝两个主角共用同一个对象，
+     改一个动两个，比"没重置"更难查。 */
+  const PROTAGONIST_KEYS = ['name', 'level', 'exp', 'bloodline', 'bloodlineLv', 'attrPoints', 'attrs',
+    'skillPoints', 'skillLv', 'realm', 'talents', 'reincarnations', 'geneLock', 'row'];
   function snapshotProtagonist() {
     const p = {};
     PROTAGONIST_KEYS.forEach(k => { p[k] = S.player[k]; });
     p.attrs = Object.assign(ATTR_ZERO(), p.attrs);
     p.skillLv = (p.skillLv || [0, 0, 0]).slice();
+    p.talents = Object.assign(TALENT_ZERO(), p.talents);    // 深拷：不然两个主角共用同一个天赋对象
     return p;
   }
   function restoreProtagonist(p) {
     PROTAGONIST_KEYS.forEach(k => { S.player[k] = p[k]; });
     S.player.attrs = Object.assign(ATTR_ZERO(), p.attrs);
     S.player.skillLv = (p.skillLv || [0, 0, 0]).slice();
+    S.player.talents = Object.assign(TALENT_ZERO(), p.talents);
+    /* 老档的 altPlayers 快照里没有这几个字段（名单是这一版才补的）——
+       取不到就按**新档初值**补，绝不留 undefined（境界 / 铭刻 / 站位读到 undefined
+       在界面上会静默当 0，但写回存档就是一个"缺字段"的档，下一轮迁移又要兜一次）。 */
+    S.player.realm = p.realm || 0;
+    S.player.reincarnations = p.reincarnations || 0;
+    S.player.geneLock = p.geneLock || 0;
+    S.player.row = p.row || 'front';
   }
   function protagonistList() {
     return [

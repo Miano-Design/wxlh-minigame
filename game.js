@@ -28,7 +28,7 @@ require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → �
 
 const CV = globalThis.CV, Core = globalThis.Core, G = globalThis;
 /* 小游戏复刻的网页版版本号（设置页底部那行要跟网页版一字不差） */
-globalThis.GAME_VER = '1.0.2';
+globalThis.GAME_VER = '1.0.3';
 /* V1.0.2（多账号调试自审时在 Console 里抓到的）：
    这一行原来是**裸调用** —— 冷启动时 jsbridge 还没就绪，wx.getWindowInfo() 会抛
    「[jsbridge] invoke getSystemInfo fail: jsbridge not ready」。
@@ -137,14 +137,21 @@ if (hadSave && Core.S.retiredRefundPending) {
         "弹窗没清完就不弹引导"那道闸就形同虚设：开场引导会先占住屏幕，
         把离线收益 / 七日登录永远堵在队列里（本单实测踩到过，boot_audit 当场报红 6 条）。 */
 if (CV.splash) CV.splash(1500);
-if (hadSave) {
-  if (!Core.S.player.name) CV.reset('create');
-  else if (!Core.S.player.bloodline) CV.reset('bloodline');
-  else CV.reset('home');
-} else {
-  Core.newGame(); Core.ensureDaily && Core.ensureDaily();
-  CV.reset('welcome');
-}
+/* V1.0.3（提审硬要求 · 规范 2.6.2 / 2.6.1）：
+   开机第一页不是"欢迎"也不是"首页"，而是**合规闸** —— 《健康游戏忠告》全文 ＋ 著作权人信息专门页
+   （两页见 js/sc-start.js 的 notice / copyright）。
+   为什么必须换掉原来的第一页：规范要的是"**游戏开始前**、显著位置全文登载"，
+   而原来的做法是开机首屏一行小字闪 1.5 秒（还点一下就跳过）—— 那不是登载，是闪一下。
+   下面这一行 `CV.reset('notice')` 就是"游戏开始前"这道闸门本身：
+   它是**第一次 reset**，比欢迎/起名/首页都早，而且合规闸没有超时、没有自动让位，
+   唯一出口是「进入灯阁」那颗按钮。
+   注意：`hadSave` 那一串分支**不能删**，改成了算好"出闸之后去哪一页"存进 G.NEXT_AFTER_NOTICE
+   （sc-start.js 的 gate_enter 处理器用它放行），否则开局三步的跳转会丢。 */
+globalThis.NEXT_AFTER_NOTICE = hadSave
+  ? (!Core.S.player.name ? 'create' : (!Core.S.player.bloodline ? 'bloodline' : 'home'))
+  : 'welcome';
+if (!hadSave) { Core.newGame(); Core.ensureDaily && Core.ensureDaily(); }
+CV.reset('notice');
 
 function catchUp() {
   const now = Date.now();

@@ -867,7 +867,10 @@
        网页版这时整块界面是隐藏的（没签契约看不到游戏界面，V9.5.23 定的），这里照做。 */
     /* 战斗页也是整屏接管：网页版战斗遮罩盖住了顶栏和底栏，这里同样不画标准顶栏/底栏，
        由战斗页自己画"标题 / 速度 / 撤离"那一条（V9.5.93）。 */
-    const chromeless = ['welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
+    /* V1.0.3：开机合规闸那两页（notice / copyright）也在名单里 ——
+       它们排在**游戏开始前**，与开局三步同一档：不画顶栏/底栏
+       （那两样本身就是"游戏界面"，游戏还没开始就不该出现）。 */
+    const chromeless = ['notice', 'copyright', 'welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
     /* V1.1.4（2026-09-23 父亲大人："改完选血统那里滑动不了了" · P0）：
        `chromeless` 这一张名单只管一件事 —— **要不要画顶栏/底栏**（纯视觉）。
        可在下面算 `CV.maxScroll` 时，它被当成了第二件事用："一屏定版、不参与滚动"。

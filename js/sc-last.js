@@ -480,7 +480,22 @@
        首屏（sc-splash.js）那一条是短标识，这里放全文；文案与网页版 ui.js 的设置弹窗逐字一致。 */
     U.card(function () {
       U.h3('适龄提示');
-      U.hint('本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。', CV.SP[1]);
+      U.hint(D.COMPLIANCE.ageFull, CV.SP[1]);
+    });
+    /* V1.0.3（提审硬要求 · 特别规范 2.6.2 / 2.6.1）：
+       忠告全文与著作权人信息在**开机流程里**已经各过一遍（js/sc-start.js 的 notice / copyright 两页），
+       这里再各留一份 —— 玩家（和审核员）进游戏之后也查得到，不用重开一次游戏。
+       文案一律取 D.COMPLIANCE（data.js 一处定义，与网页版 ui.js 的设置弹窗同源，不许手抄）。 */
+    U.card(function () {
+      U.h3(D.COMPLIANCE.healthTitle);
+      D.COMPLIANCE.healthAdvice.forEach(function (line) { U.hint(line, 3 * CV.SCALE, CV.C.text2); });
+    });
+    U.card(function () {
+      U.h3(D.COMPLIANCE.ownerTitle);
+      U.hint(D.COMPLIANCE.ownerNote, CV.SP[1]);
+      D.COMPLIANCE.ownerFields.forEach(function (f) {
+        U.kv(f.k, f.v || D.COMPLIANCE.ownerBlank, f.v ? CV.C.text2 : CV.C.dim);
+      });
     });
     U.card(function () {
       U.h3('危险区');

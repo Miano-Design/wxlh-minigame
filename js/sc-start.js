@@ -8,6 +8,77 @@
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
 
+  /* ================= ⓪ 开机合规闸（V1.0.3 · AI 视觉工程师 · 提审硬要求） =================
+     依据《微信小游戏平台运营规范》特别规范：
+       · 2.6.2《健康游戏忠告》—— 必须在**游戏开始前**、画面的**显著位置全文登载**；
+       · 2.6.1 —— 在游戏开始前、忠告**之后**设专门页面，标明游戏著作权人 / 出版服务单位 /
+                 批准文号 / 出版物号等；
+       · 6.1 适龄提示 —— 显著、可读。
+     小游戏原来是一条都没有（rg 著作权 / 健康游戏忠告 全库 0 命中），适龄提示只在开机首屏闪 1.5 秒。
+     现在照网页版同一条流程（ui.js:showComplianceGate）做**两页**：
+       notice     ——《健康游戏忠告》全文 ＋ 适龄徽标 ＋ 「下一步」；
+       copyright  ——【著作权人信息】专门页 ＋ 适龄徽标 ＋ 「进入灯阁」。
+     两条硬口径：
+       · **文案一个字都不在本文件里** —— 全部来自 data.js 的 `D.COMPLIANCE`（两端同一份来源，
+         本文件只负责排版；尺子 page_text_audit 会查有没有手抄）；
+       · **必须点出来**（没有超时、没有自动让位）：开机那 1.5 秒的首屏过去之后，
+         画面就停在 notice 上，唯一的出口是按钮 —— 与网页版同一条。 */
+  /* 适龄徽标：两页都**常驻**（老做法只有开机首屏一闪），点一下看全文。
+     底色 CV.C.panel ＋ 文字 CV.C.text2 ≥4.5:1（与网页版 #gate .gate-age 同一档；
+     尺子 visual_audit 的对比度那条两端各钉一次）。 */
+  function ageBadge() {
+    const h = 40 * CV.SCALE, top = U.y;
+    CV.round(U.pad(), top, U.cw(), h, CV.RADIUS_SM, CV.C.panel, CV.a(CV.C.gold, .5));
+    CV.text(CV.fit(D.COMPLIANCE.ageBadge, U.cw() - 90 * CV.SCALE, CV.FS.lg), U.pad() + 12 * CV.SCALE, top + h / 2,
+      { size: CV.FS.lg, color: CV.C.text2, bold: true });
+    CV.text('看全文 ›', U.pad() + U.cw() - 12 * CV.SCALE, top + h / 2,
+      { size: CV.FS.md, color: CV.C.gold, align: 'right' });
+    CV.hit('age_more', U.pad(), top, U.cw(), h);
+    U.y = top + h + CV.SP[3];
+  }
+  CV.on('age_more', function () {
+    /* 全文（与网页版逐字一致）：只看不改状态 —— 关掉它，合规闸还在原地 */
+    U.confirm('适龄提示', D.COMPLIANCE.ageFull, null, { cancel: false, okLabel: '知道了' });
+  });
+
+  CV.register('notice', function () {
+    U.begin();
+    U.space(Math.max(24 * CV.SCALE, CV.H * 0.06));
+    ageBadge();
+    U.card(function () {
+      U.h3(D.COMPLIANCE.healthTitle);
+      /* 四句**逐句一行、一句不省**（法规要的是全文登载，缩写或只放链接都不算） */
+      D.COMPLIANCE.healthAdvice.forEach(function (line) {
+        U.hint(line, 4 * CV.SCALE, CV.C.text2);
+      });
+    });
+    U.space(CV.SP[3]);
+    U.btnRow([{ label: '下一步 · 著作权人信息', style: 'primary', id: 'notice_next' }]);
+    /* 步骤与小字与网页版**逐字一致**（对表尺子 parity_audit 会两边比对，谁少一句谁红） */
+    U.hint('第 1 / 2 步 · 《健康游戏忠告》全文', CV.SP[2], CV.C.dim);
+  });
+  CV.on('notice_next', function () { CV.reset('copyright'); });
+
+  CV.register('copyright', function () {
+    U.begin();
+    U.space(Math.max(16 * CV.SCALE, CV.H * 0.04));
+    ageBadge();
+    U.card(function () {
+      U.h3(D.COMPLIANCE.ownerTitle);
+      U.hint(D.COMPLIANCE.ownerNote, CV.SP[1]);
+      D.COMPLIANCE.ownerFields.forEach(function (f) {
+        /* 值留空 → 统一画「待填」（由父亲大人一处填、两端同时生效） */
+        U.kv(f.k, f.v || D.COMPLIANCE.ownerBlank, f.v ? CV.C.text2 : CV.C.dim);
+      });
+    });
+    U.space(CV.SP[3]);
+    U.btnRow([{ label: '进入灯阁', style: 'primary', id: 'gate_enter' }]);
+    U.hint('第 2 / 2 步 · 点「进入灯阁」开始游戏', CV.SP[2], CV.C.dim);
+  });
+  /* 放行：进 game.js 在开机时算好的那一页（欢迎 / 起名 / 选命格 / 首页）——
+     合规闸只负责挡在前面，不负责决定去哪一页。 */
+  CV.on('gate_enter', function () { CV.reset((G && G.NEXT_AFTER_NOTICE) || 'home'); });
+
   /* ================= ① 欢迎（网页版 showTutorial 的文案） ================= */
   CV.register('welcome', function () {
     U.begin();

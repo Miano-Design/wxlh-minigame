@@ -528,25 +528,66 @@ expect('keji', D.KEJI.map((k) => k.name), '秘术阁（每条线）');
 expect('garden', ['第 1 块'], '药园（地块）');
 expect('sign', D.SIGNS.map((s) => s.tier), '点灯（灯焰档位）');
 
-/* ---------- ③ 适龄提示（2026-09-23 · 文案策划 · 合规岗体检报告 R4） ----------
-   依据：微信小游戏特别规范 **6.1（未成年人保护）** —— 全库原本 0 处「适龄」。
-   两边都钉，就是规矩里那条"**网页版有、画布必须有**"的对表断言（小游戏 canvas 少了东西
-   不报错、不崩溃，只是"少了那一件"，本项目栽过 ≥6 次）。断的是**缺了就红**，不是"多了才红"。 */
+/* ---------- ③ 开机合规（2026-09-23 · 提审硬要求；V1.0.3 重写） ----------
+   依据《微信小游戏平台运营规范》特别规范：
+     · 2.6.2《健康游戏忠告》—— 游戏开始前、显著位置**全文登载**；
+     · 2.6.1 —— 忠告**之后**设专门页，标明著作权人 / 出版服务单位 / 批准文号 / 出版物号；
+     · 6.1 适龄提示 —— 显著、可读。
+   上一版这一段只钉了两条：设置页有「适龄提示」、开机首屏有一行短标识。
+   现在开机首屏那行**主动删掉了**（1.5 秒一闪而过不叫显著），改成**常驻的合规闸两页**
+   （js/sc-start.js 的 notice / copyright）—— 所以这里按新形态重写，而且**断的是"缺了就红"**：
+   忠告四句少一句、著作权人少一个字段、适龄徽标只挂一页，都当场报出来。
+   两端同源依旧钉住：文案住在 data.js 的 COMPLIANCE 里，网页版与小游戏都从它取（谁手抄谁红）。 */
 {
-  const AGE_BADGE = '适龄提示：12 周岁以上';
-  const AGE_FULL = '本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。';
+  const CO = D.COMPLIANCE || {};
+  const AGE_BADGE = CO.ageBadge, AGE_FULL = CO.ageFull;
   let ageBad = 0;
-  const g = drawPage('settings');
-  if (!g || !has(g, '适龄提示')) { ageBad++; console.log('  ✗ 设置与存档页没画出「适龄提示」（合规岗 R4）'); }
-  if (!g || !has(g, AGE_FULL)) { ageBad++; console.log('  ✗ 设置页的适龄提示少了全文那句：' + AGE_FULL); }
-  const splashSrc = fs.readFileSync(path.join(JS, 'sc-splash.js'), 'utf8');
-  if (splashSrc.indexOf(AGE_BADGE) < 0) { ageBad++; console.log('  ✗ 首屏（sc-splash.js）没有「' + AGE_BADGE + '」'); }
+  /* ① 合规闸第 1 页：忠告全文（逐句画出来，不是只画标题） */
+  const gNotice = drawPage('notice');
+  if (!gNotice) { ageBad++; console.log('  ✗ 合规闸第 1 页（notice）渲染失败'); }
+  else {
+    if (!has(gNotice, CO.healthTitle)) { ageBad++; console.log('  ✗ 合规闸缺《' + CO.healthTitle + '》标题'); }
+    CO.healthAdvice.forEach((line) => {
+      if (!has(gNotice, line)) { ageBad++; console.log('  ✗ 合规闸的忠告少了一句：' + line); }
+    });
+    if (!has(gNotice, AGE_BADGE)) { ageBad++; console.log('  ✗ 合规闸第 1 页没有「' + AGE_BADGE + '」'); }
+  }
+  /* ② 合规闸第 2 页：著作权人信息专门页（2.6.1 点名的字段一个都不能少） */
+  const gOwner = drawPage('copyright');
+  if (!gOwner) { ageBad++; console.log('  ✗ 合规闸第 2 页（copyright）渲染失败'); }
+  else {
+    if (!has(gOwner, CO.ownerTitle)) { ageBad++; console.log('  ✗ 合规闸缺「' + CO.ownerTitle + '」这一页'); }
+    CO.ownerFields.forEach((f) => {
+      if (!has(gOwner, f.k)) { ageBad++; console.log('  ✗ 著作权人信息页缺字段：' + f.k); }
+    });
+    if (!has(gOwner, AGE_BADGE)) { ageBad++; console.log('  ✗ 合规闸第 2 页没有「' + AGE_BADGE + '」（适龄要两页都常驻）'); }
+  }
+  /* ③ 设置与存档：进游戏之后还查得到（忠告 ＋ 著作权人 ＋ 适龄全文） */
+  const gSet = drawPage('settings');
+  if (!gSet || !has(gSet, AGE_FULL)) { ageBad++; console.log('  ✗ 设置页的适龄提示少了全文那句：' + AGE_FULL); }
+  if (!gSet || !has(gSet, CO.healthAdvice[0])) { ageBad++; console.log('  ✗ 设置页没有《健康游戏忠告》全文'); }
+  if (!gSet || !has(gSet, CO.ownerFields[1].k)) { ageBad++; console.log('  ✗ 设置页没有著作权人信息'); }
+  /* ④ 开机顺序：第一页必须是合规闸（游戏开始前） */
+  const gameSrc = fs.readFileSync(path.join(path.resolve(__dirname, '..'), 'game.js'), 'utf8');
+  const bootPart = gameSrc.slice(gameSrc.indexOf('CV.splash('));
+  const firstReset = bootPart.slice(bootPart.indexOf('CV.reset('), bootPart.indexOf('CV.reset(') + 20);
+  if (firstReset.indexOf("'notice'") < 0) { ageBad++; console.log('  ✗ 开机第一页不是合规闸：' + firstReset.replace(/\s+/g, ' ')); }
+  const splashSrc = fs.readFileSync(path.join(JS, 'sc-splash.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  if (splashSrc.indexOf(AGE_BADGE) >= 0) { ageBad++; console.log('  ✗ 品牌首屏还挂着「' + AGE_BADGE + '」（1.5 秒一闪而过，已改成常驻闸）'); }
+  /* ⑤ 两端同源：两边都从 data.js 的 COMPLIANCE 取，谁也不许手抄原文 */
   const WEB = path.resolve(JS, '../../wxlh-game');
-  const webHtml = fs.existsSync(path.join(WEB, 'index.html')) ? fs.readFileSync(path.join(WEB, 'index.html'), 'utf8') : '';
   const webUi = fs.existsSync(path.join(WEB, 'js/ui.js')) ? fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8') : '';
-  if (webHtml.indexOf(AGE_BADGE) < 0) { ageBad++; console.log('  ✗ 网页版首屏（index.html 的 #boot）没有同一条「' + AGE_BADGE + '」'); }
-  if (webUi.indexOf(AGE_FULL) < 0) { ageBad++; console.log('  ✗ 网页版设置弹窗没有同一条全文（两端不同源）'); }
-  if (!ageBad) console.log('  适龄提示两端同源（首屏短标识 ＋ 设置页全文）✓');
+  const webMain = fs.existsSync(path.join(WEB, 'js/main.js')) ? fs.readFileSync(path.join(WEB, 'js/main.js'), 'utf8') : '';
+  const webHtml = fs.existsSync(path.join(WEB, 'index.html')) ? fs.readFileSync(path.join(WEB, 'index.html'), 'utf8') : '';
+  if (webUi.indexOf('D.COMPLIANCE') < 0) { ageBad++; console.log('  ✗ 网页版 ui.js 没有从 D.COMPLIANCE 取合规文案（两端会各抄一份）'); }
+  if (webUi.indexOf('抵制不良游戏') >= 0) { ageBad++; console.log('  ✗ 网页版 ui.js 手抄了忠告原文 —— 必须从 data.js 取'); }
+  if (webMain.indexOf('UI.showComplianceGate') < 0) { ageBad++; console.log('  ✗ 网页版开机没过合规闸（main.js 没调 showComplianceGate）'); }
+  const webBoot = webHtml.slice(webHtml.indexOf('id="boot"'), webHtml.indexOf('id="app"')).replace(/<!--[\s\S]*?-->/g, ' ');
+  if (/适龄提示|健康游戏忠告/.test(webBoot)) { ageBad++; console.log('  ✗ 网页版品牌首屏又夹了合规文案（那边同样改成常驻闸了）'); }
+  const miniStart = fs.readFileSync(path.join(JS, 'sc-start.js'), 'utf8');
+  if (miniStart.indexOf('D.COMPLIANCE') < 0) { ageBad++; console.log('  ✗ 小游戏 sc-start.js 没有从 D.COMPLIANCE 取文案'); }
+  else if (miniStart.indexOf('抵制不良游戏') >= 0) { ageBad++; console.log('  ✗ 小游戏 sc-start.js 手抄了忠告原文'); }
+  if (!ageBad) console.log('  开机合规闸两端同源：忠告全文 ＋ 著作权人信息 ＋ 适龄（常驻、可点开全文）✓');
   fails += ageBad;
 }
 

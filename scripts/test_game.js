@@ -392,6 +392,41 @@ setParty(['C021']);
   Core.switchProtagonist(0); // 切回原主角
 }
 
+/* 20b. 新建主角必须回到**新档初值**（V1.0.3 · 产品经理报的 P1）
+   ------------------------------------------------------------------------------
+   复现（产品经理实测）：主角度 12 阶 ＋ 满天赋 ＋ 转生 3 世时新建主角，
+   新主角**一出生就带着旧主角的境界与天赋**（Lv.0 的人，境界却不是 0）。
+   根因：PROTAGONIST_KEYS 只快照 9 个字段，realm / talents / reincarnations / geneLock
+   既不在快照名单里、也不在 freshProtagonist 的初值里 → "新建"只换了那 9 样。
+   下面先把状态摆成"老玩家档"，再新建，逐条验它回到初值；
+   最后**把这一轮多出来的新主角收回**，让后面的用例还是接在 #20 的状态上往下跑。 */
+{
+  Core.S.player.realm = 12;
+  Core.S.player.reincarnations = 3;
+  Core.S.player.geneLock = 2;
+  Core.S.player.row = 'back';
+  Object.keys(Core.S.player.talents).forEach(k => { Core.S.player.talents[k] = 10; });
+  const keepTalents = Core.S.player.talents;
+  const r = Core.createProtagonist(D.PROTAG_NAMES[2]);
+  t('新建主角：境界回到 0', r.ok && Core.S.player.realm === 0, 'realm = ' + Core.S.player.realm);
+  t('新建主角：天赋四支全归零', ['body', 'energy', 'nerve', 'grace'].every(k => Core.S.player.talents[k] === 0),
+    JSON.stringify(Core.S.player.talents));
+  t('新建主角：转生 0 世 ＋ 铭刻 0 阶', Core.S.player.reincarnations === 0 && Core.S.player.geneLock === 0);
+  t('新建主角：站位回前排（row 也不许继承）', Core.S.player.row === 'front');
+  t('新建主角：天赋是**新对象**，不是和上一任共用同一个（改一个不许动另一个）',
+    Core.S.player.talents !== keepTalents && keepTalents.body === 10);
+  /* 通用闸：快照名单必须覆盖 S.player 的**每一个**字段 ——
+     下次往 S.player 上加一条养成线而忘了补 PROTAGONIST_KEYS，这条当场红。
+     名单直接从快照对象上读（不进 core 再导一份，避免"第二份真相"）。 */
+  const snapKeys = Object.keys(Core.S.altPlayers[Core.S.altPlayers.length - 1]);
+  const missed = Object.keys(Core.S.player).filter(k => snapKeys.indexOf(k) < 0);
+  t('主角快照覆盖 S.player 的每一个字段（一个都不许漏）', missed.length === 0, '漏：' + missed.join(' / '));
+  /* 收尾：切回原来那位主角，再把这轮多出来的新主角从名单里摘掉 */
+  Core.switchProtagonist(Core.S.altPlayers.length - 1);
+  Core.S.altPlayers.pop();
+  t('收尾后回到原主角（境界 / 天赋原样）', Core.S.player.realm === 12 && Core.S.player.talents.body === 10);
+}
+
 // 21. 背包容量（V9.2：道具与装备分开算，各自 50 起、各自扩容）
 {
   const u0 = Core.bagUsage();

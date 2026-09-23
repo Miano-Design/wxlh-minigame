@@ -126,6 +126,18 @@ console.log('\n=== 小游戏开机与心跳审计 ===');
     + ' · 速率 ' + JSON.stringify(Core.idleRates()));
   if (bootSaves.length) console.log('   · 开机期间谁存了盘（会把离线时钟归零）：' + bootSaves.join(' / '));
 
+  /* V1.0.3（提审硬要求 · 特别规范 2.6.2 / 2.6.1）：开机第一页现在是**合规闸**
+     （《健康游戏忠告》→【著作权人信息】），不点它就到不了灯阁 ——
+     所以这里照玩家在真机上的动作走一遍：第 1 页必须就是它，点「下一步」到第 2 页，点「进入灯阁」放行。
+     合规闸**内容**（忠告四句 / 著作权人字段 / 对比度 / 两端同源）由 page_text_audit 与 visual_audit 钉，
+     这一条只管它**挡没挡住、点不点得过去**（挡住一切、又只能靠按钮过去，才是"游戏开始前显著登载"）。 */
+  t('开机第一页是合规闸（《健康游戏忠告》那页）', CV.top().name === 'notice', '当前页 ' + CV.top().name);
+  CV.dispatch('notice_next');
+  t('点「下一步」→【著作权人信息】专门页', CV.top().name === 'copyright', '当前页 ' + CV.top().name);
+  CV.dispatch('gate_enter');
+  t('点「进入灯阁」才放行到游戏里（合规闸不是装饰）', CV.top().name !== 'notice' && CV.top().name !== 'copyright',
+    '当前页 ' + CV.top().name);
+
   t('开机调了 Core.settleOffline（离线结算真的发生）', calls.settleOffline === 1, '调用 ' + calls.settleOffline + ' 次');
   t('离线 2 小时的收益真的入账了', Core.S.cur.points > ptsBefore,
     '点名 ' + ptsBefore + ' → ' + Core.S.cur.points);
@@ -170,6 +182,10 @@ console.log('\n=== 小游戏开机与心跳审计 ===');
   calls.settleOffline = 0;
   delete require.cache[require.resolve(path.join(ROOT, 'game.js'))];
   require(path.join(ROOT, 'game.js'));
+  /* V1.0.3：重新开机同样要先过合规闸（开机第一页永远是它）—— 不过闸就到不了灯阁，
+     也就等不到开机弹窗（弹窗的排队闸是"站在灯阁上"才放行）。 */
+  CV.dispatch('notice_next');
+  CV.dispatch('gate_enter');
   await wait(1300);           // 开机弹窗是排队的，第一轮 flush 在 ~1 秒
   const ov3 = G.U && G.U.overlay;
   console.log('   · 场景2现场：页面 ' + CV.top().name + ' · pending ' + String(!!(G.bootModalPending && G.bootModalPending()))

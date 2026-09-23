@@ -118,11 +118,10 @@
     CV.text('灯芯燃起中…', cx, by + 22 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: CV.C.dim });
     if (G.GAME_VER) CV.text('残域灯阁 V' + G.GAME_VER, cx, CV.H - CV.safeBottom - 24 * CV.SCALE,
       { size: CV.FS.sm, align: 'center', color: CV.dim });
-    /* 2026-09-23（文案策划 · 合规岗体检报告 R4）：适龄提示 —— 微信小游戏特别规范 6.1（未成年人保护）。
-       首屏就得看见（游戏开始**之前**），所以跟游戏名同一屏；文案与网页版 index.html 的 #boot 逐字一致，
-       全文版在「设置与存档」最后一栏。 */
-    CV.text('适龄提示：12 周岁以上', cx, CV.H - CV.safeBottom - 42 * CV.SCALE,
-      { size: CV.FS.xs, align: 'center', color: CV.C.dim });
+    /* V1.0.3（AI 视觉工程师 · 提审硬要求）：这里原来还有一行适龄提示 —— 删掉了。
+       原因：首屏只停 1.5 秒、还能点一下跳过，**一闪而过不叫"显著"**（网页版那边同一处也是这么删的）。
+       适龄提示现在住在**常驻的合规闸**上（js/sc-start.js 的两页，点一下能看全文），
+       全文另外在「设置与存档」里留一份；品牌首屏这一屏只留品牌。 */
     c.restore();
   }
 
