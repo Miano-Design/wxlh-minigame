@@ -3027,7 +3027,10 @@ setParty(['C021']);
       const n = D.BLOODLINE_EQUIP_NAMES[bl];
       return n && n.weapon && n.weapon.length >= 2;
     }));
-  t('命格套装的武器名不会串命格（科技=枪炮，不出现"镇魂铃"）',
+  /* V1.0.1 二轮（文案策划 · 提审合规）：这条断言原来拿「镇魂铃」当反例 —— 那件装备已换名为「沉铃」
+     （幽都装备名整批换壳，见 data.js 的 EQUIP_NAMES 注释）。断言逻辑一个字没改，只把反例换成现名，
+     免得后人顺着注释去 data.js 里找一件已经不存在的装备。 */
+  t('命格套装的武器名不会串命格（科技=枪炮，不出现"沉铃"）',
     D.BLOODLINE_EQUIP_NAMES['科技'].weapon.every(x => /枪|炮|弩|刃/.test(x)));
 }
 

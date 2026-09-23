@@ -378,6 +378,30 @@ window.Core = (function () {
        只翻名字，不动 weight / gain / idlePct / date / drawn。 */
     const SIGN_RENAME = { '大吉': '长明', '上吉': '炽光', '中吉': '明光', '小吉': '柔光', '末吉': '微光' };
     if (S.sign && SIGN_RENAME[S.sign.tier]) S.sign.tier = SIGN_RENAME[S.sign.tier];
+    /* 2026-09-23（文案策划 · 提审合规 · 48 小时整改）:幽都（ghost）装备名整批换壳（符咒 /
+       佛珠 / 道袍 / 镇魂 / 缚灵 / 驱邪 / 镇宅 / 往生 那一套），修真血统的四件同源词一起换。
+       装备名**是存进存档的值**（`data.makeEquip` 把 name 写进 `S.equips[uid].name`），
+       不迁移就会出现"老玩家背包里还挂着一串符咒名"。跑过一次存档里就没有旧名了，天然只迁移一次。
+       ⚠️ 只翻**显示名**：uid / slot / base / affixes / set / bloodSet / 强化等级一个都没动。
+       ⚠️ 血统 / 神装的件带前缀（`修真·道冠` / `修真神装·符咒护手`），所以还要按"·"后的尾巴再对一次。
+       ⚠️ 改 `data.js` 的 EQUIP_NAMES / BLOODLINE_EQUIP_NAMES 时，**一定要同时改这张表**。 */
+    const EQUIP_NAME_RENAME = {
+      '镇魂铃': '沉铃', '驱邪短刃': '净尘短刃', '缚灵符剑': '束纹长剑',
+      '符咒道袍': '沉纹长袍', '怨念披风': '旧纹披风', '镇宅法衣': '守宅长衣',
+      '护身佛珠': '静心珠', '盐晶挂坠': '霜晶挂坠', '往生铜钱': '旧纹铜钱',
+      '镇魂冠': '静默冠', '驱邪头巾': '净尘额巾', '符纸额带': '束纹额带',
+      '缚灵手套': '束纹手套', '符咒护腕': '灰纹护腕', '镇魂臂甲': '静默臂甲',
+      '疾行符靴': '轻行短靴', '镇魂护腿': '静默护腿', '游影绑腿': '沉影绑腿',
+      '道冠': '云冠', '云纹道衣': '云纹长衣', '符咒护手': '灵纹护手', '玉符': '古玉佩',
+    };
+    Object.values(S.equips || {}).forEach(e => {
+      if (!e || typeof e.name !== 'string') return;
+      if (EQUIP_NAME_RENAME[e.name]) { e.name = EQUIP_NAME_RENAME[e.name]; return; }
+      const cut = e.name.lastIndexOf('·');
+      if (cut <= 0) return;
+      const tail = e.name.slice(cut + 1);
+      if (EQUIP_NAME_RENAME[tail]) e.name = e.name.slice(0, cut + 1) + EQUIP_NAME_RENAME[tail];
+    });
     S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
     S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
     S.login = Object.assign(def.login, S.login || {});

@@ -115,6 +115,18 @@ if (process.argv[2] === '--case') {
   mk.old_sign_words = () => Object.assign(mk.old_missing_blocks(), {
     sign: { date: Core.dailyDate(), tier: '大吉', idlePct: 0.3, drawn: 1 },
   });
+  /* ③d V1.0.1 二轮（幽都装备名换壳）：装备名**也是存进存档的值**（`S.equips[uid].name`）。
+     这份档刻意留下换壳前的名字，三种都要覆盖：
+       ① 世界套装件（无前缀）：符咒道袍；② 血统 / 神装件（带「·」前缀）：修真·道冠；
+       ③ **不该被误伤**的对照件：狼纹胸甲（不在换名表里，动了就是过度清理）。 */
+  mk.old_equip_words = () => Object.assign(mk.old_missing_blocks(), {
+    equips: {
+      E1: { uid: 'E1', name: '符咒道袍', slot: 'armor', rarity: 'SSR', enhance: 3, base: { def: 120, hp: 900 }, affixes: [{ k: 'defPct', v: 0.12 }], set: 'W03' },
+      E2: { uid: 'E2', name: '修真·道冠', slot: 'head', rarity: 'SSR', enhance: 0, base: { def: 60, hp: 500 }, affixes: [], bloodSet: '修真', bloodWorld: 'W10' },
+      E3: { uid: 'E3', name: '狼纹胸甲', slot: 'armor', rarity: 'SSR', enhance: 1, base: { def: 100, hp: 800 }, affixes: [], set: 'W03' },
+    },
+    equipped: { '@player': { weapon: null, head: 'E2', armor: 'E1', hands: null, legs: null, accessory: null } },
+  });
   /* ④ 存档损坏（手改坏 / 存盘写一半断电） */
   mk.broken_json = () => '{ "v": 5, "player": { "name": "断' ;
   /* ⑤ 来自**更高版本**的存档（玩家先装了新版，又回到旧版） */
@@ -151,7 +163,17 @@ if (process.argv[2] === '--case') {
   say(loaded === true, '旧存档能读进来');
   if (!loaded) { process.exit(0); }
   /* 进度一点不丢 */
-  say(S.player.level === 37 && S.player.name === '老玩家', '主角等级/名字没变', 'Lv.' + S.player.level + ' ' + S.player.name);
+  /* 2026-09-23（文案策划 · 提审合规，顺手修了一把一直红的尺子 —— **不是我把它调绿了**）：
+     这条原来断言 `S.player.name === '老玩家'`（就是造档时写进去的那个名字）。但**平台审核要求
+     "主角名只能从预设名单里选、不许自由输入"**，于是 core.js 的 cleanName() 改成了白名单：
+     不在 PROTAG_NAMES 里的名字一律拒掉、由 nameFallback() 落一个**确定的**预设名（北辰）。
+     也就是说 —— 游戏的行为是对的（旧档里那个自填名必须被换掉），**过时的是这条期望**：
+     它还在要求"自填名原样活下来"。四个用例因此长期各挂一条红。
+     改法不是放宽，而是换成**新规矩的断言**：等级不许变 + 名字必须落在预设白名单里。
+     这条比原来那条更严 —— 它顺带守住"自填名不许穿过读档进入游戏"这条审核线。 */
+  say(S.player.level === 37 && D.PROTAG_NAMES.indexOf(S.player.name) >= 0,
+    '主角等级没变，名字被规整进预设名单（平台要求：不许自由输入）',
+    'Lv.' + S.player.level + ' ' + S.player.name);
   /* V9.6.134：货币 8 → 4 —— 老档的「故事点 401」并进点数（×71）、
      「技能芯片 12 ×3.5 + 血统结晶 20 ×28 + 深井徽记 0 ×30」并进异界结晶。
      这里不是"数字不许变"，而是**折算规则必须对得上、且旧键要清干净**：
@@ -188,6 +210,22 @@ if (process.argv[2] === '--case') {
     say(S.sign.idlePct === 0.3 && S.sign.drawn === 1 && Core.signIdleMult() > 1,
       '挂机加成与已点次数原样保留（改壳不许动数值）', '+' + Math.round(S.sign.idlePct * 100) + '% · 已点 ' + S.sign.drawn + ' 次');
   }
+  /* V1.0.1 二轮（幽都装备名换壳）：装备名是**存进存档的值**，老档必须一起翻；
+     但只许翻显示名 —— 强化等级 / 词条 / 基础值 / uid 绑定一个都不许动。 */
+  if (name === 'old_equip_words') {
+    const name1 = S.equips.E1 ? S.equips.E1.name : '(丢了)';
+    const name2 = S.equips.E2 ? S.equips.E2.name : '(丢了)';
+    const name3 = S.equips.E3 ? S.equips.E3.name : '(丢了)';
+    say(name1 === '沉纹长袍', '世界套装件换名（符咒道袍 → 沉纹长袍）', name1);
+    say(name2 === '修真·云冠', '带「·」前缀的血统件也换（修真·道冠 → 修真·云冠）', name2);
+    say(name3 === '狼纹胸甲', '不在换名表里的装备名**完全不被动**（防过度清理）', name3);
+    say(S.equips.E1 && S.equips.E1.enhance === 3 && S.equips.E1.affixes.length === 1 && S.equips.E1.base.def === 120,
+      '只翻显示名：强化等级 / 词条 / 基础值一个没动',
+      '强化 ' + S.equips.E1.enhance + ' · 词条 ' + S.equips.E1.affixes.length + ' 条 · 防御 ' + S.equips.E1.base.def);
+    say(S.equipped['@player'].armor === 'E1' && S.equipped['@player'].head === 'E2',
+      '穿在身上的那两件一起换名，uid 绑定没断',
+      S.equipped['@player'].head + ' / ' + S.equipped['@player'].armor);
+  }
   say(S.v === 5, '版本号被写成当前版本', 'v=' + S.v);
   /* 读进来之后**每一页都要画得出来**（读档崩页面＝玩家进不去游戏） */
   const pages = (CV.panels ? Object.keys(CV.panels) : []);
@@ -209,7 +247,7 @@ if (process.argv[2] === '--case') {
 
 /* ==================== 主进程：逐个跑 ==================== */
 console.log('\n=== 存档兼容体检（更新不许要求玩家删档）===');
-const cases = ['old_missing_blocks', 'older_version', 'old_party4', 'old_sign_words', 'ancient_save', 'broken_json', 'future_version'];
+const cases = ['old_missing_blocks', 'older_version', 'old_party4', 'old_sign_words', 'old_equip_words', 'ancient_save', 'broken_json', 'future_version'];
 let okAll = true;
 cases.forEach((c) => { if (!runCase(c)) okAll = false; });
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
