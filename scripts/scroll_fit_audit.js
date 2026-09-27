@@ -210,6 +210,52 @@ console.log('\n=== 滚动适配（内容高过一屏 ⇒ 必须滚得动）===')
   t('⑤ 三种机型下选命格都滚得动（不是"只在我这台机器上对"）', bad2.length === 0,
     bad2.length ? bad2.join('；') : sizes.map((s) => s[0] + '×' + s[1]).join(' / ') + ' 全过');
 
+  /* ================= V1.1.7（A7 · 滚动三态）=================
+     父亲大人报过的两处现场（原话见派单）：
+       · 「从执灯者进去伙伴详情页是**直接在最底下**的」→ 进新页必须归零；
+       · 「任务那里，**每次领取完他就会回到最上面**」→ 原地重画必须保位；
+       · 以及他更早认可的那条（V9.6.130）：**退出来要回到离开时的位置** → 返回必须恢复。
+     这三条以前散在三个函数里、只有注释，没有尺子；这条就是它们的判据。
+     找一个**真能滚的长页**来测（拿选命格页，它是本项目最长的页之一）。 */
+  {
+    const longPage = rows.filter((r) => r.maxScroll > 60).map((r) => r.name)[0] || 'bloodline';
+    /* ⑥ 进新页 → 归零：先把这一页滚到中段、离开、再进来一次 —— 不许把上次的位置搬回来。
+       （这条正是"伙伴详情一进去就在最底下"的判据：那一页一个页名底下有 120 个伙伴。） */
+    CV.reset(longPage);
+    const mid = Math.max(20, Math.round((CV.maxScroll || 0) / 2));
+    CV.scroll = mid; CV.render();
+    const leftFrom = CV.scroll;
+    CV.push('home');                        // 进"另一页"（顺便把它自己的位置也记下）
+    CV.push(longPage);                      // 再进这个长页 —— 必须回到顶部
+    const reentered = CV.scroll;
+    t('⑥ 进新页 → 归零（再进同一个页名也不许搬回上次的位置）',
+      reentered === 0, '上次离开时 ' + Math.round(leftFrom) + ' → 再进来 ' + Math.round(reentered));
+
+    /* ⑦ 原地重画 → 保位：同一个页面因为数据变了重画一次（领奖 / 切标签 / 买东西都是这条路） */
+    CV.scroll = mid; CV.render();
+    const before = CV.scroll;
+    CV.render(); CV.render();               // 连画两帧（数据没变、内容没变）
+    t('⑦ 原地重画 → 保位（重画一次/两次都不许跳）',
+      CV.scroll === before && CV.scroll > 0, Math.round(before) + ' → ' + Math.round(CV.scroll));
+
+    /* ⑧ 返回上一页 → 恢复：把当前页滚到中段、进子页、退回来 —— 要回到离开时那个位置 */
+    CV.reset(longPage);
+    CV.scroll = mid; CV.render();
+    const beforePush = CV.scroll;
+    CV.push('bag');
+    CV.pop();
+    t('⑧ 返回上一页 → 恢复（退回离开时那个位置，不是回顶也不是到底）',
+      CV.scroll === beforePush, Math.round(beforePush) + ' → 进了子页再退回来 ' + Math.round(CV.scroll));
+
+    /* ⑨ 边界（就是"伙伴详情在最底下"那个 case）：进一个**比自己矮**的页，
+       上一页的大 scroll 不许把它夹到"最底下" —— 必须是 0。 */
+    CV.reset(longPage);
+    CV.scroll = CV.maxScroll || 0; CV.render();          // 先在本页滑到底
+    CV.push('home');                                     // 进一个内容更短的页
+    t('⑨ 进"更矮的页"时不许被夹到最底下（上一页滑到底也不影响这一页）',
+      CV.scroll === 0, '上一页到底 ' + Math.round(CV.maxScroll || 0) + ' → 新页 ' + Math.round(CV.scroll));
+  }
+
   console.log('\n  ' + pass + ' passed, ' + fail + ' failed\n');
   process.exit(fail ? 1 : 0);
 }

@@ -34,7 +34,10 @@ global.wx = {
 const D = global.DATA;
 
 let pass = 0, fail = 0;
-const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
+const _t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
+/* V1.1.11（网页版归档）：名字以「网页版」开头的条目 —— 网页版本地已删 → ⏭ 跳过、不计失败。 */
+const WB = require('./_web_basis');
+const t = (name, ok, extra) => ((!WB.OK && /^网页版/.test(name)) ? WB.skip(name) : _t(name, ok, extra));
 
 const bag = {};
 const put = (icon, who) => {
@@ -76,7 +79,7 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
 
 /* ⑥ 界面侧不许再"按类型猜图标"（网页版 itemIcon 必须优先用数据里的 icon） */
 {
-  const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+  const web = WB.read('js/ui.js');
   t('网页版道具图标优先用数据里的 icon（按类型猜只作兜底）', /function itemIcon\(it, id\) \{\s*\n?\s*\/\*[\s\S]{0,400}?\*\/\s*\n\s*if \(it && it\.icon\) return it\.icon;/.test(web));
   t('网页版世界图标按世界取（worldIcon(w)），不再共用主题图标',
     /const worldIcon = \(w\) => \(w && w\.ico\)/.test(web) && /worldIcon\(w\)/.test(web));
@@ -93,7 +96,7 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
   t('五个族的形状互不重复（按顶点串比对）', new Set(themes.map(sig)).size === 5);
   t('每个世界的 theme 都取得到形状', D.WORLDS.every((w) => Array.isArray(G[w.theme])));
   t('五族的形状颜色互不相同', new Set(themes.map((x) => D.worldGlyphColor(x))).size === 5);
-  const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+  const web = WB.read('js/ui.js');
   const mini = fs.readFileSync(path.resolve(JS, 'sc-dungeon.js'), 'utf8');
   t('网页版族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(web));
   t('小游戏族形从 D.FACTION_GLYPH 取（没另写一套形状）', /D\.FACTION_GLYPH\[theme\]/.test(mini));
@@ -109,9 +112,10 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
     return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
   };
   const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-  t('两端的世界格角标都把 worldId 传下去（只传 theme 会退回旧亮度，浅格底上又糊）',
+  WB.OK ? t('两端的世界格角标都把 worldId 传下去（只传 theme 会退回旧亮度，浅格底上又糊）',
     /worldGlyphColor\(theme, worldId\)/.test(web) && /glyphSvg\(w\.theme, w\.id\)/.test(web)
-    && /worldGlyphColor\(w\.theme, w\.id\)/.test(mini));
+    && /worldGlyphColor\(w\.theme, w\.id\)/.test(mini))
+    : WB.skip('两端的世界格角标都把 worldId 传下去');
   const lowContrast = (D.WORLDS || []).filter((w) => cr(D.worldTint(w.id), D.worldGlyphColor(w.theme, w.id)) < 3);
   t('36 个世界的角标对本格底都 ≥3:1（旧口径 13 格不过）', lowContrast.length === 0,
     lowContrast.length ? lowContrast.map((w) => w.id + ' ' + cr(D.worldTint(w.id), D.worldGlyphColor(w.theme, w.id)).toFixed(2)).join(' · ')
@@ -160,7 +164,7 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
    落法：两端都从 `D.BATTLE_GEOM` 取（数据层一张表），这两条断言钉住"别再各写各的"。 */
 {
   const mini = fs.readFileSync(path.resolve(JS, 'sc-battle.js'), 'utf8');
-  const css = fs.readFileSync(path.resolve(JS, '../../wxlh-game/css/style.css'), 'utf8');
+  const css = WB.read('css/style.css');
   t('小游戏战斗几何从 D.BATTLE_GEOM 取（头像 / 血条 / 能量条 / 飘字字号·上升·时长 六项都在）',
     ['av', 'barHp', 'barEn', 'floatBase', 'floatRise', 'floatMs'].every((k) => mini.includes('D.BATTLE_GEOM.' + k)));
   t('网页版暴击飘字不再用编外第七档（19px / 1.1875rem → 已收回一级 17px）',
@@ -197,7 +201,9 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
 {
   const stripC = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1 ');
   const files = [];
-  [JS, path.resolve(JS, '../../wxlh-game/js')].forEach((dir) => {
+  /* V1.1.11（网页版归档）：原来这里扫**两个仓**（网页版是当年 Emoji 12+ 的重灾区）。
+     网页版本地已删 → 只扫本端；网页版若复活，把它那一份目录加回这个数组即可。 */
+  [JS].concat(WB.OK ? [path.resolve(WB.WEB, 'js')] : []).forEach((dir) => {
     fs.readdirSync(dir).filter((f) => f.endsWith('.js')).forEach((f) => files.push(path.join(dir, f)));
   });
   const banned = {}, regd = {};
@@ -234,7 +240,8 @@ t('五档强化材料图标两两不同', new Set(mats).size === 5, mats.join(' 
     '🧱': 'Emoji 5.0（Unicode 10.0, 2017）· 建设 · 同上',
     '🧊': 'Emoji 5.0（Unicode 10.0, 2017）· 寒潭 · 同上',
     '🧧': 'Emoji 5.0（Unicode 10.0, 2017）· 红包 · 同上',
-    '🧍': 'Emoji 5.0（Unicode 10.0, 2017）· 站位 · 同上',
+    /* '🧍' 已随网页版一起下架（V1.1.11）：本端全仓扫不到它了 —— 登记表里留着它，
+       下面那条"陈旧项"断言就会红。按事实删掉。 */
     '🧑': 'Emoji 5.0（Unicode 10.0, 2017）· 主角 · 同上',
     '🦠': 'Emoji 11（Unicode 11.0, 2018）· W01 黏液巢穴 · 需 Android 9 / iOS 12.1',
     '🦾': 'Emoji 11（Unicode 11.0, 2018）· 机械件 · 同上',

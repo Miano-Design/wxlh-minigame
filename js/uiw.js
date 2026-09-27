@@ -76,6 +76,95 @@
      不会在量高度那一趟把东西画两遍。 */
   U.draw = (fn) => draw(fn);
 
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："全都改了吧"）=================
+     **dry 模式收口**。`U.card` 为了算卡片高度会先把内容跑一遍（"只量不画"），
+     但那条规矩以前只在走 `U.draw()` 的 helper 里生效 —— 直接调 `CV.text / CV.round / CV.drawIcon`
+     的地方**照样落笔**，于是**每张卡都白画一整遍**。
+     尺子量到的证据：秘术阁 816 次文字绘制/帧 —— 它一屏也就十来张卡，一半是这个白画的。
+     这里把三个绘制入口一起包住：dry 期间一律不画（**量的部分照旧**：宽度走 CV.measure，
+     布局走各 helper 里的 `U.y +=`，都不受影响）。
+     做坏试验：把这三行注掉 → `perf_audit` 的字数当场翻倍。 */
+  const _cvText = CV.text, _cvRound = CV.round, _cvIcon = CV.drawIcon;
+  CV.text = function () { if (U.dry) return undefined; return _cvText.apply(CV, arguments); };
+  CV.round = function () { if (U.dry) return undefined; return _cvRound.apply(CV, arguments); };
+  CV.drawIcon = function () { if (U.dry) return undefined; return _cvIcon.apply(CV, arguments); };
+
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："快速点击连点会很卡"）=================
+     **连点合帧**：一次点击常常触发好几处 `CV.render()`（处理器自己一次、toast 一次、
+     收尾的 setTimeout 再一次），狂点的时候**一帧里能画三四遍**，而每遍都是整页重画
+     （重页面一帧上千次 native 调用）—— 这就是"连点很卡"的主因。
+     这里给渲染加一道"同一帧只画一次"的闸：
+       · **只在有 `requestAnimationFrame` 的真机环境生效** —— 尺子/自动化是假环境（没有 rAF），
+         照旧**同步**渲染，167 处调用与所有断言的行为一个字节都不变（这也是为什么这把闸能安全加）；
+       · 命中判定不受影响：`CV.hits` 是上一帧登记的那份，点击读的本来就是它；
+       · 延迟最多一帧（16ms），肉眼无感。
+     做坏试验：把 `if (typeof requestAnimationFrame !== 'function')` 那行删掉 → 尺子立刻红一片。 */
+  const _cvRender = CV.render;
+  let renderQueued = false;
+  CV.render = function () {
+    if (typeof requestAnimationFrame !== 'function') return _cvRender.apply(CV, arguments);
+    if (renderQueued) return undefined;
+    renderQueued = true;
+    requestAnimationFrame(function () { renderQueued = false; return _cvRender(); });
+    return undefined;
+  };
+
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："全都改了吧"）=================
+     **整张卡片在屏幕外 → 只量高度、不画**（`U.card` 里用）。
+     为什么在这里做、而不是逐页改：长列表页（秘术阁 / 灯录 / 游历 / 任务 / 成长）都是
+     "一页几十张卡"，而画布每帧只能显示一屏 —— 原来**屏外的卡也照样把每个字发一遍 fillText**。
+     尺子（`perf_audit`）量到：秘术阁 816 次文字绘制/帧、灯录 691~713、游历 571……
+     一帧上千次 native 调用，滑动就掉帧。
+     口径：屏幕坐标 = 内容坐标 + 顶栏 + 8 − scroll；上下各留 80px 余量（半露的卡必须画，
+     吸顶条、阴影、描边都要留活路）。**只跳过"画"，不跳过"量"** —— 布局与热区不受影响。 */
+  const ONSCREEN_PAD = 80;
+  U.onScreen = function (y, h) {
+    const top = (CV.scroll || 0) - (CV.TOP + 8) - ONSCREEN_PAD;
+    const bot = (CV.scroll || 0) - (CV.TOP + 8) + CV.H + ONSCREEN_PAD;
+    return (y + (h || 0)) >= top && y <= bot;
+  };
+
+  /* ================= 品牌题字（V1.1.11 · 父亲大人自制）=================
+     父亲大人 09-27：「这个是我做的主画面标题，你把它放到主画面上，**换掉电脑字**，记得适配不同手机的屏幕」。
+     资源：`icons/logo-title.png`（原图 2953×1385 RGBA，**背景真透明**；已压到 1000×469 / 702KB ——
+           原图 5.3MB 直接进包会把主包顶爆，主包上限 4MB）。
+     ⚠️ **文件名必须是 ASCII**：`wx.createImage()` 加载中文名的资源一律 onerror（V1.0.5 实测，见 sc-splash.js 顶部）。
+
+     两条口径：
+       · **短屏不许把【进入残域】顶出去** → 高度再夹一道 `min(H×0.22, 132·SCALE)`，超了就等比缩宽；
+       · **首帧绝不能空** → 图没到位（或加载失败）时**退回活字**「残域灯阁」，
+         而且**两种情况下占的高度完全一样**（`brandTitleH` 就是那个槽高），所以按钮不会在图到位的那一帧跳一下。
+     `U.brandTitleH(w)` 给槽高、`U.brandTitle(x, y, w)` 画并返回同一槽高 —— 一处算式，两处调用。 */
+  const BRAND_SRC = 'icons/logo-title.png';
+  const BRAND_ASPECT = 1000 / 469;                 // 落位资源就是 1000×469（宽高比与 2953×1385 一致）
+  let _brandImg = null, _brandOk = false;
+  try {
+    if (G.wx && typeof G.wx.createImage === 'function') {
+      _brandImg = G.wx.createImage();
+      /* 图到位补重画一帧：主画面不是每秒重画的那种页（只有灯阁首页在跳秒）。 */
+      _brandImg.onload = function () { _brandOk = true; try { CV.render(); } catch (e) {} };
+      _brandImg.onerror = function () { _brandOk = false; };
+      _brandImg.src = BRAND_SRC;
+    }
+  } catch (e) { _brandImg = null; }
+  U.brandTitleH = function (w) {
+    const byW = (w || CV.W * 0.86) / BRAND_ASPECT;
+    return Math.min(byW, CV.H * 0.22, 132 * CV.SCALE);
+  };
+  U.brandTitle = function (x, y, w) {
+    const h = U.brandTitleH(w);
+    const dw = Math.min(w, h * BRAND_ASPECT);      // 被高度夹过就等比缩宽，不改比例
+    const cx = x + w / 2;
+    if (_brandOk && _brandImg && _brandImg.width) {
+      CV.ctx.drawImage(_brandImg, cx - dw / 2, y + (h - dw / BRAND_ASPECT) / 2, dw, dw / BRAND_ASPECT);
+      return h;
+    }
+    /* 兜底：活字（备案名一字不差），纵向落在同一个槽里 */
+    CV.text('残域灯阁', cx, y + h * 0.5 + CV.DISP.d3 * 0.28,
+      { size: CV.DISP.d3, bold: true, align: 'center', color: CV.C.gold, ls: 4 });
+    return h;
+  };
+
   /* ---------- 卡片 .card（bg --panel / 边 --line / 圆角 10 / 内边距 14 / 下边距 14）
      传一个画内容的函数：它按"内容游标"往下画，卡片底由这里先量后画。 ---------- */
   /* opt.padY：纵向内边距（默认 14，和网页版 .card 一致）。
@@ -92,12 +181,17 @@
        高度不再随内容涨缩。 */
     const minH = (opt && opt.minH) ? opt.minH * CV.SCALE : 0;
     const h = Math.max(inner + padY * 2, minH);
+    /* V1.1.15：**整卡在屏外就不画第二遍**（第一遍的 dry 测量已经把高度算准 → `U.y` 照样推进）。
+       跳过的是"画"（背景 + 里面每个字的 fillText）；`U.y = top + h + SP[2]` 在下面统一给，
+       所以布局与滚动条长度一个像素都不会变。屏外的按钮不登记热区也没关系 ——
+       滚到它的时候会重新渲染、那时就登记上了。 */
+    const cardVis = U.onScreen(top, h);
     /* opt.line：卡片描边的颜色（V1.1.3 加）。
        用途是**命格卡**：网页版 `.bl-scope { border-color: var(--t-line2) }` ——
        六张命格卡的边框各走本命格的暗档。canvas 这端原来 CV.card 只吃默认描边，
        于是"选命格"页在小游戏里是六张一模一样的灰卡（网页版是六种颜色的卡）。 */
-    if (h > 4) CV.card(U.pad(), top, U.cw(), h, (opt && opt.line) ? { line: opt.line } : null);
-    U.y = top + padY; content();
+    if (h > 4 && cardVis) CV.card(U.pad(), top, U.cw(), h, (opt && opt.line) ? { line: opt.line } : null);
+    if (cardVis) { U.y = top + padY; content(); }
     U.inCard = outer;
     U.y = top + h + CV.SP[2];
     U.lastBottom = CV.SP[2];
@@ -116,6 +210,12 @@
        现在按网页版的位置画：竖条 → 印记 → 名字，右边的按钮不动。 */
     const glyph = opt.glyph || null;
     const gs = glyph ? (glyph.size || CV.ICO) * CV.SCALE : 0;
+    /* V1.0.6（父亲大人 09-24 反馈图 02）：**印记跟在标题文字后面**这种站位（网页版的
+       `🧬 命格 ${blGlyph(...)} <span class="sub">Lv.…</span>` 就是这么排的）。
+       以前没这个口子，主角 / 伙伴 / 精华三处的命格卡只能把印记甩到标题行**最右端**，
+       正好压在右对齐的 `Lv.1 / 50` 上（截图里那个"50"就是这么没的）。
+       opt.glyph.after = true → 画在标题文字之后；不给就是默认的"标题之前"（选命格页那种）。 */
+    const gBefore = glyph && !glyph.after;
     /* V9.6.118（父亲大人："技能的重置和下面加点的框还是贴的很近"）：
        网页版的 .hbtn 是 **2.125rem = 34px** 高，而 h3 是 flex 行 —— 行高会被按钮撑到 34px，
        再吃 10px 下边距，下面第一块才起步。画布这边原来只画了 26px 的按钮、
@@ -138,15 +238,21 @@
       g.addColorStop(0, CV.C.gold); g.addColorStop(1, CV.C.goldDeep);
       CV.round(U.ix(), cy - 6.5, bar, 13, CV.RADIUS_CHIP,  g);
       /* 印记：与左边的金色竖条同一中线（顶点表来自 data.js:BLOOD_GLYPH，两端共用一份） */
-      if (glyph) CV.blGlyph(glyph.bl, U.ix() + bar + gap + gs / 2, cy, gs, glyph.color || CV.C.text);
+      if (gBefore) CV.blGlyph(glyph.bl, U.ix() + bar + gap + gs / 2, cy, gs, glyph.color || CV.C.text);
       /* opt.color：标题颜色（网页版是内联 color，比如"没激活的产线标题压灰、激活的走金色"） */
       /* V9.6.142：标题原来**一律**按 `iw - 120` 截断 —— 哪怕这一行既没有小字也没有按钮
          （玩法指南那些章标题就是这么被砍成「⑸ 血统与境界线：换了血统就换了…」的）。
          现在只有真的有右侧内容时才让位；只有标题时占满整行。 */
       const titleMax = ((opt.btn || sub) ? (U.iw() - 120) : (U.iw() - bar - gap - 4 * CV.SCALE))
         - (gs ? gs + 4 * CV.SCALE : 0);
-      CV.text(CV.fit(title, titleMax, CV.FS.f1, true), U.ix() + bar + gap + (gs ? gs + 4 * CV.SCALE : 0), cy,
+      const titleX = U.ix() + bar + gap + (gBefore ? gs + 4 * CV.SCALE : 0);
+      const shown = CV.fit(title, titleMax, CV.FS.f1, true);
+      CV.text(shown, titleX, cy,
         { size: CV.FS.f1, bold: true, color: opt.color || CV.C.text, ls: 0.2 });   // .card h3 letter-spacing .2px
+      /* 印记跟在标题文字之后（网页版 `名字 + blGlyph` 那种站位） */
+      if (glyph && glyph.after) {
+        CV.blGlyph(glyph.bl, titleX + CV.measure(shown, CV.FS.f1, true) + 4 * CV.SCALE + gs / 2, cy, gs, glyph.color || CV.C.text);
+      }
       const subRight = opt.btn ? (CV.measure(opt.btn.label, CV.FS.sm) + 30 * CV.SCALE) : 0;   // 让开右侧按钮
       if (sub) CV.text(CV.fit(sub, U.iw() - 90 - subRight, CV.FS.sm), U.ix() + U.iw() - subRight, cy, { size: CV.FS.sm, color: opt.subColor || CV.C.dim, align: 'right' });
     });
@@ -189,7 +295,11 @@
   function wrapBlock(text, size, lh, color, gapTop, widthIn) {
     const lhPx = size * lh;
     const W = widthIn || U.iw();
-    const lines = CV.wrap(text, W, size, 6);
+    /* V1.0.6：`.hint / .note` 这类说明行改成**词级折行** —— 网页版是 CSS 折行，
+       它**永远不会**把 "1500" / "+150%" 这种数字从中间劈开；画布端原来逐字折，
+       于是"四支天赋点满各需 ♾ 6200（10/20/…/1500/2500）"会被劈成「…/100」/「0/1500/2500）」。
+       换成 CV.wrapTokens 后与网页版同一条规矩：只在 · / → / 空格 / 全角空格处断。 */
+    const lines = CV.wrapTokens(text, W, size, 6);
     const top = U.y + (gapTop || 0);
     draw(() => lines.forEach((ln, i) => CV.text(ln, U.ix(), top + lhPx * (i + 0.5), { size, color })));
     U.y = top + lines.length * lhPx;
@@ -226,7 +336,13 @@
     const bw = o.btnId === undefined ? 0 : 52 * CV.SCALE;
     const tagW = o.tag ? (CV.measure(o.tag, CV.FS.sm) + 12 * CV.SCALE) : 0;
     const tagH = o.tag ? (CV.FS.sm * 1.4 + 2 * CV.SCALE) : 0;
-    const descW = U.iw() - PAD * 2;
+    /* ⚠️ V1.0.6（父亲大人 09-24 反馈图 01：「必杀·永夜排宴那一行的按钮跟上面两行没对齐」）——
+       真因不是"按钮没对齐"，是**描述文字从 +1 按钮底下穿过去了**：
+       描述原来按"整幅内宽"折行（`U.iw() - PAD*2`），而按钮占着右边 ~52px，
+       于是最长那条描述（必杀那行）第一行的尾巴正好压在按钮上 —— 看着就像"按钮挪了位置"。
+       网页版 .skill-row 是 flex 两列（.sbody 只占左边那列），描述永远不许压按钮；
+       这里按网页版把按钮的宽度留出来（没按钮的行不受影响）。 */
+    const descW = U.iw() - PAD * 2 - (o.btnId === undefined ? 0 : bw + 6 * CV.SCALE);
     const descLines = o.desc ? CV.wrap(o.desc, descW, CV.FS.sm) : [];
     const descH = descLines.length ? (3 * CV.SCALE + descLines.length * CV.FS.sm * 1.55) : 0;
     /* V9.6.120（父亲大人："你得对齐这两者的组合，把左边当成一个整体去对齐，
@@ -390,7 +506,9 @@
        （父亲大人："六维的解释文字太大了"）。 */
     const subW = o.t1sub ? (CV.measure(' ' + o.t1sub, CV.FS.sm) + 4 * CV.SCALE) : 0;
     const l1 = CV.wrap(o.t1, availW - tagW - subW, CV.FS.f1);
-    const l2 = o.t2 ? CV.wrap(o.t2, availW, CV.FS.sm) : [];
+    /* V1.0.6：列表行的第二行（任务条件 / 奖励这类带数字的话）同样走词级折行 ——
+       "…奖励 ◆ 100 · ✦ 200" 原来会被劈成「…◆ 10」/「0 · ✦ 200」。 */
+    const l2 = o.t2 ? CV.wrapTokens(o.t2, availW, CV.FS.sm) : [];
     const h = Math.max(pad * 2 + l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0), 44 * CV.SCALE);
     const top = U.y;
     draw(() => {
@@ -398,7 +516,11 @@
       const y0 = top + pad;
       if (o.ico) CV.text(o.ico, U.ix() + 4, y0 + (l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0)) / 2, { size: CV.ICO * CV.SCALE });
       if (o.rightText) CV.text(o.rightText, U.ix() + U.iw(), y0 + (l1.length * t1) / 2, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
-      l1.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true }));
+      /* V1.1.6（A6）：标题行支持 `o.t1Color` —— 装备候选列表要按**品质色**画名字
+         （网页版那一行是 `class="t1 rtext-<rarity>"`）。原来这个口子是"传了也没人读"
+         （`sc-last` 的 coreRow / `sc-bag` 的 listBtn 都传过 t1Color），现在补上；
+         不传时就是原来的默认字色，别的页面一个字都不变。 */
+      l1.forEach((ln, i) => CV.text(ln, U.ix() + 4 + icoW, y0 + t1 * (i + 0.5), { size: CV.FS.f1, bold: true, color: o.t1Color || CV.C.text }));
       if (o.t1sub) {
         /* 解释文字跟在**最后一行**标题后面（和网页版同一行同一个基线） */
         const lastW = CV.measure(String(l1[l1.length - 1]), CV.FS.f1, true);
@@ -426,6 +548,13 @@
   U.btn = function (x, y, w, h, label, style, id, dis) {
     h = h || U.BTN_H * CV.SCALE;
     const goldBtn2 = style === 'primary' || style === 'gold';
+    /* V1.1.x（0927-P · 父亲大人：「最下面就一个**红色边框**按钮写删除当前进度重新开始…
+       红不要用纯 #FF0000 那种刺目的」）：
+       danger ＝ **只描边不填底**的危险按钮（与 ghost 同一套形，只换颜色）——
+       描边取色板里的 `danger`（#d43a4f，面/线用），**字取 `dangerText`**（#e8626f，
+       项目里"深底上写红字"的那一档，12px 上对比度 5.15 达标；直接用 danger 写小字不过 AA）。
+       新增这一档是往通用件上加，不是给某一颗按钮开小灶 —— 以后别处要危险按钮照样用 'danger'。 */
+    const danger = style === 'danger';
     const g = goldBtn2 ? CV.ctx.createLinearGradient(0, y, 0, y + h) : null;
     /* 金底按钮**只有一套**（V1.1.2 父亲大人：「金底的按钮都改成白色字」）——
        深金渐变 ＋ 白字，与网页版 .btn.primary / .btn.gold 同一套令牌（--gold-btn / --gold-btn-deep / --on-gold）。
@@ -433,11 +562,11 @@
        gold 深金配奶白字（**上端只有 2.76**）。字色一动底色就得跟着压深（「改颜色不许只改颜色」）：
        白字对渐变上下两端 4.85 / 6.91，两段都过 AA。 */
     if (goldBtn2) { g.addColorStop(0, CV.C.goldBtn); g.addColorStop(1, CV.C.goldBtnDeep); }
-    const fill = g || (style === 'ghost' ? null : CV.C.panel2);
+    const fill = g || (style === 'ghost' || danger ? null : CV.C.panel2);
     /* V9.6.90：颜色一律 rgba()，**不许用 8 位 hex**（#RRGGBBAA）——
        微信画布对这个格式"部分支持/不稳定"，赋值失败时画布会**保持上一次的填充色**，
        表现就是"黑底黑字"（父亲大人最早报的那个毛病）。见 canvas_audit 的同名规则。 */
-    const line = style === 'ghost' ? CV.C.line : (goldBtn2 ? CV.a(CV.C.gold, .33) : CV.C.line2);
+    const line = danger ? CV.C.danger : (style === 'ghost' ? CV.C.line : (goldBtn2 ? CV.a(CV.C.gold, .33) : CV.C.line2));
     draw(() => {
       if (dis) { CV.ctx.save(); CV.ctx.globalAlpha = 0.34; }
       /* 按下态：网页版 .btn:active 是 scale(.97) + 背景压暗一档。
@@ -452,7 +581,7 @@
       const lh = size * 1.25;
       lines.forEach(function (ln, i) {
         CV.text(ln, x + w / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh,
-          { size, bold: goldBtn2, align: 'center', color: goldBtn2 ? CV.C.onGold : CV.C.text });
+          { size, bold: goldBtn2, align: 'center', color: goldBtn2 ? CV.C.onGold : (danger ? CV.C.dangerText : CV.C.text) });
       });
       if (dis) CV.ctx.restore();
     });
@@ -466,14 +595,41 @@
     /* 宽度按"文字自然宽"比例分（网页版 .btn-row .btn 是 flex: 1 1 auto + min-width 5.375rem）：
        字多的按钮拿更多宽度，所以"免费抽 1 次（今日还剩 3 次）"这类长标签在网页版是一行，
        等分宽度会把它们挤成两行。 */
-    const avail = U.iw() - gap * (list.length - 1);
     const nat = list.map((b) => Math.max(U.BTN_MINW * CV.SCALE, CV.measure(b.label, CV.FS.lg) + 24 * CV.SCALE));
+    const minw = U.BTN_MINW * CV.SCALE;
+    /* ================= V1.1.11（康康 09-27 · 父亲大人报"小屏幕背包显示有问题"的同一次排查）==========
+       上面那句注释说"网页版 .btn-row 是 flex-wrap"—— **可这段实现从来没换过行**：
+       它把每颗按 `max(minw, 自然宽×比例)` 算完就横着排下去，窄屏上总数超过可用宽就**直接出画**。
+       实测：扫荡页那 4 颗（扫荡×1/×5/×10/全部剩余）在 320×568 上，第 4 颗从 x=319 开始画
+       （画布只有 320 宽）——而当时**所有尺子全绿**（页面级排版只在 390 宽上检过，见 layout_audit）。
+       ⇒ 现在真的换行：先试一行，放不下就按"一行能塞几颗"分行（高度按行数往上加）。 */
+    const avail1 = U.iw() - gap * (list.length - 1);
     const sum = nat.reduce((a, b) => a + b, 0) || 1;
-    const widths = nat.map((w) => Math.max(U.BTN_MINW * CV.SCALE, w * avail / sum));
-    let x = U.ix();
-    list.forEach((b, i) => { U.btn(x, top, widths[i], h, b.label, b.style, b.id, b.dis); x += widths[i] + gap; });
-    U.y = top + h;
-    return h;
+    const oneRow = nat.map((w) => Math.max(minw, w * avail1 / sum));
+    const total1 = oneRow.reduce((a, b) => a + b, 0) + gap * (list.length - 1);
+    const rows = [];
+    if (total1 <= U.iw() + 0.5 || list.length <= 1) {
+      rows.push(oneRow);
+    } else {
+      let cur = [], curW = 0;
+      nat.forEach((w) => {
+        const add = cur.length ? gap + w : w;
+        if (cur.length && curW + add > U.iw() + 0.5) { rows.push(cur); cur = [w]; curW = w; }
+        else { cur.push(w); curW += add; }
+      });
+      if (cur.length) rows.push(cur);
+    }
+    let y = top, idx = 0;
+    rows.forEach((ws) => {
+      const avail = U.iw() - gap * (ws.length - 1);
+      const s = ws.reduce((a, b) => a + b, 0) || 1;
+      const widths = ws.map((w) => Math.max(minw, w * avail / s));
+      let x = U.ix();
+      ws.forEach((w, k) => { U.btn(x, y, widths[k], h, list[idx].label, list[idx].style, list[idx].id, list[idx].dis); idx++; x += widths[k] + gap; });
+      y += h + gap;
+    });
+    U.y = top + rows.length * h + (rows.length - 1) * gap;
+    return U.y - top;
   };
 
   /* ---------- 进度条 .bar（高 8 / 圆角 6） ---------- */
@@ -502,6 +658,8 @@
        opt.cancel  false = 只有一个按钮（offline / 公告这类）
        opt.okLabel 那个按钮的字（默认"确定"） */
   const CHIP_H = 26, CHIP_GAP = 6 * CV.SCALE;
+  /* 输入格（opt.inputBox）：高度照购买弹窗那颗数字格（46）——同一套控件口径。 */
+  const INP_H = 46 * CV.SCALE;
   /* 胶囊居中折行：返回 [[{t,w},…], …] */
   function chipRows(list, maxW) {
     const rows = [[]];
@@ -541,6 +699,11 @@
       cy += 10 * CV.SCALE;
       rows.forEach(function (row, i) { chipY.push(cy + CHIP_H / 2); cy += CHIP_H + (i < rows.length - 1 ? CHIP_GAP : 0); });
     }
+    /* 输入格（opt.inputBox）：一块与购买弹窗"数字格"同口径的输入位 ——
+       玩家点它调起系统数字键盘（`wx.showKeyboard`），这里只显示他敲了什么。
+       见下面 drawOverlay 里登记的那颗热区（id ＝ opt.inputId）。 */
+    let inputY = null;
+    if (opt.inputBox) { cy += 10 * CV.SCALE; inputY = cy; cy += INP_H; }
     const noteY = [];
     if (note.length) {
       cy += 8 * CV.SCALE;
@@ -553,9 +716,43 @@
     U.overlay = {
       x: x, y: y, w: bw, h: h, title: title, lines: lines, text: text, onOk: onOk,
       rows: rows, note: note, single: opt.cancel === false, okLabel: opt.okLabel || '确定',
+      /* V1.1.x（0927-P · 父亲大人：「设置界面的内容和顺序应该是…最下面就一个红色边框按钮写
+         删除当前进度重新开始，点击删档跳出来一个确认弹窗随机生成 4 个数字」）：
+         通用弹窗这一轮多了三样**可选**能力，都是给"删档二次确认"和"挂机结算"用的 ——
+           opt.inputBox / opt.inputId  玩家要照着敲的那一格（点它调系统数字键盘）；
+           opt.blankClose              点空白处＝关掉弹窗返回（**只给收益类面板开**，
+                                       确认弹窗一律不许开 —— 那种必须点按钮）；
+           opt.okId / opt.okStyle      按钮的 id 与样式（默认 _cf_yes / primary）。 */
+      input: opt.inputBox ? {
+        y: inputY, h: INP_H, id: opt.inputId || '',
+        value: String((opt.inputBox && opt.inputBox.value) || ''),
+        placeholder: String((opt.inputBox && opt.inputBox.placeholder) || ''),
+      } : null,
+      blankClose: !!opt.blankClose,
+      okId: opt.okId || '_cf_yes', okStyle: opt.okStyle || 'primary',
+      /* V1.1.8（乙组 B4/B8）：非单按钮形态的第二颗**可以改文案、也可以带自己的动作** ——
+         离线收益那颗「看广告 · 收益 ×2」、签到那颗「看广告 · 今日双倍」都是"第二颗按钮"，
+         而它原来只会关闭弹窗（文案写死"取消"）。现在：`cancelLabel` 改字、`onCancel` 挂动作。 */
+      cancelLabel: opt.cancelLabel || '取消', onCancel: opt.onCancel || null,
+      cancelId: opt.cancelId || '_cf_no',
       pad: PAD, titleY: titleY, lineY: lineY, chipY: chipY, noteY: noteY, btnY: btnY,
+      /* V1.0.6：正文色分档 —— 默认 --dim；《健康游戏忠告》用 'text2'（法规原文要读得清）。 */
+      tone: opt.tone || 'dim',
     };
     CV.render();
+  };
+  /* 《健康游戏忠告》独立弹窗（V1.0.6 · 设计师 · 父亲大人 2026-09-23：「健康游戏是独立的弹窗，
+     不要跟主画面做到一起」，时机选 **C＝冷启动先弹、关掉才看到主画面**；game.js 开机调它）。
+     · 四句**逐句一行、一字不省**（特别规范 2.6.2 要的是"全文登载"：摘要＋点开会被判不合格）；
+     · 走 U.confirm 的**单按钮**形态（cancel:false）—— 没有 ×、遮罩点不掉，只有这一条出路；
+     · 正文走 --text2（与网页版 .notice-advice 同一档，"读得清"是基准）；
+     · 文案只有 data.js 的 `D.COMPLIANCE` 一份来源（本文件零手抄，与网页版同一份）。
+     按钮「我知道了」：这一颗只是"读到了"，真正的出口是主画面上的【进入残域】。 */
+  U.healthNotice = function (onOk) {
+    const CO = (G.DATA && G.DATA.COMPLIANCE) || {};
+    U.confirm(CO.healthTitle, (CO.healthAdvice || []).join('\n'), function () {
+      if (onOk) onOk(); else CV.render();
+    }, { cancel: false, okLabel: '我知道了', tone: 'text2' });
   };
   /* 离线收益 / 时间异常（与网页版 showOfflineGains 同一份文案，V9.6.90） */
   U.offlineGains = function (g) {
@@ -575,27 +772,210 @@
     
     if (g.gains.matCount && g.gains.matItem) {
       const it = (D.ITEMS || {})[g.gains.matItem];
-      chips.push('⚙️ ' + ((it && it.name) || g.gains.matItem) + '×' + g.gains.matCount);
+      /* V1.0.6（与结算胶囊同一处口径）：材料胶囊用**它自己的 icon**（基础金属 ⛏ / 灯阁残片 🏮），
+         不再一律 ⚙️。 */
+      chips.push(((it && it.icon) || '🎒') + ' ' + ((it && it.name) || g.gains.matItem) + '×' + g.gains.matCount);
     }
     if (g.gains.matStashed) chips.push('📮 待领箱 +' + g.gains.matStashed);
-    U.confirm('欢迎回来，执灯者',
-      '离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）',
-      function () { CV.render(); },
-      { cancel: false, okLabel: '收下', chips: chips, note: '离线期间挂机分工的产线一样在跑。' });
+    /* ================= V1.1.8（乙组 B4 · 离线翻倍）=================
+       父亲大人的口径：**全额 ×2、不限次数**；【定】**每个离线结算窗口只能翻一次**（翻过的记在
+       `S.idle.lastSettle.doubled`，回主页再点也翻不了第二次）。
+       这里是**第二颗按钮**（`cancelLabel` ＋ `onCancel`，见 U.confirm 那一段）：
+         · 左侧「📺 看广告 · 收益 ×2」——演练期点了直接发（wx-adapter 的 drill 分支），
+           上线后换成真广告；额度：不限次数、不计总闸（时间权益类）。
+         · 翻倍成功后**原地再画一遍**这个弹窗，胶囊换成翻倍后的数字 —— 让玩家看见"×2"到底给了多少。 */
+    const paintOffline = function (mult, usable) {
+      const line = usable ? ('离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）· **收益 ×' + mult + '**')
+        : ('离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）');
+      const opt = { okLabel: '收下', chips: chips, note: '离线期间挂机分工的产线一样在跑。' };
+      if (usable) {
+        opt.cancelLabel = '📺 看广告 · 收益 ×2';
+        opt.onCancel = function () {
+          const AD = G.AD;
+          if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); CV.render(); return; }
+          AD.show('offline_double').then(function (r) {
+            /* 没拿到一律**不给双倍**（父亲大人：「弱网拉不到广告时不给双倍」）——
+               弱网不走补偿（`wx-adapter` 的 `NO_COMP_SLOTS`），离线这份原额还在，
+               这一屏留着，网络缓过来还能再点；玩家自己关掉的才说"没看完"。 */
+            if (!r || !r.granted) {
+              CV.toast(r && r.reason === 'skipped' ? '广告没看完，奖励没发'
+                : (r && r.reason === 'quota' ? '今天没得翻了' : '广告暂时拉不到，稍后再试'), 2400);
+              CV.render(); return;
+            }
+            const d = (G.Core && G.Core.claimOfflineDouble) ? G.Core.claimOfflineDouble() : null;
+            if (!d || !d.ok) { CV.toast((d && d.msg) || '这次已经翻过倍了'); CV.render(); return; }
+            /* 胶囊换成"翻倍之后一共拿到多少"（原收益 ＋ 翻倍那一份） */
+            const g2 = g.gains, a2 = d.gains || {};
+            const cs = [
+              '◉ +' + fmt((g2.points || 0) + (a2.points || 0)),
+              'EXP +' + fmt((g2.exp || 0) + (a2.exp || 0)),
+            ];
+            if ((g2.otherworld || 0) + (a2.otherworld || 0)) cs.push('◆ +' + ((g2.otherworld || 0) + (a2.otherworld || 0)));
+            if (g2.matCount && g2.matItem) cs.push(((G.DATA.ITEMS[g2.matItem] || {}).icon || '🎒') + ' ' + ((G.DATA.ITEMS[g2.matItem] || {}).name || g2.matItem) + '×' + g2.matCount);
+            CV.toast('📺 离线收益已翻倍', 1600);
+            U.confirm('欢迎回来，执灯者', line + '（已翻倍）', function () { CV.render(); },
+              { cancel: false, okLabel: '收下', chips: cs, note: '下一次离线结算会重新给一次翻倍机会。' });
+          });
+        };
+      } else { opt.cancel = false; }
+      U.confirm('欢迎回来，执灯者', line, function () { CV.render(); }, opt);
+    };
+    /* 能不能翻：这次结算存在、还没翻过、广告模块在（演练期也算"在"） */
+    const ls = (G.Core && G.Core.lastOfflineSettle) ? G.Core.lastOfflineSettle() : null;
+    paintOffline(2, !!(ls && !ls.doubled && G.AD && G.AD.show));
+  };
+  /* ================= V1.1.16（M 轮 · 挂机结算面板 ＋ 看广告双倍领取）=================
+     父亲大人的原话：「现在这个领取奖励也可以像战斗的结算那样把有什么奖励列举出来，
+     然后两个选项，一个领取奖励，一个看广告双倍领取奖励，**这个看广告双倍领取的次数也是不限次数**」。
+
+     ⚠️ 2026-09-27（0927-P · 父亲大人原话）：「**这个不用单开一页吧，就半透明弹窗叠加就行啦，
+        然后支持点击空白处返回**」——他配的那张图就是**挂机收益那一屏**：
+        原来这里走的是 `G.BattleUI.showResult`（战斗/扫荡那条**整屏黑底**的结算层），
+        所以他看到的是"单开了一页"。现在**改走离线收益那一套通用弹窗**：
+          U.confirm ＋ opt.chips 奖励胶囊 ＋ 两颗按钮 —— 本来就是"半透明遮罩 ＋ 居中卡片"，
+          全项目已经在用，**不新造样式**（离线收益 / 七日登录 / 今日汇总都是它）。
+        · 点空白处返回 ＝ `opt.blankClose`（见 U.confirm / drawOverlay）：关掉弹窗、原地回灯阁，
+          **不发奖、也不走 onCancel 那条广告路**；
+        · 一颗都是"能点空白返回"的收益面板；**确认弹窗（删档那种）不许开**。
+       奖励那几行与 `U.offlineGains` **同一套胶囊写法**（同一个 ◉/EXP/◆/材料 icon 口径）。
+     与「离线收益」的分工（父亲大人点名要分清）：
+       · 离线收益 ＝ `U.offlineGains`：结算"**没开游戏那段时间**"，标题「欢迎回来，执灯者」；
+       · 挂机收益 ＝ 这里：结算"**开着游戏攒进挂机银行的那一份**"，标题「挂机结算」。
+
+     returns true ＝ 面板已开；false ＝ 这次没有"挂机收益"可列（银行不足 1 分钟），
+     调用方照旧走既有的"一键收"。 */
+  /* 把"挂机银行快照"折成**与真领取同口径**的展示用数字：材料按档位折算、带上它自己的 icon。
+     ⚠️ 档位与数量都问逻辑层（`Core.idleMatItem`）—— 不在这里另写一套折算公式。
+     ⚠️ 这一串是**预演**：真领取时若背包正好满载，材料会整批进「📮 待领箱」（那边有提示），
+        这里不为它开分支（开分支＝在这里抄第二份背包容量判断）。 */
+  U.idleBankPreview = function (bank) {
+    const out = { points: bank.points || 0, exp: bank.exp || 0, otherworld: bank.otherworld || 0, matItem: null, matCount: 0, matStashed: 0 };
+    if (bank.mat > 0 && G.Core && G.Core.idleMatItem) {
+      const mi = G.Core.idleMatItem();
+      const n = Math.floor(bank.mat / Math.pow(2, mi.tier - 1));
+      if (n > 0) { out.matItem = mi.item; out.matCount = n; }
+    }
+    return out;
+  };
+  /* 奖励胶囊那一行：与 `U.offlineGains` **逐句同源**（◉ / EXP / ◆ / 材料自己的 icon）。 */
+  U.idleChips = function (g) {
+    const D = G.DATA || {};
+    const fmt = G.fmt || ((n) => String(n));
+    const chips = [];
+    chips.push('◉ +' + fmt(g.points));
+    chips.push('EXP +' + fmt(g.exp));
+    if (g.otherworld) chips.push('◆ +' + g.otherworld);
+    if (g.matCount && g.matItem) {
+      const it = (D.ITEMS || {})[g.matItem] || {};
+      chips.push(((it.icon) || '🎒') + ' ' + ((it.name) || g.matItem) + '×' + g.matCount);
+    }
+    if (g.matStashed) chips.push('📮 待领箱 +' + g.matStashed);
+    return chips;
+  };
+  U.idleSettle = function () {
+    const Core = G.Core;
+    if (!Core || !Core.idleBankGains) return false;
+    const bank = Core.idleBankGains();
+    /* 不足 1 分钟 ＝ 这一轮没有"挂机收益"（列出来就是一行「◉ +0」）：不弹面板。
+       今日 / 周常那些照样收得到 —— 走调用方原来那条一键收。 */
+    if (!(bank.seconds >= 60)) return false;
+    const dur = G.formatDuration ? G.formatDuration(bank.seconds) : (bank.seconds + ' 秒');
+    const opt = {
+      chips: U.idleChips(U.idleBankPreview(bank)),
+      okLabel: '领取',
+      /* 两颗按钮的 id 直接用既有的两个处理器 —— 它们各自负责"发奖之后怎么收场"
+         （见 js/sc-home.js 的 idle_claim / idle_double）：走 U.confirm 的自定义按钮 id，
+         **点下去不会顺手把弹窗关掉**，于是"广告拉不到 → 自动那条路不发奖"时
+         面板可以原地留着（那颗「领取」照常领原额）。 */
+      okId: 'idle_claim',
+      blankClose: true,               // ← 父亲大人 09-27：「支持点击空白处返回」
+    };
+    /* 有广告模块才给第二颗按钮 —— 没有模块时留一颗"点不动的广告键"就是死键。 */
+    if (G.AD && G.AD.show) { opt.cancelLabel = '📺 看广告 · 双倍领取'; opt.cancelId = 'idle_double'; }
+    else opt.cancel = false;
+    U.confirm('挂机结算', '已挂 ' + dur + (Core.idleFull && Core.idleFull() ? '（已满）' : ''), null, opt);
+    return true;
   };
   /* 七日登录（与网页版 showLoginReward 同一份文案） */
+  /* ================= V1.1.18（N5 · 留存环：回归礼）=================
+     父亲大人拍板「把留存环做了」；策划总监 N 单的 N5：断了一阵子再回来给一份"回来的理由"。
+     这一屏**只报账**（奖在 `game.js` 开机那一刻就由 `Core.grantComeback()` 发到手了，
+     进程被杀在弹窗前也不会丢）；胶囊直接用 `Core.rewardTextOf` 拆 —— 全项目唯一那份"奖励怎么写"
+     的口径，不在这里手抄第二份。 */
+  U.comebackGift = function (g) {
+    if (!g) return;
+    const txt = (G.Core && G.Core.rewardTextOf) ? G.Core.rewardTextOf(g.reward) : '';
+    const chips = String(txt || '回归礼').split(' · ').filter(Boolean);
+    U.confirm('欢迎回来，执灯者', '好一阵子没见了 —— 这份是给你留着的。', function () { CV.render(); },
+      { cancel: false, okLabel: '收下', chips: chips,
+        note: '离线挂机的收益另有结算；这条只在隔了一天以上没上线时给一次。' });
+  };
   U.loginReward = function (r) {
     if (!r) return;
     const D = G.DATA || {};
-    const txt = r.reward.ssrTicket ? '🎫 SSR自选券'
-      : ((G.Core && G.Core.rewardTextOf) ? G.Core.rewardTextOf(r.reward) : '第 ' + r.day + ' 天奖励');
-    const moon = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗'][Math.max(0, Math.min(6, r.day - 1))];
-    U.confirm('七日登录 · 第 ' + r.day + ' 天', '今日奖励',
-      function () { CV.render(); },
-      { cancel: false, okLabel: '收下', chips: [moon + ' ' + txt] });
+    /* ================= V1.1.18（N1 · 留存环第一格：让"第 7 天的钩子"看得见）=================
+       父亲大人拍板「把留存环做了」；策划总监 N 单的结论是**钩子从来不缺、缺的是"看得见"**：
+       七日登录是全游戏**唯一一处"每天必定被玩家看到"**的留存件（`game.js` 无条件入队、一天一次），
+       而原来这里只画**当天那一格** —— 玩家从头到尾不知道第 7 天有 🎫SSR自选券。
+       改法：把 `D.LOGIN_REWARDS` **7 格全列**（`U.confirm` 的 chips 本来就自动居中折行 ⇒
+       不新造界面、不碰数值、不碰存档、不碰 `core.js` / `data.js`）：
+         · 领过的 → 前缀 `✓`　· 今天 → 后缀 `（今天）`　· 还没到的 → 只写「第 N 天 ＋ 内容」
+       第 7 天那颗是这一屏的主角，所以它把限定招募券一起写全（原来只写了"SSR自选券"）。
+       ⚠️ 一处口径没变：**奖励表一个字没动**，只是把本来就发的东西画出来（"同样的钱买明天还想来"）。 */
+    const bodyOf = function (rw) {
+      const it = (D.ITEMS || {})[rw.item] || null;
+      const itemTxt = rw.item ? (((it && it.name) || rw.item) + '×1') : '';
+      if (rw.ssrTicket) return ['🎫 SSR自选券', itemTxt].filter(Boolean).join(' · ');
+      return (G.Core && G.Core.rewardTextOf) ? G.Core.rewardTextOf(rw) : (itemTxt || '奖励');
+    };
+    const ladder = function (curDay) {
+      const list = D.LOGIN_REWARDS || [];
+      return list.map(function (rw, i) {
+        const n = i + 1;
+        return (n < curDay ? '✓' : '') + '第' + n + '天 ' + bodyOf(rw) + (n === curDay ? '（今天）' : '');
+      });
+    };
+    /* ================= V1.1.8（乙组 B8 · 签到全双倍）=================
+       口径（终版 §3.1 第 8 步）：**1 次/天**、**只翻当天那一格**、**不补历史**；
+       翻倍 = 当天那一格**原样再发一份**（含 ✦ 与招募券 —— 走的是同一个 `applyRewardObj`）。
+       这里同样是**第二颗按钮**；翻过之后弹窗重画成"已翻倍"的样子（不再给第二颗）。 */
+    const paintLogin = function (doubled) {
+      const chips = ladder(r.day);
+      if (doubled) chips.push('📺 今日已翻倍');
+      const opt = { okLabel: '收下', chips: chips };
+      if (doubled) {
+        opt.cancel = false;
+        opt.note = '今天这一格已经翻倍领过了。';
+      } else {
+        opt.cancelLabel = '📺 看广告 · 双倍';
+        opt.onCancel = function () {
+          const AD = G.AD;
+          if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); CV.render(); return; }
+          AD.show('login_double').then(function (res) {
+            if (!res || !res.granted) { CV.toast('广告没看完，奖励没发'); CV.render(); return; }
+            const d = (G.Core && G.Core.claimLoginDouble) ? G.Core.claimLoginDouble() : null;
+            if (!d || !d.ok) { CV.toast((d && d.msg) || '今天已经翻过倍了'); CV.render(); return; }
+            CV.toast('📺 签到奖励已翻倍', 1600);
+            U.confirm('七日登录 · 第 ' + r.day + ' 天', '今日奖励 ×2 已到手', function () { CV.render(); },
+              { cancel: false, okLabel: '收下', chips: ladder(r.day).concat(['📺 今日已翻倍']), note: '明天还有一次翻倍机会。' });
+          });
+        };
+      }
+      U.confirm('七日登录 · 第 ' + r.day + ' 天', '今日奖励', function () { CV.render(); }, opt);
+    };
+    paintLogin(false);
   };
-  CV.on('_cf_no', () => { U.overlay = null; CV.render(); });
+  CV.on('_cf_no', () => {
+    const o = U.overlay; U.overlay = null;
+    if (o && typeof o.onCancel === 'function') { try { o.onCancel(); } catch (e) { CV.render(); } }
+    else CV.render();
+  });
   CV.on('_cf_yes', () => { const o = U.overlay; U.overlay = null; if (o && o.onOk) o.onOk(); else CV.render(); });
+  /* ================= V1.1.x（0927-P · 父亲大人：「支持点击空白处返回」）=================
+     点空白＝**只是关掉这一层、原地回到下面那一页**：不发奖、也**不走 onCancel 那条广告路**
+     （挂机结算面板点空白 ＝ 这次不领，银行里那笔一分不少，下次点「收取奖励」还在）。
+     登记这颗热区的只有 `opt.blankClose` 的弹窗（见 drawOverlay；确认弹窗一律不开）。 */
+  CV.on('_cf_blank', () => { U.overlay = null; CV.render(); });
   /* ---------- 引导气泡（照网页版 coachmark）----------
      V9.6.27（父亲大人）：网页版有二十来处"首次操作引导"，小游戏一处都没有 —— 这是目前最大的功能缺口。
      画布版的做法：**不另存坐标**，直接拿 CV.hits 里那颗热区的矩形当锚点
@@ -615,6 +995,8 @@
      玩家做完这一步、再回到那一页，同一条卡片又冒出来讲一遍（看着就是没更新）。
      现在这个窗口**每条只破例一次**：主动求一次就讲一次，之后照常按"已看过"收敛。 */
   const coachForcedUsed = {};
+  /* V1.1.12：每条引导"同一页被登记了几次"—— 用来抓"这条引导永远收不掉"的死锁（见 U.coach 里那段）。 */
+  const coachRetry = {};
   /* V9.6.68（资料 §5「引导每一步都要能测」）：本地引导漏斗 —— 形状与网页版一致，
      记 看过/点过/跳过/没指到 + 累计毫秒；GM 面板里能看（sc-last 的调试页）。 */
   function coachFunnel(key, what, ms) {
@@ -666,6 +1048,10 @@
     const key = opts.key || [].concat(targetId).join('|');
     if (S.coachSeen[key] && !forcedNow(key)) return;   // 看过就不再弹（玩家主动又要了，才再讲一次）
     if (forcedNow(key)) coachForcedUsed[key] = true;   // 破例只给一次
+    /* ⚠️ V1.1.12 第一版把"死锁自愈"写在这里（数**登记次数**）—— **写错了**：
+       主页每秒重画一次 → 3 秒就把引导自动标已读，`guide_walk_audit` 当场报 4 步"没讲"。
+       自愈必须只在**"这条引导真被拿起来过、又被丢掉"**时计数 ——
+       见 `U.drawCoach` 里那条"换页就放下"的分支（那才是死循环真正发生的地方）。 */
     /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
        mustTap 改成**默认开** —— 所有引导都只有两条出路：点高亮的那颗，或者点右下角「跳过这一步」。
        以前非强制的那些给了一颗全屏热区（点哪都算过），玩家一边看引导一边还能操作别的东西。 */
@@ -797,7 +1183,24 @@
        引导期间那条"点高亮那颗只推进引导、不执行动作"的规矩会把它们吃掉 ——
        于是点了没反应、页面没跳，屏幕上还挂着上一条引导（看着就是"引导讲的是上一件事"）。
        这两颗按钮一律直接执行：执行完 goQuest 会清掉旧引导、按新一步重新讲。 */
-    if (id === 'goto_quest' || id === 'claim_quest') return _dispatch(id);
+    /* V1.1.12（康康 09-27 · 父亲大人报的**死循环**：「重跑新手指引 → 主线第 27 步是转生 →
+       转生做不了 → 一进主页就进引导，引导到转生，无限循环」）：
+       ⚠️ 下面这条旁路（V9.6.102 为修"点了没反应"加的）**当年漏了最要紧的一步 —— 没把当前引导收掉**：
+         点「去完成」→ 直接派发 → `goQuest` 把玩家带到那一步的页面 → **换页** →
+         `drawCoach` 见"换页了"就把这条放下、**不标已读**（那条规矩本身是对的，防串台）
+         ⇒ 这条引导**永远收不掉** → 回主页又登记一遍 → 再点又带走 …… 死循环。
+       实测复现（`/tmp/coach_loop_probe.js`）：`coachSeen` 卡在 3 条、`tourForce` 永远 true，
+       每轮都在「登记 tut_blk4（目标=去完成）→ 点 goto_quest → 落到 world/reincarn → 回主页」之间打转。
+       修法：**旁路照样要"执行 ＋ 收掉"**（与"点高亮那颗"同一条口径，V9.6.107 那套）。 */
+    if (id === 'goto_quest' || id === 'claim_quest') {
+      if (st) {
+        coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
+        U.coachMark(st);
+        coachState = null;
+        promoteCoach();
+      }
+      return _dispatch(id);
+    }
     if (!st || coachSuspended()) return _dispatch(id);   // 战斗页：按原样派发，不拦
     /* V9.6.66（父亲大人："引导时只能点高亮区域，不能点其他区域或滑动界面"）：
        这里原来是**漏的** —— 只有按下判定（hitAt）过滤了，真正执行动作的这条派发路
@@ -840,6 +1243,20 @@
        （跑 onDone 会误触发"退回上一层"，把玩家拽到更乱的地方）。 */
     if (coachState.bornPage && coachState.bornPage !== ((CV.top() || {}).name)) {
       coachFunnel(coachState.key, 'miss');     // 换页了：这一步这次没讲成
+      /* ================= V1.1.12（康康 09-27 · **死锁自愈**，就写在这条真出事的路上）==========
+         父亲大人报的那次死循环，机理就是"**这条引导每次被拿起来、点一下就被换页丢掉**"：
+         丢掉时**不标已读**（那条规矩是对的，防串台）→ 回到原页又登记 → 再点又被丢掉 …… ∞。
+         根因（`goto_quest` 那条旁路没标已读）已经单独修了；这里再加一道兜底：
+         **同一条引导连续 3 次"被拿起来又被换页丢掉"** → 认定它这辈子收不掉
+         （目标当前做不到 / 指错地方），**自动标已读放行**，并记一笔 `auto-unlock`
+         （GM 的引导漏斗里看得见）。宁可少讲一条，也不能把玩家钉死在主页上 —— 这是本文件 V9.6.38 立的规矩。 */
+      coachRetry[coachState.key] = (coachRetry[coachState.key] || 0) + 1;
+      if (coachRetry[coachState.key] >= 3) {
+        coachFunnel(coachState.key, 'auto-unlock');
+        const S2 = G.Core && G.Core.S;
+        if (S2) { S2.coachSeen = S2.coachSeen || {}; S2.coachSeen[coachState.key] = true; try { G.Core.save(); } catch (e) {} }
+        coachRetry[coachState.key] = 0;
+      }
       coachState = null;
       promoteCoach();                          // V9.6.105：换页丢掉的这条之后，队列里的下一条要顶上来
       if (coachState) { setTimeout(function () { CV.render(); }, 0); }
@@ -889,13 +1306,23 @@
        先把它滚进可视区再画引导，否则高亮框和提示都指着屏幕外，等于没引导。
        做法：算一下目标中心离可视区中心差多少 → 改 CV.scroll → 重画一帧（下一次进来就在视野里了）。 */
     const viewTop = CV.TOP + 8, viewBot = CV.H - CV.NAV_H - CV.safeBottom - 8;
-    if (r && (r.y < viewTop + 6 || r.y + r.h > viewBot - 6)) {
-      const mid = (viewTop + viewBot) / 2;
-      const want = Math.max(0, Math.min(CV.maxScroll || 0, (CV.scroll || 0) + (r.y + r.h / 2 - mid)));
-      if (Math.abs(want - (CV.scroll || 0)) > 1) {
-        CV.scroll = want;
-        setTimeout(function () { CV.render(); }, 0);   // 滚到位后再画（这一帧先放行）
-        return;
+    /* V1.1.5（A1）· 父亲大人：「进去二级界面和退出二级界面的位置感觉还是不太对，像任务那里，
+       **每次领取完他就会回到最上面**，得再次下滑…」
+       真因就在这一块：领取之后页面**原地重画**，而这段"把目标滚进视野"又跑了一遍 ——
+       它要找的锚点（第一颗能领的按钮）在列表上方，于是把玩家从当前看到的位置**拽回上边**。
+       现在改成：**每条引导只在它第一次出现时滚一次**（"带玩家看见它"正是引导的职责），
+       之后玩家自己滑到哪就停在哪 —— 人手动滑走是明确的意图，不该被引导掰回去。
+       （顺带把背包 / 世界列表 / 商店这些"点一下就重画"的页面一起治了：同一个毛病。） */
+    if (r && !coachState.scrolled) {
+      coachState.scrolled = true;                      // 只滚一次（无论这一帧滚没滚）
+      if (r.y < viewTop + 6 || r.y + r.h > viewBot - 6) {
+        const mid = (viewTop + viewBot) / 2;
+        const want = Math.max(0, Math.min(CV.maxScroll || 0, (CV.scroll || 0) + (r.y + r.h / 2 - mid)));
+        if (Math.abs(want - (CV.scroll || 0)) > 1) {
+          CV.scroll = want;
+          setTimeout(function () { CV.render(); }, 0);   // 滚到位后再画（这一帧先放行）
+          return;
+        }
       }
     }
     c.save();
@@ -974,7 +1401,10 @@
        这里只负责照着画 —— V9.6.94 起不再各算各的。 */
     const PAD = o.pad || 14 * CV.SCALE;
     CV.text(o.title, o.x + PAD, o.y + o.titleY, { size: CV.FS.f1, bold: true });
-    o.lines.forEach((ln, i) => CV.text(ln, o.x + PAD, o.y + o.lineY[i], { size: CV.FS.lg, color: CV.C.dim }));
+    /* 正文色：默认 --dim；`tone:'text2'` 的弹窗（《健康游戏忠告》）走 --text2 —— 法规原文要的是
+       "读得清"，与网页版 .notice-advice 同一档（两端各钉一次对比度）。 */
+    o.lines.forEach((ln, i) => CV.text(ln, o.x + PAD, o.y + o.lineY[i],
+      { size: CV.FS.lg, color: o.tone === 'text2' ? CV.C.text2 : CV.C.dim }));
     /* 奖励胶囊（居中折行）——网页版 .reward-chips */
     (o.rows || []).forEach(function (row, ri) {
       const cy = o.y + o.chipY[ri];
@@ -990,17 +1420,53 @@
     (o.note || []).forEach(function (ln, i) {
       CV.text(ln, o.x + o.w / 2, o.y + o.noteY[i], { size: CV.FS.xs, align: 'center', color: CV.C.dim });
     });
+    /* 输入格（opt.inputBox）：购买弹窗那颗"数字格"的同款 —— 底色 panel2 ＋ 金色粗体数字居中，
+       没有内容时显示灰底提示语（别留一块空白的、看不出要干什么的方框）。 */
+    if (o.input) {
+      const iy = o.y + o.input.y;
+      CV.round(o.x + PAD, iy, o.w - PAD * 2, o.input.h, CV.RADIUS_SM, CV.C.panel2, CV.C.line2);
+      const shown = o.input.value || o.input.placeholder;
+      CV.text(shown, o.x + o.w / 2, iy + o.input.h / 2, {
+        size: o.input.value ? CV.FS.f2 : CV.FS.md, bold: !!o.input.value, align: 'center',
+        color: o.input.value ? CV.C.gold : CV.C.dim,
+      });
+    }
     const by = o.y + o.btnY;
-    const bw = (o.w - PAD * 2 - 10 * CV.SCALE) / 2;
+    const gapBtn = 10 * CV.SCALE;
+    const avail = o.w - PAD * 2;
+    /* ================= V1.1.x（0927-P · 挂机结算搬进弹窗时抓到的一条老账）=================
+       两颗按钮原来是**死等分**的：卡片 350 − 内距 28 − 缝 10 ⇒ 每颗 156，字号 13 时可用宽 140。
+       而「📺 看广告 · 双倍领取」量出来 141 —— **差一个字**，`U.btn` 于是折成两行、
+       末行只剩一个孤零零的「取」（真机上 emoji 更宽，只会更早折）。
+       改成照**文字自然宽**分（与 `U.btnRow` / 网页版 `.btn-row{flex:1 1 auto; min-width:5.375rem}` 同一条规矩）：
+         · 两行一样长（取消 / 确定，都是 2 字）⇒ 分下来仍然**逐像素等于从前的等分**；
+         · 一行长一行短（看广告 / 领取）⇒ 长的那颗拿到它需要的宽度，消灭孤字；
+         · 自然宽总和超过可用宽（超窄屏 + 双长文案）⇒ 退回等分（照旧靠 `U.btn` 折行兜底）。 */
+    const minw = U.BTN_MINW * CV.SCALE;
+    const natOf = (t) => Math.max(minw, CV.measure(t, CV.FS.lg) + 24 * CV.SCALE);
+    const natNo = natOf(o.cancelLabel || '取消'), natYes = natOf(o.okLabel || '确定');
+    const useNat = (natNo + natYes + gapBtn <= avail);
+    const bw = useNat ? Math.max(minw, (avail - gapBtn) * natNo / (natNo + natYes)) : (avail - gapBtn) / 2;
+    const bwYes = useNat ? (avail - gapBtn - bw) : (avail - gapBtn) / 2;
     /* 确认弹窗画在**屏幕坐标**里（内容区已经 restore），命中区也要按屏幕坐标登记。
        V9.6.95：这里是**真模态** —— 用 'overlay' 模式登记，触摸层会只放行这两颗按钮，
        底栏/顶栏/吸顶条在弹窗打开期间一律不吃点击（以前弹窗开着还能点底栏换页）。 */
     CV.hitMode = 'overlay';
+    /* ================= V1.1.x（0927-P · 父亲大人：「支持点击空白处返回」）=================
+       整屏一颗**模态**热区＝"点空白 = 关掉弹窗、原地返回"（不发奖、也不走 onCancel 那条广告路）。
+       ⚠️ 顺序是死的：**它必须先登记**，下面两颗按钮的热区登记在它之后 ——
+          `hitAt` 是从数组**末尾往前扫**，后登记的先命中；反过来点按钮会先撞上这块整屏的。
+       ⚠️ 只对 opt.blankClose 的弹窗开（挂机结算 / 离线收益这类收益面板）；
+          确认弹窗（删档那种）**不许开** —— 那种必须点按钮，点空白什么都不该发生。
+       ⚠️ 输入格的热区也登记在它之后（点输入格＝调键盘，不能顺手把弹窗关掉）。 */
+    if (o.blankClose) CV.hit('_cf_blank', 0, 0, CV.W, CV.H);
+    if (o.input && o.input.id) CV.hit(o.input.id, o.x + PAD, o.y + o.input.y, o.w - PAD * 2, o.input.h);
     if (o.single) {
-      U.btn(o.x + PAD, by, o.w - PAD * 2, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+      U.btn(o.x + PAD, by, avail, 44 * CV.SCALE, o.okLabel || '确定', o.okStyle, o.okId);
     } else {
-      U.btn(o.x + PAD, by, bw, 44 * CV.SCALE, '取消', 'ghost', '_cf_no');
-      U.btn(o.x + PAD + bw + 10 * CV.SCALE, by, bw, 44 * CV.SCALE, o.okLabel || '确定', 'primary', '_cf_yes');
+      /* 左侧那颗的文案可改（`cancelLabel`）—— 广告点位用它当"看广告"那颗，视觉上仍是次要按钮（ghost） */
+      U.btn(o.x + PAD, by, bw, 44 * CV.SCALE, o.cancelLabel || '取消', 'ghost', o.cancelId);
+      U.btn(o.x + PAD + bw + gapBtn, by, bwYes, 44 * CV.SCALE, o.okLabel || '确定', o.okStyle, o.okId);
     }
     CV.hitMode = 'content';
   };

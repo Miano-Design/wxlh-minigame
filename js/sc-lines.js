@@ -13,6 +13,8 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
+  /* V1.1.x（2026-09-27 · 音频系统）：秘术阁「升 1 级」的成功 / 被拒音（G.AUD 缺失时静默跳过） */
+  function snd(name) { if (G.AUD && G.AUD.play) G.AUD.play(name); }
   const fmt = G.fmt || ((n) => String(n));
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
@@ -54,18 +56,23 @@
     head('秘术阁');
     U.card(function () {
       U.h3('秘术阁', '已修 ' + total + ' / ' + maxTotal + ' 级');
-      U.note('升级只花 ◆ 异界结晶 · 前 8 条加战斗，后 4 条加挂机经济', 2 * CV.SCALE);
+      /* V1.1.4（A12-F · 秘术阁接「秘卷残章」）：这一句原来写"**升级只花** ◆ 异界结晶" ——
+         接了材料之后它就是假话了（文案与实现必须同源，这个项目最忌讳"写了没做/没说做了"）。 */
+      U.note('升级花 ◆ 异界结晶 · 每 5 级另需 1 张秘卷残章', 2 * CV.SCALE);
       U.kv('◆ 异界结晶', fmt(coin), CV.C.gold);
+      U.kv('📃 秘卷残章', String(S.items[D.KEJI_MAT] || 0));
     });
     U.card(function () {
       D.KEJI.forEach(function (k) {
         const lv = Core.kejiLv(k.id);
         const cost = Core.kejiCostOf(k.id);
+        const matNeed = cost === null ? 0 : D.kejiMatNeed(lv);
+        const matHave = S.items[D.KEJI_MAT] || 0;
         const cur = lv ? (k.rate * lv * 100) : 0;
         const next = cost === null ? cur : (k.rate * (lv + 1) * 100);
         const top = U.y;
         const sub0 = k.info + ' 当前 +' + cur.toFixed(1) + '%'
-          + (cost === null ? ' · 已满级' : (' → 下一级 +' + next.toFixed(1) + '%（需 ◆ ' + fmt(cost) + '）'));
+          + (cost === null ? ' · 已满级' : (' → 下一级 +' + next.toFixed(1) + '%（需 ◆ ' + fmt(cost) + (matNeed ? ' · 秘卷×' + matNeed : '') + '）'));
         /* V9.6.142：这一行原来单行 fit → 尾巴「→ 下一级 +0.4%（需 ◆ 13）」被砍成「…」。
            现在折到最多两行，行高跟着算 —— 12 条线一条不漏地看得见升级收益和价钱。 */
         const bw = 78 * CV.SCALE;
@@ -84,9 +91,11 @@
         subLines.forEach(function (ln, k2) {
           CV.text(ln, tx, top + (36 + k2 * 18) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         });
-        const can = cost !== null && coin >= cost;
+        /* 材料进"能不能点"的判定（与逻辑层 kejiUp 的判据同一条：每 5 级 1 张）。 */
+        const can = cost !== null && coin >= cost && matHave >= matNeed;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          cost === null ? '满级' : '升 1 级', 'ghost', can ? 'keji_up:' + k.id : '');
+          cost === null ? '满级' : '升 1 级', 'ghost',
+          cost === null ? '' : (can ? 'keji_up:' + k.id : 'noop'), cost !== null && !can);
         U.y = top + h;
       });
     });
@@ -94,6 +103,7 @@
   D.KEJI.forEach(function (k) {
     CV.on('keji_up:' + k.id, function () {
       const r = Core.kejiUp(k.id);
+      snd(r.ok ? 'levelup' : 'error');
       CV.toast(r.msg || (r.ok ? '已升级' : '升不了'));
       CV.render();
     });
@@ -191,6 +201,11 @@
     U.card(function () {
       U.h3('佩戴');
       U.hint('主角同时只带 1 件，随时能换。', 4 * CV.SCALE);
+      /* V1.0.6（父亲大人 09-24 反馈图 05「贴了」）：
+         网页版那一行是 `<div class="note mb2">` —— 说明下面还留着 10px 才挨到按钮。
+         画布这边 U.hint 走完直接把 U.y 交出去，按钮顶上只剩 1.2px，字看上去是**粘在按钮上**的。
+         按网页版补回那 10px（.mb2 = --sp2）。 */
+      U.space(CV.SP[2]);
       U.btnRow([{ label: wearing ? '摘下' : '佩戴这件', style: wearing ? 'ghost' : 'primary', id: 'fabao_wear_now' }]);
     });
   });
@@ -232,7 +247,8 @@
           + (m.cost.mat ? (' + ' + ((D.ITEMS[m.cost.mat] || {}).name || m.cost.mat) + '×' + m.cost.matN) : '');
         /* V9.6.142：同法宝 —— 单行 fit 会把「· 驯服需要 ◉ 5000…」砍掉，改成最多两行。 */
         /* 高阶坐骑的"驯服需要 …"要写三样（点数 + 结晶 + 材料），两行也不够 → 放到三行。 */
-        const dLines = CV.wrap(m.desc + (own ? (' · 喂养 ' + lv + '/' + mx) : (' · 驯服需要 ' + costTxt)), textW, CV.FS.sm, 3);
+        /* V1.0.6：同法宝 —— 这里带着"驯服需要 ◉ 15万 + ◆ 1240 + 异界合金×15"，逐字折行会把 ×15 劈开 */
+        const dLines = CV.wrapTokens(m.desc + (own ? (' · 喂养 ' + lv + '/' + mx) : (' · 驯服需要 ' + costTxt)), textW, CV.FS.sm, 3);
         const h = (52 + (dLines.length - 1) * 17) * CV.SCALE;
         CV.text(m.rarity, U.ix(), top + h / 2 - 8 * CV.SCALE, { size: CV.FS.sm, bold: true, color: rarColor(m.rarity) });
         CV.text(CV.fit(m.name, textW, CV.FS.lg, true), tx, top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
@@ -299,6 +315,7 @@
     U.card(function () {
       U.h3('乘骑');
       U.hint('同时只骑 1 匹，随时能换。', 4 * CV.SCALE);
+      U.space(CV.SP[2]);          // 同「佩戴」：网页版是 .note mb2，说明与按钮之间留 10px
       U.btnRow([{ label: riding ? '下坐骑' : '乘骑这匹', style: riding ? 'ghost' : 'primary', id: 'mount_ride_now' }]);
     });
   });
@@ -319,6 +336,10 @@
   CV.register('garden', function () {
     const plots = Core.gardenState();
     const busy = plots.filter((p) => p.plot).length;
+    /* V1.1.4（A12-F · 药园接「灵植种」）：种子数在**卡片顶**报一次，行里的"播种"按钮要用它判禁用态。
+       必须提在 register 作用域里（放进上面那个 U.card 的回调里，下面的 U.draw 闭包就取不到）。 */
+    const seedItem = D.ITEMS[D.GARDEN_SEED] || {};
+    const seedHave = Core.S.items[D.GARDEN_SEED] || 0;
     U.begin();
     head('药园');
     U.card(function () {
@@ -326,53 +347,77 @@
          没开的地也画出来、灰着并写清"通关哪张图开"，玩家才知道药园还能扩。 */
       U.h3('药园', busy + ' 块在用 · 已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块');
       U.note('有几率出稀有物（兽魂石 / 装备箱）', 2 * CV.SCALE);
+      /* V1.1.4（A12-F · 药园接「灵植种」）：播种要 1 颗种子、收成回收 70% ——
+         颗数写在卡片顶上（每一行都再报一遍会刷屏），来源也写出来，
+         不然"一颗种子都没有"的玩家只会看到一颗点不动的按钮。 */
+      U.kv((seedItem.icon || '') + ' ' + (seedItem.name || '灵植种'), String(seedHave), seedHave > 0 ? CV.C.text : CV.C.dangerText);
       U.hint('每通关 9 张图多开 1 块，同一种灵田可以多种一块。', 2 * CV.SCALE);
+      if (seedHave <= 0) U.hint('没有种子：副本有概率掉、市集可买（◉）。', 2 * CV.SCALE);
     });
     U.card(function () {
+      /* V1.0.6（父亲大人 09-24 反馈图 06「版式不行，没对齐且间距也不行」）：
+         根因是这两行**两套骨架** ——
+           · 已开的地：标题一行 + 说明两行，行**高 72**；
+           · 未开垦的地：状态和要求**挤成一行**，行**高 62**；
+         于是同一张卡里行距一紧一松、状态字也没落在同一条基线上（他圈的就是那三行）。
+         现在逐条照网页版 `.list-row` 重排（这一段就是它的画布实现）：
+           [第 N 块 胶囊] + [状态标题 / 说明两行] + [右侧按钮]，整行 `align-items:center`，
+           `padding: 0.625rem 0`、行间一条 --line-soft 分隔线、说明行高 1.55（原来只有 1.33）。
+         未开垦的两种行随之变成同一套骨架：标题「🔒 未开垦」+ 说明「通关 XX 后开放」，
+           整行 opacity .55（网页版 `.list-row` 的内联 opacity）。 */
       plots.forEach(function (p, i) {
         const top = U.y;
-        const bw = 84 * CV.SCALE;
-        /* V9.6.142：说明改成**占满整行**（按钮挪到标题那一行的右边）。
-           上一版把说明限制在"减去按钮宽"的 246px 里，第二行照样被砍成
-           「→ 收 异界合金×12 · 20% 出 SR装…」—— 等于没修干净。 */
-        const fullW = U.iw();
-        /* V9.6.141/142：说明原来是一行 fit → 末尾被省略号切掉（"…出 兽魂石"整段没了）。
-           现在按语义拆两行（状态 / 收什么），并且**占满整行宽度**，行高跟着算。 */
+        const padY = 10 * CV.SCALE, gapX = 14 * CV.SCALE;      // .list-row: padding .625rem / gap --sp3
         const ready = p.plot && p.leftMs <= 0;
-        const state2 = !p.plot ? 'empty' : (ready ? 'ready' : 'growing');
-        const descLines = D.gardenRowLines(p.kind || {}, state2, p.leftMs / 1000)
-          .map((t, k) => CV.fit(k === 0 ? t : ('→ ' + t), fullW, CV.FS.xs));
-        /* 行内布局（按钮挪到**标题那一行的右边**，把下面的整行让给说明）：
-             第 N 块            [播种]
-             空地 · 可种「下品灵田」：◉ 800 · 10 分钟
-             → 收 基础金属×5 · 15% 出 兽魂石×1 */
-        const h = 72 * CV.SCALE;
-        if (p.locked) {
-          CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true, color: CV.C.dim });
-          CV.text(CV.fit('🔒 未开垦 · ' + (p.req || '继续推图'), fullW, CV.FS.sm), U.ix(), top + 44 * CV.SCALE,
-            { size: CV.FS.sm, color: CV.C.dim });
-          U.y = top + 62 * CV.SCALE;
-          return;
-        }
-        CV.text('第 ' + (i + 1) + ' 块', U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
-        const state = (p.plot ? '' : '空地 · ') + descLines[0];
-        CV.text(CV.fit(state, fullW, CV.FS.sm), U.ix(), top + 44 * CV.SCALE, { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
-        /* V9.6.131（父亲大人："药园种植的消耗你也没写，我不知道是机制改了还是怎么"）：
-           机制没改（播种照旧扣 ◉ 点数，core.plantGarden 一直在扣），是**这一行把花费漏写了**。
-           现在把"种这一块要花多少"写回描述里，货币图标取货币表（不是手写符号）。 */
-        /* ⚠️ 必须用 p.kind，不能写 D.GARDEN[i] —— 地和灵田是"循环对应"（第 i 块取第 i%4 种），
-           扩到 8 块之后 D.GARDEN[4] 是 undefined，名字和花费都会画成空白。 */
-        /* V9.6.141（父亲大人："药园的排版明显有问题"）：
-           这一行原来拼的是 `seed.desc` —— 而灵田数据里**根本没有 desc 这个字段**，
-           于是每行都只剩「可种「下品灵田」：◉ 800 · 」，结尾挂着一个孤零零的「· 」；
-           种下去之后那行干脆是空的「收 」。产物、稀有掉落、成熟时间**全都没写出来**。
-           现在改用数据层的 D.gardenRowText()（与网页版同一份文案）+ 两行折行。 */
-        CV.text(descLines[1], U.ix(), top + 60 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
-        /* 按钮跟"第 N 块"那一行居中对齐，不再压在说明上 */
-        const by = top + 16 * CV.SCALE - (U.BTN_SM * CV.SCALE) / 2;
-        if (!p.plot) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '播种', 'ghost', 'garden_plant:' + i);
-        else U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE,
-          ready ? '收获' : '生长中', ready ? 'primary' : 'ghost', ready ? 'garden_get:' + i : '');
+        const btnLabel = p.locked ? '' : (ready ? '收获' : (p.plot ? '未熟' : '播种'));
+        /* 右列按钮宽度照网页版 `.btn.small`（min-width 2.75rem + padding 0 0.8125rem）——
+           原来写死 84，比网页版宽 20px，说明那一列被无谓地挤窄了。 */
+        const bw = p.locked ? 0 : Math.max(64 * CV.SCALE, CV.measure(btnLabel, CV.FS.lg) + 26 * CV.SCALE);
+        /* V1.0.6（康康按本室热区基准定的 09-24）：药园这四颗按钮原来走 U.BTN_SM＝40，
+           够不到"热区 ≥88rpx（44pt）"。**只抬小游戏端**这一处到 U.BTN_H＝44
+           （网页版 `.btn.small` 仍是 40，两端此处会不一致，已在回单里记明）。 */
+        const bh = U.BTN_H * CV.SCALE;
+        const chipW = CV.measure('第 ' + (i + 1) + ' 块', CV.FS.xs) + 12 * CV.SCALE;  // .tag: padding 1px 0.375rem
+        const chipH = CV.FS.xs * 1.4 + 2 * CV.SCALE;
+        const state = p.locked ? '🔒 未开垦' : (p.plot ? p.kind.name : '空地');
+        /* ⚠️ 必须用 p.kind，不能写 D.GARDEN[i] —— 地和灵田是"循环对应"，扩到 8 块后 D.GARDEN[4] 是 undefined */
+        const desc = p.locked
+          ? (p.req ? (p.req + ' 后开放') : '继续推图后开放')
+          : D.gardenRowText(p.kind || {}, !p.plot ? 'empty' : (ready ? 'ready' : 'growing'), p.leftMs / 1000);
+        /* 说明那一列要**让开右边的按钮**（网页版是 flex 兄弟节点，天然不许叠）——
+           这也是"文字从按钮底下穿过去"这一类缺陷的根治写法。 */
+        const colW = U.iw() - chipW - gapX - (p.locked ? 0 : bw + gapX);
+        const t1H = CV.FS.f1 * 1.35, t2H = CV.FS.sm * 1.55;     // .list-row .t1 / .t2 line-height
+        const l1 = CV.wrapTokens(state, colW, CV.FS.f1, 1);
+        const l2 = CV.wrapTokens(desc, colW, CV.FS.sm);
+        const h = padY * 2 + l1.length * t1H + 4 * CV.SCALE + l2.length * t2H;
+        U.draw(function () {
+          if (p.locked) { CV.ctx.save(); CV.ctx.globalAlpha = 0.55; }
+          const cy = top + h / 2, cx = U.ix() + chipW + gapX, y0 = top + padY;
+          CV.round(U.ix(), cy - chipH / 2, chipW, chipH, CV.RADIUS_SM, null, p.locked ? CV.C.line : CV.C.line2);
+          CV.text('第 ' + (i + 1) + ' 块', U.ix() + chipW / 2, cy, { size: CV.FS.xs, align: 'center', color: CV.C.text2 });
+          l1.forEach(function (ln, k) {
+            CV.text(ln, cx, y0 + t1H * (k + 0.5), { size: CV.FS.f1, bold: true, color: p.locked ? CV.C.text2 : CV.C.text });
+          });
+          l2.forEach(function (ln, k) {
+            CV.text(ln, cx, y0 + l1.length * t1H + 4 * CV.SCALE + t2H * (k + 0.5),
+              { size: CV.FS.sm, color: ready ? CV.C.green : CV.C.dim });
+          });
+          if (!p.locked) {
+            /* 空地且种子不够 → 按钮进禁用态（`dis`：压暗 + 不给热区），
+               与「背包满了不该让玩家白点」是同一套处理。种子来源写在卡片顶上那条 hint。 */
+            const noSeed = !p.plot && seedHave < (D.GARDEN_SEED_N || 1);
+            U.btn(U.ix() + U.iw() - bw, cy - bh / 2, bw, bh,
+              btnLabel, ready ? 'primary' : 'ghost',
+              ready ? 'garden_get:' + i : (p.plot || noSeed ? 'noop' : 'garden_plant:' + i), noSeed);
+          }
+          /* .list-row 的行分隔线（最后一行由 :last-child 去掉那一笔） */
+          if (i < plots.length - 1) {
+            CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.lineWidth = 1;
+            CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + h - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + h - .5); CV.ctx.stroke();
+          }
+          if (p.locked) CV.ctx.restore();
+        });
         U.y = top + h;
       });
       U.space(CV.SP[1]);
@@ -430,8 +475,12 @@
       });
     });
   });
-  CV.on('arena_fight', function () {
+  /* V1.0.6（父亲大人 09-24：「斗法台打完没有继续的选择，**还有次数的情况下应该能选择继续**」）：
+     开一台这件事原来只写在 `arena_fight` 的处理器里，结算页摸不到 —— 现在抽成 arenaStart()，
+     主按钮与结算里那颗「继续」**走同一条入口**（次数在 arenaStart 里再查一次，不会绕过限制）。 */
+  function arenaStart() {
     const st = Core.arenaState();
+    if (st.left <= 0) { CV.toast('今日斗法次数已用完'); return; }
     const allies = G.BattleUI.buildAllies(null, null);
     if (!allies.length) { CV.toast('没有可出战的成员'); return; }
     G.BattleUI.run({
@@ -445,9 +494,26 @@
            补了 onClose 之后，底部那颗「收下奖励并返回」已经回斗法台了 ——
            这里再挂一颗「返回斗法台」就是同一件事两颗按钮。**去掉**，只留底部那颗。
            （失败时也一样：底部的文案会变成「返回」。） */
-        return { title: win ? '守擂成功' : '守擂失败', sub: r.msg || '', rewards: [], acts: [] };
+        /* V1.0.6 · 继续打下一台（结算面板的 acts 机制，副本 / 深井早就在用这一套，不新增代码路径）。
+           两条口径（派单授权我定，理由写在回单里）：
+             · **不自动续打**：`style: 'gold'` 而不是 `'primary'` —— 自动倒计时那条路的触发键是
+               `a.primary || a.style === 'primary'`（sc-battle.js:243）。斗法台每天 5 次是**有限资源**，
+               替玩家自动开下一台＝替他花次数；副本自动下一关没这问题才敢自动。
+             · **次数用完（r.left <= 0）不给这一颗**，只剩底部「收下奖励」/「返回」。
+           文案把"第几台 / 今日还剩几次"写在按钮上，点之前就知道这一下要花掉一次。 */
+        const acts = (r.ok && r.left > 0) ? [{
+          label: (win ? '继续第 ' : '再挑战第 ') + r.floor + ' 台（今日还剩 ' + r.left + ' 次）',
+          style: 'gold', id: 'arena_next',
+        }] : [];
+        return { title: win ? '守擂成功' : '守擂失败', sub: r.msg || '', rewards: [], acts: acts };
       },
     });
+  }
+  CV.on('arena_fight', arenaStart);
+  /* 结算里那颗「继续」：先收掉上一场的战斗状态，再从同一个入口开下一台 */
+  CV.on('arena_next', function () {
+    if (G.BattleUI.clear) G.BattleUI.clear();
+    arenaStart();
   });
   CV.on('arena_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); });
 

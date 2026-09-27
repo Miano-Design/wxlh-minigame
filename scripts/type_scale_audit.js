@@ -46,6 +46,8 @@ CV.setup(global.wx.getWindowInfo());
 
 let pass = 0, fail = 0;
 const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
+/* V1.1.11（网页版归档）：凡"拿网页版当基准"的条目（名字以「网页版」开头）→ ⏭ 跳过、不计失败。 */
+const WB = require('./_web_basis');
 
 /* 定稿的五级阶梯（这是唯一出处；两边都必须等于它）—— V1.1 数字一个没变，
    变的是第五级的**载体名字**：11px 不再是"注释"档，而是 `--fs-tag` / `CV.FS.tag`
@@ -72,7 +74,7 @@ console.log('\n=== ① 五级阶梯本身 ===');
     T4_ALIAS.map((k) => k + '=' + CV.FS[k]).join(' ') + ' · tag=' + CV.FS.tag);
 
   /* 网页版：--fs-* 的 rem 换算成 px 必须等于同一张表（16px 根字号） */
-  const css = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
+  const css = WB.read('css/style.css');
   const vars = {};
   (css.match(/--fs-[a-z0-9]+:\s*([0-9.]+)rem/g) || []).forEach((m) => {
     const mm = /--(fs-[a-z0-9]+):\s*([0-9.]+)rem/.exec(m);
@@ -86,14 +88,15 @@ console.log('\n=== ① 五级阶梯本身 ===');
   ['fs-xs', 'fs-sm'].forEach((k) => {
     if (vars[k] !== LADDER.t4) wbad.push('--' + k + '=' + vars[k] + 'px（应与四级同为 ' + LADDER.t4 + '）');
   });
-  t('网页版：CSS 变量换算成 px 后与画布**逐级相等**', wbad.length === 0,
-    wbad.length ? wbad.join(' · ') : Object.keys(LADDER).map((k) => TIER_NAME[k] + ' ' + vars[webMap[k]]).join(' / '));
+  WB.OK ? t('网页版：CSS 变量换算成 px 后与画布**逐级相等**', wbad.length === 0,
+    wbad.length ? wbad.join(' · ') : Object.keys(LADDER).map((k) => TIER_NAME[k] + ' ' + vars[webMap[k]]).join(' / '))
+    : WB.skip('网页版：CSS 变量换算成 px 后与画布逐级相等');
 }
 
 console.log('\n=== ② 语义映射：谁该用哪一级 ===');
 {
   const uiw = fs.readFileSync(path.join(JS, 'uiw.js'), 'utf8');
-  const css = fs.readFileSync(path.join(WEB, 'css/style.css'), 'utf8');
+  const css = WB.read('css/style.css');
   /* 画布侧的"出字口子"——全项目都从这几个口子出字，所以查它们就等于查了全项目 */
   const rules = [
     /* V1.1.3：窗口 2200 → 4000 —— 与下面 kv 那条同一个病因（尺子过期，不是代码退化）：
@@ -116,9 +119,10 @@ console.log('\n=== ② 语义映射：谁该用哪一级 ===');
     ['网页版技能名 .sname = 二级（与六维名字同级）· 描述 .sdesc = 四级',
       /\.skill-row \.sname \{[^}]*font-size: var\(--fs-1\)/.test(css) && /\.skill-row \.sdesc \{[^}]*font-size: var\(--fs-(sm|md)\)/.test(css)],
     ['网页版六维：名字二级 + 解释内联四级',
-      /class="t1">\$\{a\.name\} <span style="color:var\(--dim\);font-size:var\(--fs-md\)"/.test(fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8'))],
+      /class="t1">\$\{a\.name\} <span style="color:var\(--dim\);font-size:var\(--fs-md\)"/.test(WB.read('js/ui.js'))],
   ];
-  rules.forEach(([name, ok]) => t(name, ok));
+  /* 名字以「网页版」开头的 → 没有网页版就不评（⏭），其余照评 */
+  rules.forEach(([name, ok]) => ((WB.OK || !/^网页版/.test(name)) ? t(name, ok) : WB.skip(name)));
 }
 
 console.log('\n=== ③ 不许出现"裸数字字号"（图标 / 大数字也有名字）===');

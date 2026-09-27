@@ -31,12 +31,21 @@
   const CV = G.CV;
   if (!CV) return;
 
-  const SRC = 'icons/主视觉-提灯入残域-暗调.jpg';
+  /* ⚠️ **文件名必须是 ASCII**（V1.0.5 实测的硬约束）：`wx.createImage()` 在模拟器 / 真机上
+     加载**中文名**的资源一律 `onerror`（实测：`icons/主视觉-提灯入残域-暗调.jpg` 失败，
+     同一份字节改成 `icons/mv-main-lamp.jpg` 立刻 896×1200 加载成功；`icons/测试图.jpg` 同样失败）。
+     也就是说 V1.1.3/V1.1.5 那两轮"主视觉上屏"在小游戏端**一次都没真的显示过** ——
+     当时只做了合成仿真（见 岗位回单/AI视觉工程师-主视觉真图落地.md 第七节），没在模拟器里看过。
+     网页版那边不受影响（CSS 走 HTTP，中文名正常），所以**两端文件名可以不同**，
+     "两端同一张图"改由**字节一致（sha256）**来钉（尺子 visual_audit ⑦ / mv_audit ⑧）。 */
+  const SRC = 'icons/mv-main-lamp.jpg';
   let img = null, imgOk = false;
   try {
     if (G.wx && typeof G.wx.createImage === 'function') {
       img = G.wx.createImage();
-      img.onload = function () { imgOk = true; };
+      /* 图到位之后**补重画一帧**：主画面（gate）这一类页面不是每秒重画的（只有灯阁首页在跳秒），
+         图晚到一步就会一直停在"只有底色"的那一帧上（实测：模拟器 2.5 秒截图里主视觉是空的）。 */
+      img.onload = function () { imgOk = true; try { CV.render(); } catch (e) {} };
       img.onerror = function () { imgOk = false; };
       img.src = SRC;
     }
@@ -112,13 +121,18 @@
     }
     scrim(c, 0.72, 0.28, 0.86);
 
-    /* 活字：游戏名（＝备案名，一字不差）＋ 副题 ＋ 加载条 ＋ 版本 */
+    /* 品牌：**题字图**（父亲大人自制 `icons/logo-title.png`）＋ 副题 ＋ 加载条 ＋ 版本。
+       V1.1.11：原来这两行都是活字；现在上面那行换成他的图（`U.brandTitle`，
+       与主画面 gate 同一处出口 —— 不许在这里再写一份算式）。图没到位时它会**自动退回活字**
+       「残域灯阁」，所以"第一帧不是黑的、也不空"这条仍然成立。 */
     const cx = CV.W / 2;
-    const ty = CV.H * 0.42;
-    CV.text('残域灯阁', cx, ty, { size: CV.DISP.d3, bold: true, align: 'center', color: CV.C.gold, ls: 4 });
-    CV.text('提灯入残域', cx, ty + 30 * CV.SCALE, { size: CV.FS.lg, align: 'center', color: CV.C.text2, ls: 4 });
+    const brandW = Math.min(CV.W * 0.72, 460 * CV.SCALE);
+    const brandH = U.brandTitleH(brandW);
+    U.brandTitle(cx - brandW / 2, CV.H * 0.42 - brandH / 2, brandW);
+    const ty = CV.H * 0.42 + brandH / 2;
+    CV.text('提灯入残域', cx, ty + 26 * CV.SCALE, { size: CV.FS.lg, align: 'center', color: CV.C.text2, ls: 4 });
     const bw = CV.W * 0.34, bh = 3 * CV.SCALE;
-    const bx = cx - bw / 2, by = ty + 60 * CV.SCALE;
+    const bx = cx - bw / 2, by = ty + 56 * CV.SCALE;
     CV.round(bx, by, bw, bh, CV.RADIUS_CHIP, CV.a(CV.C.gold, 0.18));
     /* 来回走的灯芯：不定进度（真正的结束信号是这一层自己淡出，不是进度走满） */
     const kw = bw * 0.4;
@@ -132,8 +146,9 @@
       { size: CV.FS.sm, align: 'center', color: CV.C.dim });
     /* V1.0.3（AI 视觉工程师 · 提审硬要求）：这里原来还有一行适龄提示 —— 删掉了。
        原因：首屏只停 1.5 秒、还能点一下跳过，**一闪而过不叫"显著"**（网页版那边同一处也是这么删的）。
-       适龄提示现在住在**常驻的合规闸**上（js/sc-start.js 的两页，点一下能看全文），
-       全文另外在「设置与存档」里留一份；品牌首屏这一屏只留品牌。 */
+       V1.0.6：主画面上那颗适龄徽标也撤了（父亲大人 2026-09-23：「适龄好像到时上线小程序会
+       自己打，这些等审核通过再说吧」），适龄全文只留在「设置与存档」那张卡里；
+       品牌首屏这一屏只留品牌（合规岗 2.6.2 要的是《健康游戏忠告》全文，它常驻在主画面上）。 */
     c.restore();
   }
 
@@ -148,4 +163,18 @@
     cover(c, 0.42, 0.62);
     scrim(c, 0.68, 0.62, 0.72);
   });
+
+  /* ---------- ③ 主画面的背影（V1.0.5；V1.0.6 只服务 `gate` 一页）----------
+     父亲大人："开局的适龄和版权两个弹窗可以不要，主画面可以在初次登陆选完血统出现，
+     上面有个按钮写进入残域" —— 主画面这一页（`gate`）在网页版是**主视觉满屏铺**：
+     `#boot::before`（同一张真图 cover）＋ `#boot::after`（0.72 / 0.28@42% / 0.86 的竖向渐隐）。
+     画布这端照同一条画（same 图、same 档位），两端才是同一个观感。
+     V1.0.6：原来 `copyright` 那页也挂这层背影，整页已按父亲大人的话删掉（著作权不要），
+     所以这里只剩 `gate` 一次登记。忠告卡是**实底**（U.card → CV.C.panel），
+     正文对比度不吃背景的亏（尺子 visual_audit ⑩ 的对比度那条两端各钉一次）。 */
+  function mainVeil(c) {
+    cover(c, 1, 0.5);
+    scrim(c, 0.72, 0.28, 0.86);
+  }
+  CV.veilPage('gate', mainVeil);
 })();

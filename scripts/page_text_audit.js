@@ -34,7 +34,19 @@ const TEXT = [];
 const TXY = [];
 const ctxStub = new Proxy({}, {
   get(t, k) {
-    if (k === 'measureText') return (s) => ({ width: String(s == null ? '' : s).length * 7 });
+    /* V1.0.6：字宽模型以前是 `字数 × 7` —— 对中文**严重低估**（12px 汉字实宽 12），
+       于是"假环境里的折行位置"和真机差得远：炼化台那行「配方：…（现有 基础金属 50 ·」
+       在假环境里被算成"行尾挂着一个 ·"，真机上那个 `·` 明明在下一行的中间（我用真宽模型量过）。
+       现在与 layout_audit / detail_audit 用**同一套模型**（中文≈字号 / 西文≈0.55 / emoji≈1.1），
+       三把尺子对同一句话量出同一个宽度，不再各算各的。 */
+    if (k === 'measureText') return (s) => {
+      const m = /(\d+(?:\.\d+)?)px/.exec(String(t.font || ''));
+      const size = m ? +m[1] : 11;
+      return { width: Array.from(String(s == null ? '' : s)).reduce((a, c) => {
+        const n = c.codePointAt(0);
+        return a + (n > 0x1F000 ? size * 1.1 : (n > 127 ? size : size * 0.55));
+      }, 0) };
+    };
     if (k === 'fillText') return (s, x, y) => { TEXT.push(String(s)); TXY.push({ x: Number(x) || 0, y: Number(y) || 0 }); };
     if (k === 'createLinearGradient') return () => ({ addColorStop() {} });
     const props = ['font', 'fillStyle', 'strokeStyle', 'lineWidth', 'globalAlpha', 'textAlign',
@@ -143,6 +155,39 @@ Object.keys(CV.panels || {}).forEach((name) => {
 });
 if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Object] ✓');
 
+/* ①-d V1.1.9（丙组"顺手全库扫一遍"）：**别处还有没有把内部字段名直接拼进给玩家看的字符串**。
+   判据（可复核、可做坏试验）：给玩家看的字符串里出现"裸的键名拼加号"这种形状 ——
+   最典型的就是旧扫荡那条 `parts.push(k + '+' + agg[k])`（`k` 是 `points`/`otherworld` 这类内部键）。
+   这里扫的是**界面层源码**里的那几种形状，命中就报出来（要人工判是不是真漏给玩家看）。 */
+{
+  const uiFiles = fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)).concat(['uiw.js']);
+  const SHAPES = [
+    [/\bObject\.keys\(agg\)\.forEach/, 'Object.keys(agg) 直接拼串（旧扫荡那种）'],
+    [/\bparts\.push\(k\s*\+\s*'\+'/, "parts.push(k + '+') —— 内部键名直接上屏"],
+    [/\bkey\s*\+\s*'\+'\s*\+\s*/, "key + '+' + 值 —— 内部键名直接上屏"],
+    /* V1.1.9（丙组 · 改坏试验补的盲区）：上面三条认的是**旧代码的变量名**（`agg` / `key` / `parts.push`）——
+       把变量名一换（`byCur` / `k`）就整条溜过去了（实测：改坏版就是这么绕过静态那条、只剩动态那条红）。
+       所以补一条**认形状不认名字**的：`Object.keys(X).forEach(function (k) { … k + '+' … })`
+       —— 即"**拿循环变量本身当文案**"。这是内部键名漏上屏的充分指纹。
+       ⚠️ 别把它放宽成 `任意名 + '+'`：`sc-bag.js` 的 `eqBrief` 就在 `.name + '+' + 数值`
+       （那是**查过名的合法用法**），放宽了当场报假警。 */
+    [/\bObject\s*\.\s*keys\s*\([^()]*\)\s*\.\s*forEach\s*\(\s*function\s*\(\s*([A-Za-z_$][\w$]*)\s*\)[\s\S]{0,300}?\b\1\s*\+\s*'\+'/,
+      "拿循环变量本身当文案（Object.keys(X).forEach(k){ … k + '+' … }）—— 内部键名直接上屏"],
+  ];
+  const found = [];
+  uiFiles.forEach((f) => {
+    const src = fs.readFileSync(path.join(JS, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (t) => t.replace(/[^\n]/g, ' '));
+    SHAPES.forEach(([re, why]) => {
+      const m = re.exec(src);
+      if (m) found.push(f + ':' + src.slice(0, m.index).split('\n').length + '  ' + why);
+    });
+  });
+  if (found.length) { badText++; console.log('  ✗ 还有"内部字段名拼进屏幕文案"的形状：\n      ' + found.join('\n      ')); }
+  else console.log('  全库扫一遍：没有"内部字段名直接拼进屏幕文案"的形状 ✓');
+}
+
 /* ①-b 残句：一行画完却"话没说完"（行尾挂着 · → + / ： 这种连接符）。
    这是"少写了半句"的通用指纹 —— V9.6.141 药园那行就是「可种「下品灵田」：◉ 800 · 」
    （产物、稀有掉落全没了）。它**不含 undefined**，所以上面那条抓不到；
@@ -198,7 +243,7 @@ if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Obj
     ['garden', () => '已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块'],
     ['authority', () => 'Lv.' + (Core.S.auth || 0) + ' / ' + D.AUTHORITY_MAX],
     ['keji', () => '已修 ' + D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0) + ' / ' + KEJI_TOTAL + ' 级'],
-    ['codex', () => '收集进度 ' + (Core.S.codex.chars || []).length + ' / ' + D.characters.filter(c => !c.hidden).length],
+    ['codex', () => '收集进度 ' + (Core.S.codex.chars || []).length + ' / ' + D.characters.length],
     ['realm', () => '已突破 ' + (Core.S.player.realm || 0) + ' / ' + D.REALM_STAGE_COUNT + ' 阶'],
   ];
   CASES.forEach(([page, fn]) => {
@@ -219,7 +264,7 @@ if (!badText) console.log('  所有页面都没有 undefined / NaN / [object Obj
    （按 y、再按 x 读），不是"排序函数返回了什么"，所以连"排版时又被打乱"也能抓到。 */
 {
   const S = Core.S;
-  const ids = D.characters.filter(c => !c.hidden).slice(0, 12).map(c => c.id);
+  const ids = D.characters.slice(0, 12).map(c => c.id);          // 2026-09-27：没有 hidden 概念了
   ids.forEach(id => Core.addChar(id));
   // 造出"等级 / 星级 / 稀有度互相交错"的场面，否则排序错了也看不出来
   ids.forEach((id, i) => { const c = S.chars[id]; c.lv = (i * 7) % 40; c.star = 1 + (i % 5); });
@@ -318,6 +363,12 @@ const RETIRED_TEXT = [
   [/凡体/, 'V8.1 起的第 1 阶境界不再是"凡体"'],
   [/跳过战斗/, 'V9.5.64 已删掉该按钮（战斗界面用"撤离"）'],
   [/个人房间/, '旧界面名，主角面板已并进主页最上面的主角卡'],
+  /* V1.1.9（甲组 · 文案正名）：把这一轮改掉的名字**钉在尺子上**，
+     免得以后哪一屏/哪段引导又写回旧口径（这三条都是"玩家一眼就看出没过脑子"的那类）。 */
+  [/灯阁市集|兑换大厅/, 'V1.1.9 甲组：入口 / 屏标题 / 来源 / 引导 / 指南 / 任务里一律叫「市集」'],
+  [/材料档/, 'V1.1.9 甲组：黑话，玩家可见文案改成"副本有概率掉落"'],
+  [/\bT[1-5]\s*档/, 'V1.1.9 甲组：T 档是内部编号，文案改成"低阶 / 中阶 / 高阶（点名材料名）"'],
+  [/W0\d\s*[~\-—]\s*W0\d/, 'V1.1.9 甲组：W 代号是内部编号，文案改成"第 1~5 张图"'],
 ];
 {
   let ret = 0;
@@ -435,6 +486,19 @@ const COMPLIANCE_TEXT = [
        只在 `if (X[old]) X = 新值` 里做比较用，**永远不进玩家眼睛**；而它们必须原样留着，
        不然老档迁不过来（见 save_migrate_audit 的 old_sign_words 那条）。
        摘的只有这一种形状（`*_RENAME` / `*RENAME*` 的单行对象），别当成"给文案开后门"。 */
+    /* V1.1.1（这一条修的是**尺子自己**，不是文案）：原来的正则只认"**单行**对象"
+       （`[^}]*` 不含换行），而 09-23 合规整改加的那张 `EQUIP_NAME_RENAME` 是**多行**写法，
+       于是它整段没被摘掉 → 26 条"备案禁词"假警报（镇魂/驱邪/缚灵/符咒/道袍/镇宅/佛珠/往生、
+       以及求签档位 大吉/上吉/中吉/小吉/末吉）。
+       证据：这些词全在**迁移映射表的键**里（`'镇魂铃': '沉铃'` 这种），
+       键是玩家老存档里的旧值、只在比较时用，**永远不进玩家眼睛**，而且是老档能迁过来的前提。
+       现在放宽成"`*RENAME*` 常量 + 花括号配平（含多行）"，并且要求 `const` 开头 ——
+       不会给真正的文案开后门（真要写禁词当显示文案，它不会长成 `const X_RENAME = {…}`）。 */
+    /* 两种真实形状都要认（09-26 实测）：
+       · 单行：`const SIGN_RENAME = getProxied({ '大吉': '长明', … });`
+       · 多行：`const EQUIP_NAME_RENAME = getProxied({\n '镇魂铃': '沉铃', …\n });`
+       —— 也就是"等号后面可能还包一层 `getProxied(`"。 */
+    .replace(/\bconst\s+\w*RENAME\w*\s*=[^;]*?\{[\s\S]*?\n\s*\}[\s)]*;/g, ' ')
     .replace(/\bconst\s+\w*RENAME\w*\s*=\s*\{[^}]*\}\s*;/g, ' ');
   let cmpSrc = 0;
   fs.readdirSync(JS).filter((f) => f.endsWith('.js')).forEach((f) => {
@@ -511,84 +575,204 @@ const own = Object.keys(Core.S.chars || {});
 expect('roster', own.slice(0, 6).map((id) => Core.charName(id)), '执灯者（伙伴名）');
 const partyIds = Object.keys(Core.S.party || {}).map((k) => Core.S.party[k]).filter(Boolean);
 expect('party', partyIds.map((id) => Core.charName(id)), '队伍（上阵名）');
-/* 背包默认停在「道具」页 —— 三个子页各切一次，各自的格子都得真的列出来 */
+/* 背包：V1.1.2（A11 并池）之后**只剩两个标签**（道具＋材料并成一个池、装备独立），
+   所以这把尺子跟着改：① 两个标签各切一次都要画出来；② **并池那一页要同时看得到
+   道具与材料的名字**（这正是"并池"那条要证的事——材料不再住在自己的标签里）。 */
 {
-  const tabs = [['item', '道具'], ['mat', '材料'], ['eq', '装备']];
+  const tabs = [['item', '道具'], ['eq', '装备']];
   tabs.forEach(([v, label]) => {
     try { CV.dispatch('bagview:' + v); } catch (e) {}
     const g = drawPage('bag');
     if (!g || !has(g, label)) { fails++; console.log('  ✗ 背包切到「' + label + '」页没画出来'); }
   });
-  try { CV.dispatch('bagview:mat'); } catch (e) {}
+  try { CV.dispatch('bagview:item'); } catch (e) {}
   const gm = drawPage('bag');
-  if (!gm || !has(gm, (D.ITEMS.mat_t1 || {}).name)) { fails++; console.log('  ✗ 背包材料页里看不到材料名'); }
+  if (!gm || !has(gm, (D.ITEMS.mat_t1 || {}).name)) { fails++; console.log('  ✗ 并池后「道具」页里看不到材料名（材料没并进同一个池）'); }
   try { CV.dispatch('bagview:item'); } catch (e) {}
 }
 expect('keji', D.KEJI.map((k) => k.name), '秘术阁（每条线）');
 expect('garden', ['第 1 块'], '药园（地块）');
 expect('sign', D.SIGNS.map((s) => s.tier), '点灯（灯焰档位）');
 
-/* ---------- ③ 开机合规（2026-09-23 · 提审硬要求；V1.0.3 重写） ----------
-   依据《微信小游戏平台运营规范》特别规范：
-     · 2.6.2《健康游戏忠告》—— 游戏开始前、显著位置**全文登载**；
-     · 2.6.1 —— 忠告**之后**设专门页，标明著作权人 / 出版服务单位 / 批准文号 / 出版物号；
-     · 6.1 适龄提示 —— 显著、可读。
+/* ---------- ③ 开机合规（2026-09-23 · 提审硬要求；V1.0.3 重写 · V1.0.6 忠告独立成弹窗） ----------
+   依据《微信小游戏平台运营规范》特别规范 **2.6.2**：
+     ·《健康游戏忠告》—— 游戏开始前、显著位置**全文登载**。
    上一版这一段只钉了两条：设置页有「适龄提示」、开机首屏有一行短标识。
-   现在开机首屏那行**主动删掉了**（1.5 秒一闪而过不叫显著），改成**常驻的合规闸两页**
-   （js/sc-start.js 的 notice / copyright）—— 所以这里按新形态重写，而且**断的是"缺了就红"**：
-   忠告四句少一句、著作权人少一个字段、适龄徽标只挂一页，都当场报出来。
-   两端同源依旧钉住：文案住在 data.js 的 COMPLIANCE 里，网页版与小游戏都从它取（谁手抄谁红）。 */
+   V1.0.3 把首屏那行主动删掉（1.5 秒一闪而过不叫显著），改成两页"必须点才放行"的合规闸；
+   V1.0.5 按父亲大人的原话（"开局的适龄和版权两个弹窗可以不要，主画面可以在初次登陆选完血统
+   出现，上面有个按钮写进入残域"）压成**主画面一页 ＋ 一个可点开的 2.6.1 专门页**
+   （js/sc-start.js 的 gate）。V1.0.6（父亲大人 2026-09-23：「著作权不要啊，个人的没有这个，
+   适龄好像到时上线小程序会自己打，这些等审核通过再说吧」，随后又改「健康游戏是独立的弹窗，
+   不要跟主画面做到一起」，时机选 **C＝冷启动先弹**）：
+     · 主画面只剩**两块**：品牌 ＋【进入残域】——**忠告不在这一屏上**；
+     · 《健康游戏忠告》四句全文搬进 `U.healthNotice` 弹窗（uiw.js），game.js 冷启动先弹它。
+   这一节是**双向**的：
+     缺了就红 —— 弹窗里的忠告标题 / 四句少一句 /【进入残域】不在；
+     多了也红 —— 主画面里又长出忠告、适龄徽标、著作权人那一行 / 入口、`copyright` 专门页。
+   ⚠️ 保留项只有一个：设置页那张**适龄卡**（父亲大人点名留的），它的全文必须在。
+   ⚠️ 空值字段**不许画出来**（本项目无版号，画「待填」比缺页更致命 —— 合规岗点名的最大风险）。
+  两端同源依旧钉住：文案住在 data.js 的 COMPLIANCE 里，网页版与小游戏都从它取（谁手抄谁红）。 */
 {
   const CO = D.COMPLIANCE || {};
-  const AGE_BADGE = CO.ageBadge, AGE_FULL = CO.ageFull;
+  const AGE_FULL = CO.ageFull;
   let ageBad = 0;
-  /* ① 合规闸第 1 页：忠告全文（逐句画出来，不是只画标题） */
-  const gNotice = drawPage('notice');
-  if (!gNotice) { ageBad++; console.log('  ✗ 合规闸第 1 页（notice）渲染失败'); }
+  /* ① 主画面（gate）：**只有**品牌 ＋【进入残域】——忠告、适龄、著作权一个都不该在这一屏上 */
+  const gGate = drawPage('gate');
+  if (!gGate) { ageBad++; console.log('  ✗ 主画面（gate）渲染失败'); }
   else {
-    if (!has(gNotice, CO.healthTitle)) { ageBad++; console.log('  ✗ 合规闸缺《' + CO.healthTitle + '》标题'); }
-    CO.healthAdvice.forEach((line) => {
-      if (!has(gNotice, line)) { ageBad++; console.log('  ✗ 合规闸的忠告少了一句：' + line); }
+    if (!has(gGate, CO.enterLabel)) { ageBad++; console.log('  ✗ 主画面没有「' + CO.enterLabel + '」按钮'); }
+    /* 查的是**画在屏上的字**（drawPage 只收 fillText 的字，源码注释里写着这些名字不算）。 */
+    const gateStream = gGate.join('');
+    if (gateStream.indexOf(CO.healthTitle) >= 0 || gateStream.indexOf(CO.healthAdvice[0]) >= 0) {
+      ageBad++; console.log('  ✗ 主画面里还画着《健康游戏忠告》—— 它已经搬进独立弹窗了（父亲大人：不要跟主画面做到一起）');
+    }
+    if (AGE_FULL && has(gGate, AGE_FULL)) {
+      ageBad++; console.log('  ✗ 主画面又把适龄全文画出来了 —— 那颗徽标 2026-09-23 已撤（只留设置页那张卡）');
+    }
+    const dropped = ['适龄提示', '著作权人', '待填'];
+    dropped.forEach((w) => {
+      if (has(gGate, w)) { ageBad++; console.log('  ✗ 主画面又画出了「' + w + '」—— 这一块已按父亲大人的话撤掉'); }
     });
-    if (!has(gNotice, AGE_BADGE)) { ageBad++; console.log('  ✗ 合规闸第 1 页没有「' + AGE_BADGE + '」'); }
   }
-  /* ② 合规闸第 2 页：著作权人信息专门页（2.6.1 点名的字段一个都不能少） */
-  const gOwner = drawPage('copyright');
-  if (!gOwner) { ageBad++; console.log('  ✗ 合规闸第 2 页（copyright）渲染失败'); }
-  else {
-    if (!has(gOwner, CO.ownerTitle)) { ageBad++; console.log('  ✗ 合规闸缺「' + CO.ownerTitle + '」这一页'); }
-    CO.ownerFields.forEach((f) => {
-      if (!has(gOwner, f.k)) { ageBad++; console.log('  ✗ 著作权人信息页缺字段：' + f.k); }
-    });
-    if (!has(gOwner, AGE_BADGE)) { ageBad++; console.log('  ✗ 合规闸第 2 页没有「' + AGE_BADGE + '」（适龄要两页都常驻）'); }
+  /* ②《健康游戏忠告》独立弹窗（U.healthNotice）：四句全文 ＋ 一颗按钮，必须真的画在屏上 */
+  const U = global.U;
+  if (!U || typeof U.healthNotice !== 'function') {
+    ageBad++; console.log('  ✗ uiw.js 里没有 U.healthNotice（忠告独立弹窗没实现）');
+  } else {
+    U.healthNotice(null);
+    const gNotice = drawPage(CV.top().name);      // 覆盖层也在这一帧里画出来
+    if (!gNotice) { ageBad++; console.log('  ✗ 忠告弹窗渲染失败'); }
+    else {
+      if (!has(gNotice, CO.healthTitle)) { ageBad++; console.log('  ✗ 忠告弹窗缺《' + CO.healthTitle + '》标题'); }
+      CO.healthAdvice.forEach((line) => {
+        if (!has(gNotice, line)) { ageBad++; console.log('  ✗ 忠告弹窗里少了这一句：' + line); }
+      });
+      if (!has(gNotice, '我知道了')) { ageBad++; console.log('  ✗ 忠告弹窗没有确认按钮（「我知道了」）'); }
+    }
+    U.overlay = null; CV.render();
   }
-  /* ③ 设置与存档：进游戏之后还查得到（忠告 ＋ 著作权人 ＋ 适龄全文） */
+  /* ③ 撤掉的 copyright 专门页不许留空壳（注册了就是审核员点开一片空白） */
+  if (CV.panels && CV.panels.copyright) {
+    ageBad++; console.log('  ✗ copyright（2.6.1 的著作权人信息专门页）还在注册表里 —— 整页已删，别留空壳');
+  }
+  /* ④ V1.1.6（父亲大人 09-26 原话）：「把设置里的…**适龄、健康游戏去掉**」。
+     口径**改了**（这是他的决定，不是在放宽合规）：设置页那两张卡撤掉，
+     所以这里改成断言"**设置页不再画这两段**"，并且把合规的落点钉回**冷启动那个独立弹窗**：
+       · 《健康游戏忠告》**全文仍在**（② 那一段逐句验的就是它，游戏开始前先弹、看完才进去）；
+       · 适龄提示改成"平台启动页自己打 + MP 后台那一栏自己设"，游戏内不再出现。
+     ⚠️ 这条尺子以后**不许**再加回"设置页必须有全文"——那会跟父亲大人的决定打架；
+        真要恢复入口，先问，再改这里。 */
   const gSet = drawPage('settings');
-  if (!gSet || !has(gSet, AGE_FULL)) { ageBad++; console.log('  ✗ 设置页的适龄提示少了全文那句：' + AGE_FULL); }
-  if (!gSet || !has(gSet, CO.healthAdvice[0])) { ageBad++; console.log('  ✗ 设置页没有《健康游戏忠告》全文'); }
-  if (!gSet || !has(gSet, CO.ownerFields[1].k)) { ageBad++; console.log('  ✗ 设置页没有著作权人信息'); }
-  /* ④ 开机顺序：第一页必须是合规闸（游戏开始前） */
+  if (gSet && has(gSet, AGE_FULL)) { ageBad++; console.log('  ✗ 设置页又画出了适龄提示全文 —— 父亲大人 09-26 已点名撤掉这张卡'); }
+  if (gSet && has(gSet, CO.healthAdvice[0])) { ageBad++; console.log('  ✗ 设置页又画出了《健康游戏忠告》全文 —— 忠实落在冷启动弹窗那边，这里不该再有'); }
+  /* ⑤ 同一条要求的另外两块（战斗速度 / 存档槽）—— 一并盯着，免得以后被"顺手加回来"。
+     V1.1.6（父亲大人 09-26）：「把设置里的**战斗速度**、**存档槽（就导出导入就行了，不要三个槽）**…去掉」。 */
+  ['战斗速度', '存档槽', '适龄提示', CO.healthTitle].forEach((w) => {
+    if (gSet && w && has(gSet, w)) { ageBad++; console.log('  ✗ 设置页又画出了「' + w + '」—— 父亲大人 09-26 已点名撤掉'); }
+  });
+  if (gSet && has(gSet, '著作权人')) { ageBad++; console.log('  ✗ 设置页还画着著作权人信息 —— 那份随主画面那颗入口一起撤了'); }
+  /* ⑤ 开机顺序（V1.0.6 · C 案）：**冷启动先弹忠告**，关掉才往下走 —— 页面先落在主画面
+        （弹窗背后就是它），关掉之后老档落主画面、新档落「欢迎（签契约）」；
+        首页只在点过【进入残域】之后才到得了。 */
   const gameSrc = fs.readFileSync(path.join(path.resolve(__dirname, '..'), 'game.js'), 'utf8');
-  const bootPart = gameSrc.slice(gameSrc.indexOf('CV.splash('));
-  const firstReset = bootPart.slice(bootPart.indexOf('CV.reset('), bootPart.indexOf('CV.reset(') + 20);
-  if (firstReset.indexOf("'notice'") < 0) { ageBad++; console.log('  ✗ 开机第一页不是合规闸：' + firstReset.replace(/\s+/g, ' ')); }
+  /* ⚠️ 先剥注释再找位置：game.js 里那段 P0 说明（"首次安装白屏"）引用了 `CV.splash()` 与
+     `CV.reset(...)` 的**字面写法**，直接 indexOf 会命中注释 → 取到一段不是代码的"第一次 reset"，
+     这条断言就凭空红（本单实测踩到）。 */
+  const gameCode = gameSrc.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  const bootPart = gameCode.slice(gameCode.indexOf('CV.splash('));
+  /* 第一页＝主画面（弹窗背后那一层）；关掉弹窗之后那一次 reset 才是"新档 welcome / 老档 gate" */
+  const firstReset = bootPart.slice(bootPart.indexOf('CV.reset('), bootPart.indexOf('CV.reset(') + 200)
+    .replace(/\s+/g, ' ');
+  if (!/'gate'/.test(firstReset)) {
+    ageBad++; console.log('  ✗ 开机第一页不是主画面（弹窗背后那一层）：' + firstReset.slice(0, 90));
+  }
+  if (!/G\.U\.healthNotice|U\.healthNotice/.test(bootPart)) {
+    ageBad++; console.log('  ✗ 开机没有弹《健康游戏忠告》（game.js 里没调 healthNotice）');
+  }
+  const afterNotice = bootPart.slice(bootPart.indexOf('function afterHealthNotice'),
+    bootPart.indexOf('function afterHealthNotice') + 260).replace(/\s+/g, ' ');
+  if (!/'welcome'/.test(afterNotice) || !/'gate'/.test(afterNotice)) {
+    ageBad++; console.log('  ✗ 关掉忠告之后没有"新档欢迎 / 老档主画面"的分支：' + afterNotice.slice(0, 90));
+  }
+  const startSrc2 = fs.readFileSync(path.join(JS, 'sc-start.js'), 'utf8');
+  if (!/CV\.on\('gate_enter'[\s\S]{0,160}CV\.reset\('home'\)/.test(startSrc2)) {
+    ageBad++; console.log('  ✗ 【进入残域】没有接上首页（gate_enter → home）');
+  }
   const splashSrc = fs.readFileSync(path.join(JS, 'sc-splash.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
-  if (splashSrc.indexOf(AGE_BADGE) >= 0) { ageBad++; console.log('  ✗ 品牌首屏还挂着「' + AGE_BADGE + '」（1.5 秒一闪而过，已改成常驻闸）'); }
+  /* 品牌首屏（1.5 秒）里不许挂任何合规文案 —— 合规那块归主画面（常驻），首屏只留品牌。 */
+  if (/适龄提示|健康游戏忠告/.test(splashSrc)) {
+    ageBad++; console.log('  ✗ 品牌首屏又挂上合规文案了（1.5 秒一闪而过的那条老毛病）');
+  }
   /* ⑤ 两端同源：两边都从 data.js 的 COMPLIANCE 取，谁也不许手抄原文 */
   const WEB = path.resolve(JS, '../../wxlh-game');
   const webUi = fs.existsSync(path.join(WEB, 'js/ui.js')) ? fs.readFileSync(path.join(WEB, 'js/ui.js'), 'utf8') : '';
   const webMain = fs.existsSync(path.join(WEB, 'js/main.js')) ? fs.readFileSync(path.join(WEB, 'js/main.js'), 'utf8') : '';
+  /* 查"那套代码还在不在"要把注释剥掉 —— 网页版 main.js 的注释里就写着「hideBoot 已删」。 */
+  const webMainCode = webMain.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n').replace(/\/\*[\s\S]*?\*\//g, ' ');
   const webHtml = fs.existsSync(path.join(WEB, 'index.html')) ? fs.readFileSync(path.join(WEB, 'index.html'), 'utf8') : '';
-  if (webUi.indexOf('D.COMPLIANCE') < 0) { ageBad++; console.log('  ✗ 网页版 ui.js 没有从 D.COMPLIANCE 取合规文案（两端会各抄一份）'); }
-  if (webUi.indexOf('抵制不良游戏') >= 0) { ageBad++; console.log('  ✗ 网页版 ui.js 手抄了忠告原文 —— 必须从 data.js 取'); }
-  if (webMain.indexOf('UI.showComplianceGate') < 0) { ageBad++; console.log('  ✗ 网页版开机没过合规闸（main.js 没调 showComplianceGate）'); }
-  const webBoot = webHtml.slice(webHtml.indexOf('id="boot"'), webHtml.indexOf('id="app"')).replace(/<!--[\s\S]*?-->/g, ' ');
-  if (/适龄提示|健康游戏忠告/.test(webBoot)) { ageBad++; console.log('  ✗ 网页版品牌首屏又夹了合规文案（那边同样改成常驻闸了）'); }
+  /* V1.1.11（网页版归档）：下面六条**全是查网页版**的（"两端别各抄一份"那类）。
+     网页版本地已删、归档在 GitHub（commit 589bebb）→ 没有基准可比，整段 ⏭ 跳过、不计失败；
+     本端（小游戏）对应的合规断言在别处照常钉着。 */
+  const WEB_OK = webUi !== '' || webMain !== '' || webHtml !== '';
+  if (!WEB_OK) {
+    console.log('  ⏭ 网页版合规对表 6 条（网页版已归档，本条退役）');
+  } else {
+    if (webUi.indexOf('D.COMPLIANCE') < 0) { ageBad++; console.log('  ✗ 网页版 ui.js 没有从 D.COMPLIANCE 取合规文案（两端会各抄一份）'); }
+    if (webUi.indexOf('抵制不良游戏') >= 0) { ageBad++; console.log('  ✗ 网页版 ui.js 手抄了忠告原文 —— 必须从 data.js 取'); }
+    if (webMain.indexOf('UI.showMainScreen') < 0) { ageBad++; console.log('  ✗ 网页版开机没画主画面（main.js 没调 showMainScreen）'); }
+    if (/hideBoot|boot-out/.test(webMainCode)) { ageBad++; console.log('  ✗ 网页版 main.js 又有"主画面自己淡出"那套（一屏文案一闪而过不叫登载）'); }
+    const webBoot = webHtml.slice(webHtml.indexOf('id="boot"'), webHtml.indexOf('id="app"')).replace(/<!--[\s\S]*?-->/g, ' ');
+    if (/适龄提示|健康游戏忠告/.test(webBoot)) { ageBad++; console.log('  ✗ 网页版 index.html 又手抄了合规文案（那一块由 ui.js 从 D.COMPLIANCE 画）'); }
+  }
   const miniStart = fs.readFileSync(path.join(JS, 'sc-start.js'), 'utf8');
   if (miniStart.indexOf('D.COMPLIANCE') < 0) { ageBad++; console.log('  ✗ 小游戏 sc-start.js 没有从 D.COMPLIANCE 取文案'); }
   else if (miniStart.indexOf('抵制不良游戏') >= 0) { ageBad++; console.log('  ✗ 小游戏 sc-start.js 手抄了忠告原文'); }
-  if (!ageBad) console.log('  开机合规闸两端同源：忠告全文 ＋ 著作权人信息 ＋ 适龄（常驻、可点开全文）✓');
+  /* 撤掉的字段不许在数据层留孤儿（两端都从同一份 data.js 取）。 */
+  const droppedFields = ['ownerFields', 'ownerTitle', 'ownerNote', 'ownerEntry', 'ageBadge']
+    .filter((k) => Object.prototype.hasOwnProperty.call(CO, k));
+  if (droppedFields.length) { ageBad++; console.log('  ✗ COMPLIANCE 里还留着已撤掉的字段（孤儿）：' + droppedFields.join(' / ')); }
+  if (!ageBad) console.log('  主画面两端同源：忠告四句在**独立弹窗**里、主画面只剩品牌 ＋【进入残域】'
+    + '（V1.1.6：适龄 / 著作权人 / 设置页那两张卡都撤干净了 —— 忠告全文只走**冷启动弹窗**这一条路）✓');
   fails += ageBad;
+}
+
+/* ================= V1.1.9（丙组 · 扫荡结算页）=================
+   父亲大人截图证据：`0 次:points+710 · otherworld+20 · 🗡装备×1 · EXP+480 ·`（还横着溢出屏幕）。
+   ⚠️ 这一段**必须放在文件最后**：它要 `Core.newGame()` 造自己的档 ——
+      第一版插在中间，把后面那些用例的状态洗了（"并池后看不到材料名"当场变红，其实是尺子自己的顺序问题）。 */
+{
+  const BAD_KEYS = ['points', 'otherworld', 'mat_t', 'box_', 'equip+', ':points', 'exp:'];
+  let sweepText = null, sweepErr = null;
+  try {
+    Core.newGame(); Core.setPlayerName('扫荡');
+    (D.UNLOCKS || []).forEach((u) => { Core.S.unlocks[u.id] = true; });
+    Core.S.worlds.W01.stages.normal = Core.S.worlds.W01.stages.normal.map(() => 3);
+    Core.S.sweep = { date: Core.dailyDate(), count: 0, bonus: 0, adBonus: 0 };
+    /* **走真路径**（不是验我自己抄的一份）：世界页 → 扫荡页 → 点「扫荡 ×1」——
+       这一下跑的就是 `doSweep` 本体（它自己会调 `BattleUI.showResult` 挂结算页）。
+       第一版这里是"照它的口径自己拼一遍胶囊"，那验的是抄件，改坏 `doSweep` 也验不出来。 */
+    if (U && U.coachDrop) U.coachDrop();
+    CV.dispatch('w:W01');            // 进世界详情
+    CV.dispatch('sweep_open');       // 进扫荡页
+    if (U && U.coachDrop) U.coachDrop();
+    CV.dispatch('sweep_1');          // ← 真扫荡一次
+    sweepText = drawPage('battle');  // 结算页挂在 battle 页的 pageOverlay 上
+  } catch (e) { sweepErr = e.message; }
+  if (sweepErr) { fails++; console.log('  ✗ 扫荡结算页渲染抛错：' + sweepErr); }
+  else if (!sweepText) { fails++; console.log('  ✗ 扫荡结算页没画出来（BattleUI.showResult 没生效？）'); }
+  else {
+    /* 画布上一条文字可能被**逐字画**（缺字形时一个码点一次 fillText）→ 按 y 拼回整行再查 */
+    const stream = linesOf(sweepText, LAST_POS).join('|');
+    const leaked = BAD_KEYS.filter((k) => stream.indexOf(k) >= 0);
+    const hasCount = /扫荡\s*\d+\s*次/.test(stream);
+    /* ⚠️ "货币图标"**不能用抓字来验**：`◉ / ◆` 是走**图形路径**画的（V1.0.6 的图标形状系统），
+       不落 fillText —— 所以改成"必须出现带 + 的数字"（证明资源是真列出来的，不是被静默丢掉）。 */
+    const hasNum = /\+\s*\d/.test(stream);
+    if (leaked.length) { fails++; console.log('  ✗ 扫荡结算页漏了内部字段名：' + leaked.join(' / ') + '　← 玩家会看到"乱码"'); }
+    if (!hasCount) { fails++; console.log('  ✗ 扫荡结算页没写"扫荡 N 次"（他截图里那条开头就是它）'); }
+    if (!hasNum) { fails++; console.log('  ✗ 扫荡结算页没有列出任何"数量"（资源被静默丢了？）'); }
+    if (!leaked.length && hasCount && hasNum) console.log('  扫荡结算页：无内部键名 · 有"扫荡 N 次" · 数量都列出来了 ✓');
+  }
 }
 
 const totalBad = fails + badText + retiredHits;

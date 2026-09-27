@@ -138,8 +138,16 @@ function fresh(rich) {
 
 console.log('\n=== 关键路径体检（真触摸，按"事"走）===');
 
-/* ① 开局三步：签契约 → 起名 → 选血统 → 首页 */
+/* ① 开局三步：签契约 → 起名 → 选血统 → 主画面 → 首页
+   V1.0.6 起冷启动先落**主画面**（gate），《健康游戏忠告》是它上面的弹窗；
+   忠告关掉（game.js 的 afterHealthNotice）新档才落到 welcome，
+   签契约 / 起名 / 选血统走完落回主画面，再点【进入残域】才进首页。
+   这把尺子照真顺序走一遍 —— 少一步就是把"玩家到底怎么进来的"测歪了。 */
 Core.newGame();
+CV.reset('gate');
+const okGate = page() === 'gate';
+tapId('gate_enter');                       // 主画面上唯一的出口
+const okGateHome = page() === 'home';
 CV.reset('welcome');
 tapId('welcome_ok');
 const p1 = page();
@@ -147,7 +155,9 @@ tapId('name_ok');
 CV.render();
 tapId('bl_pick:');
 tapId('_cf_yes');
-t('① 开局三步走得通（欢迎 → 起名 → 选血统 → 首页）', page() === 'home', '终点页 ' + page());
+if (page() === 'gate') tapId('gate_enter');   // 建档走完落回主画面 → 进入残域
+t('① 开局三步走得通（主画面 → 欢迎 → 起名 → 选血统 → 主画面 → 首页）',
+  okGate && okGateHome && page() === 'home', '终点页 ' + page());
 
 /* ② 上阵：首页 → 队伍 → 空位 → 挑人 → 选伙伴 */
 fresh(true);
@@ -206,7 +216,10 @@ t('⑥ 首页点「收取奖励」有反应', !!Core.S.idle && (Core.S.idle.bank
 {
   const entries = ['open_grow', 'open_sect', 'open_keji', 'open_fabao', 'open_garden', 'open_arena', 'open_mount',
     'open_refine', 'open_authority', 'open_buildings', 'open_genelock', 'open_beast', 'open_reincarn', 'open_codex',
-    'open_bounty', 'open_tasks', 'open_sign', 'open_shop', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings'];
+    /* V1.1.5（A1）：`open_bounty` 撤了 —— 悬赏并进「任务」页（同一页第一段），
+       主页不再有那一格，所以这条名单里也不能再有它（《定调与口径》§7 点名的必改项）。
+       新加 `open_ach`：成就从任务页搬出来独立成页，主页那一格直连。 */
+    'open_tasks', 'open_ach', 'open_sign', 'open_shop', 'open_travel', 'open_idlelines', 'open_guide', 'open_settings'];
   /* V9.6.134：顶栏那四颗货币胶囊现在**每一颗都能点**（点了开货币图鉴），
      所以这里改成验「四颗 currency 热区都在、且都能打开图鉴」——
      原来只验一颗 `open_currency`（那颗「▤ 全部货币」已经撤了）。 */
@@ -226,6 +239,49 @@ t('⑥ 首页点「收取奖励」有反应', !!Core.S.idle && (Core.S.idle.bank
     if (!backHome()) { bad.push(id + ' → ' + pg + '(回不了首页)'); }
   });
   t('⑦ 23 个入口：都能开、引导都能脱身、都能回首页', bad.length === 0, bad.length ? bad.slice(0, 4).join(' / ') : '全部通过');
+}
+
+/* ⑧ V1.1.5（A2）· 父亲大人：「养成和日常你整理一下顺序，从常用到不常用重新排下序」。
+   顺序表落在逻辑层 `data.js:HOME_GROUPS`（唯一真相），界面**按表摆**。
+   三条一起钉，缺一条都说明"已经分叉"：
+     ① **表 ＝ 总监排定的顺序**（那一份写在这里当基准）→ 表被人改了当场红；
+     ② **画出来的 ＝ 表**（逐格比对热区顺序，不是比对源码）→ 界面自己另搞一套当场红；
+     ③ 悬赏并进任务页之后，主页**不许**再有 `open_bounty` 那一格（A1 的收尾）。
+   ⚠️ 只写 ①②③ 里的 ②③ 是**空断言**：把表里的两行换一下，界面跟着换、两边照样相等
+      （第一版就是这么写的，我拿"改坏试验"当场验出来）。所以①必须有。 */
+{
+  /* ①＝《定调与口径》§3.2 的两张表，逐字抄在这里当基准 */
+  const WANT = {
+    grow: ['open_garden', 'open_arena', 'open_party', 'open_grow', 'open_buildings', 'open_keji',
+      'open_fabao', 'open_refine', 'open_mount', 'open_sect', 'open_authority', 'open_genelock',
+      'open_beast', 'open_codex', 'open_reincarn'],
+    daily: ['open_tasks', 'open_sign', 'open_recruit', 'open_shop', 'open_ach'],
+  };
+  const tableBad = [];
+  (D.HOME_GROUPS || []).forEach((g) => {
+    const want = WANT[g.id];
+    if (!want) { tableBad.push('多出一组 ' + g.id); return; }
+    const got = g.members.map((m) => m.id);
+    if (got.join(',') !== want.join(',')) tableBad.push(g.name + '：' + got.join('>'));
+  });
+  t('⑧a 顺序表 = 总监《定调与口径》§3.2 排定的顺序（15 ＋ 5，一条不多不少）',
+    tableBad.length === 0 && (D.HOME_GROUPS || []).length === 2,
+    tableBad.length ? tableBad.join(' / ') : '养成 15 · 日常 5');
+
+  fresh(false);
+  if (U.coachActive()) runCoachChain(8);
+  const order = (CV.hits || []).map((h) => String(h.id));
+  const groups = (D.HOME_GROUPS || []);
+  const bad2 = [];
+  groups.forEach((g) => {
+    const want = g.members.map((m) => m.id);
+    const got = order.filter((id) => want.indexOf(id) >= 0);
+    if (got.join(',') !== want.join(',')) bad2.push(g.name + '：期望 ' + want.join('>') + '，实际 ' + got.join('>'));
+  });
+  t('⑧b 主页画出来的顺序 = data.js:HOME_GROUPS（界面不维护第二份名单）', bad2.length === 0,
+    bad2.length ? bad2.join(' / ') : groups.map((g) => g.name + ' ' + g.members.length + ' 格').join(' · '));
+  t('⑧c 悬赏并进任务页之后，主页不再有「限时悬赏」那一格', order.indexOf('open_bounty') < 0,
+    order.indexOf('open_bounty') < 0 ? '已撤' : '**还挂着**');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed\n');

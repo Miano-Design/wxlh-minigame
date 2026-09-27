@@ -15,6 +15,13 @@
   const fmt = G.fmt || ((n) => String(n));
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
   let last = null;                 // 上一次抽的结果（继续招募用）
+  /* V1.1.x（2026-09-27 · 音频系统）：抽卡出声 —— **出货（SSR/UR）给一声亮的**，
+     其余给一声柔和的落定音。放在"拿到结果之后"，与结果页同一拍。 */
+  function sndResults(list) {
+    if (!(G.AUD && G.AUD.play)) return;
+    const rare = (list || []).some(function (r) { return r && (r.rarity === 'SSR' || r.rarity === 'UR'); });
+    G.AUD.play(rare ? 'recruitRare' : 'recruit');
+  }
 
   const mmss = (sec) => String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(Math.max(0, sec % 60)).padStart(2, '0');
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
@@ -29,32 +36,55 @@
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'rec_back');
     CV.text('招募伙伴', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    const iw = 34 * CV.SCALE;
-    CV.round(U.pad() + U.cw() - iw, U.y + 3 * CV.SCALE, iw, iw, iw / 2, CV.C.panel, CV.C.line2);
-    CV.text('i', U.pad() + U.cw() - iw / 2, U.y + 3 * CV.SCALE + iw / 2, { size: CV.FS.f1, bold: true, align: 'center', color: CV.C.text2 });
-    CV.hit('rec_rates', U.pad() + U.cw() - iw, U.y + 3 * CV.SCALE, iw, iw);
+    /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 5 条）：页头那个 ⓘ 照网页版
+       `.page-head .info-i`（占位 **2.5rem＝40px**，与左边返回键等宽）＋ `.info-i::after`
+       （里面那颗圆只有 **1.25rem＝20px**、边框 line2、底 panel2、`--fs-md` 12px 斜体 Georgia、色 --dim）。
+       小游戏原来是"40px 热区配 34px 圆圈 + 15px 粗白字"——圆圈比网页版大 70%、
+       字比网页版大一档还改成白色，页头一眼就不一样。 */
+    const ibox = 40 * CV.SCALE, icir = 20 * CV.SCALE;      // 2.5rem 占位 / 1.25rem 圆圈
+    const ibx = U.pad() + U.cw() - ibox, iby = U.y + (U.BTN_SM * CV.SCALE - ibox) / 2;
+    CV.round(ibx + (ibox - icir) / 2, iby + (ibox - icir) / 2, icir, icir, icir / 2, CV.C.panel2, CV.C.line2);
+    CV.text('i', ibx + ibox / 2, iby + ibox / 2, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+    CV.hit('rec_rates', ibx, iby, ibox, ibox);
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
 
     Object.keys(D.RECRUIT_POOLS).forEach(function (pid) {
       const p = D.RECRUIT_POOLS[pid];
       const tk = Core.ticketOf(pid);
       const tkName = tk ? ((D.ITEMS[tk.id] || {}).name || tk.id) : '';
+      /* V1.0.6（与结算胶囊同一处口径 · 父亲大人 2026-09-24：「配的就是背包图标」）：
+         券的图标也要取**它自己那张券的 icon** —— 三张券 🎫 / 🎋 / 🎴 各不相同，
+         写死一个 🎫 就等于"不一样的东西做成一样"。 */
+      const tkIco = tk ? (((D.ITEMS[tk.id] || {}).icon) || '🎫') : '🎫';
       const fst = Core.freeState(pid);
       const freeNow = fst.left > 0 && fst.ready;
       const costText = Object.keys(p.cost).map((k) => curIcon(k) + fmt(p.cost[k])).join('');
       const tenText = Object.keys(p.ten || p.cost).map((k) => curIcon(k) + fmt((p.ten || p.cost)[k])).join('');
-      const payLabel = (tk && tk.n >= 1) ? ('抽 1 次（🎫 ' + tkName + '×1）') : ('抽 1 次（' + costText + '）');
+      const payLabel = (tk && tk.n >= 1) ? ('抽 1 次（' + tkIco + ' ' + tkName + '×1）') : ('抽 1 次（' + costText + '）');
+      /* ================= V1.1.15（2026-09-27 · 派单 I 第 1 条 · 视觉复审 P0-2）=================
+         320 上两颗按钮的标签都被压成两行，而且**从金额中间断**：
+         「十连（◉ 4500）」→「十连（◉ 450」＋「0）」（父亲大人最常读的就是"花多少"，读错数）。
+         根因在 `U.btnRow`：它把每颗按"自然宽 × 可用宽/总自然宽"**等比缩到刚好铺满一行**，
+         缩完再交给 `U.btn` 按 `w − 16` 折行 —— 自然宽本来就不够，于是必折。
+         修法（**本页这几颗按钮的活**，不动 uiw.js 的通用件）：
+           ① 窄屏先把免费那串长标签收短（"今日还剩 N 次"→"剩 N"）；
+           ② 两颗的**自然宽**排不下就改竖排（一列一颗、整宽）—— 整宽时标签一定放得下，
+              宁可让卡长一点，也不许把数字劈开。
+         判据：`自然宽 a ＋ 自然宽 b ＋ 间距 ≤ U.iw()` 时一行必不折行
+         （U.btnRow 只会把宽度**放大**到铺满，放大不会造成折行）。 */
+      const near = CV.W < 360 * CV.SCALE;
       const oneLabel = fst.left > 0
-        ? (fst.ready ? ('免费抽 1 次（今日还剩 ' + fst.left + ' 次）') : (payLabel + ' · 免费还差 ' + mmss(fst.waitSec)))
+        ? (fst.ready ? (near ? ('免费抽1次（剩' + fst.left + '）') : ('免费抽 1 次（今日还剩 ' + fst.left + ' 次）'))
+          : (payLabel + ' · 免费还差 ' + mmss(fst.waitSec)))
         : payLabel;
-      const tenLabel = (tk && tk.n >= 10) ? ('十连（🎫 ' + tkName + '×10）') : ('十连（' + tenText + '）');
+      const tenLabel = (tk && tk.n >= 10) ? ('十连（' + tkIco + ' ' + tkName + '×10）') : ('十连（' + tenText + '）');
       U.card(function () {
         U.h3(p.name);
         /* 招募券行（网页版 .ticket-row）：有券 = 金色实线，没券 = 灰虚线 */
         const rowH = 26 * CV.SCALE;
         /* 网页版只在**有券**时才画这一行（`tk && tk.n > 0`）；没券什么都不显示 */
         if (tk && tk.n > 0) {
-          const txt = '🎫 ' + tkName + ' ×' + tk.n;
+          const txt = tkIco + ' ' + tkName + ' ×' + tk.n;
           CV.round(U.ix(), U.y, U.iw(), rowH, CV.RADIUS_CHIP,  null, CV.a(CV.C.goldBright, .4));
           CV.text(CV.fit(txt, U.iw() - 16 * CV.SCALE, CV.FS.xs), U.ix() + 9 * CV.SCALE, U.y + rowH / 2,
             { size: CV.FS.xs, color: CV.C.text });
@@ -88,10 +118,39 @@
             U.y += bh + 8 * CV.SCALE;
           }
         }
-        U.btnRow([
-          { label: oneLabel, style: freeNow ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') },
-          { label: tenLabel, style: 'gold', id: 'pull10:' + pid },
-        ]);
+        {
+          const one = { label: oneLabel, style: freeNow ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') };
+          const ten = { label: tenLabel, style: 'gold', id: 'pull10:' + pid };
+          /* 「一行放不放得下」必须**在卡片里量**（`U.iw()` 在卡内是卡内宽 268，在卡外是页宽 296）——
+             第一版把这段算在 `U.card` 外面，于是拿 296 去判、实际只有 268，
+             320 上「免费抽 1 次（剩 3）」被挤到只剩 141 宽，0.9px 之差把末尾的「）」折到第二行。
+             判法照抄 `U.btnRow` 那三行（自然宽 → 等比缩到铺满 → `U.btn` 按 `w − 16` 折行），
+             两颗都不折才走一行；只要有一颗要折就竖排（整宽时一定放得下）。 */
+          const oneRowFits = (function () {
+            const gap = 10 * CV.SCALE, minw = U.BTN_MINW * CV.SCALE;
+            const nat = [oneLabel, tenLabel].map((s) => Math.max(minw, CV.measure(s, CV.FS.lg) + 24 * CV.SCALE));
+            const avail1 = U.iw() - gap, sum = nat[0] + nat[1];
+            return [oneLabel, tenLabel].every(function (s, i) {
+              return Math.max(minw, nat[i] * avail1 / sum) - 16 * CV.SCALE >= CV.measure(s, CV.FS.lg) - 0.5;
+            });
+          })();
+          if (oneRowFits) U.btnRow([one, ten]);
+          else { U.btnRow([one]); U.space(CV.SP[1]); U.btnRow([ten]); }   // 排不下 → 竖排（一颗一行、整宽）
+        }
+        /* ================= V1.1.8（乙组 B7 · 高级池看广告免费 1 抽）=================
+           父亲大人的口径：**10 次/天**，每次免 1 抽（等价 ◆200）。
+           **只在高级池那一屏出现**（`pid === 'advanced'`）—— 别的池没有这个点位。
+           "未解锁不显示"这条**位置保证**：这一段在 `CV.isUnlocked('recruit')` 之后、且池子本身要已解锁
+           （`recruit` 页的整体入口就在解锁门后，见 sc-home 的 open_recruit）。
+           抽卡走 `Core.adRecruitAdv()`（内部复用 `recruitOnce(noCost)`，与付费抽同一段出率/保底）。 */
+        if (pid === 'advanced' && G.AD && G.AD.show) {
+          const adLeft = G.AD.left ? G.AD.left('recruit_adv') : 0;
+          U.space(CV.SP[1]);
+          U.btnRow([{
+            label: '📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）',
+            style: 'ghost', id: adLeft > 0 ? ('ad_pull1:' + pid) : 'noop', dis: adLeft <= 0,
+          }]);
+        }
       });
     });
     if (S.ssrTicket > 0) {
@@ -116,9 +175,17 @@
        10 连是 4 行 ≈ 4×107+3×10 = 458，加上标题与底部固定条仍在画内（854 的屏余量够）。 */
     const PAD = 10 * CV.SCALE, AV = 46 * CV.SCALE, AVGAP = 6 * CV.SCALE;
     const NAME_H = CV.FS.lg * 1.35, META_H = CV.FS.sm * 1.55;
-    /* V1.1（基准 §4.2）：卡底再让出 16px 画品质框 v2 的**档色铭牌 ＋ 档码字**。 */
-    const BAND = 16 * CV.SCALE;
-    const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * CV.SCALE + META_H + BAND;
+    /* V1.1（基准 §4.2）：卡底让出铭牌带画品质框 v2 的**档色铭牌 ＋ 档码字**。
+       V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 5 条）：带高照网页版
+       `[class*="rarity-"]::after` 的 **22px**（这里原来 16px）。
+       同时补上末行小字到铭牌之间的 **6px** —— 原式 `PAD*2 + …` 把下内边距也算成了 10px，
+       而铭牌一翻到 22px 就会直接压到最后一行小字上（复审实测只剩 0.5px 间距）。
+       网页版口径：.char-card padding-bottom 1.75rem(28) − 铭牌 1.375rem(22) = 6。 */
+    const BAND = 22 * CV.SCALE;                       // 铭牌高（网页版 1.375rem）
+    const BAND_PAD = 28 * CV.SCALE;                   // 卡片下内边距（网页版 1.75rem）＝铭牌 22 + 净空 6
+    /* 上内边距 10 + 内容 + 下内边距 28；算式沿用"内容从 PAD*2 起算"的老写法，
+       把 28 与 20 的差（18）补回来 —— 高度仍然完全由内容算出来，一个数都没写死。 */
+    const ch = PAD * 2 + AV + AVGAP + NAME_H + 2 * CV.SCALE + META_H + (BAND_PAD - PAD);
     const y0 = U.y;
     res.forEach(function (r, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
@@ -130,9 +197,10 @@
       }
       CV.qframe(x, y, cw, ch, r.rarity, 12 * CV.SCALE, BAND);
       if (r.isUp) {
-        const tw = CV.measure('UP', CV.FS.xs) + 10 * CV.SCALE;
+        /* 「UP」角标：网页版 .char-card .inparty 是**五级 11px**（原来画成 12px） */
+        const tw = CV.measure('UP', CV.FS.tag) + 10 * CV.SCALE;
         CV.round(x + cw - tw - 3 * CV.SCALE, y + 3 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
-        CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.sel });
+        CV.text('UP', x + cw - tw / 2 - 3 * CV.SCALE, y + 11 * CV.SCALE, { size: CV.FS.tag, align: 'center', color: CV.C.sel });
       }
       const acx = x + cw / 2, acTop = y + PAD;
       CV.ctx.beginPath(); CV.ctx.arc(acx, acTop + AV / 2, AV / 2 - CV.SCALE, 0, Math.PI * 2);
@@ -141,8 +209,14 @@
       CV.text(String(r.name || '?').slice(0, 1), acx, acTop + AV / 2, { size: AV * 0.44, bold: true, align: 'center', color: col });
       const nameCy = acTop + AV + AVGAP + NAME_H / 2;
       CV.text(CV.fit(r.name, cw - PAD * 2, CV.FS.lg, true), acx, nameCy, { size: CV.FS.lg, bold: true, align: 'center' });
-      /* V9.6.129：重复抽到进的是**该稀有度的通用池**，标注清楚（省得玩家以为还是各攒各的） */
-      CV.text(r.isNew ? 'NEW' : (r.rarity + '碎片+' + (r.shards || 0)), acx, nameCy + NAME_H / 2 + 2 * CV.SCALE + META_H / 2,
+      /* V1.1.14（0927-F · 父亲大人）：碎片**按抽到谁就是谁的** ——
+         没满星进**他自己**那份；**满星之后**才转成该稀有度的通用碎片（`r.to` 由 Core 给出）。
+         所以这行要**说清进的是谁的**（老文案写"UR碎片+10"，玩家会以为直接进通用池）。 */
+      const shardTxt = (r.to === 'pool')
+        ? (r.rarity + ' 通用 +' + (r.shards || 0))
+        : ('碎片 +' + (r.shards || 0));      /* 名字就在卡片正上方，行里不再重复写 ——
+                                                 写了会挤爆（实测「叶沉舟 碎片 +…」当场被砍） */
+      CV.text(r.isNew ? 'NEW' : CV.fit(shardTxt, cw - PAD * 2, CV.FS.sm), acx, nameCy + NAME_H / 2 + 2 * CV.SCALE + META_H / 2,
         { size: CV.FS.sm, align: 'center', color: r.isNew ? CV.C.green : CV.C.dim });
     });
     U.y = y0 + Math.ceil(res.length / cols) * (ch + gap);
@@ -212,14 +286,15 @@
       const pv = Core.pityView(pid);
       const tk = Core.ticketOf(pid);
       const tkName = tk ? ((D.ITEMS[tk.id] || {}).name || tk.id) : '';
+      const tkIco = tk ? (((D.ITEMS[tk.id] || {}).icon) || '🎫') : '🎫';   // 券自己的图标（V1.0.6）
       const rate = Object.keys(p.rates).map((r) => r + ' ' + (p.rates[r] * 100).toFixed(1) + '%').join('　');
       const cost = Object.keys(p.cost).map((k) => curIcon(k) + fmt(p.cost[k])).join(' + ');
       const ten = Object.keys(p.ten || p.cost).map((k) => curIcon(k) + fmt((p.ten || p.cost)[k])).join(' + ');
       U.sectionTitle(p.name);
       rateBlock([
         ['概率', rate],                     // 标签列别空着（父亲大人：看着像漏写了一个词）
-        ['单抽', cost + (tk ? ' · 或 🎫 ' + tkName + '×1（现有 ' + tk.n + ' 张）' : '')],
-        ['十连', ten + (tk ? ' · 或 🎫 ' + tkName + '×10' : '') + ' · 保底至少 1 个 SR'],
+        ['单抽', cost + (tk ? ' · 或 ' + tkIco + ' ' + tkName + '×1（现有 ' + tk.n + ' 张）' : '')],
+        ['十连', ten + (tk ? ' · 或 ' + tkIco + ' ' + tkName + '×10' : '') + ' · 保底至少 1 个 SR'],
       ], [
         { t: D.pityText(pid) },
         pv ? { t: 'SSR 还差 ' + Math.max(0, pv.ssr.cap - pv.ssr.n) + ' 抽 · UR 还差 ' + Math.max(0, pv.ur.cap - pv.ur.n) + ' 抽'
@@ -235,24 +310,41 @@
     const parts = String(arg).split(':');
     const pid = parts[0], isFree = parts[1] === 'free';
     const r = isFree ? Core.freeRecruit(pid) : Core.recruitOnce(pid);
-    if (r.error) { CV.toast(r.error); return; }
+    if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
     last = { results: isFree ? [r] : [r], pid: pid, n: 1, free: isFree };
+    sndResults(last.results);
     if (!isFree) { /* 单抽结果也给返回 */ }
     CV.push('recruit_result');
   });
   CV.on('pull10:*', function (arg) {
     const pid = String(arg).split(':')[0];
     const r = Core.recruitTen(pid);
-    if (r.error) { CV.toast(r.error); return; }
+    if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
     last = { results: r.results, pid: pid, n: 10, free: false };
+    sndResults(last.results);
     CV.push('recruit_result');
+  });
+  /* B7 · 高级池：看广告免费 1 抽（配额在 wx-adapter 的 LIMITS.recruit_adv ＝ 10/天） */
+  CV.on('ad_pull1:*', function (arg) {
+    const pid = String(arg).split(':')[0];
+    const AD = G.AD;
+    if (!AD || !AD.show) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast('这个版本没有广告模块'); return; }
+    AD.show('recruit_adv').then(function (r) {
+      if (!r || !r.granted) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r && r.reason === 'total' ? '今天看广告的次数用完了' : '今天这个免费次数用完了'); CV.render(); return; }
+      const got = Core.adRecruitAdv ? Core.adRecruitAdv() : null;
+      if (!got || got.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast((got && got.error) || '抽不了'); return; }
+      last = { results: [got], pid: pid, n: 1, free: true };
+      sndResults(last.results);
+      CV.push('recruit_result');
+    });
   });
   CV.on('again', function () {
     if (!last) { CV.toast('没有可继续的招募'); return; }
     const pid = last.pid, n = last.n;
     const r = n >= 10 ? Core.recruitTen(pid) : Core.recruitOnce(pid);
-    if (r.error) { CV.toast(r.error); return; }
+    if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
     last = { results: n >= 10 ? r.results : [r], pid: pid, n: n, free: false };
+    sndResults(last.results);
     CV.render();
   });
   /* ---------- SSR 自选券（网页版 ssrPickModal） ----------
@@ -276,12 +368,16 @@
       U.btnRow([{ label: '返回招募', style: 'primary', id: 'ssr_back' }]);
       return;
     }
-    U.note('选一名 SSR 伙伴入队；已拥有的伙伴会转成碎片。', 0);
+    /* V1.1.14（0927-F）：碎片改成"抽到谁就是谁的" —— 已拥有的进**他自己**那份；
+       他已经满星才会转成 SSR 通用碎片（可给同档别人用）。文案跟着说清。 */
+    U.note('选一名 SSR 伙伴入队；已拥有的伙伴会进**他自己的碎片**（他满星之后才转成 SSR 通用碎片，同档别人可以用）。', 0);
     U.space(CV.SP[2]);
-    const ssrs = D.characters.filter(function (c) { return c.rarity === 'SSR' && !c.hidden; });
+    /* 2026-09-27（父亲大人："就没有隐藏角色这种概念"）：自选池不再排除任何人 */
+    const ssrs = D.characters.filter(function (c) { return c.rarity === 'SSR'; });
     const cols = 3, gap = CV.SP[2];
-    /* V1.1（基准 §4.2）：让出 16px 给品质框 v2 的铭牌。 */
-    const SSBAND = 16 * CV.SCALE;
+    /* V1.1（基准 §4.2）：让出铭牌带。V1.0.5：带高与结果卡/伙伴卡统一成网页版的 **22px**
+       —— 同一个品质框组件在三处卡片上厚薄必须一样（原来是 16 / 16 / 18 三个数）。 */
+    const SSBAND = 22 * CV.SCALE;
     const cw = (U.cw() - gap * (cols - 1)) / cols, ch = 132 * CV.SCALE + SSBAND, y0 = U.y;
     ssrs.forEach(function (c, i) {
       const x = U.pad() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
@@ -293,8 +389,15 @@
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(c.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
       CV.text(CV.fit(c.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });
-      CV.text(CV.fit(c.bloodline + ' · ' + c.faction, cw - 10 * CV.SCALE, CV.FS.sm), acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE,
-        { size: CV.FS.sm, align: 'center', color: CV.C.dim });
+      /* V1.1.12（0927-B · 三机型复审）：这行是"命格 · 阵营"，3 列网格在 320 上每格只有 ~93pt，
+         单行 `CV.fit` 把「念动力 · 仙界」砍成「念动力 · …」（320 上实测 6 张卡全中）。
+         卡片下方本来就有 ~46pt 空档（头像 46 ＋ 名字 ＋ 这行，卡片高 154）→ **折到两行**即可，
+         信息一个字不丢、也不动卡片高度与网格。 */
+      const subLines = CV.wrap(c.bloodline + ' · ' + c.faction, cw - 10 * CV.SCALE, CV.FS.sm, 2);
+      subLines.forEach(function (ln, k2) {
+        CV.text(ln, acx, y + 10 * CV.SCALE + asz + 30 * CV.SCALE + (k2 - (subLines.length - 1) / 2) * CV.FS.sm * 1.3,
+          { size: CV.FS.sm, align: 'center', color: CV.C.dim });
+      });
       CV.hit('ssrpick:' + c.id, x, y, cw, ch);
     });
     U.y = y0 + Math.ceil(ssrs.length / cols) * (ch + gap);

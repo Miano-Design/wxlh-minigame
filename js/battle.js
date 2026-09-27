@@ -181,14 +181,21 @@ window.Battle = (function () {
     const taunter = list.find(u => hasStatus(u, 'taunt'));
     if (taunter && src.side !== taunter.side) return taunter;
     if (preferred === 'lowest') return list.reduce((a, b) => (a.hp / a.maxHp < b.hp / b.maxHp ? a : b));
+    /* V1.0.5 定稿（2026-09-23 游戏策划总监《经济三改》回单）：**点名技 / 全体技可以越排**。
+       这一行排在下面的分排之前，是故意的、不是漏的：
+       · 它是"前排挡刀"唯一的解法 —— 后排的精英 / 守关 Boss 不然永远够不到；
+       · 删掉它，守关战会退化成"先清小怪"的耐力战，V1.0.1 刚调好的前期手感跟着回退。
+       嘲讽（上一行的 taunter）仍是唯一能把目标从"前排"拉走的机制；全体技走另一条路、不受影响。 */
     if (preferred === 'boss') return list.find(u => u.isBoss) || list[0];
-    // 敌人优先打前排
-    if (src.side === 'enemy') {
-      const front = list.filter(u => u.position === 'front');
-      const pool = front.length ? front : list;
-      return pool[Math.floor(Math.random() * pool.length)];
-    }
-    return list[Math.floor(Math.random() * list.length)];
+    /* V1.0.5（2026-09-23 游戏策划总监会诊查出：「敌方分排**画得出来、引擎不认**」）：
+       原来这层"先打前排"**只对敌人生效**（原文是 `if (src.side === 'enemy')`），
+       我方仍走 `list` 全随机 —— 而 `dungeon.js` 的阵型注释和 `ui.js` 的战斗画面
+       都**已经按"前 2 后 3、前排替后排挡刀"来画、也这么承诺了**，承诺＞实现。
+       现在不分敌我：**选谁都是先看前排**，前排打光才碰后排（和我方阵型同一套规矩）。
+       注：`position` 缺失时 front 为空 → 自动退回全体随机，不会锁死目标。 */
+    const front = list.filter(u => u.position === 'front');
+    const pool = front.length ? front : list;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   /* ---------- 敌人构造 ---------- */
@@ -392,7 +399,12 @@ window.Battle = (function () {
     }
     win = alive(allies).length > 0 && !alive(enemies).length;
     frames.push({ type: 'end', win, rounds: Math.min(round, maxRounds), timeout: round > maxRounds });
-    return { frames, win, rounds: Math.min(round, maxRounds) };
+    /* V1.1.9（续13 · 复活基线）：多回一份**本场结束时的双方单位**（hp / maxHp / energy 都还是活的）。
+       用处只有一个：`world_curve` 要按"**允许每场 1 次复活**"这条新基线重跑
+       （报告 §5.4 —— 复活是线上现实，不能假装不存在），而复活的口径是
+       "**敌人带剩余血量续战、阵亡者回 50% 血**"，那就必须拿得到这一刻的血量。
+       游戏本身不用这个字段（战斗页自己留着 `B.units`），所以它是**纯增量**、不改任何行为。 */
+    return { frames, win, rounds: Math.min(round, maxRounds), units: all };
 
     function checkEnd() {
       if (!alive(enemies).length || !alive(allies).length) return false;

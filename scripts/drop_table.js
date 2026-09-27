@@ -151,12 +151,15 @@ console.log('\n=== ⑥ 四条装备线：各几套 · 从哪来 ===');
   }
   const sigRar = [...new Set(D.SIGNATURE_EQUIPS.map(x => (D.charById[x.charId] || {}).rarity))].join('/');
   const sigBl = [...new Set(D.SIGNATURE_EQUIPS.map(x => (D.charById[x.charId] || {}).bloodline))];
-  console.log('  ④ 伙伴专属 ' + D.SIGNATURE_EQUIPS.length + ' 件（六支血统各一件 · 绑定的都是本血统最强的那位：' + sigRar
-    + ' · 覆盖 ' + sigBl.length + ' 支血统 · 名字里那 6 件全是武器，UR 品质）');
-  D.SIGNATURE_EQUIPS.forEach(s => {
-    const c = (D.charById || {})[s.charId] || {};
-    console.log('     ' + s.name.padEnd(6) + ' · ' + (c.name || s.charId) + '（' + (c.rarity || '') + '·' + (c.bloodline || '') + '血统）');
+  console.log('  ④ 伙伴专属（本命）' + D.SIGNATURE_EQUIPS.length + ' 件 ＝ 6 支血统各**一人一套 6 件**（武器/头/胸甲/手/腿/饰品）'
+    + ' · 绑定的都是本血统"含全部角色的 power 第一名"：' + sigRar + ' · 覆盖 ' + sigBl.length + ' 支血统 · UR 品质 · 每件 5 条词条');
+  sigBl.forEach(bl => {
+    const rows = D.SIGNATURE_EQUIPS.filter(s => ((D.charById || {})[s.charId] || {}).bloodline === bl);
+    const c = (D.charById || {})[rows[0].charId] || {};
+    console.log('     ' + (c.name || rows[0].charId) + '（' + bl + '·' + (c.rarity || '') + '）六件：'
+      + rows.map(s => s.name).join(' / '));
   });
-  console.log('     来源：地狱难度**守关** 5% ＋ UR 装备箱 10%（普通/困难不打地狱，就只剩开箱这条路）');
+  console.log('     来源：地狱难度**守关** 5% ＋ UR 装备箱 10%；**优先掉还没拥有过的那件**'
+    + '（36 件全拿到之后才转 ◆ 折现）—— 普通/困难不打地狱，就只剩开箱这条路');
   console.log('\n  说明：一件装备只会属于其中一条线（互斥）—— 判定顺序是 专属 > 神装 > 血统套装 > 世界套装 > 普通。');
 }

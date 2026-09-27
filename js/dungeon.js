@@ -1,6 +1,20 @@
 /* 《残域》副本/关卡/深井：敌人编成、路线生成、奖励 */
 window.Dungeon = (function () {
   const D = window.DATA;
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："现在的背包的待领箱有 bug"）=================
+     **掉落统一出口**。这一文件原来 17 处全写成 `if (Core.addItem(...)) got.push(...)` ——
+     背包满时那一行**什么都不做**：不进背包、不进待领箱、结算页也不列。
+     玩家打了一关只看到"什么都没掉"，待领箱里也永远收不到副本掉的东西（掉落凭空蒸发）。
+     现在统一走这个口：**装得下 → 进背包；装不下 → 进待领箱**，并照样列进结算（多一个 `stashed` 标）。
+     ⚠️ 这条规矩与 core.js 的 `applyRewardObj`（任务/悬赏/图鉴奖励）同源：
+        "宁可少收也不吞" —— 凡是要发给玩家的东西，都不许在容量这一步消失。 */
+  function dropItem(got, id, n) {
+    const num = Math.max(1, Math.round(n || 1));
+    if (Core.addItem(id, num)) { got.push({ k: 'item', v: id, n: num, stashed: false }); return true; }
+    if (Core.stashItem) Core.stashItem(id, num);
+    got.push({ k: 'item', v: id, n: num, stashed: true });
+    return false;
+  }
   /* 世界主题 → 敌人阵营（V9.6.86 跟着阵营改地名） */
   const THEME_FACTION = { bio: '灰原', ghost: '幽都', mystic: '雾乡', tech: '锈港', god: null };
 
@@ -27,8 +41,93 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
        所以给前六个世界一个 0.60→0.95 的平滑系数（第 7 个世界起完全不动）：
        敌人 HP 与攻击都乘它，守关 BOSS 自己那份也一样乘 —— 目标是把"守关"从
        前面关卡的 2.6~3.0 倍压到 1.3~1.6 倍，前期不再在最后一关突然变成墙。 */
-    const EASE = [0.75, 0.78, 0.82, 0.86, 0.90, 0.95, 1.0];   // V1.0.1（父亲大人）：原 0.26 起太软，敌人 HP/攻击只有两三成 —— 开局一刀一个、主角单挂能平推到 10~11 关。整体抬起，第一关落在一只手数得过来的回合数。
-    const ease = wi < EASE.length ? EASE[wi] : 1;
+    /* V1.0.1（父亲大人）：原 0.26 起太软，敌人 HP/攻击只有两三成 —— 开局一刀一个、主角单挂能平推到 10~11 关。整体抬起，第一关落在一只手数得过来的回合数。
+       V1.1.9（续13 · P0-2）：**EASE[0] 0.75 → 0.90**（父亲大人拍板「1 改＝P0 四项全改」）。
+       依据＝报告 §五 5.2／§八 8.2：`balance_check` 实测 **W01 第 1/2 关 1 回合就结束** ——
+       玩家还没看到战斗系统（技能 / 连击 / 状态一个都没展示）就过关了，新手前 10 分钟的教学价值被浪费。
+       改后第 1 关落在 **2~3 回合**。 */
+    const EASE = [0.90, 0.78, 0.82, 0.86, 0.90, 0.95, 1.0];
+    /* ================= V1.1.9（续13 · P0-1 拆 5 道硬墙 ＋ P0-2 压平两处陡段）=================
+       起因（报告 §五 5.1，本轮最重的一条）：`world_curve` 满配档（每条线点到上限的账号）
+       复核出 **W29 / W33 / W34 / W35 / W36 五个世界满配也打不穿 —— 真硬墙**。
+       为什么必须改：这五张图是**全部成长线的前置** → 一条墙同时卡死三条线 ——
+         ① **铭刻**（`longrun_sim 90` 实测：铭刻卡在"通关 W17"，玩家卡在 W16）；
+         ② **世界首通 ✦**（主要来源）；
+         ③ **境界 / 评级**（评级经验来自推进）。
+       同时压平两处陡段（报告 §五 5.2）：W14→W15 常规档**多练 15 级**、W16→W17 **多练 30 级**
+       （相邻世界的落差应在 5 级内）。
+       数值怎么来的：**按"满配能过 ＋ 30% 余量"用 `world_curve` 满配档现场反解**
+       （world_curve 结尾的"余量"一栏就是这个判据的读数），不是拍脑袋；
+       改动后的读数（常规档所需等级 / 满配余量）逐条贴在回单里。
+       ⚠️ 这张表**只给第 7 个世界之后**用（前 6 个世界仍走上面的 EASE，两段互不影响）；
+          key 是**世界下标**（W15 = 14 … W36 = 35）。 */
+    const EASE_LATE = {
+      /* ---------- H2 轮（2026-09-27 父亲大人拍板【收】）：把 W13~W17 的白给区一起收 ----------
+         父亲大人看了 H 轮回单 §六 ③（"白给区其实从 W13 就起"）之后拍板收。
+
+         ⚠️ 真值是**用探针把刻度上限抬到 16 才读出来的**（官方尺子上限 3.00，这一段的读数
+            本来全是"≥3.00"的假天花板）：**W13 15.60 / W14 12.25 / W15 10.40(血)·9.85(血攻) /
+            W16 8.75·8.95 / W17 8.20** —— 比拍板时以为的"≥3.50"还高 2.5~4.5 倍。
+         算式沿用 H 轮：`新 ease = 旧 ease × 改前真余量 ÷ 目标余量`（余量 ∝ 1/ease）。
+         W15 / W16 两栏不同（攻击成长比血量缓），所以 **f 取两栏的交集中点**，
+         保证**血 / 血攻两栏都落在 1.30~1.45 内**（不是只看一栏）：
+           W15 f∈[1.30/9.85, 1.45/10.40]=[0.1320, 0.1394] → 取 0.1357
+           W16 f∈[1.30/8.75, 1.45/8.95]=[0.1486, 0.1620] → 取 0.1553
+
+         ⚠️ **必须记住的后果（回单 §六 已单列，不是附注）**：这三张图原来被 0.95 / 0.82 / 0.70
+            压软过（那是上一轮为了压平"W14→W15 多练 15 级 / W16→W17 多练 30 级"特意做的），
+            现在整段反向抬起 → **W12→W13 会出现一道约 11 倍的敌人强度断崖**
+            （W12 常规档 Lv.5、W13 常规档将变成 `>Lv.100`）。
+            根因是"余量对齐"这条判据**只在末段成立**：满配号的强度远高于 W13 这类图的设计强度，
+            硬把余量压到 1.40 ＝ 把中段也变成"要满配"。平滑的做法是从白给区真正的起点
+            （W08 甚至更前）一路斜坡上去，那要动 W08~W12 —— **父亲大人本轮没批，没动。** */
+      12: 11.14,  // W13 寒冠王座：15.60 → 目标 1.40（旧 ease 1.00 = 这条表原来没设它）
+      13: 8.75,   // W14 灯阁试炼场：12.25 → 1.40（旧 1.00）
+      14: 6.90,   // W15 绯月旧堡：10.40 / 9.85 → 1.40 / 1.35（旧 0.95）
+                  //   ⚠️ 这张图的两栏读数差 0.55，而余量刻度是 0.05 一档 → 能落进的格子很粗：
+                  //   ease 7.00 → 1.35 / 1.30（血攻贴下界）、6.75 → 1.45 / 1.35（血贴上界）；
+                  //   取中间 6.90，两栏都离开边界、且都在 1.30~1.45 内。
+      15: 5.28,   // W16 沉海废墟：8.75 / 8.95 → 1.36 / 1.39（旧 0.82）
+      16: 4.10,   // W17 蜂群主控：8.20 → 1.40（旧 0.70）
+      /* ================= H 轮（2026-09-27 · 后期难度"两头"重画）=================
+         起因：`world_curve` 量余量那句原来写死 `k <= 1.6001` —— **1.60 是刻度上限，不是余量**。
+         上限抬到 3.00 之后，"W18~W25 白给"这句才露出真身：**W18 的真实余量是 3.10**，一路递减到
+         W25 的 1.50。所以上一轮"给 wi 17~24 加 ease 1.15、读数一个没动"**不是这张表不管用**，
+         而是**读数被 1.60 封顶盖住了**（3.10 ÷ 1.15 仍 > 1.60，屏幕上照旧写 1.60）。
+         —— 这是"没有真实读数之前不许动难度"的下半句：**读数还得先确认它没被自己的刻度骗了**。
+         手段为什么选这一层（不是 `stageMult` 的后期段，也不是 `data.js` 的世界基准）：
+           · 目标是**按图**调（W18~W25 一组、W32~W36 另一组）→ `stageMult` / `diffMult` 是**全局**的，
+             一改会把前六个世界一起抬上去（那六关的门槛已经贴到 85 / 95 的天花板，动一下必红）→ 层不对；
+           · `data.js` 的 w.hp / w.atk / w.def 是**世界自身的"基准强度"**，36 张图共享一条被断言锁住
+             （`test_game` 验单调）的成长形状；把 W18 的基准乘 2.2 ＝ 把它挪进 W27~W29 的数值区间，
+             以后再没人看得出"这张图本来是第 18 张"→ 表示层不干净；
+           · `ease` 本来就是**"这张图相对基准的难度系数"**，值 >1 ＝ 在基准之上再加硬，语义天然吻合。
+         数值怎么来的：**ease ＝ 改前真实余量 ÷ 目标余量**（余量 ∝ 1/ease，两栏同源）。
+         目标取甜区中点 **1.40**（W18 记 3.10 → 3.10/2.20 ＝ 1.41；其余逐条见行末）。
+         改后读数（血 / 血攻两栏）按同一把尺子复跑，已贴进回单。 */
+      17: 2.20,   // W18 白墙疗养院：余量 3.10 → ~1.41（白给区起点，抬得最狠）
+      18: 2.05,   // W19 星骸遗址：2.85 → ~1.39
+      19: 1.93,   // W20 灯阁回廊：2.70 → ~1.40
+      20: 1.54,   // W21 无声戏院：2.15 → ~1.40
+      21: 1.29,   // W22 锈蚀方舟：1.80 → ~1.40
+      22: 1.39,   // W23 巢母孵化间：1.95 → ~1.40（**注意：它是"常规档 Lv.90 就能过"的世界**，
+                  //   抬它等于把 W23 也推进"要满配"那一档 —— 代价在回单里单列）
+      23: 1.25,   // W24 灰烬圣所：1.75 → ~1.40（同上：常规档 Lv.100）
+      24: 1.07,   // W25 镜界法庭：1.50 → ~1.40（第 3 道转生门，只按余量收，不再往上抬）
+      28: 0.75,   // W29 第九碑庭：硬墙（−25%）
+      30: 0.75,   // W31 回音之墙：**报告漏列的第 6 道墙**（同一把尺子同一判据下，满配也打不穿）——
+                  //   而且它是**第 4 道转生门**（W31 需要转生 4 次），堵在这儿等于堵住最后一道门。
+                  //   证据：改前 `world_curve` 满配复核里它写的是"满配 + 1 次复活 打得穿"
+                  //   （＝不许复活时打不穿），与报告 §5.1 点名的 5 道墙同一种表现。回单里单列。
+                   //   余量 1.20，在甜区内，本轮不动。
+      31: 0.83,   // W32 万灯之座：改前"不许复活打不穿"（尺子读不出：它要 k≥1.05 才有的量，
+                  //   按同一把尺子的线性关系反推 ≈0.91，比 1.00 更糟）→ 抬到 ~1.10
+      32: 0.68,   // W33 吞噬环带：1.00（零容错）→ ~1.10
+      33: 0.75,   // W34 时序废墟：1.10（已达标，不动）
+      34: 0.68,   // W35 九幽渡口：1.00（零容错）→ ~1.10（**康康那张表漏列的第 7 处**，与 W32/W33 同一种表现）
+      35: 0.66,   // W36 灯阁王座：改前"不许复活打不穿"（同上，反推 ≈0.97）→ 抬到 ~1.10
+    };
+    const ease = wi < EASE.length ? EASE[wi] : (EASE_LATE[wi] === undefined ? 1 : EASE_LATE[wi]);
     const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
     const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
     const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);           // 防御放缓，避免伤害坍缩
@@ -66,7 +165,11 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     if (kind === 'elite') {
       return label([
         mk(w.elite, w.hp * 2.0 * m, w.atk * 1.35 * mAtk, w.def * 1.3 * mDef, { isElite: true, position: 'back' }),
-        mk(w.enemies[Math.floor(Math.random() * 3)], w.hp * m, w.atk * mAtk, w.def * mDef, { position: 'front' }),
+        /* V1.0.5（2026-09-23 游戏策划总监会诊查出）：这里原来写死 `Math.random() * 3`，
+           而同文件下面那一波用的是 `w.enemies.length` —— 只要某个世界的敌人表不是 3 只，
+           抽到的下标就越界 → 取到 `undefined` → **"名字 undefined"直接上屏**。
+           改成和下面同一份判据（取表的真实长度），增删怪物都不会再炸。 */
+        mk(w.enemies[Math.floor(Math.random() * w.enemies.length)], w.hp * m, w.atk * mAtk, w.def * mDef, { position: 'front' }),
       ]);
     }
     /* V1.0.1（父亲大人："前期可以一个敌人，到后期可以固定 5 个敌人啊，就慢慢增加，
@@ -109,8 +212,8 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
          （价格那边已经按同一个池子的日收入等比放大过）。 */
       base.points += Math.round(50 * rm);                       // 原 故事点
       base.otherworld = Math.round(30 * rm)                     // 原 异界结晶
-        + (50 + tier * 8)                                       // 原 技能芯片
-        + (diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5);    // 原 血统结晶
+        + Math.round((50 + tier * 8) * rm * 0.5333)             // 原 技能芯片（同底 · 12 关总量不变）
+        + Math.round((diff === 'hell' ? 30 : diff === 'hard' ? 15 : 5) * rm * 0.5333);   // 原 血统结晶（同底）
       /* V9.5.65（策划体检留档）：一度想把这行从 5/15/30 翻倍，理由是"铭刻 5 阶要 8200 枚结晶"。
          补上"扫荡"这一环后实测发现守关 Boss 是**可反复扫荡**的稳定来源：
          每天 60 次扫荡 ≈ 300 枚/天，铭刻全解锁约 27 天、单伙伴血统满 8 天，供给本来就够。
@@ -127,17 +230,28 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
          起因是 drop_audit 把那本账算了出来：扫荡 60 次守关 = 一天 6 件神话，
          "神装是后期也算稀有的东西"这句话就站不住了（父亲大人的原话）。
          收到 5% 之后是 ~3 件/天，给一个 5 人队凑齐 6 件×5 人仍然要几周。 */
-      if (tier >= 21) base.mythChance = diff === 'hell' ? 0.25 : diff === 'hard' ? 0.12 : 0.05;
+      /* ================= V1.1.8（乙组 B11 · 神话概率"收"）=================
+         **这是一段"冻结段"的改动，理由必须写在代码里**（《总落地清单》§1 点名）：
+         父亲大人 09-26 拍板「**收**」—— 因为 **B6 给扫荡加了"每天 +30 次"**（18 → 48 次，×2.67），
+         若神话概率不动，**神装的日产出会跟着 ×2.67**：普通档 0.9 → 2.4 件/天、
+         地狱档 4.5 → 12 件/天 —— "一整套神话 ≈ 9 天"会被腰斩到 **≈ 3.5 天**（地狱 ≈ 1.9 → 0.7 天），
+         终局线（神装是"后期也算稀有的东西"）当场失效。
+         按 **2.67 反比**把三档收回来（0.05/0.12/0.25 ÷ 2.67 ≈ 0.019/0.045/0.094）：
+           · 这是**为了维持原产出量级**，不是为了改设计（产出回到"每天约 0.9 / 4.5 件"这个基线）；
+           · 所以它与 B6 **必须同批上线**：只放次数不收概率 → 有一段时间神话 ×2.67；
+             只收概率不放次数 → 扫荡党被白砍一刀（这也是"'必须同批'的第 5 条"的由来）。
+         ⚠️ 已经掉出去的装备收不回来 —— 这一行**上线即生效**，回滚要连 B6 一起退。 */
+      if (tier >= 21) base.mythChance = diff === 'hell' ? 0.094 : diff === 'hard' ? 0.045 : 0.019;
     } else if (kind === 'elite') {
       base.points = Math.round((80 + tier * 40) * rm * 2.5);
       base.exp = Math.round((60 + tier * 20) * rm * 2.5);
       base.points += Math.random() < 0.5 ? Math.round(15 * rm) : 0;   // 原 故事点
-      base.otherworld += 15 + tier * 2;                               // 原 技能芯片
+      base.otherworld += Math.round((15 + tier * 2) * rm * 0.5333);    // 原 技能芯片（同底 · 12 关总量不变）
       base.equipChance = 0.55;
     } else {
       base.points = Math.round((80 + tier * 40) * rm);
       base.exp = Math.round((60 + tier * 20) * rm);
-      base.otherworld += 5 + tier;                                    // 原 技能芯片
+      base.otherworld += Math.round((5 + tier) * rm * 0.5333);         // 原 技能芯片（同底 · 12 关总量不变）
       base.equipChance = 0.15;
     }
     return base;
@@ -181,14 +295,25 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
       if (r.mythChance && Math.random() < r.mythChance) rarity = 'MYTH';
       const res = Core.grantEquip(worldId, rarity, guarantee ? guarantee.slot : undefined);
       if (res.equip) got.push({ k: 'equip', v: res.equip });
-      else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true });
+      /* V1.1.15：装备格满 → 装备进**装备待领箱**（不再折现）——结算页照样列出来、标 📮 */
+      else if (res.stashed) got.push({ k: 'equip', v: res.eq, stashed: true });
+      /* V1.1.15：装备格满时 `grantEquip` 是**强制折现**（这是给"无限掉落"设计的防堆积）。
+         结算页得说清"这件装备是被折现了、不是没掉" —— 带上 bagFull 让胶囊标出来。 */
+      else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true, bagFull: !!res.bagFull, overflow: !!res.overflow });
     }
-    // 地狱 Boss：5% 掉落伙伴专属装备（UR）
+    // 地狱 Boss：5% 掉落伙伴专属装备（UR · 本命 36 件）
     if (kind === 'boss' && diff === 'hell' && Math.random() < 0.05) {
-      const sig = D.SIGNATURE_EQUIPS[Math.floor(Math.random() * D.SIGNATURE_EQUIPS.length)];
-      const sigRes = Core.grantSignatureEquip(D.SIGNATURE_EQUIPS.indexOf(sig));
-      if (sigRes.equip) got.push({ k: 'equip', v: sigRes.equip, signature: true });
-      else if (sigRes.sold) got.push({ k: 'otherworld', v: sigRes.gain, sold: true });
+      /* 2026-09-27（父亲大人要的"收集感"）：36 件里**优先给还没拥有过的那件**（挑件在数据层，
+         见 data.js 的 `pickSignatureEquip`）；36 件全拿到之后转 ◆ 折现，不再硬塞重复件。 */
+      const sigId = D.pickSignatureEquip((Core.S.codex && Core.S.codex.equipNames) || []);
+      if (sigId < 0) {
+        Core.addCur('otherworld', D.DECOMPOSE_GAIN.UR);
+        got.push({ k: 'otherworld', v: D.DECOMPOSE_GAIN.UR, sold: true, allSignature: true });
+      } else {
+        const sigRes = Core.grantSignatureEquip(sigId);
+        if (sigRes.equip) got.push({ k: 'equip', v: sigRes.equip, signature: true });
+        else if (sigRes.sold) got.push({ k: 'otherworld', v: sigRes.gain, sold: true });
+      }
     }
     if (r.exp) got.push({ k: 'exp', v: r.exp });
     /* 强化材料掉落：精英 35%、Boss 必掉 1~2 件，普通战 8% 小概率掉。
@@ -204,9 +329,9 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
       return 'mat_t' + t;
     };
     const matId = pickMat();
-    if (kind === 'elite' && Math.random() < Math.min(1, 0.35 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
-    if (kind === 'boss') { const n = 1 + (Math.random() < 0.5 ? 1 : 0); if (Core.addItem(matId, n)) got.push({ k: 'item', v: matId, n }); }
-    if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) { if (Core.addItem(matId)) got.push({ k: 'item', v: matId, n: 1 }); }
+    if (kind === 'elite' && Math.random() < Math.min(1, 0.35 * dropBoost)) { dropItem(got, matId, 1); }
+    if (kind === 'boss') { const n = 1 + (Math.random() < 0.5 ? 1 : 0); dropItem(got, matId, n); }
+    if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) { dropItem(got, matId, 1); }
     /* V9.5.66（父亲大人）：探索消耗品（治疗剂 / 强化剂）整条线删掉，这里原来占着
        "普通战 20% / 精英 40% / Boss 必掉"三档掉落位。直接空掉会让每一局的收益凭空缩水，
        所以把这三档**换成同档位的强化材料**——材料有真实去处（强化装备、建筑、商店都在吃）。
@@ -214,7 +339,7 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     const supplyChance = kind === 'boss' ? 1 : kind === 'elite' ? 0.40 : 0.20;
     if (Math.random() < Math.min(1, supplyChance * dropBoost)) {
       const sn = kind === 'boss' ? 2 : 1;
-      if (Core.addItem(matId, sn)) got.push({ k: 'item', v: matId, n: sn });
+      dropItem(got, matId, sn);
     }
     /* 招募券掉落（V9.5.75 复核）：券是"探索的惊喜"，**扫荡不给**。
        起因：券改成"商店不卖、只能玩法获得"之后，我算了一下日产量——
@@ -232,15 +357,15 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
        1.7 张普通券 + 0.4 张高级券 —— 仍然比"一天白给"好得多，但回到了"每十几次给一次惊喜"的量级。 */
     if (!opts.noTicket) {
       if (kind === 'boss' && Math.random() < Math.min(1, 0.18 * dropBoost)) {
-        if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
+        dropItem(got, 'ticket_adv', 1);
       } else if (kind === 'elite' && Math.random() < Math.min(1, 0.10 * dropBoost)) {
-        if (Core.addItem('ticket_adv')) got.push({ k: 'item', v: 'ticket_adv', n: 1 });
+        dropItem(got, 'ticket_adv', 1);
       } else if (kind === 'combat' && Math.random() < Math.min(1, 0.08 * dropBoost)) {
-        if (Core.addItem('ticket_normal')) got.push({ k: 'item', v: 'ticket_normal', n: 1 });
+        dropItem(got, 'ticket_normal', 1);
       }
       // 地狱难度的 Boss 额外掉限定券（限定池是"定向池"，券最稀有）
       if (diff === 'hell' && kind === 'boss' && Math.random() < 0.12) {
-        if (Core.addItem('ticket_lim')) got.push({ k: 'item', v: 'ticket_lim', n: 1 });
+        dropItem(got, 'ticket_lim', 1);
       }
     }
     /* （旧这里的"高阶世界 12% 掉低一档材料"已经并进 pickMat 的低档权重里：
@@ -249,22 +374,58 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     if (worldIdx >= 7 && (kind === 'boss' || (kind === 'elite' && Math.random() < 0.3 * dropBoost))) {
       const expId = worldIdx >= 15 ? 'exp_xxl' : worldIdx >= 11 ? 'exp_xl' : 'exp_l';
       const n = kind === 'boss' ? (worldIdx >= 11 ? 1 : 2) : 1;
-      if (Core.addItem(expId, n)) got.push({ k: 'item', v: expId, n });
+      dropItem(got, expId, n);
     }
     /* 原来的"增益补给 / 高阶消耗品"两段判定同样并进素材掉落：
        精英/Boss 额外给一件当前档位材料，保证一局的实得收益不因删道具而变少。 */
     if (kind !== 'combat' && Math.random() < Math.min(1, 0.30 * dropBoost)) {
-      if (Core.addItem(matId, 1)) got.push({ k: 'item', v: matId, n: 1 });
+      dropItem(got, matId, 1);
     }
     /* 兽魂石：伴生体的唯一稳定来源。
        V9.6.79（drop_audit 算出来的）：原来是"守关**必掉** 1~3 颗、精英 30%"，
        而扫荡一天能打 60 次守关 → **一天 105 颗**，孵一只要 10 颗 = 一天孵 10 只。
        全游戏只有 12 只伴生体，等于这个系统两天就被刷穿，兽魂升级那条线也一起废掉。
-       现在：守关 10%、精英 5% → 扫荡约 6 颗/天（12 只约 20 天收齐，重复的转兽魂）。 */
+      现在：守关 10%、精英 5% → 扫荡 18 次守关 ≈ **1.8 颗/天**（10 颗孵 1 只 → 约 0.18 只/天，
+      全 12 只约 66 天收齐，重复的转兽魂）。
+      ⚠️ 这行原来写的是"约 6 颗/天"——那是**尺子读错**：drop_audit 的采样段没开大背包，
+       几千次抽样把 50 格塞满后掉落不再进 `got`，掉率被读成 1.8%（真值 10%）。
+       尺子已修（`openBag()`），1.8 是修完之后的实测值。 */
     if (kind === 'boss' && Math.random() < Math.min(1, 0.10 * dropBoost)) {
-      if (Core.addItem(D.BEAST_EGG_ITEM, 1)) got.push({ k: 'item', v: D.BEAST_EGG_ITEM, n: 1 });
+      dropItem(got, D.BEAST_EGG_ITEM, 1);
     } else if (kind === 'elite' && Math.random() < Math.min(1, 0.05 * dropBoost)) {
-      if (Core.addItem(D.BEAST_EGG_ITEM, 1)) got.push({ k: 'item', v: D.BEAST_EGG_ITEM, n: 1 });
+      dropItem(got, D.BEAST_EGG_ITEM, 1);
+    }
+    /* ================= V1.1.4（A12-F · 新料的产出口）=================
+       《收口2》§3.1 / §3.3 定的口径：**只加一个额外掉落槽，不动现有材料档** ——
+         · 守关 Boss 额外 30% × 1 颗（W10 起，见下）· 精英额外 15% × 1 颗；
+         · 两种料按**需求比 2:1** 分（铭魂砂 293 块 : 血髓晶 145 块），所以期望 2/3 给砂、1/3 给晶。
+       ⚠️ **两条不能省的理由**：① 现有 6 种材料的日产量必须"一个数不变"（§3.3 第 2 条）；
+          ② 新料在旧版里会被画成 `undefined` 空框 → 产出必须与消耗、入门包同批上（《总落地清单》§2.2 第 4 条）。
+       ⚠️ 概率 30% / 15% 是**临时保守值**（§1.4 那张表），数值轮按 30 天库存曲线调。 */
+    const newMatChance = kind === 'boss' ? 0.30 : kind === 'elite' ? 0.15 : 0;
+    if (newMatChance && Math.random() < Math.min(1, newMatChance * dropBoost)) {
+      const id = Math.random() < 2 / 3 ? 'minghun_sha' : 'xuesui_jing';
+      dropItem(got, id, 1);
+    }
+    /* ================= V1.1.13（0927-E · 总监 §5.3 来源⑤）：守关 Boss 额外槽 ＋ 重铸石 =================
+       8% × 1 颗，**挂在同一条"额外掉落槽"上**（与铭魂砂/血髓晶同一条规矩，不动它们那两档概率）。
+       为什么只挂守关 Boss：给**不看广告、也不买东西**的玩家一条路（总监原话）。
+       ⚠️ 8% 是**临时值**（表 B），数值轮按 30 天库存曲线调。 */
+    if (kind === 'boss' && Math.random() < Math.min(1, 0.08 * dropBoost)) {
+      dropItem(got, 'reforge_stone', 1);
+    }
+    /* 「灵植种」的"副本材料档"那一半来源（《收口2》§3.1）：跟着材料档小概率掉。
+       它是药园自循环（收成回收 70%）之外的**缺口补充** —— 没有它，新号手里 0 颗种子就种不下去，
+       只能去市集买（那条"不设卡"的保险也在）。⚠️ 10% 是临时值。 */
+    if (Math.random() < Math.min(1, 0.10 * dropBoost)) {
+      dropItem(got, 'lingzhi_zhong', 1);
+    }
+    /* 「材料包·上品」的地狱守关那一格（《收口2》§3.2 来源列）。
+       ⚠️ 加了 W10 门槛（我加的，原文没写）：上品包给的是 **T5 材料**，
+          若第 1 张图的地狱守关就能掉，等于前期的强化线被空投一段。这道门槛是
+          "别让新东西在开局就出"的同一条原则（《收口2》§3.3 里"神装不该早期出"也是这么处理的）。 */
+    if (kind === 'boss' && diff === 'hell' && worldIdx >= 10 && Math.random() < 0.05) {
+      dropItem(got, 'matpack_high', 1);
     }
     return { rewards: r, got };
   }
@@ -319,6 +480,19 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     }
     // 战斗统计与"战斗 N 次"这类进度也要跟着走——否则扫荡党永远完不成日常/成就，两套口径打架
     for (let i = 0; i < n; i++) Core.battleSettle({}, true, kind === 'boss');
+    /* V1.1.4（A12-F · 「秘卷残章」的唯一来源）：《收口2》§3.1 = **每 5 次扫荡 1 张**，
+       而且写明"走扫荡、不占副本掉落"（所以它不在这上面的 grantRewards 里，只在扫荡这条路上）。
+       口径：按**今日累计扫荡次数**跨过 5 的倍数发（S.sweep.count 跨天归零，见 ensureSweepDay），
+       所以一天最多 2 张（扫荡基础 10 次）——与 §3.1 的"≤4/天"上限一致（权限 +8 次时最多 3~4 张）。
+       ⚠️ 每 5 次 1 张是《收口2》给的，不是临时值。 */
+    const beforeCnt = Core.S.sweep.count || 0;            // 这里 S.sweep.count 还是"这一批之前"的值
+    const scrolls = Math.floor((beforeCnt + n) / 5) - Math.floor(beforeCnt / 5);
+    if (scrolls > 0) {
+      /* 同上：扫荡给"秘卷残章"，背包满时也进待领箱（不许因为容量把这条产出口吞掉） */
+      const sg = [];
+      dropItem(sg, 'mijuan_canzhang', scrolls);
+      total.push({ rewards: {}, got: sg });
+    }
     Core.S.sweep.count += n;
     Core.save();
     return { ok: true, total, count: n, capped: n < times };

@@ -12,6 +12,9 @@
 const fs = require('fs');
 const path = require('path');
 const JS = path.resolve(__dirname, '../js');
+/* V1.1.7（B-2）：同一页名底下的**每个状态**都要铺一遍再收热区 ——
+   这张表由 `_ui_states.js` 提供（两把尺子共用一份，不许各写一份）。 */
+const STATES = require('./_ui_states');
 
 /* ---- ⓪ 静态检查：按钮不许"看着能点、其实没热区" ----
    V1.0.1（开发自审会诊）：本脚本原来只查**一个方向** —— 热区登记了、但没有处理器。
@@ -121,12 +124,35 @@ function openState() {
   });
 }
 
-console.log('\n=== 全界面点一遍（死键 / 交互崩溃） ===');
+/* ---------- V1.1.7（B-2）"同一页名 + 多状态"的盲区 ----------
+   原来这里是 `Object.keys(CV.panels).forEach(page => { CV.reset(page); 收热区; })` ——
+   **一个页名只渲染一次**，于是"背包的装备页""商店的四家店""灯录的两卷"这些状态
+   从来轮不到（装备页那颗「＋（扩容）」就是这么漏掉的：它只在 `view==='equip'` 时登记，
+   而尺子只渲染过 `view==='item'` 那一版）。现在按 `_ui_states` 把每个状态都铺一遍。
+   状态清单在 `scripts/_ui_states.js`（改那道表就能扩尺子覆盖面）。 */
+const SCREENS = [];
 Object.keys(CV.panels || {}).forEach((page) => {
+  SCREENS.push({ page, via: [], label: page });
+  STATES.filter((e) => e.page === page).forEach((e) => {
+    SCREENS.push({ page, via: e.via, label: page + '[' + e.via.join(' + ') + ']' });
+  });
+});
+
+console.log('\n=== 全界面点一遍（死键 / 交互崩溃） ===');
+console.log('（页面 ' + Object.keys(CV.panels || {}).length + ' 个 → 摊平成 ' + SCREENS.length + ' 屏：含同页多状态）');
+SCREENS.forEach((scr) => {
+  const page = scr.page;
   openState();
+  if (U) { U.overlay = null; if (U.coachClearAll) U.coachClearAll(); }
   let ids = [];
-  try { CV.reset(page); ids = (CV.hits || []).map((h) => h.id); }
-  catch (e) { bad++; console.log('✗ ' + page + ' 渲染就抛异常：' + e.message); return; }
+  try {
+    CV.reset(page);
+    /* 先把它推进这个状态（就是玩家点那几颗标签）——派发本身也会被算进"有没有处理器"，
+       所以状态热区本身有问题时，下面那条会照常报出来。 */
+    scr.via.forEach((id) => { if (U && U.coachDrop) U.coachDrop(); CV.dispatch(id); });
+    ids = (CV.hits || []).map((h) => h.id);
+  }
+  catch (e) { bad++; console.log('✗ ' + scr.label + ' 渲染就抛异常：' + e.message); return; }
   const seen = new Set();
   ids.forEach((id) => {
     if (seen.has(id)) return;
@@ -139,7 +165,7 @@ Object.keys(CV.panels || {}).forEach((page) => {
     if (!hasExact && !hasPrefix) {
       if (inertOk(id) || INERT.some((x) => id.indexOf(x) === 0)) return;
       warn++;
-      console.log('⚠ 死键：' + page + ' 页的 ' + id + ' 没有处理器（看着能点、点了没反应）');
+      console.log('⚠ 死键：' + scr.label + ' 的 ' + id + ' 没有处理器（看着能点、点了没反应）');
       return;
     }
     try {
@@ -162,17 +188,17 @@ Object.keys(CV.panels || {}).forEach((page) => {
       if (preFn) CV.onAct[pref0] = preFn;
       if (!ran) {
         warn++;
-        console.log('⚠ 被闸门吃掉：' + page + ' 页的 ' + id + ' 有处理器，但派发时没跑到（正常状态下不该发生）');
+        console.log('⚠ 被闸门吃掉：' + scr.label + ' 的 ' + id + ' 有处理器，但派发时没跑到（正常状态下不该发生）');
       }
     }
     catch (e) {
       bad++;
-      console.log('✗ ' + page + ' 页点 ' + id + ' 崩了：' + e.message);
+      console.log('✗ ' + scr.label + ' 点 ' + id + ' 崩了：' + e.message);
     }
   });
 });
 
-console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.panels || {}).length + ' 个');
+console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.panels || {}).length + ' 个（摊平成 ' + SCREENS.length + ' 屏）');
 
 /* ---- V9.6.108：**锚点区域不许吃点击** ----
    有些热区是"给引导当锚点"的整块区域（party_board / attr_card / stage_grid / grid:* / hero:*），
@@ -188,12 +214,17 @@ console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.pan
     const i = String(id).indexOf(':');
     return i > 0 && !!CV.onAct[String(id).slice(0, i + 1) + '*'];
   };
-  Object.keys(CV.panels || {}).forEach((page) => {
+  SCREENS.forEach((scr) => {
+    const page = scr.page;
     openState();
     /* 每页都从干净状态开始：上一页留下的弹窗/引导热区会把结果带偏 */
     if (U) { U.overlay = null; if (U.coachClearAll) U.coachClearAll(); }
     let hits = [];
-    try { CV.reset(page); hits = (CV.hits || []).slice(); } catch (e) { return; }
+    try {
+      CV.reset(page);
+      scr.via.forEach((id) => { if (U && U.coachDrop) U.coachDrop(); CV.dispatch(id); });
+      hits = (CV.hits || []).slice();
+    } catch (e) { return; }
     const dead = hits.filter((h) => !hasH(h.id));
     const live = hits.filter((h) => hasH(h.id));
     dead.forEach((d) => {
@@ -211,7 +242,7 @@ console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.pan
         const winner = top ? top.id : null;
         if (winner !== l.id) {
           eaten++;
-          console.log('  ⚠ 被锚点吃掉：' + page + ' 页的「' + l.id + '」被「' + d.id + '」压住，点它会派发成 ' + (winner || '（什么都不是）'));
+          console.log('  ⚠ 被锚点吃掉：' + scr.label + ' 的「' + l.id + '」被「' + d.id + '」压住，点它会派发成 ' + (winner || '（什么都不是）'));
         }
       });
     });
@@ -220,4 +251,8 @@ console.log('\n共派发 ' + taps + ' 次点击 · 页面 ' + Object.keys(CV.pan
   if (eaten) { bad++; }
 }
 console.log('结论：' + (bad ? '✗ 有 ' + bad + ' 处崩溃' : '没有交互崩溃 ✓') + (warn ? '；' + warn + ' 个死键待核' : '；没有死键 ✓') + '\n');
-process.exitCode = bad ? 1 : 0;
+/* V1.1.7（B-2 的连带）：**死键也要让退出码非 0**。
+   原来是 `exitCode = bad ? 1 : 0` —— 死键只打印一行 ⚠、退出码照样 0，
+   于是"看退出码判绿不绿"的流程会把一只真死键当成全绿（康康那只是从截图上看出来的，
+   不是这台尺子报出来的）。尺子的存在意义就是"红了就是红"，这条必须一起改。 */
+process.exitCode = (bad || warn) ? 1 : 0;

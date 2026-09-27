@@ -1,3 +1,15 @@
+/* ================= 加固钩子（V1.1.1 · 拆掉"加固分叉"，见 js/mem-guard.js）=================
+   本文件（core.js）是**两端共用的一份真相**。曾经《小游戏内存风险检测与辅助加固工具》把一整套
+   加解密运行时**注入到本文件头部**：小游戏端带加固、网页版不带 → 两端不同源、`sync-logic` 拒绝覆盖。
+   现在运行时搬去 `wxlh-minigame/js/mem-guard.js`（只在游戏端、在本文件**之前**加载），
+   本文件只留这一个钩子：
+     · 小游戏端：mem-guard 已把真正的 `getProxied` 挂到 `globalThis` → 下面取到它，
+       正文里那些 `getProxied({...})` 包装照旧生效（加固行为一点没变）；
+     · 网页版 / 各把尺子：没有那个文件 → 退化成恒等函数（对象原样返回，零开销）。
+   ⚠️ 不许把运行时再注回本文件（那会让两端又分叉）；要改加固就改 mem-guard 的生成侧。 */
+const getProxied = (typeof globalThis !== 'undefined' && typeof globalThis.getProxied === 'function')
+  ? globalThis.getProxied
+  : function (v) { return v; };
 /* 《残域》核心逻辑：状态 / 存档 / 挂机 / 养成 / 经济 */
 window.Core = (function () {
   const D = window.DATA;
@@ -26,12 +38,51 @@ window.Core = (function () {
   }
 
   /* ================= 存档 ================= */
-  const ATTR_ZERO = () => ({ muscle: 0, immune: 0, cell: 0, nerve: 0, intelligence: 0, spirit: 0 });
+  /* V1.1.12（父亲大人 09-27：「**只要不被人改就行了**」）—— 存档**加密**的两个口子：
+     · `packSave()`：写盘前把整份 JSON 过一层加密（算法在 `js/mem-guard.js`，只在小游戏端加载）；
+     · `unpackSave()`：读盘时**先按密文解**，解不开（没有 `MPG1:` 前缀）就当**明文**读 ——
+       老档 / 老导出串 / 手工备份**全部继续可用**：不迁移、不会因为加密毁掉任何人的进度。
+     ⚠️ **读档失败时"原样备份"那条路不许动**：备份里存的是**原始字符串**（密文或明文都原样留），
+        它永远是可诊断的；这一层防的是"改文件白嫖"，不是"读不出来就丢档"。
+     ⚠️ 没有 mem-guard 的环境（网页版 / 各把尺子的假环境）→ 两个函数退化成恒等，行为与从前一致。 */
+  function packSave(obj) {
+    const json = JSON.stringify(obj);
+    const e = (typeof globalThis !== 'undefined') ? globalThis.__MP_ENC_STR : null;
+    return (typeof e === 'function') ? e(json) : json;
+  }
+  /* 读档时"到底是明文读不动、还是密文解不开"—— 这两件事的救法完全不同：
+     明文坏 = 档真坏了；密文解不开 = 密钥/格式不匹配（**档还是好的，只是这一版读不懂**）。
+     所以 `unpackSave` 顺手把结论记在这儿，`load()` 报原因时用它（V1.1.15 存档审计）。 */
+  let lastUnpackIssue = null;
+  function unpackSave(raw) {
+    if (raw == null) return raw;
+    lastUnpackIssue = null;
+    /* 头写成"MPG + 数字 + 冒号"：将来换密钥是加一条 `MPG2:`（旧档照样解，见 mem-guard 的密钥表） */
+    const isCipher = /^MPG\d+:/.test(String(raw));
+    const d = (typeof globalThis !== 'undefined') ? globalThis.__MP_DEC_STR : null;
+    if (typeof d === 'function') {
+      try {
+        const s = d(raw);
+        if (typeof s === 'string') {
+          /* V1.1.15（2026-09-27 存档审计）：**解出来的必须是 JSON 才算解密成功**。
+             为什么加这一条：将来万一换了密钥，旧档也能"解"出一串乱码（base64 能过、
+             XOR 用错 key 也照样出字符）—— 拿乱码去 `JSON.parse` 会在上层报"json 错"，
+             玩家看到的还是"档没了"，而真正的原因（密钥不匹配）被埋掉。
+             在这里判一次，读档失败的原因就能精确到"密文解不开"。 */
+          try { JSON.parse(s); return s; }
+          catch (e2) { lastUnpackIssue = 'enc'; }          // 解得出字符、但不是 JSON → 密钥/格式不匹配
+        }
+        else if (isCipher) lastUnpackIssue = 'enc';        // 带密文头却解不出来（base64 坏了 / 没解密器）
+      } catch (e) { if (isCipher) lastUnpackIssue = 'enc'; }
+    }
+    return raw;
+  }
+  const ATTR_ZERO = () => ( getProxied({ muscle: 0, immune: 0, cell: 0, nerve: 0, intelligence: 0, spirit: 0 }));
   /* 天赋初值：四支天赋树各 0 级（分支键与 data.js 的 TALENTS 同源）。
      和 ATTR_ZERO 放一起，是因为**"新档初值"必须只有一份定义** ——
      以前它只写在 defaultState() 里，于是 createProtagonist() 走 freshProtagonist() 时
      一个都没有，新建主角就继承了旧主角的天赋（V1.0.3 · 产品经理报的 P1）。 */
-  const TALENT_ZERO = () => ({ body: 0, energy: 0, nerve: 0, grace: 0 });
+  const TALENT_ZERO = () => ( getProxied({ body: 0, energy: 0, nerve: 0, grace: 0 }));
   // row：主角站前排还是后排（V8.3 新增）。默认前排——和旧存档的战场表现一致。
   /* V9.5.69（父亲大人）：**所有等级从 0 起算**——数字就是"已经升过几次"。
      主角 Lv.0 / 技能 Lv.0 / 建筑 0 级 / 评级 Lv.0 / 伴生体 0 级（血统、铭刻、境界、权限本来就是 0 起）。 */
@@ -41,73 +92,86 @@ window.Core = (function () {
        只写在 defaultState() 里，freshProtagonist 里一个都没有 —— 于是"新建主角"
        拿到的是**旧主角**的境界 / 天赋 / 转生世数 / 铭刻阶数（实测：境界 12 阶 + 满天赋 + 转生 3 世，
        新主角一出生就带着这些）。现在四样都归零，名单也补进了 PROTAGONIST_KEYS。 */
-    return { name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0,
-      attrs: ATTR_ZERO(), skillPoints: 0, skillLv: [0, 0, 0], row: 'front',
-      realm: 0, geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() };
+    return  getProxied({ name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0,
+      attrs: ATTR_ZERO(), skillPoints: 0, skillLv:  getProxied([0, 0, 0]), row: 'front',
+      realm: 0, geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() });
   }
   function defaultState() {
-    return {
+    return  getProxied({
       v: 5,
-      player: Object.assign(freshProtagonist('执灯者'), { geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() }),
-      altPlayers: [],         // 新建的主角（体验不同血统），与当前主角可切换
+      player: Object.assign(freshProtagonist('执灯者'),  getProxied({ geneLock: 0, reincarnations: 0, talents: TALENT_ZERO(),
+        /* V1.1.9（续13 · P0-4）：**历史最高通关世界的下标**（0 = 还没通关任何世界）。
+           为什么要单独存：转生会把 `player.level` 清零、也会把 `S.worlds` 清空，
+           挂机基数如果只看等级，转生一次挂机就腰斩（打 W16 的号掉回新手档）。
+           这个字段**转生不清**，只涨不跌（见 stageComplete / migrate）。 */
+        bestWorldIdx: 0 })),
+      altPlayers:  getProxied([]),         // 新建的主角（体验不同血统），与当前主角可切换
       // V9.2：背包分三池（道具 / 材料 / 装备），各 50 格起、各自扩容
-      bag: { itemCap: 50, itemExpands: 0, matCap: 50, matExpands: 0, eqCap: 50, eqExpands: 0 },
+      bag:  getProxied({ itemCap: 50, itemExpands: 0, matCap: 50, matExpands: 0, eqCap: 50, eqExpands: 0 }),
       // V9.6.134：货币 8 → 4（见 data.js 顶部的四层说明）
-      cur: { points: 0, otherworld: 0, holy: 0, rp: 0 },
-      chars: {},            // id → {lv, exp, star, skillLv:[1,1,1], bloodlineLv}
-      /* V9.6.129：碎片改成**按稀有度的公共池**（抽到谁都进同一个池子，不再各攒各的） */
-      shardPool: { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 },
+      cur:  getProxied({ points: 0, otherworld: 0, holy: 0, rp: 0 }),
+      chars:  getProxied({}),            // id → {lv, exp, star, skillLv:[1,1,1], bloodlineLv}
+      /* V9.6.129：碎片改成**按稀有度的公共池**（抽到谁都进同一个池子，不再各攒各的）。
+         V1.1.14（0927-F）：**新档**从今天起按"每人一份 ＋ 满星后才转通用"记账（见 addChar），
+         `shardPoolMerged` 这个"老档一次性合并"的标记**只在 newGame 里落**（不能写进 defaultState ——
+         那会被 `fillDefaults` 填给老档、把老档的合并整段跳过，实测当场红）。 */
+      shardPool:  getProxied({ N: 0, R: 0, SR: 0, SSR: 0, UR: 0 }),
       // 上阵 5 格（固定前 2 后 3）：0/1 前排，2/3/4 后排。
       // '@player' 就是主角本人——主角必上阵，所以他也占其中一格，站位能拖到前排也能拖到后排。
-      party: ['@player', null, null, null, null],
-      equips: {},           // uid → 装备实例
-      equipped: { '@player': { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null } },
-      items: {},            // itemId → count
-      serums: {},           // charId（或 '@player'）→ { serumId: 已服支数 }
-      buildings: { core: 0, training: 0, medical: 0, workshop: 0, geneLab: 0 },   // 建筑从 0 级起（0 级 = 没升过）
+      party:  getProxied(['@player', null, null, null, null]),
+      equips:  getProxied({}),           // uid → 装备实例
+      equipped:  getProxied({ '@player':  getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null }) }),
+      items:  getProxied({}),            // itemId → count
+      serums:  getProxied({}),           // charId（或 '@player'）→ { serumId: 已服支数 }
+      buildings:  getProxied({ core: 0, training: 0, medical: 0, workshop: 0, geneLab: 0 }),   // 建筑从 0 级起（0 级 = 没升过）
       auth: 0,               // 灯阁权限等级（对标"洞府"：高级货币的一次性长线投资）
-      sect: { lv: 0, exp: 0 },   // 灯阁评级（从 0 起：打关卡自动涨的全局长线）
-      keji: {},                  // 秘术阁（对标"KeJi"）：id → 等级
-      travel: { bankSec: 0, pending: null, got: 0, round: 0, day: '' },   // 挂机游历奇遇（对标"YouLi"）
+      sect:  getProxied({ lv: 0, exp: 0 }),   // 灯阁评级（从 0 起：打关卡自动涨的全局长线）
+      keji:  getProxied({}),                  // 秘术阁（对标"KeJi"）：id → 等级
+      travel:  getProxied({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }),   // 挂机游历奇遇（对标"YouLi"）
       charExp: 0,               // 伙伴经验池（V9.5.46）：所有伙伴共用这一份，升级从这里扣、重生返还回来
       garden: Array(4).fill(null),       // 药园（对标"洞府·药园"）：每块地 null 或 {kind, at}
-      arena: { floor: 1, best: 1, date: '', used: 0 },   // 斗法台（对标"Arena"）
+      arena:  getProxied({ floor: 1, best: 1, date: '', used: 0 }),   // 斗法台（对标"Arena"）
       /* V9.6.130：法宝多一条"祭炼"等级线、坐骑多一条"喂养"等级线（父亲大人点头的方案）
          lvMap = { id → 等级 }；0 级＝刚买到时的原始效果 */
-      fabao: { own: [], on: null, lvMap: {} },
-      mount: { own: [], on: null, lvMap: {} },   // 坐骑（V9.6.130：lvMap = 喂养等级）
-      sign: { date: '', tier: '', idlePct: 0, drawn: 0 },   // 点灯（原「求签」，对标"SignItem"）：今天的灯焰与挂机加成
-      worlds: {},           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
-      worldFirstClear: {},  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
+      fabao:  getProxied({ own:  getProxied([]), on: null, lvMap:  getProxied({}) }),
+      mount:  getProxied({ own:  getProxied([]), on: null, lvMap:  getProxied({}) }),   // 坐骑（V9.6.130：lvMap = 喂养等级）
+      sign:  getProxied({ date: '', tier: '', idlePct: 0, drawn: 0 }),   // 点灯（原「求签」，对标"SignItem"）：今天的灯焰与挂机加成
+      worlds:  getProxied({}),           // worldId → {unlocked, stages: {normal:[stars×12], hard, hell}}
+      worldFirstClear:  getProxied({}),  // 'worldId_diff' → true（通关奖励每个世界·每个难度只发一次）
       /* V9.6.113：新档一出生就带这个标记 —— "旧版把 C001 当主角占位"那段迁移只该对**很老的档**跑。
          不给默认值的话会有个很脏的后果：新玩家正常抽到 C001（普通池 N 档 6 人之一），
          下次开机 migrate 一跑就把他删了，等级和碎片一起没（玩家只会说"我的伙伴不见了"）。 */
       c001Merged: true,
-      corridor: { floor: 1, best: 0 },
+      corridor:  getProxied({ floor: 1, best: 0 }),
       // 保底按池分开记账：高级 / 限定 各自算 SSR / UR / 当期 UP 的累计数
-      recruit: { pity: { advanced: { ssr: 0, ur: 0, up: 0 }, limited: { ssr: 0, ur: 0, up: 0 } }, lastFree: '',
-        free: { date: '', normal: { used: 0, at: 0 }, advanced: { used: 0, at: 0 } } },   // V9.5.51 每日免费抽
-      shop: { dailyDate: '', dailyItems: [], bought: {} },
+      recruit:  getProxied({ pity:  getProxied({ advanced:  getProxied({ ssr: 0, ur: 0, up: 0 }), limited:  getProxied({ ssr: 0, ur: 0, up: 0 }) }), lastFree: '',
+        free:  getProxied({ date: '', normal:  getProxied({ used: 0, at: 0 }), advanced:  getProxied({ used: 0, at: 0 }) }) }),   // V9.5.51 每日免费抽
+      shop:  getProxied({ dailyDate: '', dailyItems:  getProxied([]), bought:  getProxied({}) }),
       // bonus：额外扫荡额度（由玩法自行发放的临时加次数；网页版不发，恒为 0，跨天清零）
-      sweep: { date: '', count: 0, bonus: 0 },
-      tasks: { date: '', daily: {}, claimed: {}, allClaimed: false, weekKey: '', weekly: {}, weeklyClaimed: {}, weeklyAllClaimed: false },
-      login: { day: 0, round: 1, lastClaim: '' },
-      idle: { bankSec: 0, lastTs: Date.now(), lines: { cultivate: null, gather: null, explore: null, guard: null } },
-      bounty: { start: Date.now(), claimed: {}, list: null, rev: 0 },   // 限时悬赏：list 按当前进度生成，本期固定（rev 见 migrate）
-      beast: { owned: {}, active: null },                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
-      stats: { battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0,
-        taskClaims: 0, signDraws: 0 },   // V9.6.74：主线新步骤要用的两个计数（老档没有 → 一律 || 0 兜底）
+      /* V1.1.8（B6）：`bonus` ＝ 灯阁权限的额外额度；`adBonus` ＝ 广告买来的额度（两本账分开记） */
+      sweep:  getProxied({ date: '', count: 0, bonus: 0, adBonus: 0 }),
+      tasks:  getProxied({ date: '', daily:  getProxied({}), claimed:  getProxied({}), allClaimed: false, weekKey: '', weekly:  getProxied({}), weeklyClaimed:  getProxied({}), weeklyAllClaimed: false }),
+      /* V1.1.8（B8）：`doubledDay` ＝ 哪一天已经翻过倍（只翻当天那一格、不补历史） */
+      login:  getProxied({ day: 0, round: 1, lastClaim: '', doubledDay: '', comeback: '' }),
+      idle:  getProxied({ bankSec: 0, lastTs: Date.now(), lines:  getProxied({ cultivate: null, gather: null, explore: null, guard: null }) }),
+      bounty:  getProxied({ start: Date.now(), claimed:  getProxied({}), list: null, rev: 0 }),   // 限时悬赏：list 按当前进度生成，本期固定（rev 见 migrate）
+      beast:  getProxied({ owned:  getProxied({}), active: null }),                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
+      stats:  getProxied({ battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0,
+        taskClaims: 0, signDraws: 0 }),   // V9.6.74：主线新步骤要用的两个计数（老档没有 → 一律 || 0 兜底）
       /* V9.6.115（父亲大人）：自动战斗整条下线 —— 默认值里也不留这个键（老存里的残留值没人读了）。
          autoNext 保留（结算 5 秒自动进下一关）。 */
-      settings: { speed: 1, autoSellN: false, autoSellR: false, sfx: true, autoNext: true },
-      codex: { chars: [], equipsSeen: 0, claimed: [] },
-      achievements: {},       // achId → true（已领取）
-      presets: [null, null, null],   // 3 组编队预设（保存队伍成员）
+      /* V1.1.x（2026-09-27 · 音频系统）：`bgm` / `sfx` ＝ 音乐 / 音效两个开关，**默认都开**。
+         老档没有这两个键 → 下面 migrate 那句 `S.settings = Object.assign(def.settings, S.settings || …)`
+         会把默认值补上（老玩家进游戏照样有声音；见 scripts/audio_audit.js ③）。 */
+      settings:  getProxied({ speed: 1, autoSellN: false, autoSellR: false, bgm: true, sfx: true, autoNext: true }),
+      codex:  getProxied({ chars:  getProxied([]), equipNames:  getProxied([]), equipsSeen: 0, claimed:  getProxied([]) }),
+      achievements:  getProxied({}),       // achId → true（已领取）
+      presets:  getProxied([null, null, null]),   // 3 组编队预设（保存队伍成员）
       pendingRun: null,       // 未打完的副本进度：刷新 / 切后台回来可以继续
-      unlocks: {},
-      quests: { claimed: [] },
+      unlocks:  getProxied({}),
+      quests:  getProxied({ claimed:  getProxied([]) }),
       ssrTicket: 0,
-    };
+    });
   }
 
   let suppressSave = false;
@@ -127,7 +191,7 @@ window.Core = (function () {
     if (suppressSave) return;
     if (offlineSettled) S.idle.lastTs = Date.now();
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+      localStorage.setItem(SAVE_KEY, packSave(S));
       saveFailed = false;
     } catch (e) {
       // 存储不可用（隐私模式）/ 配额满：只提示一次，别让玩家打完一整局才发现没存上
@@ -136,6 +200,24 @@ window.Core = (function () {
         notice('⚠ 存档写入失败：浏览器存储不可用或已满，请到「设置 → 导出存档」先备份');
       }
     }
+  }
+  /* ================= 渲染前的兜底闸（V1.0.6 · P0 提审驳回：真机"卡在此界面"） =================
+     `S` 为 null 时：**先试着读档，读不出来才建档**，并把"怎么救的"返回给调用方。
+     为什么这条放在 core、而不是塞进每个渲染入口：只有这里知道"读档优先、建档兜底"的次序；
+     渲染入口（小游戏 cv.js 的 CV.render / 网页版 ui.js 的 render）只负责"发现 null 就叫它一声"。
+     ⚠️ 必须**出声**（console.warn）：走到这里说明开机顺序出了岔子（正常开机绝不会走到），
+        静默救回来＝把事故藏起来。
+     ⚠️ 它只是兜底：根因是 game.js（小游戏）把建档排在一切渲染/事件注册之前。 */
+  function ensureState() {
+    if (S) return 'ok';
+    let loaded = false;
+    try { loaded = load(); } catch (e) { loaded = false; }
+    if (!loaded) { newGame(); ensureDaily(); }
+    try {
+      console.warn('[boot] 渲染前发现 S=null：' + (loaded ? '已重新读档' : '已先建内存档')
+        + '，界面继续画（正常开机不该走到这里，请把这条日志交给康康）');
+    } catch (e) {}
+    return loaded ? 'rescued:loaded' : 'rescued:new';
   }
   // 彻底删除进度（阻止 beforeunload 等钩子重新写入）
   function wipeSave() {
@@ -150,6 +232,7 @@ window.Core = (function () {
        删档 = 真的回到"全新档"（内存 + 硬盘 + 存盘开关）。 */
     S = defaultState();
     offlineSettled = true;      // 全新档没有离线窗口要保
+    lastLoadIssue = null;       // 玩家自己按的"删档"＝这条诊断该收起来了（V1.1.15）
     /* suppressSave 仍然保持"关着"：网页版删完档会立刻 reload，
        期间任何一次 beforeunload / 定时存盘都不许把**旧档写回去**（这是它原来的用处）。
        存盘开关由 newGame() 负责恢复 —— "开始新游戏"才代表真的重新开始。 */
@@ -163,17 +246,36 @@ window.Core = (function () {
     if (!raw) return false;
     let data = null;
     try {
-      data = JSON.parse(raw);
-    } catch (e) { backupSave(raw, 'json'); return false; }
-    if (!data || typeof data !== 'object') { backupSave(raw, 'shape'); return false; }
+      data =  getProxied(JSON.parse(unpackSave(raw)));
+    } catch (e) {
+      /* 原因细分（V1.1.15）：`enc` = 密文解不开（档多半还在，只是这一版读不懂）；`json` = 明文本身坏了。 */
+      const why = lastUnpackIssue || 'json';
+      lastLoadIssue = issue(why, raw, e);
+      backupSave(raw, why);
+      return false;
+    }
+    if (!data || typeof data !== 'object') { lastLoadIssue = issue('shape', raw); backupSave(raw, 'shape'); return false; }
     const ver = Number(data.v || 0);
     /* 来自**更高版本**的存档（玩家装过新版又回到旧版）：不覆盖、不删，原样备份后退出去 */
-    if (ver > SAVE_VER) { backupSave(raw, 'future-v' + ver); return false; }
+    if (ver > SAVE_VER) { lastLoadIssue = issue('future-v' + ver, raw); backupSave(raw, 'future-v' + ver); return false; }
     legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
     /* 缺字段自动补齐（新系统上线后老档也能直接读），再跑语义迁移（改名 / 换算 / 退款这类） */
     S = fillDefaults(defaultState(), data);
     S.v = SAVE_VER;
-    migrate();
+    /* V1.1.15（2026-09-27 · P0）：**迁移抛异常 ≠ 存档坏了**。
+       原来 `migrate()` 裸调，任何一个字段对不上就一路抛到开机流程 ——
+       表现就是"更了个版本，我的档没了"（其实是新档顶上来把它盖了）。
+       现在：迁移出错只记一笔、游戏照常进（数据按"已读到的样子"用），并留下 `loadIssue` 给界面报。 */
+    try { migrate(); }
+    catch (e) {
+      lastLoadIssue = issue('migrate:' + (e && e.message ? e.message : 'unknown'), raw);
+      /* ⚠️ 这一行是 2026-09-27 审计补的：迁移出错时，**原档必须先留一份**。
+         实测过（`equips` 里塞 null 的那种档）：迁移抛错 → 我们让它"按已读到的样子继续"，
+         玩家接着玩 → 15 秒后心跳把**这份半迁移的档**写盘 → 原始档就真的没了。
+         留了备份，最坏情况也只是"设置页里有旧档可恢复"。 */
+      backupSave(raw, 'migrate');
+      try { console.warn('[save] 迁移这一步出错了，进度按已读到的样子保留：' + (e && e.message)); } catch (e2) {}
+    }
     /* 刚读进来的存档带着"上次见到玩家"的时间戳 —— 在 settleOffline 跑来认领它之前，
        中途任何一次存盘都不许把它冲掉（V9.6.92，见 save() 与 offlineSettled 的说明）。 */
     offlineSettled = false;
@@ -183,16 +285,77 @@ window.Core = (function () {
      备份里连"什么时候、为什么读不出来"一起记，出了问题能追。 */
   function backupSave(raw, why) {
     try {
-      localStorage.setItem(SAVE_BAK, JSON.stringify({ at: Date.now(), why: why || 'unknown', raw: String(raw) }));
+      /* V1.1.15（2026-09-27 · P0"我手里的存档没了"）：**备份只许变好，不许变坏** ——
+         原来每次读档失败都无脑覆盖 `_bak`：万一某次失败是个"小毛病"（比如迁移抛错），
+         它会把上一次*真正读得出来*的那份好备份冲掉。现在先看旧的能不能读，
+         旧的好、新的坏 → 保留旧的。 */
+      const old = localStorage.getItem(SAVE_BAK);
+      if (old) {
+        try {
+          const o = JSON.parse(old);
+          const oOk = o && o.raw && (function () { try { return !!(JSON.parse(unpackSave(o.raw))); } catch (e) { return false; } })();
+          const nOk = (function () { try { return !!(JSON.parse(unpackSave(String(raw)))); } catch (e) { return false; } })();
+          if (oOk && !nOk) return;                       // 旧备份读得出、新的读不出 → 别覆盖
+        } catch (e) { /* 旧备份自己也坏了 → 让新的盖上（新的至少是最近那份） */ }
+      }
+      localStorage.setItem(SAVE_BAK, JSON.stringify( getProxied({ at: Date.now(), why: why || 'unknown', raw: String(raw) })));
     } catch (e) { /* 存不下也没关系，主存档还在原地没动 */ }
+  }
+  /* ================= V1.1.15（2026-09-27 · P0「我手里的存档没了」）=================
+     背景：父亲大人重新上传到手机之后，手里的进度不见了。老实说 —— **先修好这三件事**，
+     因为不管这次到底是哪条路径，老代码都有同一个结构性毛病：
+       · 读档失败**没有任何出口** —— 玩家看到的就是"档没了"，康康这边也拿不到"哪一步坏的"；
+       · 读不出来之后，新档一存盘就把主档盖了（原始串只躺在 `_bak` 里，没人能拿到）；
+       · `migrate()` 抛异常一路抛到开机流程（表现同样是"档没了"）。
+     三道保险：① `saveDiag()` 把"本机到底有什么"摊开（设置页显示，父亲大人念一句就知道）；
+               ② `restoreFromBackup()` 一键把 `_bak` 里那份救回来；
+               ③ `migrate` 出错不再致命、备份不被坏的覆盖（见 backupSave）。 */
+  let lastLoadIssue = null;
+  const issue = (why, raw, e) => ({ why: why, at: Date.now(), len: String(raw == null ? '' : raw).length,
+    err: (e && e.message) ? e.message : '' });
+  function loadIssue() { return lastLoadIssue; }
+  function backupInfo() {
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem(SAVE_BAK) || 'null'); } catch (e) { o = null; }
+    if (!o || !o.raw) return { exists: false };
+    let readable = false;
+    try { readable = !!JSON.parse(unpackSave(o.raw)); } catch (e) { readable = false; }
+    return { exists: true, at: o.at || 0, why: o.why || '', len: String(o.raw).length, readable: readable };
+  }
+  function restoreFromBackup() {
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem(SAVE_BAK) || 'null'); } catch (e) { o = null; }
+    if (!o || !o.raw) return  getProxied({ ok: false, msg: '本机没有备份' });
+    let data = null;
+    try { data = JSON.parse(unpackSave(o.raw)); }
+    catch (e) { return  getProxied({ ok: false, msg: '备份也读不出来（' + (e.message || '未知') + '）' }); }
+    if (!data || typeof data !== 'object') return  getProxied({ ok: false, msg: '备份内容不像存档' });
+    /* 恢复之前先把"当前这份"留一手（父亲大人可能只是试一下）—— 存在 `_pre_restore`，不参与自动读写。 */
+    try { const cur = localStorage.getItem(SAVE_KEY); if (cur) localStorage.setItem(SAVE_KEY + '_pre_restore', cur); } catch (e) {}
+    S = fillDefaults(defaultState(), data);
+    S.v = SAVE_VER;
+    try { migrate(); } catch (e) { /* 恢复优先：迁移这一步出问题也不拦着玩家把进度拿回来 */ }
+    lastLoadIssue = null;
+    offlineSettled = true;
+    save();
+    return  getProxied({ ok: true, at: o.at || 0, msg: '已恢复到 ' + (o.at ? new Date(o.at).toLocaleString() : '备份那份') });
+  }
+  function saveDiag() {
+    let raw = null;
+    try { raw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+    return  getProxied({
+      key: SAVE_KEY, has: !!raw, len: raw ? String(raw).length : 0,
+      enc: !!raw && String(raw).slice(0, 5) === 'MPG1:',
+      ver: (S && S.v) || 0, bak: backupInfo(), issue: lastLoadIssue,
+    });
   }
   /* 按默认结构**递归**补齐：缺的字段给默认值，多出来的字段原样保留。
      数组（背包槽、阵容、技能等级…）以存档里的为准，长度也不强行改 —— 交给 migrate 决定。 */
   function fillDefaults(def, data) {
     if (Array.isArray(def)) return Array.isArray(data) ? data : def.slice();
     if (def && typeof def === 'object') {
-      const out = {};
-      const src = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+      const out =  getProxied({});
+      const src = (data && typeof data === 'object' && !Array.isArray(data)) ? data :  getProxied({});
       Object.keys(def).forEach(function (k) {
         out[k] = Object.prototype.hasOwnProperty.call(src, k) ? fillDefaults(def[k], src[k]) : def[k];
       });
@@ -204,7 +367,7 @@ window.Core = (function () {
   // 上阵 5 格归一化：0/1 前排，2/3/4 后排；'@player' 一定在里面（主角必上阵）。
   // 老存档是 4 格且主角不占位，按他原来站的那一排把他插进去，其它人顺序不变。
   function normalizeParty(raw, oldRow) {
-    const src = (Array.isArray(raw) ? raw : []).slice(0, 5);
+    const src = (Array.isArray(raw) ? raw :  getProxied([])).slice(0, 5);
     if (src.indexOf('@player') >= 0) {
       // 已经是新结构：只补长度、清掉不再拥有的角色
       while (src.length < 5) src.push(null);
@@ -212,31 +375,31 @@ window.Core = (function () {
     }
     const mates = src.filter(id => id && S.chars && S.chars[id]);
     const arr = oldRow === 'back'
-      ? [mates[0] || null, mates[1] || null, '@player', mates[2] || null, mates[3] || null]
-      : ['@player', mates[0] || null, mates[1] || null, mates[2] || null, mates[3] || null];
+      ?  getProxied([mates[0] || null, mates[1] || null, '@player', mates[2] || null, mates[3] || null])
+      :  getProxied(['@player', mates[0] || null, mates[1] || null, mates[2] || null, mates[3] || null]);
     while (arr.length < 5) arr.push(null);
     return arr.slice(0, 5);
   }
   // 旧档迁移：C001 林默不再是主角占位，主角为独立实体
  function migrate() {
     const def = defaultState();
-    S.stats = Object.assign(def.stats, S.stats || {});
+    S.stats = Object.assign(def.stats, S.stats ||  getProxied({}));
     // V8.0 新增的三块（灯阁评级 / 秘术阁 / 挂机游历）：老档补默认值，缺字段不会读出 undefined
-    S.sect = Object.assign({ lv: 1, exp: 0 }, S.sect || {});
-    S.keji = S.keji || {};
-    S.travel = Object.assign({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }, S.travel || {});
+    S.sect = Object.assign( getProxied({ lv: 1, exp: 0 }), S.sect ||  getProxied({}));
+    S.keji = S.keji ||  getProxied({});
+    S.travel = Object.assign( getProxied({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }), S.travel ||  getProxied({}));
     if (typeof S.charExp !== 'number') S.charExp = 0;
     // 老档：把每个人身上攒的零散经验并进共享池（不丢东西）
-    Object.values(S.chars || {}).forEach(c => { if (c && c.exp) { S.charExp += c.exp; c.exp = 0; } });
+    Object.values(S.chars ||  getProxied({})).forEach(c => { if (c && c.exp) { S.charExp += c.exp; c.exp = 0; } });
     /* V9.6.129：碎片从"每人各攒"改成"按稀有度公共池" —— 老存档把各人身上的碎片**原样并入**池子，
        一点不丢；跑过一次就把标记写上（S.shardPoolMerged），不再重复累加。 */
-    if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
+    if (!S.shardPool) S.shardPool =  getProxied({ N: 0, R: 0, SR: 0, SSR: 0, UR: 0 });
     /* V9.6.134：货币 8 → 4 —— 老存档手里的旧币**折算并入新币，一点不丢**。
        折算率取"这个池子的日收入 ÷ 旧币的日收入"（跟价格那边的系数同源），所以
        玩家攒了"能买几件东西"的购买力在合并前后是一样的，不是随手给个数。
        跑过一次就写标记，不再重复累加。 */
     if (!S.curMerged4) {
-      const c = S.cur || (S.cur = {});
+      const c = S.cur || (S.cur =  getProxied({}));
       const n = (k) => Math.max(0, Math.floor(c[k] || 0));
       // 故事点 → 点数（点数池 50418/天 ÷ 故事点 706/天 ≈ 71）
       if (c.story) { c.points = (c.points || 0) + n('story') * 71; delete c.story; }
@@ -248,7 +411,7 @@ window.Core = (function () {
     }
     if (!S.shardPoolMerged) {
       let moved = 0;
-      Object.keys(S.chars || {}).forEach(function (id) {
+      Object.keys(S.chars ||  getProxied({})).forEach(function (id) {
         const c = S.chars[id]; const base = D.charById[id];
         if (!c || !base) return;
         const n = Math.max(0, Math.floor(c.shards || 0));
@@ -258,39 +421,39 @@ window.Core = (function () {
       S.shardPoolMerged = true;
       if (moved) save();
     }
-    S.garden = Object.assign(Array(def.garden.length).fill(null), S.garden || {});
-    S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
-    S.fabao = Object.assign({ own: [], on: null }, S.fabao || {});
-    S.mount = Object.assign({ own: [], on: null }, S.mount || {});
-    S.sign = Object.assign({ date: '', tier: '', idlePct: 0, drawn: 0 }, S.sign || {});
+    S.garden = Object.assign(Array(def.garden.length).fill(null), S.garden ||  getProxied({}));
+    S.arena = Object.assign( getProxied({ floor: 1, best: 1, date: '', used: 0 }), S.arena ||  getProxied({}));
+    S.fabao = Object.assign( getProxied({ own:  getProxied([]), on: null }), S.fabao ||  getProxied({}));
+    S.mount = Object.assign( getProxied({ own:  getProxied([]), on: null }), S.mount ||  getProxied({}));
+    S.sign = Object.assign( getProxied({ date: '', tier: '', idlePct: 0, drawn: 0 }), S.sign ||  getProxied({}));
     // V8.3：主角也能选前后排（老档默认前排）
     S.player.row = S.player.row === 'back' ? 'back' : 'front';
-    S.recruit = Object.assign(def.recruit, S.recruit || {});
+    S.recruit = Object.assign(def.recruit, S.recruit ||  getProxied({}));
     // 招募保底从"两个散字段"改成"按池记账"；老档把旧计数搬过来，进度不丢
-    S.recruit.pity = S.recruit.pity || {};
-    [['advanced', 'pityAdvS', 'pityAdv'], ['limited', 'pityLimS', 'pityLim']].forEach(([k, ssrKey, urKey]) => {
-      const cur = S.recruit.pity[k] || {};
-      S.recruit.pity[k] = {
+    S.recruit.pity = S.recruit.pity ||  getProxied({});
+     getProxied([ getProxied(['advanced', 'pityAdvS', 'pityAdv']),  getProxied(['limited', 'pityLimS', 'pityLim'])]).forEach(([k, ssrKey, urKey]) => {
+      const cur = S.recruit.pity[k] ||  getProxied({});
+      S.recruit.pity[k] =  getProxied({
         ssr: cur.ssr || S.recruit[ssrKey] || 0,
         ur: cur.ur || S.recruit[urKey] || 0,
         up: cur.up || 0,
-      };
+      });
       delete S.recruit[ssrKey];
       delete S.recruit[urKey];
     });
-    S.idle.lines = Object.assign({ cultivate: null, gather: null, explore: null, guard: null }, S.idle.lines || {});
-    S.bounty = Object.assign({ start: Date.now(), claimed: {}, list: null }, S.bounty || {});
-    S.bounty.claimed = S.bounty.claimed || {};
+    S.idle.lines = Object.assign( getProxied({ cultivate: null, gather: null, explore: null, guard: null }), S.idle.lines ||  getProxied({}));
+    S.bounty = Object.assign( getProxied({ start: Date.now(), claimed:  getProxied({}), list: null }), S.bounty ||  getProxied({}));
+    S.bounty.claimed = S.bounty.claimed ||  getProxied({});
     /* V9.6.17（父亲大人："限时悬赏的时间还是没改"）：悬赏期**生成一次就写进存档**，
        只改数据表里的 hours 对老档无效（它那一期的截止时间是老的）。rev 对不上就丢掉这一期、
        按新表重新生成 —— 一次性迁移，之后 rev 就一致了。 */
     if (S.bounty.rev !== D.BOUNTY_REV) {
-      S.bounty = { start: Date.now(), claimed: {}, list: null, rev: D.BOUNTY_REV };
+      S.bounty =  getProxied({ start: Date.now(), claimed:  getProxied({}), list: null, rev: D.BOUNTY_REV });
     }
     // 悬赏改成"按进度动态生成"，老档没有 list 就在这里补一份（不改变已领记录）
     if (!Array.isArray(S.bounty.list) || !S.bounty.list.length) S.bounty.list = D.makeBounties(S);
-    S.beast = Object.assign({ owned: {}, active: null }, S.beast || {});
-    S.beast.owned = S.beast.owned || {};
+    S.beast = Object.assign( getProxied({ owned:  getProxied({}), active: null }), S.beast ||  getProxied({}));
+    S.beast.owned = S.beast.owned ||  getProxied({});
     if (S.beast.active && !S.beast.owned[S.beast.active]) S.beast.active = null;
     S.player.realm = S.player.realm || 0;   // 已突破的境界（小阶）数
     // 境界从「10 个大境」改成「36 小阶」（见 data.js REALMS 注释）。
@@ -300,54 +463,68 @@ window.Core = (function () {
     // 只能由 newGame() 在建档时落上——见 newGame 里的说明。
     if (!S.realmScaled) { S.player.realm = S.player.realm * 4; S.realmScaled = true; }
     S.auth = S.auth || 0;   // 灯阁权限等级
-    S.sweep = Object.assign(def.sweep, S.sweep || {});
+    S.sweep = Object.assign(def.sweep, S.sweep ||  getProxied({}));
     S.sweep.bonus = S.sweep.bonus || 0;
     /* V9.5.66（父亲大人）：探索消耗品整条线删掉（ITEMS 里已经没有它们了）。
        老存档背包 / 待领箱里可能还躺着几个——不清理的话，背包会画出一格名字是 undefined 的空格子，
        点进去还会报错。这里按**当时商店里的原价**退回 ◉ 点数（玩家是真买的，不能凭空吞掉）。
        退款天然只做一次：清掉之后存档里就没有这些 id 了，下次读档退不到东西。 */
-    const retired = D.RETIRED_ITEMS || {};
+    const retired = D.RETIRED_ITEMS ||  getProxied({});
     let retiredRefund = 0;
     Object.keys(retired).forEach(id => {
       const n = S.items[id] || 0;
       if (n > 0) { retiredRefund += n * retired[id]; delete S.items[id]; }
     });
-    (S.stash || []).forEach(x => {
+    (S.stash ||  getProxied([])).forEach(x => {
       if (x && x.n > 0 && retired[x.id] !== undefined) { retiredRefund += x.n * retired[x.id]; x.n = 0; }
     });
     if (retiredRefund > 0) {
-      S.stash = (S.stash || []).filter(x => x && x.n > 0);
+      S.stash = (S.stash ||  getProxied([])).filter(x => x && x.n > 0);
       S.cur.points += retiredRefund;
       S.retiredRefund = (S.retiredRefund || 0) + retiredRefund;
       S.retiredRefundPending = true;      // main.js 读到这一位就在开局给一次提示，不静默改玩家的钱
     }
     // 老存档补新字段：设置项 / 图鉴领取记录 / 登录轮次
-    S.settings = Object.assign(def.settings, S.settings || {});
-    S.tasks = Object.assign(def.tasks, S.tasks || {});
-    S.tasks.weekly = S.tasks.weekly || {};
-    S.tasks.weeklyClaimed = S.tasks.weeklyClaimed || {};
-    S.achievements = S.achievements || {};
-    S.presets = Array.isArray(S.presets) ? S.presets.slice(0, 3) : [null, null, null];
+    S.settings = Object.assign(def.settings, S.settings ||  getProxied({}));
+    S.tasks = Object.assign(def.tasks, S.tasks ||  getProxied({}));
+    S.tasks.weekly = S.tasks.weekly ||  getProxied({});
+    S.tasks.weeklyClaimed = S.tasks.weeklyClaimed ||  getProxied({});
+    S.achievements = S.achievements ||  getProxied({});
+    S.presets = Array.isArray(S.presets) ? S.presets.slice(0, 3) :  getProxied([null, null, null]);
     while (S.presets.length < 3) S.presets.push(null);
     S.pendingRun = S.pendingRun || null;
-    S.serums = S.serums || {};   // 老档补齐：血清服用记录
+    S.serums = S.serums ||  getProxied({});   // 老档补齐：血清服用记录
     // 待领箱（背包满时的兜底）：老档补空数组，同时剔除脏条目
-    S.stash = Array.isArray(S.stash) ? S.stash.filter(x => x && (x.n || 0) > 0 && D.ITEMS[x.id]) : [];
+    S.stash = Array.isArray(S.stash) ? S.stash.filter(x => x && (x.n || 0) > 0 && D.ITEMS[x.id]) :  getProxied([]);
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："不行啊，那我要是副本掉落的装备呢"）==========
+       装备待领箱（`S.stashEq`）：装备格满时掉的/开出来的装备先存这儿，扩容后一键领回。
+       为什么必须有：原来满格是**强制折现成 ◆** —— 刷本出的 UR 就这么变成一点结晶，
+       玩家扩容回来发现"装备没了"。道具那边早就有 `S.stash` 兜底，装备这条一直空着。
+       ⚠️ 老档补空数组 + 剔除脏条目（uid/名字缺的不要），和 `S.stash` 同一套规矩。 */
+    S.stashEq = Array.isArray(S.stashEq) ? S.stashEq.filter(e => e && e.uid && e.name && e.slot) :  getProxied([]);
     // 老档补齐：招募角色的装备槽从 3 个扩到 6 个（世界套装 4/6 件效果才可能触发）
-    Object.keys(S.chars || {}).forEach(id => {
-      S.equipped[id] = Object.assign({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null }, S.equipped[id] || {});
+    Object.keys(S.chars ||  getProxied({})).forEach(id => {
+      S.equipped[id] = Object.assign( getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null }), S.equipped[id] ||  getProxied({}));
     });
-    Object.values(S.equips || {}).forEach(e => { if (e.lock === undefined) e.lock = false; });
+    Object.values(S.equips ||  getProxied({})).forEach(e => { if (e.lock === undefined) e.lock = false; });
+    /* V1.1.13（0927-E）：两档重铸带来的两个**新字段**（老装备按默认值读，**不补发炉火、
+       不改老装备的词条** —— 谁都别占便宜、也谁都不吃亏，总监 §十）。
+       ⚠️ 这两个字段只在"读取时缺就补"，**跑不跑都不影响老装备的词条与数值**。 */
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
+      if (!e) return;
+      if (!e.forge || typeof e.forge.n !== 'number') e.forge = { n: 0 };
+      if (!Array.isArray(e.affixLock)) e.affixLock = [];
+    });
     /* V9.6.81（父亲大人："现在的职业套装改成血统套装"）：老存档里的装备带着旧的 `classSet`（定位名，
        如 warrior）。按 LEGACY_KIND_SET 换成血统，名字前缀也跟着换（'战士·磁轨枪' → '狼人·磁轨枪'），
        玩家的套装不会凭空掉档。跑过一次存档里就没有 classSet 了，天然只迁移一次。 */
-    Object.values(S.equips || {}).forEach(e => {
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
       if (!e || !e.classSet) return;
       const oldKind = e.classSet;
-      const bl = (D.LEGACY_KIND_SET || {})[oldKind] || null;
+      const bl = (D.LEGACY_KIND_SET ||  getProxied({}))[oldKind] || null;
       e.bloodSet = bl;
       delete e.classSet;
-      const oldName = (D.KIND_NAMES || {})[oldKind];
+      const oldName = (D.KIND_NAMES ||  getProxied({}))[oldKind];
       if (bl && oldName && typeof e.name === 'string' && e.name.indexOf(oldName + '·') === 0) {
         e.name = bl + e.name.slice(oldName.length);
       }
@@ -355,15 +532,15 @@ window.Core = (function () {
     /* V9.6.82：血统套装改成"按世界"之后，老的血统件（只有 bloodSet、没有 bloodWorld）
        在套装卡里会显示成 0/6 却不知道为什么。给它们补上出处（第 10 张图，血统套装的最早一张），
        让它们仍然是有效的一套、能被计数。 */
-    Object.values(S.equips || {}).forEach(e => {
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
       if (e && e.bloodSet && !e.bloodWorld) e.bloodWorld = D.WORLDS[Math.max(0, (D.BLOODLINE_MIN_WORLD || 10) - 1)].id;
     });
     /* V9.6.86：血统体系改成"血统即定位"，**魔法血统被删掉**（成员并入修真）。
        老存档里跟魔法血统有关的东西必须迁移，否则：主角的技能栏会指向一个不存在的血统（直接白屏级问题），
        玩家的魔法套装件也永远凑不齐。 */
-    const BL_RENAME = { '魔法': '修真' };
+    const BL_RENAME =  getProxied({ '魔法': '修真' });
     if (S.player && BL_RENAME[S.player.bloodline]) S.player.bloodline = BL_RENAME[S.player.bloodline];
-    Object.values(S.equips || {}).forEach(e => {
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
       if (!e) return;
       if (e.bloodSet && BL_RENAME[e.bloodSet]) e.bloodSet = BL_RENAME[e.bloodSet];
       if (e.godSet && BL_RENAME[e.godSet]) e.godSet = BL_RENAME[e.godSet];
@@ -373,9 +550,9 @@ window.Core = (function () {
        S.player.bloodline / equip.bloodSet / equip.godSet 可能还是「血族」，
        不迁移就是"主角没命格 + 套装永远凑不齐"。装备名里的前缀（血族·／血族神装·）
        一起换，免得背包里新旧名字混着看。跑过一次存档里就没有「血族」了，天然只迁移一次。 */
-    const BL_RENAME_V2 = { '血族': '绯红' };
+    const BL_RENAME_V2 =  getProxied({ '血族': '绯红' });
     if (S.player && BL_RENAME_V2[S.player.bloodline]) S.player.bloodline = BL_RENAME_V2[S.player.bloodline];
-    Object.values(S.equips || {}).forEach(e => {
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
       if (!e) return;
       if (e.bloodSet && BL_RENAME_V2[e.bloodSet]) e.bloodSet = BL_RENAME_V2[e.bloodSet];
       if (e.godSet && BL_RENAME_V2[e.godSet]) e.godSet = BL_RENAME_V2[e.godSet];
@@ -388,7 +565,7 @@ window.Core = (function () {
        `signState().pick` 是拿 `S.sign.tier` 去 `D.SIGNS` 里找同名的，不迁移就会出现
        "今天的面板写着【大吉】但灯焰文案是空的"。跑过一次存档里就没有旧档位名了，天然只迁移一次。
        只翻名字，不动 weight / gain / idlePct / date / drawn。 */
-    const SIGN_RENAME = { '大吉': '长明', '上吉': '炽光', '中吉': '明光', '小吉': '柔光', '末吉': '微光' };
+    const SIGN_RENAME =  getProxied({ '大吉': '长明', '上吉': '炽光', '中吉': '明光', '小吉': '柔光', '末吉': '微光' });
     if (S.sign && SIGN_RENAME[S.sign.tier]) S.sign.tier = SIGN_RENAME[S.sign.tier];
     /* 2026-09-23（文案策划 · 提审合规 · 48 小时整改）:幽都（ghost）装备名整批换壳（符咒 /
        佛珠 / 道袍 / 镇魂 / 缚灵 / 驱邪 / 镇宅 / 往生 那一套），修真血统的四件同源词一起换。
@@ -397,7 +574,7 @@ window.Core = (function () {
        ⚠️ 只翻**显示名**：uid / slot / base / affixes / set / bloodSet / 强化等级一个都没动。
        ⚠️ 血统 / 神装的件带前缀（`修真·道冠` / `修真神装·符咒护手`），所以还要按"·"后的尾巴再对一次。
        ⚠️ 改 `data.js` 的 EQUIP_NAMES / BLOODLINE_EQUIP_NAMES 时，**一定要同时改这张表**。 */
-    const EQUIP_NAME_RENAME = {
+    const EQUIP_NAME_RENAME =  getProxied({
       '镇魂铃': '沉铃', '驱邪短刃': '净尘短刃', '缚灵符剑': '束纹长剑',
       '符咒道袍': '沉纹长袍', '怨念披风': '旧纹披风', '镇宅法衣': '守宅长衣',
       '护身佛珠': '静心珠', '盐晶挂坠': '霜晶挂坠', '往生铜钱': '旧纹铜钱',
@@ -409,8 +586,8 @@ window.Core = (function () {
          「秘纹铠甲」。它和 W29 的「第九碑陵」是同一个「陵」（陵墓语汇），上一轮只清世界名时漏了它。
          装备名是存进存档的值，所以这张迁移表必须同时改（上面那条 ⚠️ 就是为它写的）。 */
       '秘陵铠甲': '秘纹铠甲',
-    };
-    Object.values(S.equips || {}).forEach(e => {
+    });
+    Object.values(S.equips ||  getProxied({})).forEach(e => {
       if (!e || typeof e.name !== 'string') return;
       if (EQUIP_NAME_RENAME[e.name]) { e.name = EQUIP_NAME_RENAME[e.name]; return; }
       const cut = e.name.lastIndexOf('·');
@@ -418,10 +595,81 @@ window.Core = (function () {
       const tail = e.name.slice(cut + 1);
       if (EQUIP_NAME_RENAME[tail]) e.name = e.name.slice(0, cut + 1) + EQUIP_NAME_RENAME[tail];
     });
-    S.codex = Object.assign({ chars: [], equipsSeen: 0 }, S.codex || {});
-    S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed : [];
-    S.login = Object.assign(def.login, S.login || {});
-    S.cur = Object.assign(def.cur, S.cur || {});
+    /* ================= 2026-09-27（本命装备 36 件）· 老档手里那几件专属就地升级 =================
+       父亲大人四条：专属词条 5 条 / 改绑第一 / 不要隐藏角色 / 每人一套本命。
+       老玩家手里已有的专属（含最初那 6 件、全是武器）必须**就地升级**，不能留着当废件：
+         · 词条补齐到 5 条 —— 按**新表里同部位那一件**重建（不是随手加两条凑数）；
+         · **只有一件要改绑**：代行之刃（C120 灯阁代行者 ＝ 狼人第三）→ C111 黑田宗一（狼人第一），
+           名字与 sigText 跟着换。另两件元素咏叹（C059 楚衍）/ 磐岩壁垒（C117 零式）**本来就绑的第一**
+           —— 04:30 父亲大人修正"不要排除隐藏角色"之后，它们不用改绑、名字也不用换（见 data.js
+           的 `SIGNATURE_LEGACY_BINDING` / `SIGNATURE_KEEP_NAME`）；
+         · 基础值补到新系数（旧 ×1.15 → 新 ×1.30）—— 只补差、只补一次；整数仍是整数；
+         · `uid` / `slot` / `enhance` / `lock` **原样保留**（玩家强化过的等级不许被重置）。
+       幂等靠逐件标记 `sigRev`（**不写进 defaultState** —— 写进去老档就会先拿到默认值、这段永不执行）：
+       跑两遍既不会变两件、也不会把词条再加一遍。认不出来的一律不动（宁可不迁，也不许改坏）。 */
+    Object.keys(S.equips ||  getProxied({})).forEach(uid => {
+      const e = S.equips[uid];
+      if (!e || !e.charId) return;                          // 只有专属件带 charId
+      if (e.sigRev === D.SIGNATURE_REV) return;             // 已经迁过
+      const sigId = D.signatureIdOf(e);
+      if (sigId < 0) return;
+      const sig = D.SIGNATURE_EQUIPS[sigId];
+      e.charId = sig.charId;
+      e.name = sig.name;
+      e.sigText = sig.text;
+      e.slot = sig.slot;
+      e.affixes = sig.affixes.map(a =>  getProxied({ k: a.k, v: a.v }));
+      if (e.base) Object.keys(e.base).forEach(k => {
+        const v = e.base[k] * D.SIGNATURE_BASE_RATIO;
+        e.base[k] = Number.isInteger(e.base[k]) ? Math.round(v) : +v.toFixed(3);
+      });
+      e.sigRev = D.SIGNATURE_REV;
+    });
+    S.codex = Object.assign( getProxied({ chars:  getProxied([]), equipsSeen: 0 }), S.codex ||  getProxied({}));
+    S.codex.claimed = Array.isArray(S.codex.claimed) ? S.codex.claimed :  getProxied([]);
+    /* V1.1.3（A10 图鉴装备卷）：老档**回填** —— 玩家已经穿在身上 / 躺在背包里的装备名，
+       一读档就该算进装备卷（不然老玩家打开灯录看到"0 / 232"，会以为收集进度被清了）。
+       放在这里（并池容量合并之后）是材料《总落地清单》§2.2 点名的顺序：**容量合并 → 装备卷回填**。 */
+    S.codex.equipNames = Array.isArray(S.codex.equipNames) ? S.codex.equipNames :  getProxied([]);
+    Object.keys(S.equips ||  getProxied({})).forEach(uid => {
+      const e = S.equips[uid];
+      if (e && e.name && S.codex.equipNames.indexOf(e.name) < 0) S.codex.equipNames.push(e.name);
+    });
+    /* 2026-09-27（本命 36 件）· 装备卷名单**换了**：旧专属名（代行之刃 / 元素咏叹 / 磐岩壁垒）已不存在，
+       而 `codexEquipNameList()` 也不再摊平出 C120 / weapon / 神装文案这些永远集不到的字符串。
+       老档的 `equipNames` 里可能还挂着那些旧名 —— 不清掉的话，"已收集"会**超过总数**
+       （收集数按"名字在不在名单里"算，collected 那一侧没有滤网）。只留现在还在名单里的名字。 */
+    const validEquipNames =  getProxied({});
+    D.codexEquipNameList().forEach(n => { validEquipNames[n] = 1; });
+    S.codex.equipNames = S.codex.equipNames.filter(n => validEquipNames[n]);
+    /* ================= V1.1.4（A12-F 第 4 块 · 老档入门包）=================
+       《续2》§3.5 第 3 条：**内容 = 铭魂砂×5 ＋ 血髓晶×3**，条件 = 老档且**已经动过铭刻或命格**，
+       **只发一次**。写在这里（材料表 → 两个报价 → 产出口 → 入门包）是《总落地清单》§1 那条硬线：
+       顺序倒了的话，入门包会按**旧报价**判条件（旧报价不看材料，等于白判）。
+
+       幂等**靠"这个字段在不在"**，不靠 `S.flags`（《续3》风险表 R7 点名：老档可能没有 `S.flags`，
+       先补再判就会抛错；而且 flag 一旦被别处清掉就会重复发）。写法与 `realmScaled` 完全一样 ——
+       **不写进 defaultState**（写进去 `fillDefaults` 会先给老档补上默认值，这段就永远不进），
+       新档由 `newGame()` 在建档时落位。
+
+       ⚠️ 数量**刻意小**（《续2》原话"它只是垫脚，不是补偿"）：老玩家当年按纯 ◆ 价买过的那些阶，
+          **不倒欠材料、也不退那 25% 的 ◆**（§3.5 第 1/2 条，那正是往老档注入 14.6 万 ◆ 的口子）。 */
+    if (S.a12Pack === undefined) {
+      const touchedGene = (S.player.geneLock || 0) > 0;                       // 点过铭刻
+      const touchedBlood = (S.player.bloodlineLv || 0) > 0                    // 主角命格
+        || Object.keys(S.chars ||  getProxied({})).some(id => (((S.chars ||  getProxied({}))[id] ||  getProxied({})).bloodlineLv || 0) > 0);
+      if (touchedGene || touchedBlood) {
+        /* 装不下就进待领箱 —— 读档路径上不许有"发不出去就丢掉"的写法（同 migrate 里其它几段）。 */
+         getProxied([['minghun_sha', 5], ['xuesui_jing', 3]]).forEach(([id, n]) => {
+          if (!addItem(id, n)) stashItem(id, n);
+        });
+        S.a12PackGiven = true;
+      }
+      S.a12Pack = true;
+      save();
+    }
+    S.login = Object.assign(def.login, S.login ||  getProxied({}));
+    S.cur = Object.assign(def.cur, S.cur ||  getProxied({}));
     // ⚠️ 只跑一次：C001 是旧版"主角占位"，新版主角是独立实体。
     // 之前这段没有开关，**每次读档都会跑**——玩家只要抽到 C001（他很普通池里 N 档 6 人之一），
     // 下次开游戏角色就被删掉，花的货币不退（V9.2 修）。
@@ -430,9 +678,9 @@ window.Core = (function () {
     const legacySave = legacyRaw || ((S.c001Merged === undefined) && !S.altPlayers && !S.fabao);
     if (S.chars && S.chars['C001'] && legacySave) {
       // 转移 C001 装备到主角
-      const old = (S.equipped && S.equipped['C001']) || {};
+      const old = (S.equipped && S.equipped['C001']) ||  getProxied({});
       const slots = S.equipped['@player'];
-      ['weapon', 'armor', 'accessory'].forEach(k => { if (old[k] && !slots[k]) slots[k] = old[k]; });
+       getProxied(['weapon', 'armor', 'accessory']).forEach(k => { if (old[k] && !slots[k]) slots[k] = old[k]; });
       delete S.equipped['C001'];
       delete S.chars['C001'];
       if (S.codex && S.codex.chars) S.codex.chars = S.codex.chars.filter(x => x !== 'C001');
@@ -446,7 +694,7 @@ window.Core = (function () {
     // V8.3：上阵位从「4 格（主角不占位）」改成「5 格（前 2 后 3，主角占一格）」
     S.party = normalizeParty(S.party, S.player.row);
     if (Array.isArray(S.presets)) S.presets = S.presets.map(p => (p ? normalizeParty(p, 'front') : p));
-    if (!S.equipped['@player']) S.equipped['@player'] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
+    if (!S.equipped['@player']) S.equipped['@player'] =  getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null });
     // V8.3：老档里可能存在的"一件装备被多人穿"（旧版换装 / 一键最优装备留下的脏数据）——
     // 在装备槽补齐之后再修，只留给排在最前面的那个人
     dedupeEquips();
@@ -466,23 +714,23 @@ window.Core = (function () {
       return D.PROTAG_NAMES[n % D.PROTAG_NAMES.length];
     };
     S.player.name = cleanName(S.player.name) || nameFallback(S.player.name);
-    (S.altPlayers || []).forEach(p => { if (p) p.name = cleanName(p.name) || nameFallback(p.name); });
-    S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs || {});
+    (S.altPlayers ||  getProxied([])).forEach(p => { if (p) p.name = cleanName(p.name) || nameFallback(p.name); });
+    S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs ||  getProxied({}));
     S.player.attrPoints = S.player.attrPoints || 0;
     /* V9.5.69：技能等级从 1 起改成 0 起。老档一次性把已点等级整体减 1（Lv.1→Lv.0），
        这样"实际强度"和"已花点数"都保持不变，不会因为改口径白送或白扣。
        用 skillZeroBased 这个一次性标记，避免每次读档都减。 */
     if (!S.skillZeroBased) {
       const conv = v => Math.max(0, (v || 1) - 1);
-      S.player.skillLv = (S.player.skillLv || [1, 1, 1]).slice(0, 3).map(conv);
-      Object.values(S.chars || {}).forEach(c => { if (c) c.skillLv = (c.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
-      (S.altPlayers || []).forEach(p => { if (p) p.skillLv = (p.skillLv || [1, 1, 1]).slice(0, 3).map(conv); });
+      S.player.skillLv = (S.player.skillLv ||  getProxied([1, 1, 1])).slice(0, 3).map(conv);
+      Object.values(S.chars ||  getProxied({})).forEach(c => { if (c) c.skillLv = (c.skillLv ||  getProxied([1, 1, 1])).slice(0, 3).map(conv); });
+      (S.altPlayers ||  getProxied([])).forEach(p => { if (p) p.skillLv = (p.skillLv ||  getProxied([1, 1, 1])).slice(0, 3).map(conv); });
       S.skillZeroBased = true;
     }
     /* V9.5.78：技能点改成"按等级算"的纯函数（skillPointsForLevel），
        老档与转生档都自动算对，不需要一次性标记，也不会重复发放。 */
     S.player.skillPoints = skillPointsForLevel();
-    S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3);
+    S.player.skillLv = (S.player.skillLv ||  getProxied([0, 0, 0])).slice(0, 3);
     /* V9.5.83：脏档洗净放**最后**跑——前面还有「技能 1 基→0 基」这类一次性换算，
        先洗会把越界的值夹住、再被换算改一次（实测技能等级会差 1 级）。洗净永远该是最后一道。 */
     sanitizeSave();
@@ -491,11 +739,11 @@ window.Core = (function () {
       // 技能点每 3 级 1 点，老档按同一口径补算，避免"老档凭空多出几十点"
       S.player.skillPoints = Math.max(0, Math.floor(S.player.level / D.SKILL_POINT_EVERY_LV) - spent);
     }
-    S.altPlayers = Array.isArray(S.altPlayers) ? S.altPlayers : [];
+    S.altPlayers = Array.isArray(S.altPlayers) ? S.altPlayers :  getProxied([]);
     S.altPlayers.forEach(p => {
-      p.attrs = Object.assign(ATTR_ZERO(), p.attrs || {});
+      p.attrs = Object.assign(ATTR_ZERO(), p.attrs ||  getProxied({}));
       p.attrPoints = p.attrPoints || 0;
-      p.skillLv = (p.skillLv || [0, 0, 0]).slice(0, 3);
+      p.skillLv = (p.skillLv ||  getProxied([0, 0, 0])).slice(0, 3);
       if (p.skillPoints === undefined) {
         const spent = p.skillLv.reduce((s, x) => s + x, 0);
         p.skillPoints = Math.max(0, Math.floor(p.level / D.SKILL_POINT_EVERY_LV) - spent);
@@ -505,22 +753,37 @@ window.Core = (function () {
     // 老档的扩容次数同时算给三边：总格数只多不少，不会因为改版缩水。
     if (!S.bag || S.bag.itemCap === undefined) {
       const oldExpands = (S.bag && S.bag.expands) || 0;
-      S.bag = {
+      S.bag =  getProxied({
         itemCap: D.BAG_BASE_ITEM_CAP + oldExpands * D.BAG_EXPAND_SIZE, itemExpands: oldExpands,
         matCap: D.BAG_BASE_MAT_CAP + oldExpands * D.BAG_EXPAND_SIZE, matExpands: oldExpands,
         eqCap: D.BAG_BASE_EQ_CAP + oldExpands * D.BAG_EXPAND_SIZE, eqExpands: oldExpands,
-      };
+      });
+    }
+    /* V1.1.1（背包四份样本 S4 抓到的真洞）：**极老档**（只有 `bag: { expands: N }`）在
+       `fillDefaults` 那一步就已经被补上了 `itemCap: 50` —— 于是上面那个分支（判 itemCap 缺不缺）
+       根本不进，老玩家**买过的扩容次数被静默丢掉**（本来 50+2×10=70，结果只剩 50）。
+       这里补一条按"旧字段存在性"走的迁移：只要 `expands` 还在，就把三池的容量都抬到
+       "基数 + 扩容次数×10"（**只多不少**，与上面那条同一个口径），并留一个幂等标记。 */
+    if (S.bag && S.bag.expands !== undefined && !S.bag.mergedExpandsApplied) {
+      const e = S.bag.expands || 0;
+      getProxied(['item', 'mat', 'eq']).forEach(k => {
+        const capKey = k + 'Cap', expKey = k + 'Expands';
+        const base = { item: D.BAG_BASE_ITEM_CAP, mat: D.BAG_BASE_MAT_CAP, eq: D.BAG_BASE_EQ_CAP }[k];
+        S.bag[capKey] = Math.max(S.bag[capKey] || 0, base + e * D.BAG_EXPAND_SIZE);
+        S.bag[expKey] = Math.max(S.bag[expKey] || 0, e);
+      });
+      S.bag.mergedExpandsApplied = true;
     }
     if (S.bag.matCap === undefined) {   // V9.2 中途有过"只有两池"的版本，补上材料池
       S.bag.matCap = D.BAG_BASE_MAT_CAP; S.bag.matExpands = 0;
     }
     // 世界首通奖励改成"每个世界·每个难度只发一次"。
     // 老档里已经打穿的世界要当场标成"已领过"，否则更新之后还能再白领一轮（V9.2）。
-    S.unlocks = S.unlocks || {};
-    S.worldFirstClear = S.worldFirstClear || {};
-    Object.keys(S.worlds || {}).forEach(wid => {
+    S.unlocks = S.unlocks ||  getProxied({});
+    S.worldFirstClear = S.worldFirstClear ||  getProxied({});
+    Object.keys(S.worlds ||  getProxied({})).forEach(wid => {
       const w = S.worlds[wid];
-      ['normal', 'hard', 'hell'].forEach(d => {
+       getProxied(['normal', 'hard', 'hell']).forEach(d => {
         if (w && w.stages && w.stages[d] && w.stages[d].length && w.stages[d].every(x => x > 0)) {
           S.worldFirstClear[wid + '_' + d] = true;
         }
@@ -528,6 +791,12 @@ window.Core = (function () {
     });
     // 功能解锁按"当前进度"补一遍：老档（或解锁表后续加过条目）读进来时，
     // 已经打过的关卡要立刻反映成"已解锁"，否则新加的解锁门禁会把老玩家拦在外面。
+    /* V1.1.9（续13 · P0-4）：老档补"历史最高通关世界"。
+       口径：取 **max(存档里已有的值, 当前实际打穿的最高世界)** —— 老档没这个字段时按当前进度给一次。
+       ⚠️ 如实说清一处局限：**如果这个老档已经转过生、当前进度又低于它当年打到的地方**，
+       "当年"那个数字在任何地方都没有留痕（转生会清 `S.worlds`），所以补不出来 ——
+       这种情况会从"当前进度"起算（也就是只赚不亏，但拿不回那一次的腰斩）。新档起不会有这个问题。 */
+    S.player.bestWorldIdx = Math.max(S.player.bestWorldIdx || 0, bestWorldIdx());
     refreshUnlocks();
   }
   function newGame() {
@@ -543,6 +812,13 @@ window.Core = (function () {
     // 这个标记以前要等第一次读档才写入，于是新档第一次读档时也被乘了 4
     // （新档渡劫 5 次 → 重开变 20 阶）。建档时就把标记落上，新档永远不会被换算（V9.5 修）。
     S.realmScaled = true;
+    /* V1.1.4（A12 老档入门包）：同理 —— 新档在建档时就把标记落上，
+      这样"新号刚点了一阶铭刻再读档"不会被当成老档白拿一份入门包。 */
+    S.a12Pack = true;
+    /* V1.1.14（0927-F）：碎片改成"按人各算各的"，而 `shardPoolMerged` 是**老档那一次合并**的标记 ——
+       新档建好就落上，免得"新号攒了一堆他自己的碎片、第一次读档全被并进通用池"（新口径当场作废）。
+       和 `realmScaled` / `a12Pack` 同一个套路：**建档时落标记，老档靠缺标记走到迁移那一支**。 */
+    S.shardPoolMerged = true;
     // 新手资源（V5.0 §113）
     addCur('points', D.STARTER.points);
     addCur('holy', D.STARTER.holy);
@@ -590,45 +866,77 @@ window.Core = (function () {
     if (id === '@player') return S.player.name || '主角';
     return D.charById[id] ? D.charById[id].name : id;
   }
-  function exportSave() { return JSON.stringify(S); }
+  /* 导出/导入存档：**导出走的也是加密那条口子**（否则"手工造一份明文 JSON 再导进来"就是另一个白嫖口）。
+     导入时 `unpackSave` 两种都认 —— 老玩家手里那份**明文**导出串照样能粘进来。 */
+  function exportSave() { return packSave(S); }
+  /* ================= V1.1.15（2026-09-27 存档审计）=================
+     **"换档"这类操作一律先备份现场、出错要能回滚。**
+     审计抓到的真洞（比"重传丢档"那次更隐蔽）：
+       `importSave` / `loadSlot` 原来是 `S = fillDefaults(...)` → **裸调 `migrate()`** → `save()`。
+       迁移一旦抛错（老档缺字段、字段类型不对、某条换算越界），异常被外层 catch 吃掉、
+       函数返回"存档文件损坏"——**可内存里的 S 已经被换成那份半迁移的档了**，
+       而 `game.js` 的 15 秒心跳会照常 `Core.save()` → **玩家原来那份主档被静默覆盖**。
+       玩家看到的是"我导入了一下，结果我自己的档没了"。
+     现在：切档前把主档原文留一份（`_pre_switch`），并把 `S / offlineSettled / legacyRaw`
+     一起入栈，任何一步抛错都**整份回滚**再报错；迁移出错不再致命（与 `load()` 同一口径）。 */
+  function switchStateTo(rawData, why) {
+    const prevS = S, prevOffline = offlineSettled, prevLegacy = legacyRaw;
+    let prevRaw = null;
+    try { prevRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+    try {
+      if (prevRaw) { try { localStorage.setItem(SAVE_KEY + '_pre_switch', prevRaw); } catch (e) {} }
+      legacyRaw = (rawData.c001Merged === undefined) && (rawData.altPlayers === undefined) && (rawData.fabao === undefined);
+      S = fillDefaults(defaultState(), rawData);
+      S.v = SAVE_VER;
+      try { migrate(); }
+      catch (e) {
+        lastLoadIssue = issue('migrate:' + (e && e.message ? e.message : 'unknown'), prevRaw || '');
+        /* 同 `load()`：迁移出错也要把**切换前那份主档**留成备份（`_pre_switch` 是现场快照，
+           这里再进一次标准备份口，设置页的【恢复上一份存档】才看得到它）。 */
+        if (prevRaw) backupSave(prevRaw, 'migrate');
+        try { console.warn('[save] 迁移这一步出错了（' + why + '），进度按已读到的样子保留：' + (e && e.message)); } catch (e2) {}
+      }
+      save();
+      return true;
+    } catch (e) {
+      S = prevS; offlineSettled = prevOffline; legacyRaw = prevLegacy;      // 整份回滚，绝不留下半迁移的 S
+      if (prevRaw) { try { localStorage.setItem(SAVE_KEY, prevRaw); } catch (e2) {} }
+      lastLoadIssue = issue(why + ':' + (e && e.message ? e.message : 'unknown'), '');
+      return false;
+    }
+  }
   function importSave(json) {
     try {
-      const data = JSON.parse(json);
-      if (!data || typeof data !== 'object') return { ok: false, msg: '存档文件损坏' };
+      const data =  getProxied(JSON.parse(unpackSave(json)));
+      if (!data || typeof data !== 'object') return  getProxied({ ok: false, msg: '存档文件损坏' });
       /* V9.6.113：导入**自己老版本**导出的存档也要能进来（补齐字段 + 迁移），
          只有"更高版本"的存档才拒收（那说明对方用的是更新的版本，导向后兼容）。 */
-      if (Number(data.v || 0) > SAVE_VER) return { ok: false, msg: '存档来自更新的版本，请先更新游戏' };
-      legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
-      S = fillDefaults(defaultState(), data);
-      S.v = SAVE_VER;
-      migrate();     // 老版本导出的存档也要补字段（之前漏了这一步，导入老档会缺东西）
-      save();
-      return { ok: true };
-    } catch (e) { return { ok: false, msg: '存档文件损坏' }; }
+      if (Number(data.v || 0) > SAVE_VER) return  getProxied({ ok: false, msg: '存档来自更新的版本，请先更新游戏' });
+      if (!switchStateTo(data, 'import')) return  getProxied({ ok: false, msg: '这份存档读不进来，已原样退回，你的进度没动' });
+      return  getProxied({ ok: true });
+    } catch (e) { return  getProxied({ ok: false, msg: '存档文件损坏' }); }
   }
-  function saveSlot(n) { try { localStorage.setItem(slotKey(n), JSON.stringify(S)); return true; } catch (e) { return false; } }
+  function saveSlot(n) { try { localStorage.setItem(slotKey(n), packSave(S)); return true; } catch (e) { return false; } }
   function loadSlot(n) {
     try {
       const raw = localStorage.getItem(slotKey(n));
       if (!raw) return false;
-      const data = JSON.parse(raw);
+      const data =  getProxied(JSON.parse(unpackSave(raw)));
       if (!data || typeof data !== 'object') return false;
       if (Number(data.v || 0) > SAVE_VER) return false;      // 更高版本：不载入（也不覆盖）
-      legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
-      S = fillDefaults(defaultState(), data);
-      S.v = SAVE_VER;
-      migrate();     // 同上：读存档槽也要走一遍迁移
-      save();
-      return true;
+      /* V1.1.15：这条路原来也是裸调 migrate + 直接 save（同 importSave 那个洞），现在走同一套"先备份后切换" */
+      return switchStateTo(data, 'slot');
     } catch (e) { return false; }
   }
   function slotInfo() {
-    const out = [];
+    const out =  getProxied([]);
     for (let i = 1; i <= SLOT_COUNT; i++) {
       const raw = localStorage.getItem(slotKey(i));
       let meta = null;
-      if (raw) { try { const d = JSON.parse(raw); meta = { level: d.player.level, floor: d.corridor.best, time: d.idle && d.idle.lastTs }; } catch (e) {} }
-      out.push({ slot: i, exists: !!raw, meta });
+      /* V1.1.15：这里原来直接 `JSON.parse(raw)` —— 可存档槽存的是**密文**（`packSave`），
+         于是元信息永远解析不出来（列表显示"空槽"，玩家以为槽位丢了）。走同一条 `unpackSave`。 */
+      if (raw) { try { const d =  getProxied(JSON.parse(unpackSave(raw))); meta =  getProxied({ level: d.player.level, floor: d.corridor.best, time: d.idle && d.idle.lastTs }); } catch (e) { meta = null; } }
+      out.push( getProxied({ slot: i, exists: !!raw, meta }));
     }
     return out;
   }
@@ -670,7 +978,7 @@ window.Core = (function () {
      ⚠️ 第一版写成 `tallyCur(on){ curTally = on ? {} : null }` —— 于是"读取"那一下会把累计清零，
      跑出来全是 0。取值和重置必须是两件事。 */
   function tallyCur(on) {
-    if (on !== undefined) curTally = on ? {} : null;
+    if (on !== undefined) curTally = on ?  getProxied({}) : null;
     return curTally;
   }
   function canAfford(cost) {
@@ -702,6 +1010,16 @@ window.Core = (function () {
         if (n >= 6 && gs.b6) Object.entries(gs.b6).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
         return;
       }
+      /* V1.1.15：**本命套装**（第 4 类）—— 六件同一位伙伴的专属 → 2/4/6 三档。
+         效果表在 data.js 的 `SIGNATURE_SET`（一处定义）；这里只按件数取档。 */
+      if (setId.startsWith('sig:')) {
+        const ss = D.SIGNATURE_SET;
+        if (!ss) return;
+        if (n >= 2 && ss.b2) Object.entries(ss.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 4 && ss.b4) Object.entries(ss.b4).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        if (n >= 6 && ss.b6) Object.entries(ss.b6).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
+        return;
+      }
       const set = D.SETS[setId];
       if (!set) return;
       if (n >= 2 && set.b2) Object.entries(set.b2).forEach(([k, v]) => { pct[k] = (pct[k] || 0) + v; });
@@ -710,68 +1028,88 @@ window.Core = (function () {
     });
   }
   /* --- 转生天赋：一支入口，文案与效果同源（D.TALENTS 的节点自带 e 效果表） --- */
-  const TALENT_PCT_KEYS = ['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct'];
+  const TALENT_PCT_KEYS =  getProxied(['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct']);
   function talentAll() {
     const t = S.player.talents;
-    const out = {};
-    ['body', 'energy', 'nerve', 'grace'].forEach(b => {
+    const out =  getProxied({});
+     getProxied(['body', 'energy', 'nerve', 'grace']).forEach(b => {
       Object.entries(D.talentEffect(b, t[b] || 0)).forEach(([k, v]) => { out[k] = (out[k] || 0) + v; });
     });
     return out;
   }
   function talentPct() {
-    const all = talentAll(), out = {};
+    const all = talentAll(), out =  getProxied({});
     TALENT_PCT_KEYS.forEach(k => { out[k] = all[k] || 0; });
     return out;
   }
   // 战斗引擎专用的天赋字段（减伤/受治疗/开场能量/CD/先制/必杀）
   function talentCombatExtra() {
     const all = talentAll();
-    return {
+    return  getProxied({
       dmgReduce: Math.min(0.6, all.dmgReduce || 0),
       healUp: all.healUp || 0,
       initEnergy: all.initEnergy || 0,
       cdRed: all.cdRed || 0,
       firstStrike: all.firstStrike || 0,
       ultPct: all.ultPct || 0,
-    };
+    });
   }
   const graceIdleMult = () => 1 + (talentAll().idlePct || 0);
   const graceExpMult = () => 1 + (talentAll().expPct || 0);
   const graceDropMult = () => 1 + (talentAll().dropPct || 0) + kejiBonus().dropPct;
   // 背包占用 = 道具种类数 + 未装备装备件数
   function bagUsage() {
-    const equippedUids = new Set();
-    Object.values(S.equipped || {}).forEach(slots => Object.values(slots || {}).forEach(uid => { if (uid) equippedUids.add(uid); }));
+    const equippedUids =  getProxied(new Set());
+    Object.values(S.equipped ||  getProxied({})).forEach(slots => Object.values(slots ||  getProxied({})).forEach(uid => { if (uid) equippedUids.add(uid); }));
     const eqCount = Object.keys(S.equips).filter(uid => !equippedUids.has(uid)).length;
     const stacks = Object.entries(S.items).filter(([, n]) => n > 0);
-    const isMat = k => ((D.ITEMS[k] || {}).type === 'material');
-    const matStacks = stacks.filter(([k]) => isMat(k)).length;
-    const itemStacks = stacks.length - matStacks;
-    return {
+    const isMat = k => ((D.ITEMS[k] ||  getProxied({})).type === 'material');
+    /* V1.1.1（父亲大人 0926 拍板：「并池容量还是 50，**单格物品上限 100 个**，超过 100 就会占两格」）：
+       占用格数从"每种 1 格"改成 **Σ ceil(件数 / BAG_STACK_MAX)** —— 一件东西超过 100 个就占第二格。
+       ⚠️ 这个算式**只有这一处**（界面读 bagUsage()、不自己算），上限常量也只在 data.js 定义一次。 */
+    const MAX = D.BAG_STACK_MAX || 100;
+    const slotsOf = n => Math.max(0, Math.ceil((n || 0) / MAX));
+    /* V1.1.2（A11 并池 · 父亲大人 0926 拍板「**并池容量还是 50**，单格物品上限 100」）：
+       道具与材料**并成一个池**（材料不再单独占一个 50 格池）—— 他心里的口径一直是"一个背包"，
+       而且并池之后"品种 52 种 vs 50 格"才真的能撞到（扩容才有用）。
+       占用格数 = 池子里所有种类 Σ ceil(件数/100)（材料与道具一视同仁）。 */
+    const usedAll = stacks.reduce((a, [, n]) => a + slotsOf(n), 0);
+    const itemStacks = usedAll;          // 并池后 "itemStacks" 就是这个池子的占用
+    const matStacks = 0;                 // 材料那一块已并入同一个池（字段保留给老调用点，恒 0）
+    const itemSlots = stacks.filter(([k]) => !isMat(k)).reduce((a, [, n]) => a + slotsOf(n), 0);
+    const matSlots = usedAll - itemSlots;
+    /* 容量口径：**max(基数 50, 两侧已扩容值, 实际理论占用)**。
+       他明确"老档不做一次性宽限"，靠这个取大天然兜住：老档一读档，容量自动不低于它已经占的格数，
+       所以任何改动都不会让老档"缩水"（也不会出现"东西凭空进待领箱"）。 */
+    const capAll = Math.max(D.BAG_BASE_CAP || 50, S.bag.itemCap || 0, S.bag.matCap || 0, usedAll);
+    const capOf = (base, stored, used) => Math.max(base || 50, stored || 0, used || 0);
+    return  getProxied({
       eqCount, itemStacks, matStacks,
-      // used/cap 保留成"道具那一块"，老调用点不会读错
-      used: itemStacks, cap: S.bag.itemCap,
-      matUsed: matStacks, matCap: S.bag.matCap,
-      eqUsed: eqCount, eqCap: S.bag.eqCap,
-      total: eqCount + itemStacks + matStacks,
-    };
+      // used/cap ＝ **整个背包**（并池后唯一那个池）；matUsed/matCap 保留字段、供老调用点读
+      used: usedAll, cap: capAll,
+      itemSlots, matSlots,
+      matUsed: matStacks, matCap: capOf(D.BAG_BASE_MAT_CAP, S.bag.matCap, matStacks),
+      eqUsed: eqCount, eqCap: capOf(D.BAG_BASE_EQ_CAP, S.bag.eqCap, eqCount),
+      total: eqCount + usedAll,
+    });
   }
   function addItem(id, n = 1) {
-    if (!(S.items[id] > 0)) {
-      // 新堆叠要占格：材料进材料池，其余进道具池
-      const isMat = (D.ITEMS[id] || {}).type === 'material';
-      const u = bagUsage();
-      if (isMat ? u.matUsed >= u.matCap : u.itemStacks >= S.bag.itemCap) return false;
-    }
+    /* V1.1.1：判据收进 canAddItem（"加完占几格"那一条），避免两处各写一遍容量规则。
+       —— 这项目被"同一件事写两份"咬过多次（尺子也钉了这一条：容量常量与算式各只有一处）。 */
+    if (!canAddItem(id, n)) return false;
     S.items[id] = (S.items[id] || 0) + n;
     return true;
   }
   // 能否再放进这个道具（已有堆叠不占新格）
-  function canAddItem(id) {
-    if (S.items[id] > 0) return true;
+  /* V1.1.1（单格上限 100）：能不能再放 n 个 —— 按"**加完之后**占几格"判，不再按"有没有这种"判。
+     满了就 return false（调用方把它送进待领箱，东西不会丢；界面有"背包已满"的提示＋一键扩容）。 */
+  function canAddItem(id, n = 1) {
     const u = bagUsage();
-    return (D.ITEMS[id] || {}).type === 'material' ? u.matUsed < u.matCap : u.itemStacks < S.bag.itemCap;
+    const MAX = D.BAG_STACK_MAX || 100;
+    const cur = S.items[id] || 0;
+    const before = Math.ceil(cur / MAX), after = Math.ceil((cur + n) / MAX);
+    /* 并池后只有**一个**容量口径：整个背包（道具＋材料）占多少格 vs cap。 */
+    return u.used - before + after <= u.cap;
   }
   function removeItem(id, n = 1) {
     if ((S.items[id] || 0) < n) return false;
@@ -786,35 +1124,91 @@ window.Core = (function () {
   function stashItem(id, n = 1) {
     if (!(n > 0)) return;
     if (!D.ITEMS[id]) return;                    // 不认识的 id 不进箱，免得存档里堆垃圾
-    S.stash = S.stash || [];
+    S.stash = S.stash ||  getProxied([]);
     const ex = S.stash.find(x => x.id === id);
     if (ex) ex.n += n;
-    else S.stash.push({ id, n, at: Date.now() });
-    notice(`背包已满：${(D.ITEMS[id] || {}).name || id}×${n} 已存入待领箱`);
+    else S.stash.push( getProxied({ id, n, at: Date.now() }));
+    notice(`背包已满：${(D.ITEMS[id] ||  getProxied({})).name || id}×${n} 已存入待领箱`);
   }
-  function stashCount() { return (S.stash || []).reduce((s, x) => s + (x.n || 0), 0); }
-  function stashList() { return (S.stash || []).slice(); }
+  function stashCount() { return (S.stash ||  getProxied([])).reduce((s, x) => s + (x.n || 0), 0); }
+  function stashList() { return (S.stash ||  getProxied([])).slice(); }
+  /* 还差几格才能把待领箱清空（界面提示用）。
+     V1.1.15（2026-09-27 · 父亲大人："扩容后还是没东西"）：以前界面只说"领回了 N 件"，
+     玩家不懂"为什么领不回来"——现在把"差几格"直接写在卡片上。 */
+  function stashNeedCells() {
+    const u = bagUsage();
+    const MAX = D.BAG_STACK_MAX || 100;
+    let need = 0;
+    (S.stash ||  getProxied([])).forEach(x => {
+      if (!(x.n > 0)) return;
+      const before = Math.ceil((S.items[x.id] || 0) / MAX);
+      const after = Math.ceil(((S.items[x.id] || 0) + x.n) / MAX);
+      need += Math.max(0, after - before);
+    });
+    return Math.max(0, need - Math.max(0, u.cap - u.used));
+  }
+  /* ================= 装备待领箱（V1.1.15）=================
+     装备格满时，掉的/开出来的装备**存这儿**（不再是"折现成 ◆"）。
+     上限 60 件（约 20KB 存档）：真堆到 60 件还不扩容，才折现并把原因告诉玩家 ——
+     存档不许因为"一直不扩容"无限膨胀。 */
+  const EQ_STASH_MAX = 60;
+  function stashEquip(eq) {
+    if (!eq || !eq.uid) return  getProxied({ stashed: false, sold: false });
+    S.stashEq = S.stashEq ||  getProxied([]);
+    if (S.stashEq.length >= EQ_STASH_MAX) {
+      const gain = D.DECOMPOSE_GAIN[eq.rarity] || 0;
+      addCur('otherworld', gain);
+      return  getProxied({ stashed: false, sold: true, gain: gain, overflow: true });
+    }
+    S.stashEq.push(eq);
+    return  getProxied({ stashed: true, sold: false });
+  }
+  function stashEqCount() { return (S.stashEq ||  getProxied([])).length; }
+  function stashEqList() { return (S.stashEq ||  getProxied([])).slice(); }
+  /* 装备格空出多少就领回多少（与道具那条同一个口径：**能放多少放多少**） */
+  function claimStashEq() {
+    S.stashEq = S.stashEq ||  getProxied([]);
+    let moved = 0;
+    while (S.stashEq.length) {
+      const eq = S.stashEq[0];
+      /* 口径与 `grantEquip` 一致：**加进去之后**超没超（eqUsed + 1 > eqCap） */
+      if (bagUsage().eqUsed + 1 > bagUsage().eqCap) break;
+      S.equips[eq.uid] = eq;
+      S.stashEq.shift();
+      moved++;
+    }
+    if (moved) save();
+    return  getProxied({ ok: moved > 0, moved: moved, left: stashEqCount(),
+      need: Math.max(0, stashEqCount() - Math.max(0, bagUsage().eqCap - bagUsage().eqUsed)) });
+  }
   // 把待领箱里"现在装得下"的东西搬进背包；装不下的留着
   function claimStash() {
-    S.stash = S.stash || [];
+    S.stash = S.stash ||  getProxied([]);
     let moved = 0;
     S.stash.forEach(x => {
       if (!(x.n > 0)) return;
-      if (!canAddItem(x.id)) return;
-      const n = x.n;
-      if (addItem(x.id, n)) { moved += n; x.n = 0; }
+      if (!canAddItem(x.id, 1)) return;
+      /* V1.1.15（2026-09-27 · 父亲大人："待领箱的卡片显示和扩容后还是没东西"）——
+         **原来的写法是"整堆能装下才领"**：`if (addItem(x.id, x.n))`。
+         可箱里常常是一大堆（例如 250 颗，按单格上限 100 要占 3 格），
+         玩家只扩了一两格 → 一件都领不回来，看起来就是"扩容了也没用"。
+         现在**能放多少放多少**：先从整堆往下折半试出放得下的量，再往上补齐到最大。 */
+      let k = x.n;
+      while (k > 1 && !canAddItem(x.id, k)) k = Math.max(1, Math.floor(k / 2));
+      while (k < x.n && canAddItem(x.id, k + 1)) k++;
+      if (k > 0 && addItem(x.id, k)) { moved += k; x.n -= k; }
     });
     S.stash = S.stash.filter(x => (x.n || 0) > 0);
     if (moved) save();
-    return { ok: moved > 0, moved, left: stashCount() };
+    return  getProxied({ ok: moved > 0, moved, left: stashCount(), need: stashNeedCells() });
   }
   // 统一的"奖励对象"结算：货币走 addCur，item 走 addItem。
   // 所有奖励（任务 / 周常 / 登录 / 悬赏 / 图鉴）都走这一个入口，避免"某处支持道具、某处不支持"。
   function applyRewardObj(obj) {
-    const out = { stashed: [] };
-    Object.entries(obj || {}).forEach(([k, v]) => {
+    const out =  getProxied({ stashed:  getProxied([]) });
+    Object.entries(obj ||  getProxied({})).forEach(([k, v]) => {
       // 道具装不下就进待领箱（之前是直接丢掉 addItem 的返回值，背包满时奖励静默蒸发）
-      if (k === 'item') [].concat(v).forEach(id => { if (!addItem(id)) { stashItem(id, 1); out.stashed.push(id); } });
+      if (k === 'item')  getProxied([]).concat(v).forEach(id => { if (!addItem(id)) { stashItem(id, 1); out.stashed.push(id); } });
       else if (k === 'ssrTicket') S.ssrTicket = (S.ssrTicket || 0) + (v === true ? 1 : v || 0);
       else addCur(k, v);
     });
@@ -824,25 +1218,44 @@ window.Core = (function () {
   /* ================= 角色 ================= */
   function addChar(id) {
     const base = D.charById[id];
-    if (!base) return { isNew: false };
+    if (!base) return  getProxied({ isNew: false });
     if (S.chars[id]) {
+      /* ================= V1.1.14（0927-F · 父亲大人）=================
+         「**还是得当前伙伴等级满星了，之后再抽出来才成通用的**，不然还是得**按照抽到谁就是谁的碎片**」
+         ⇒ 重复抽到先记在**他自己**那份；**该伙伴满星之后**再抽到，才转成**该稀有度的通用池**。 */
       const gain = (typeof D.DUP_SHARDS === 'number') ? D.DUP_SHARDS : (D.DUP_SHARDS[base.rarity] || 10);   // V9.6.129：统一 10 碎片
-      addShardsToPool(id, gain);
-      return { isNew: false, shards: gain };
+      const c = S.chars[id];
+      const maxStar = D.RARITY_MAXSTAR[base.rarity] || 6;
+      if ((c.star || 1) >= maxStar) {
+        addShardPool(base.rarity, gain);                       // 满星了 → 进通用池（同档别人能用）
+        return  getProxied({ isNew: false, shards: gain, to: 'pool' });
+      }
+      c.shards = Math.max(0, (c.shards || 0) + gain);          // 没满星 → 进他自己那份
+      return  getProxied({ isNew: false, shards: gain, to: 'self' });
     }
-    S.chars[id] = { lv: 0, exp: 0, star: 1, shards: 0, skillLv: [0, 0, 0], bloodlineLv: 0 };   // 伙伴也从 0 级起
-    S.equipped[id] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
+    S.chars[id] =  getProxied({ lv: 0, exp: 0, star: 1, shards: 0, skillLv:  getProxied([0, 0, 0]), bloodlineLv: 0 });   // 伙伴也从 0 级起
+    S.equipped[id] =  getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null });
     if (!S.codex.chars.includes(id)) S.codex.chars.push(id);
-    return { isNew: true };
+    return  getProxied({ isNew: true });
   }
   function addShards(id, n) {
+    /* 与 `addChar` 同一条规矩（V1.1.14）：**没满星进他自己那份，满星之后转该档通用池**。
+       商店买碎片、悬赏给碎片、道具开出碎片……都走这一个入口。 */
+    const base = D.charById[id];
     if (!S.chars[id]) addChar(id);
-    addShardsToPool(id, n);
+    const c = S.chars[id];
+    if (!base || !c) return 0;
+    const add = Number(n);
+    if (!isFinite(add) || add === 0) return shardsOf(id);
+    const maxStar = D.RARITY_MAXSTAR[base.rarity] || 6;
+    if ((c.star || 1) >= maxStar) return addShardPool(base.rarity, add);
+    c.shards = Math.max(0, (c.shards || 0) + add);
+    return c.shards;
   }
   function levelCost(charId) {
     const c = S.chars[charId];
     if (!c || c.lv >= D.PLAYER_MAX_LV) return null;
-    return { exp: D.EXP_TABLE[c.lv], points: D.LEVEL_POINTS[c.lv] };
+    return  getProxied({ exp: D.EXP_TABLE[c.lv], points: D.LEVEL_POINTS[c.lv] });
   }
   /* V9.5.46（父亲大人）：伙伴升级统一吃**共享的伙伴经验池**（S.charExp）——
      经验模块往池子里加，升级从池子里扣，伙伴重生把花掉的加回池子。
@@ -853,10 +1266,10 @@ window.Core = (function () {
        ② 被换下那位身上"新伙伴也穿得了"的装备跟着转过去；穿不了（别人专属 / 血统对不上）留在原位。
      返回 { ok, outId, inheritLv, moved }。 */
   function swapPartyMember(slotIdx, newId) {
-    if (!S.chars[newId]) return { ok: false, msg: '未拥有该伙伴' };
+    if (!S.chars[newId]) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
     const outId = S.party[slotIdx];
-    if (outId === '@player') return { ok: false, msg: '主角必上阵，这一格不能换' };
-    if (outId === newId) return { ok: false, msg: '他已经在这一格了' };
+    if (outId === '@player') return  getProxied({ ok: false, msg: '主角必上阵，这一格不能换' });
+    if (outId === newId) return  getProxied({ ok: false, msg: '他已经在这一格了' });
     let inheritLv = 0, moved = 0;
     if (outId && S.chars[outId]) {
       const keep = Math.max(S.chars[outId].lv, S.chars[newId].lv);
@@ -874,11 +1287,11 @@ window.Core = (function () {
       });
     }
     save();
-    return { ok: true, outId: outId || null, inheritLv, moved };
+    return  getProxied({ ok: true, outId: outId || null, inheritLv, moved });
   }
   function levelUp(charId, times = 1) {
     const c = S.chars[charId];
-    if (!c) return { ok: false, msg: '未拥有该伙伴' };
+    if (!c) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
     let ups = 0;
     for (let i = 0; i < times; i++) {
       if (c.lv >= D.PLAYER_MAX_LV) break;
@@ -888,7 +1301,7 @@ window.Core = (function () {
       c.lv++; ups++;
     }
     save();
-    return { ok: ups > 0, ups, msg: ups > 0 ? `升到 Lv.${c.lv}` : (S.charExp < 1 ? '伙伴经验不够（用经验模块补）' : '点数不够') };
+    return  getProxied({ ok: ups > 0, ups, msg: ups > 0 ? `升到 Lv.${c.lv}` : (S.charExp < 1 ? '伙伴经验不够（用经验模块补）' : '点数不够') });
   }
   // 一个伙伴从 Lv.0 练到此刻，一共吃掉多少伙伴经验（重生就返还这么多）
   // V9.5.69：等级从 0 起，所以累加的是 EXP_TABLE[0 .. lv-1]（第 k 项 = 从 k 级升到 k+1 级的代价）
@@ -903,27 +1316,27 @@ window.Core = (function () {
      装备 / 星级 / 血统 / 血清 都不动 —— 只重置"等级"这一条线。 */
   function rebornChar(charId) {
     const c = S.chars[charId];
-    if (!c) return { ok: false, msg: '未拥有该伙伴' };
-    if (c.lv <= 0 && !c.exp) return { ok: false, msg: '已经是 Lv.0 了' };
+    if (!c) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
+    if (c.lv <= 0 && !c.exp) return  getProxied({ ok: false, msg: '已经是 Lv.0 了' });
     const refund = expSpentOn(charId);
     c.lv = 0; c.exp = 0;
     S.charExp = (S.charExp || 0) + refund;
     save();
-    return { ok: true, refund, msg: `重生完成：返还 ${fmtNum(refund)} 伙伴经验` };
+    return  getProxied({ ok: true, refund, msg: `重生完成：返还 ${fmtNum(refund)} 伙伴经验` });
   }
   // V9.5.46：经验模块不再"选一个人喂"，直接进共享池（谁要练谁就从池子里扣）
   function useExpItem(itemId, n = 1) {
     const item = D.ITEMS[itemId];
-    if (!item || item.type !== 'exp') return { ok: false, msg: '不是经验道具' };
+    if (!item || item.type !== 'exp') return  getProxied({ ok: false, msg: '不是经验道具' });
     const have = S.items[itemId] || 0;
-    if (have < 1) return { ok: false, msg: '道具不足' };
+    if (have < 1) return  getProxied({ ok: false, msg: '道具不足' });
     const use = Math.max(1, Math.min(n, have));
     S.items[itemId] -= use;
     if (S.items[itemId] <= 0) delete S.items[itemId];
     S.charExp = (S.charExp || 0) + item.exp * use;
     task('item1', use);
     save();
-    return { ok: true, msg: `+${(item.exp * use).toLocaleString()} 伙伴经验（×${use}）`, count: use, pool: S.charExp };
+    return  getProxied({ ok: true, msg: `+${(item.exp * use).toLocaleString()} 伙伴经验（×${use}）`, count: use, pool: S.charExp });
   }
   /* ================= 血清（永久强化剂） =================
      对标同类放置游戏的"丹药矩阵"：成长被拆成很多次小成长，喂一支就有一次可见的跳动。
@@ -933,7 +1346,7 @@ window.Core = (function () {
     return (m && m[serumId]) || 0;
   }
   function serumApplied(charId) {
-    const m = S.serums[charId] || {};
+    const m = S.serums[charId] ||  getProxied({});
     return Object.keys(m).reduce((n, k) => n + m[k], 0);
   }
   // 把血清加成并进百分比区（与血统 / 天赋同区，加算）
@@ -960,18 +1373,18 @@ window.Core = (function () {
   // 炼化：材料 + 点数 → 血清道具
   function craftSerum(serumId, n = 1) {
     const sd = D.serumById[serumId];
-    if (!sd) return { ok: false, msg: '没有这个配方' };
+    if (!sd) return  getProxied({ ok: false, msg: '没有这个配方' });
     /* V9.6.138：`unlock` 从"写在数据里没人读"改成**真门槛** ——
        配方按通关进度开（见 data.js 里 SERUMS 的注释）。已经炼出来的照常能用，
        只挡"再炼"，所以老存档里存着的血清不会作废。 */
-    if (!serumUnlocked(sd)) return { ok: false, msg: `🔒 ${serumUnlockTip(sd)}` };
+    if (!serumUnlocked(sd)) return  getProxied({ ok: false, msg: `🔒 ${serumUnlockTip(sd)}` });
     // V9.5.86（边界压测）：n 传 null/NaN 时 Math.floor 会给出 NaN，后面的扣款会写成 NaN
     const want = Math.max(1, Math.floor(Number(n)) || 1);
     const haveMat = S.items[sd.mat] || 0;
     const can = Math.min(want, Math.floor(haveMat / sd.matN), Math.floor(S.cur.points / sd.points));
     if (can < 1) {
-      if (haveMat < sd.matN) return { ok: false, msg: `${D.ITEMS[sd.mat].name}不足（${haveMat}/${sd.matN}）` };
-      return { ok: false, msg: `点数不足（${S.cur.points.toLocaleString()}/${sd.points.toLocaleString()}）` };
+      if (haveMat < sd.matN) return  getProxied({ ok: false, msg: `${D.ITEMS[sd.mat].name}不足（${haveMat}/${sd.matN}）` });
+      return  getProxied({ ok: false, msg: `点数不足（${S.cur.points.toLocaleString()}/${sd.points.toLocaleString()}）` });
     }
     S.items[sd.mat] -= sd.matN * can;
     if (S.items[sd.mat] <= 0) delete S.items[sd.mat];
@@ -979,7 +1392,27 @@ window.Core = (function () {
     addItem(D.SERUM_ITEM(serumId), can);
     task('item1', can);
     save();
-    return { ok: true, count: can, msg: `炼化「${sd.name}」×${can}` };
+    return  getProxied({ ok: true, count: can, msg: `炼化「${sd.name}」×${can}` });
+  }
+  /* ================= V1.1.13（0927-E · 总监 §5.3 来源②）：炼化台的重铸石配方 =================
+     `2×mat_t3 ＋ ◉4,000 → 1 颗`，**不限次**。取值全部来自 `D.REFORGE_CRAFT`（不在这里写死数字）。
+     与 `craftSerum` 的差别只有一处：这里**不看解锁进度**（原材料本身就够后期了）。 */
+  function craftReforgeStone(n) {
+    const R = D.REFORGE_CRAFT ||  getProxied({ mat: 'mat_t3', matN: 2, points: 4000, out: 1 });
+    const want = Math.max(1, Math.floor(Number(n)) || 1);
+    const haveMat = S.items[R.mat] || 0;
+    const can = Math.min(want, Math.floor(haveMat / R.matN), Math.floor((S.cur.points || 0) / R.points));
+    if (can < 1) {
+      if (haveMat < R.matN) return  getProxied({ ok: false, msg: `${(D.ITEMS[R.mat] ||  getProxied({})).name || R.mat} 不足（${haveMat}/${R.matN}）` });
+      return  getProxied({ ok: false, msg: `◉ 点数不足（${fmtNum(S.cur.points || 0)}/${fmtNum(R.points)}）` });
+    }
+    S.items[R.mat] -= R.matN * can;
+    if (S.items[R.mat] <= 0) delete S.items[R.mat];
+    addCur('points', -R.points * can);
+    addItem(D.REFORGE_ITEM || 'reforge_stone', (R.out || 1) * can);
+    task('item1', can);
+    save();
+    return  getProxied({ ok: true, count: can, msg: `炼化「重铸石」×${(R.out || 1) * can}` });
   }
   /* 配方解锁：unlock = 要通关到第几张图（普通 12 关全清才算） */
   function serumUnlocked(sd) {
@@ -1000,22 +1433,22 @@ window.Core = (function () {
   // 使用：喂给某名角色（或主角 '@player'）
   function useSerum(charId, serumId, n = 1) {
     const sd = D.serumById[serumId];
-    if (!sd) return { ok: false, msg: '没有这支精华' };
+    if (!sd) return  getProxied({ ok: false, msg: '没有这支精华' });
     const itemId = D.SERUM_ITEM(serumId);
     const have = S.items[itemId] || 0;
-    if (have < 1) return { ok: false, msg: '道具不足' };
+    if (have < 1) return  getProxied({ ok: false, msg: '道具不足' });
     const isPlayer = charId === '@player';
     const base = isPlayer ? null : D.charById[charId];
-    if (!isPlayer && !S.chars[charId]) return { ok: false, msg: '未拥有该伙伴' };
+    if (!isPlayer && !S.chars[charId]) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
     if (sd.bloodline) {
       const bl = isPlayer ? S.player.bloodline : (base && base.bloodline);
-      if (!bl) return { ok: false, msg: `该伙伴还没觉醒命格，先觉醒「${sd.bloodline}」再用` };
-      if (bl !== sd.bloodline) return { ok: false, msg: `只有「${sd.bloodline}」命格能用这支精华` };
+      if (!bl) return  getProxied({ ok: false, msg: `该伙伴还没觉醒命格，先觉醒「${sd.bloodline}」再用` });
+      if (bl !== sd.bloodline) return  getProxied({ ok: false, msg: `只有「${sd.bloodline}」命格能用这支精华` });
     }
-    S.serums[charId] = S.serums[charId] || {};
+    S.serums[charId] = S.serums[charId] ||  getProxied({});
     const taken = S.serums[charId][serumId] || 0;
     const room = sd.max - taken;
-    if (room <= 0) return { ok: false, msg: `已达上限（${sd.max} 支）` };
+    if (room <= 0) return  getProxied({ ok: false, msg: `已达上限（${sd.max} 支）` });
     const use = Math.max(1, Math.min(n, have, room));
     S.items[itemId] -= use;
     if (S.items[itemId] <= 0) delete S.items[itemId];
@@ -1023,14 +1456,34 @@ window.Core = (function () {
     task('item1', use);
     save();
     const kn = D.SERUM_KEYS[sd.key] || sd.key;
-    return { ok: true, count: use, msg: `${sd.name} ×${use}：${kn} 永久 +${(sd.per * use * 100).toFixed(1)}%` };
+    return  getProxied({ ok: true, count: use, msg: `${sd.name} ×${use}：${kn} 永久 +${(sd.per * use * 100).toFixed(1)}%` });
   }
   /* ---------- 伙伴碎片：按稀有度通用（V9.6.129） ---------- */
   function shardPoolOf(rarity) { return (S.shardPool && S.shardPool[rarity]) || 0; }
+  /* V1.1.14（0927-F）：**他自己那份**（`S.chars[id].shards`）。
+     老档里这个字段被 V9.6.129 的合并迁移清零并进了通用池（那一轮的口径照旧、不追溯），
+     从这一版起重新按人记账。 */
+  function shardsOf(charId) { const c = S.chars[charId]; return (c && c.shards) || 0; }
+  /* 升星要什么、够不够 —— **界面唯一口径**（伙伴详情那三行、列表行、按钮能不能点、提示文案都读它），
+     免得界面自己再算一遍"自己＋通用 vs 需求"（本项目对"同一件事写两份"踩过多次）。 */
+  function starInfo(charId) {
+    const c = S.chars[charId], base = D.charById[charId];
+    if (!c || !base) return null;
+    const maxStar = D.RARITY_MAXSTAR[base.rarity] || 6;
+    const full = (c.star || 1) >= maxStar;
+    const need = full ? 0 : (D.starCostOf ? D.starCostOf(base.rarity, c.star) : D.STAR_COST[c.star]);
+    const own = shardsOf(charId);
+    const pool = shardPoolOf(base.rarity);
+    return  getProxied({
+      star: c.star, maxStar, full, need, own, pool, rarity: base.rarity,
+      total: own + pool, can: !full && (own + pool) >= need,
+      fromOwn: Math.min(own, need), fromPool: Math.max(0, need - own),
+    });
+  }
   /* V9.6.131（data_audit 抓到）：导出函数被传异常入参（比如 []）时**不能返回 NaN/Infinity** ——
      稀有度不认识就退回 N 档，数量非数字就当 0，永远返回一个数字。 */
   function addShardPool(rarity, n) {
-    if (!S.shardPool) S.shardPool = { N: 0, R: 0, SR: 0, SSR: 0, UR: 0 };
+    if (!S.shardPool) S.shardPool =  getProxied({ N: 0, R: 0, SR: 0, SSR: 0, UR: 0 });
     const rar = (typeof rarity === 'string' && rarity && (rarity in S.shardPool)) ? rarity : 'N';
     const add = Number(n);
     S.shardPool[rar] = Math.max(0, (S.shardPool[rar] || 0) + (isFinite(add) ? add : 0));
@@ -1044,17 +1497,37 @@ window.Core = (function () {
   function starUp(charId) {
     const c = S.chars[charId];
     const base = D.charById[charId];
-    if (!c) return { ok: false, msg: '未拥有该伙伴' };
+    if (!c) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
     const maxStar = D.RARITY_MAXSTAR[base.rarity];
-    if (c.star >= maxStar) return { ok: false, msg: '已达最高星级' };
-    const need = D.STAR_COST[c.star];
-    /* V9.6.129：碎片从**该稀有度的公共池**扣（同稀有度通用） */
+    if (c.star >= maxStar) return  getProxied({ ok: false, msg: '已达最高星级' });
+    /* V1.1.14（0927-F · 父亲大人）：**先吃自己的，不够再用同稀有度通用池补**。
+       成本走 `D.starCostOf(rarity, star)`（UR 那条独立曲线在这里生效）。 */
+    const need = D.starCostOf ? D.starCostOf(base.rarity, c.star) : D.STAR_COST[c.star];
+    const own = shardsOf(charId);
     const pool = shardPoolOf(base.rarity);
-    if (pool < need) return { ok: false, msg: `碎片不足（${base.rarity} 通用碎片 ${pool}/${need}）` };
-    addShardPool(base.rarity, -need);
+    if (own + pool < need) {
+      return  getProxied({ ok: false, msg: `碎片不足（他自己的 ${own} ＋ ${base.rarity} 通用 ${pool} ＝ ${own + pool} / 需 ${need}）` });
+    }
+    const fromOwn = Math.min(own, need);
+    c.shards = own - fromOwn;
+    const rest = need - fromOwn;
+    if (rest > 0) addShardPool(base.rarity, -rest);
     c.star++;
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："升完星后溢出的不会转成万能碎片"）==========
+       升到**满星那一刻**，他自己那份剩下的碎片就再也用不上了
+       （满星之后新抽到的、买到的本来就走通用池），可这份"溢出"原来一直躺在他一个人身上 ——
+       别人用不到、他自己也吃不下。现在一起转进**同档通用池**（"万能碎片"）。 */
+    let overflow = 0;
+    if (c.star >= maxStar && (c.shards || 0) > 0) {
+      overflow = c.shards;
+      addShardPool(base.rarity, overflow);
+      c.shards = 0;
+    }
     save();
-    return { ok: true, msg: `升到 ${c.star}★` };
+    return  getProxied({ ok: true,
+      msg: `升到 ${c.star}★（他自己的 ${fromOwn} 颗${rest ? (' ＋ 通用 ' + rest + ' 颗') : ''}`
+        + (overflow ? (' · 满星溢出 ' + overflow + ' 颗已转 ' + base.rarity + ' 通用碎片') : '') + '）',
+      fromOwn, fromPool: rest, overflow: overflow });
   }
   /* V9.5.73（父亲大人：技能上限 35/35/30）：伙伴技能也用同一张上限表，
      但伙伴花的是**异界结晶**（主角花技能点）。上限从 11 涨到 35，价目表不能还是手写 11 条，
@@ -1065,22 +1538,22 @@ window.Core = (function () {
      （芯片日收入 518，异界结晶池 1804，518×3.5 = 1813 ≈ 池收入）——
      "满一条技能要几天"跟合并前一样，只是改从异界结晶里扣。 */
   const SKILL_CHIP_BASE = 35, SKILL_CHIP_GROW = 1.16;
-  const SKILL_CHIP_COST = Array.from({ length: D.SKILL_MAX }, (_, lv) => Math.round(SKILL_CHIP_BASE * Math.pow(SKILL_CHIP_GROW, lv)));
+  const SKILL_CHIP_COST = Array.from( getProxied({ length: D.SKILL_MAX }), (_, lv) => Math.round(SKILL_CHIP_BASE * Math.pow(SKILL_CHIP_GROW, lv)));
   function skillUp(charId, idx) {
     const c = S.chars[charId];
-    if (!c) return { ok: false, msg: '未拥有该伙伴' };
+    if (!c) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
     /* V9.5.86（边界压测）：索引越界时 cost 会变 undefined，`skillChip -= undefined` 直接写成 NaN。
        注意 `null >= 0` 在 JS 里是 **true**（null 会隐式转成 0），所以不能只判大小，得判整数。 */
     const si = Number(idx);
-    if (!Number.isInteger(si) || si < 0 || si > 2) return { ok: false, msg: '技能不存在' };
+    if (!Number.isInteger(si) || si < 0 || si > 2) return  getProxied({ ok: false, msg: '技能不存在' });
     const lv = c.skillLv[si];
-    if (lv >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
+    if (lv >= D.SKILL_MAX_BY_INDEX[idx]) return  getProxied({ ok: false, msg: '已满级' });
     const cost = SKILL_CHIP_COST[lv];      // 技能从 0 级起，价目表也跟着 0 起
-    if (S.cur.otherworld < cost) return { ok: false, msg: `异界结晶不足（${S.cur.otherworld}/${cost}）` };
+    if (S.cur.otherworld < cost) return  getProxied({ ok: false, msg: `异界结晶不足（${S.cur.otherworld}/${cost}）` });
     S.cur.otherworld -= cost;
     c.skillLv[idx]++;
     save();
-    return { ok: true, msg: `技能升到 Lv.${c.skillLv[idx]}` };
+    return  getProxied({ ok: true, msg: `技能升到 Lv.${c.skillLv[idx]}` });
   }
 
   /* ================= 血统 / 铭刻 ================= */
@@ -1090,11 +1563,16 @@ window.Core = (function () {
      charId 传 '@player' 或伙伴 id；返回 null 表示已经没得升。 */
   function bloodlineQuote(charId) {
     const discount = Math.min(0.4, S.buildings.geneLab * 0.01);
-    const apply = (cost) => ({
+    const apply = (cost) => ( getProxied({
       otherworld: Math.ceil((cost.otherworld || 0) * (1 - discount)),
       points: Math.ceil(cost.points * (1 - discount)),
       discount,
-    });
+      /* V1.1.4（A12-F · 命格接「血髓晶」）：**材料不吃实验室折扣**——
+         《续2》§3.2 给的是逐级固定块数（0→50 级合计 145 块/人），
+         跟着折扣浮动会让"每人 145 块"这个口径当场失效（尺子也钉不住）。 */
+      mat: cost.mat || D.BLOODLINE_MAT,
+      matN: cost.matN || 0,
+    }));
     if (charId === '@player') {
       if (!S.player.bloodline || S.player.bloodlineLv >= D.BLOODLINE_MAX) return null;
       return apply(D.bloodlineCost(S.player.bloodlineLv));
@@ -1106,15 +1584,21 @@ window.Core = (function () {
   function bloodlineUpgrade(charId) {
     const c = S.chars[charId];
     const base = D.charById[charId];
-    if (!c) return { ok: false, msg: '未拥有该伙伴' };
-    if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
-    if (c.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '命格已满级' };
+    if (!c) return  getProxied({ ok: false, msg: '未拥有该伙伴' });
+    if (!isUnlocked('bloodline')) return  getProxied({ ok: false, msg: `🔒 ${unlockTip('bloodline')}` });
+    if (c.bloodlineLv >= D.BLOODLINE_MAX) return  getProxied({ ok: false, msg: '命格已满级' });
     const q = bloodlineQuote(charId);            // 与界面同一份报价（已含血统实验室折扣）
-    const cost = { otherworld: q.otherworld, points: q.points };
-    if (!spend(cost)) return { ok: false, msg: '异界结晶或点数不足' };
+    /* V1.1.4：材料先判、再扣钱 —— 反过来的话"钱扣了料不够"就要退款，多一条回滚路径。 */
+    const matId = q.mat, matN = q.matN || 0;
+    if (matN && (S.items[matId] || 0) < matN) {
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[matId] ||  getProxied({})).name || matId} 不足（${S.items[matId] || 0}/${matN}）` });
+    }
+    const cost =  getProxied({ otherworld: q.otherworld, points: q.points });
+    if (!spend(cost)) return  getProxied({ ok: false, msg: '异界结晶或点数不足' });
+    if (matN) addItem(matId, -matN);
     c.bloodlineLv++;
     save();
-    return { ok: true, msg: `${base.bloodline}命格 Lv.${c.bloodlineLv}` };
+    return  getProxied({ ok: true, msg: `${base.bloodline}命格 Lv.${c.bloodlineLv}` });
   }
   function geneLockInfo() {
     const cur = S.player.geneLock;
@@ -1122,9 +1606,9 @@ window.Core = (function () {
        但这里还写着 `cur >= 5` 就是满级、后面两个要求的数组也只有 5 个元素 ——
        结果第 6 阶以后永远点不动（玩家看得到 20 行，第 6 行起全锁死）。
        现在要求直接读 GENE_LOCKS 里的 w（世界）与 lv（等级）字段，加多少阶都不用再改这里。 */
-    if (cur >= D.GENE_LOCKS.length) return { max: true };
+    if (cur >= D.GENE_LOCKS.length) return  getProxied({ max: true });
     const next = D.GENE_LOCKS[cur];
-    const reqs = [];
+    const reqs =  getProxied([]);
     const worldReq = next.w;
     const lvReq = next.lv || 0;
     const w = D.WORLDS.find(x => x.id === worldReq);
@@ -1133,27 +1617,35 @@ window.Core = (function () {
     if (S.player.level < lvReq) reqs.push(`玩家等级达到 Lv.${lvReq}`);
     const need = next.cost.otherworld || 0;
     if ((S.cur.otherworld || 0) < need) reqs.push(`异界结晶 ${S.cur.otherworld || 0}/${need}`);
-    return { max: false, next, can: reqs.length === 0, reqs };
+    /* V1.1.4（A12-F · 铭刻接「铭魂砂」）：材料与货币**分开报**——
+       混成一句"材料不足"玩家不知道该去哪刷哪一样。`matHave`/`matNeed` 也给界面直接用。 */
+    const matId = next.mat || D.GENE_LOCK_MAT;
+    const matN = next.matN || 0;
+    const matHave = matN ? (S.items[matId] || 0) : 0;
+    if (matN && matHave < matN) reqs.push(`${(D.ITEMS[matId] ||  getProxied({})).name || matId} ${matHave}/${matN}`);
+    return  getProxied({ max: false, next, can: reqs.length === 0, reqs, mat: matId, matN, matHave });
   }
   function geneLockUnlock() {
     const info = geneLockInfo();
-    if (info.max) return { ok: false, msg: '铭刻已完全解锁' };
-    if (!info.can) return { ok: false, msg: info.reqs.join('；') };
+    if (info.max) return  getProxied({ ok: false, msg: '铭刻已完全解锁' });
+    if (!info.can) return  getProxied({ ok: false, msg: info.reqs.join('；') });
     S.cur.otherworld -= info.next.cost.otherworld;
+    /* V1.1.4：材料一并扣（走 addItem 的负数通道，与法宝祭炼 / 坐骑喂养同一写法）。 */
+    if (info.matN) addItem(info.mat, -info.matN);
     S.player.geneLock++;
     save();
-    return { ok: true, msg: `铭刻 ${info.next.name} 已解锁！` };
+    return  getProxied({ ok: true, msg: `铭刻 ${info.next.name} 已解锁！` });
   }
 
   /* ================= 属性计算 ================= */
   // 装备面板数值（含强化）
   function equipStats(eq) {
     const mult = 1 + eq.enhance * 0.05;
-    const out = { atk: 0, def: 0, hp: 0, spd: 0, critPct: 0 };
+    const out =  getProxied({ atk: 0, def: 0, hp: 0, spd: 0, critPct: 0 });
     Object.entries(eq.base).forEach(([k, v]) => { out[k] = (out[k] || 0) + v * mult; });
-    const affix = {};
+    const affix =  getProxied({});
     eq.affixes.forEach(a => { affix[a.k] = (affix[a.k] || 0) + a.v; });
-    return { flat: out, affix };
+    return  getProxied({ flat: out, affix });
   }
   function effectiveStats(charId) {
     const c = S.chars[charId];
@@ -1161,10 +1653,10 @@ window.Core = (function () {
     if (!c || !base) return null;
     const lvMult = 1 + c.lv * 0.035;      // V9.5.69：等级从 0 起，Lv.0 = 基准 1.0
     const starMult = D.STAR_MULT[c.star - 1];
-    const a = {};
+    const a =  getProxied({});
     Object.keys(base.attrs).forEach(k => { a[k] = base.attrs[k] * lvMult * starMult; });
     // 百分比加成（加算区）
-    const pct = { atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0, resPct: 0, lifesteal: 0, spiritPct: 0 };
+    const pct =  getProxied({ atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0, resPct: 0, lifesteal: 0, spiritPct: 0 });
     // 血统
     const bl = D.BLOODLINES[base.bloodline];
     if (bl && c.bloodlineLv > 0) {
@@ -1186,7 +1678,7 @@ window.Core = (function () {
     // 转生天赋：效果全部由 D.talentEffect 派生，文案与数值同源
     // （旧版是两套硬编码数组，说明改了、效果没改，导致 15 个节点写了没实装）
     const tt = talentPct();
-    ['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct'].forEach(k => { pct[k] += tt[k] || 0; });
+     getProxied(['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct']).forEach(k => { pct[k] += tt[k] || 0; });
     applySerums(charId, pct);                      // 血清（永久强化剂）
     applyBeast(pct);                               // 随行伴生体（全队加成）
     applyAuthority(pct);                           // 灯阁权限（满 10 级的全属性加成）
@@ -1194,9 +1686,9 @@ window.Core = (function () {
     applyKeji(pct);                                // 秘术阁（全队百分比长线）
     applyMount(pct);                               // 坐骑（全队，含招募角色）
     // 装备
-    const eq = S.equipped[charId] || {};
-    const flat = { atk: 0, def: 0, hp: 0, spd: 0 };
-    const sets = {};
+    const eq = S.equipped[charId] ||  getProxied({});
+    const flat =  getProxied({ atk: 0, def: 0, hp: 0, spd: 0 });
+    const sets =  getProxied({});
     Object.values(eq).forEach(uid => {
       if (!uid || !S.equips[uid]) return;
       const e = S.equips[uid];
@@ -1213,6 +1705,9 @@ window.Core = (function () {
       }
       /* 血统神装：只有**同血统**的人穿上的那几件才算数（V9.6.76） */
       if (e.godSet && e.godSet === base.bloodline) sets['god:' + e.godSet] = (sets['god:' + e.godSet] || 0) + 1;
+      /* V1.1.15：**本命套装**（第 4 类）—— 只数"这位伙伴自己的专属"那几件（`sigSet` = 角色 id）。
+         别人穿不上（canEquip 按 charId 锁），所以这里再判一次 `e.charId === charId` 是双保险。 */
+      if (e.sigSet && e.charId === charId) sets['sig:' + e.sigSet] = (sets['sig:' + e.sigSet] || 0) + 1;
     });
     applySetBonuses(pct, sets);
     // 主攻击属性
@@ -1225,14 +1720,14 @@ window.Core = (function () {
     const crit = Math.min(0.6, 0.05 + a.intelligence * 0.0008 + pct.critPct);
     const eva = Math.min(0.6, a.nerve * 0.0012 + pct.evaPct);
     const skillMult = 1 + a.spirit * 0.006 + pct.skillPct;
-    return {
+    return  getProxied({
       atk: Math.round(atk), def: Math.round(def), hp: Math.round(hp), spd: Math.round(spd),
       crit, critDmg: 2.0 + pct.critDmg, eva, skillMult,
       lifesteal: pct.lifesteal + (base.kind === 'vampire' ? 0.1 : 0),
       resPct: pct.resPct || 0,
       attrs: a, sets,
       ...talentCombatExtra(),
-    };
+    });
   }
   function power(charId) {
     const st = effectiveStats(charId);
@@ -1243,12 +1738,12 @@ window.Core = (function () {
   function effectivePlayerStats() {
     const P = D.PROTAGONIST;
     const lvMult = 1 + S.player.level * 0.035;   // V9.5.69：同上
-    const a = {};
+    const a =  getProxied({});
     Object.keys(P.baseAttrs).forEach(k => { a[k] = P.baseAttrs[k] * lvMult; });
     // 六维属性点加成（每点 +ATTR_POINT_VALUE）
-    const pa = S.player.attrs || {};
+    const pa = S.player.attrs ||  getProxied({});
     Object.keys(a).forEach(k => { a[k] += (pa[k] || 0) * D.ATTR_POINT_VALUE; });
-    const pct = { atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0.05, resPct: 0, lifesteal: 0, spiritPct: 0 };
+    const pct =  getProxied({ atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0.05, resPct: 0, lifesteal: 0, spiritPct: 0 });
     // 铭刻（全队加成 + 主角每阶额外3%）
     if (S.player.geneLock >= 1) { pct.atkPct += 0.05; pct.hpPct += 0.05; pct.defPct += 0.05; pct.spdPct += 0.05; }
     if (S.player.geneLock >= 2) pct.skillPct += 0.15;
@@ -1273,7 +1768,7 @@ window.Core = (function () {
     }
     // 转生天赋（主角同样吃满四支天赋）
     const tt = talentPct();
-    ['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct'].forEach(k => { pct[k] += tt[k] || 0; });
+     getProxied(['atkPct', 'hpPct', 'defPct', 'spdPct', 'critPct', 'critDmg', 'skillPct', 'evaPct', 'spiritPct']).forEach(k => { pct[k] += tt[k] || 0; });
     applySerums('@player', pct);                   // 血清（主角同样是永久加成）
     applyBeast(pct);                               // 随行伴生体（全队加成）
     applyAuthority(pct);                           // 灯阁权限（满 10 级的全属性加成）
@@ -1284,9 +1779,9 @@ window.Core = (function () {
     const rp = realmBonusPct();
     if (rp) { pct.atkPct += rp; pct.hpPct += rp; pct.defPct += rp; pct.spdPct += rp; }
     // 装备（6 槽）
-    const eq = S.equipped['@player'] || {};
-    const flat = { atk: 0, def: 0, hp: 0, spd: 0 };
-    const psets = {};
+    const eq = S.equipped['@player'] ||  getProxied({});
+    const flat =  getProxied({ atk: 0, def: 0, hp: 0, spd: 0 });
+    const psets =  getProxied({});
     Object.values(eq).forEach(uid => {
       if (!uid || !S.equips[uid]) return;
       const st = equipStats(S.equips[uid]);
@@ -1316,39 +1811,46 @@ window.Core = (function () {
     const crit = Math.min(0.6, 0.05 + a.intelligence * 0.0008 + pct.critPct);
     const eva = Math.min(0.6, a.nerve * 0.0012 + pct.evaPct);
     const skillMult = 1 + a.spirit * 0.006 + pct.skillPct;
-    return {
+    return  getProxied({
       atk: Math.round(atk), def: Math.round(def), hp: Math.round(hp), spd: Math.round(spd),
       crit, critDmg: 2.0 + pct.critDmg, eva, skillMult,
       lifesteal: pct.lifesteal, resPct: pct.resPct || 0, attrs: a,
       ...extra,
-    };
+    });
   }
   function playerPower() {
     const st = effectivePlayerStats();
     return Math.round(st.atk * 2 + st.def + st.hp * 0.2 + st.spd * 3);
   }
   function choosePlayerBloodline(id) {
-    if (!D.BLOODLINES[id]) return { ok: false, msg: '命格不存在' };
-    if (S.player.bloodline) return { ok: false, msg: '命格一旦选择不可更改' };
-    if (S.player.level < D.BLOODLINE_UNLOCK_LV) return { ok: false, msg: `主角 Lv.${D.BLOODLINE_UNLOCK_LV} 才能觉醒命格（当前 Lv.${S.player.level}）` };
+    if (!D.BLOODLINES[id]) return  getProxied({ ok: false, msg: '命格不存在' });
+    if (S.player.bloodline) return  getProxied({ ok: false, msg: '命格一旦选择不可更改' });
+    if (S.player.level < D.BLOODLINE_UNLOCK_LV) return  getProxied({ ok: false, msg: `主角 Lv.${D.BLOODLINE_UNLOCK_LV} 才能觉醒命格（当前 Lv.${S.player.level}）` });
     S.player.bloodline = id;
     save();
-    return { ok: true, msg: `已觉醒${id}命格，境界线开启：${D.realmName(id, 0)} 起` };
+    return  getProxied({ ok: true, msg: `已觉醒${id}命格，境界线开启：${D.realmName(id, 0)} 起` });
   }
   // 当前血统的 36 阶全览（境界页整条展示用）
   function realmChainOf(bloodlineId) { return D.realmChain(bloodlineId || S.player.bloodline); }
   function upgradePlayerBloodline() {
-    if (!S.player.bloodline) return { ok: false, msg: '尚未选择命格' };
+    if (!S.player.bloodline) return  getProxied({ ok: false, msg: '尚未选择命格' });
     // 解锁门禁：血统"强化"要通关 潜影窟·第1关 才开（与 D.UNLOCKS 的说明同源；
     // 起步时的"选血统"不受限——那是开局必经的一步）
-    if (!isUnlocked('bloodline')) return { ok: false, msg: `🔒 ${unlockTip('bloodline')}` };
-    if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return { ok: false, msg: '命格已满级' };
+    if (!isUnlocked('bloodline')) return  getProxied({ ok: false, msg: `🔒 ${unlockTip('bloodline')}` });
+    if (S.player.bloodlineLv >= D.BLOODLINE_MAX) return  getProxied({ ok: false, msg: '命格已满级' });
     const q = bloodlineQuote('@player');         // 与界面同一份报价（已含血统实验室折扣）
-    const cost = { otherworld: q.otherworld, points: q.points };
-    if (!spend(cost)) return { ok: false, msg: "异界结晶或点数不足" };
+    /* V1.1.4（A12-F · 命格接「血髓晶」）：主角这条**与伙伴那条同一份口径**——
+       两边都从 bloodlineQuote 取料，不然会出现"伙伴要料、主角不要料"这种最难查的分叉。 */
+    const matId = q.mat, matN = q.matN || 0;
+    if (matN && (S.items[matId] || 0) < matN) {
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[matId] ||  getProxied({})).name || matId} 不足（${S.items[matId] || 0}/${matN}）` });
+    }
+    const cost =  getProxied({ otherworld: q.otherworld, points: q.points });
+    if (!spend(cost)) return  getProxied({ ok: false, msg: "异界结晶或点数不足" });
+    if (matN) addItem(matId, -matN);
     S.player.bloodlineLv++;
     save();
-    return { ok: true, msg: `命格 Lv.${S.player.bloodlineLv}` };
+    return  getProxied({ ok: true, msg: `命格 Lv.${S.player.bloodlineLv}` });
   }
   function teamPower() {
     // 上阵 5 格里就有主角本人（'@player'），所以这里按人算，别再单独加一次主角战力
@@ -1357,42 +1859,42 @@ window.Core = (function () {
   // 阵型（对标《道友修仙》的"阵法"）：由 D.FORMATIONS 的具名组合判定，界面直接显示"站的是哪一阵"。
   // 规则只有两条：①「同阵营」那一族只取命中的最高档，不重复叠；② 主角是万能补位（顶人数最多的那个阵营）。
   function formationState(partyIds) {
-    const ids = (partyIds || []).filter(Boolean);
+    const ids = (partyIds ||  getProxied([])).filter(Boolean);
     // V9.5.44（父亲大人）：阵型只有**上满 5 人**才可能激活（不满编一律算未成阵）
     const full = ids.length >= 5;
-    const count = {};
+    const count =  getProxied({});
     ids.forEach(id => { const c = D.charById[id]; if (c) count[c.faction] = (count[c.faction] || 0) + 1; });
     let top = '';
     Object.keys(count).forEach(f => { if (!top || count[f] > count[top]) top = f; });
-    const eff = Object.assign({}, count);
+    const eff = Object.assign( getProxied({}), count);
     if (top) eff[top] += 1;              // 主角补位
     const vals = Object.values(eff);
     const maxN = vals.length ? Math.max.apply(null, vals) : 0;
     const twoPlus = vals.filter(n => n >= 2).length;
     const kinds = Object.keys(count).length;
-    const has = {
+    const has =  getProxied({
       tri: full && maxN >= 3, quad: full && maxN >= 4, penta: full && maxN >= 5,
       pillar: full && twoPlus >= 2, allfour: full && kinds >= 4,
-    };
-    const SAME_FAMILY = ['penta', 'quad', 'tri'];
+    });
+    const SAME_FAMILY =  getProxied(['penta', 'quad', 'tri']);
     const bestSame = SAME_FAMILY.find(x => has[x]) || null;
-    const hit = [];
-    const buff = { atkPct: 0, hpPct: 0, skillPct: 0 };
+    const hit =  getProxied([]);
+    const buff =  getProxied({ atkPct: 0, hpPct: 0, skillPct: 0 });
     D.FORMATIONS.forEach(f => {
       if (!has[f.id]) return;
       if (SAME_FAMILY.includes(f.id) && f.id !== bestSame) return;   // 同阵营只取最高档
       hit.push(f.id);
       Object.keys(f.buff).forEach(k => { buff[k] = (buff[k] || 0) + f.buff[k]; });
     });
-    return {
+    return  getProxied({
       atkPct: buff.atkPct, hpPct: buff.hpPct, skillPct: buff.skillPct,
       count, eff, maxN, kinds, hit,
       bestSame,
       active: hit.map(id => D.FORMATIONS.find(f => f.id === id)),
       // 界面用：现在命中的阵型名，没命中就是"未成阵"
-      names: hit.map(id => (D.FORMATIONS.find(f => f.id === id) || {}).name).filter(Boolean),
+      names: hit.map(id => (D.FORMATIONS.find(f => f.id === id) ||  getProxied({})).name).filter(Boolean),
       full,
-    };
+    });
   }
   function factionBuffs(partyIds) { return formationState(partyIds); }
 
@@ -1400,12 +1902,12 @@ window.Core = (function () {
   /* opts.preferWorldSet：开箱专用 —— 世界套装的概率从 60% 抬到 80%
      （父亲大人："箱子开出来的是那一张图的套装"，见 openBox） */
   function grantEquip(worldId, rarity, slot, opts0) {
-    opts0 = opts0 || {};
+    opts0 = opts0 ||  getProxied({});
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
-    const slots = slot ? [slot] : D.DROP_SLOTS;
+    const slots = slot ?  getProxied([slot]) : D.DROP_SLOTS;
     const s = slots[Math.floor(Math.random() * slots.length)];
     // 装备类别：普通 / 世界套装 / 血统套装 / 血统神装（神话专属）
-    let opts = { setType: 'plain' };
+    let opts =  getProxied({ setType: 'plain' });
     const roll = Math.random();
     /* 神话只会是血统神装，没有"普通神话"这一说。
        血统怎么挑（V9.6.76）：**七成偏向上阵那 5 个人的血统**，剩下三成六支里随机。
@@ -1413,41 +1915,48 @@ window.Core = (function () {
        偏差给到七三，既照顾主力，又留着"别的血统也能刷出来"的空间。 */
     const wi = D.WORLDS.findIndex(x => x.id === worldId) + 1;
     const hasBlood = wi >= D.BLOODLINE_MIN_WORLD;
-    if (rarity === 'MYTH') opts = { setType: 'god', godSet: randomGodSet() };
-    else if (rarity === 'R') opts = roll < 0.5 ? { setType: 'plain' } : { setType: 'world' };
+    if (rarity === 'MYTH') opts =  getProxied({ setType: 'god', godSet: randomGodSet() });
+    else if (rarity === 'R') opts = roll < 0.5 ?  getProxied({ setType: 'plain' }) :  getProxied({ setType: 'world' });
     else if (rarity === 'SR' || rarity === 'SSR' || rarity === 'UR') {
       /* 血统套装**第 10 张图起**才有（父亲大人："就第 10 个世界后每个世界都有对应的血统套装"）——
          第 10 张之前那 30% 落点只给普通装，不会掉出一件"属于不存在套装"的装备
          （makeEquip 里还有一道兜底：这张图没这套就退化成世界套装）。 */
       const pWorld = rarity === 'SR' ? (opts0.preferWorldSet ? 0.85 : 0.7) : (opts0.preferWorldSet ? 0.8 : 0.6);
-      if (roll < pWorld) opts = { setType: 'world' };
-      else opts = hasBlood ? { setType: 'blood', bloodSet: randomBloodlineSet() } : { setType: 'plain' };
+      if (roll < pWorld) opts =  getProxied({ setType: 'world' });
+      else opts = hasBlood ?  getProxied({ setType: 'blood', bloodSet: randomBloodlineSet() }) :  getProxied({ setType: 'plain' });
     }
     const eq = D.makeEquip(worldId, s, rarity, uid, opts);
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
+    /* V1.1.3（A10 图鉴装备卷）：记**装备名**（同一件装备不同强化/词条算一种）——
+       名字是"收集轴"的粒度，uid 那种一次性 id 没法当图鉴用。 */
+    if (S.codex.equipNames && eq.name && S.codex.equipNames.indexOf(eq.name) < 0) S.codex.equipNames.push(eq.name);
     // 自动分解（设置页开关）：白装 / 绿装不进背包，直接换成异界结晶
     if ((rarity === 'N' && S.settings.autoSellN) || (rarity === 'R' && S.settings.autoSellR)) {
       delete S.equips[uid];
       const gain = D.DECOMPOSE_GAIN[rarity];
       addCur('otherworld', gain);
-      return { sold: true, gain, auto: true };
+      return  getProxied({ sold: true, gain, auto: true });
     }
-    // 装备格子已满 → 自动分解为异界结晶
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："那我要是副本掉落的装备呢"）=================
+       装备格满 → **进装备待领箱**（不再是折现成 ◆）。
+       原来是 `delete S.equips[uid]; addCur('otherworld', gain);` —— 刷本出的 UR 直接变成一点结晶，
+       玩家扩容回来发现装备没了。现在存进 `S.stashEq`，装备页顶部会出现「📮 待领箱」卡片，
+       点"全部领回"就回到背包（一件不丢）。只有堆到 60 件上限还不扩容，才折现。 */
     if (bagUsage().eqUsed > S.bag.eqCap) {
-      const gain = D.DECOMPOSE_GAIN[rarity];
       delete S.equips[uid];
-      addCur('otherworld', gain);
-      return { sold: true, gain, bagFull: true };
+      const sr = stashEquip(eq);
+      if (sr.stashed) return  getProxied({ equip: null, stashed: true, eq: eq, bagFull: true });
+      return  getProxied({ sold: true, gain: sr.gain || 0, bagFull: true, overflow: !!sr.overflow });
     }
-    return { equip: eq };
+    return  getProxied({ equip: eq });
   }
   /* 套装该给哪支血统：**七成偏向上阵那 5 个人**，三成六支里随机。
      全随机的话想给主力凑一套要刷到天荒地老；全按队伍给又变成"没有选择"。
      （V9.6.81：血统套装与血统神装共用这一条随机线 —— 都是血统的东西。） */
   function randomBloodSet(pool) {          // pool = 一组"血统名"，返回其中一个
-    const party = (S.party || []).filter(Boolean)
-      .map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] || {}).bloodline))
+    const party = (S.party ||  getProxied([])).filter(Boolean)
+      .map(id => (id === '@player' ? S.player.bloodline : (D.charById[id] ||  getProxied({})).bloodline))
       .filter(b => b && pool.indexOf(b) >= 0);
     if (party.length && Math.random() < 0.7) return party[Math.floor(Math.random() * party.length)];
     return pool[Math.floor(Math.random() * pool.length)];
@@ -1456,36 +1965,40 @@ window.Core = (function () {
   /* ⚠ 这里要的是**血统名**，不是套装 key（V9.6.82 踩过：传错的池子会让 makeEquip 找不到套装、
      静默降级成世界套装 —— 表面不报错，实际血统套装一件都掉不出来）。 */
   function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_KEYS || Object.keys(D.BLOODLINE_SETS)); }
-  // 伙伴专属装备（UR，绑定角色 · 六支血统各一件）
+  // 伙伴专属装备（本命 · UR · 绑定角色 · 6 支血统 × 6 个部位 ＝ 36 件，见 data.js 的 SIGNATURE_EQUIPS）
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     /* 专属装备的基础值按**玩家当前进度**那张图的档位生成（V9.6.83）——
        以前是写死的 320，第 20 张图之后随便一件普通 UR 武器都比它强，专属成了纪念品。 */
     const eq = D.makeSignatureEquip(sigId, uid, boxSourceWorld());
-    if (!eq) return { sold: false };
+    if (!eq) return  getProxied({ sold: false });
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
+    if (S.codex.equipNames && eq.name && S.codex.equipNames.indexOf(eq.name) < 0) S.codex.equipNames.push(eq.name);
     if (bagUsage().eqUsed > S.bag.eqCap) {
       delete S.equips[uid];
       addCur('otherworld', D.DECOMPOSE_GAIN.UR);
-      return { sold: true, gain: D.DECOMPOSE_GAIN.UR, bagFull: true };
+      return  getProxied({ sold: true, gain: D.DECOMPOSE_GAIN.UR, bagFull: true });
     }
-    return { equip: eq, signature: true };
+    return  getProxied({ equip: eq, signature: true });
   }
 
   // 扩容分三种：kind = 'item'（道具）| 'mat'（材料）| 'eq'（装备），三条曲线各自独立。
   // 每次 +10 格，价格从 ◉ 1500 起、每扩一次 ×1.3。
   function buyBagCap(kind) {
-    const k = ['eq', 'mat'].includes(kind) ? kind : 'item';
+    /* V1.1.2（并池）：道具池与材料池并成一个 —— 所以 `item` 与 `mat` 两种 kind 都扩**同一个池**
+       （扩容价按同一个 expands 计数往上走，不会出现"两个池各花一份钱"）。`eq` 保持独立。 */
+    const k = kind === 'eq' ? 'eq' : 'item';
     const expandsKey = k + 'Expands';
     const capKey = k + 'Cap';
-    const label = { eq: '装备', mat: '材料', item: '道具' }[k];
+    const label = (k === 'eq') ? '装备' : '背包';
     const cost = D.bagExpandCost(S.bag[expandsKey] || 0);
-    if (!spend({ points: cost })) return { ok: false, msg: `点数不足（需 ◉ ${cost}）` };
+    if (!spend( getProxied({ points: cost }))) return  getProxied({ ok: false, msg: `点数不足（需 ◉ ${cost}）` });
     S.bag[expandsKey] = (S.bag[expandsKey] || 0) + 1;
     S.bag[capKey] += D.BAG_EXPAND_SIZE;
+    if (k === 'item') S.bag.matCap = Math.max(S.bag.matCap || 0, S.bag.itemCap);   // 并池：两侧同步，老读法也不会看到"材料池更小"
     save();
-    return { ok: true, msg: `${label}格 +${D.BAG_EXPAND_SIZE}，现在 ${S.bag[capKey]} 格` };
+    return  getProxied({ ok: true, msg: `${label}格 +${D.BAG_EXPAND_SIZE}，现在 ${S.bag[capKey]} 格` });
   }
   function equipItem(charId, uid) {
     const eq = S.equips[uid];
@@ -1494,7 +2007,7 @@ window.Core = (function () {
     // 一件装备只能有一个人穿：先把它从别人（或自己的别的槽）身上摘下来。
     // 旧版少了这一步，同一件装备会同时留在多个角色身上（越换装越脏）。
     unequipEverywhere(uid, charId);
-    if (!S.equipped[charId]) S.equipped[charId] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null };
+    if (!S.equipped[charId]) S.equipped[charId] =  getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null });
     S.equipped[charId][eq.slot] = uid;
     save();
     return true;
@@ -1506,7 +2019,7 @@ window.Core = (function () {
       if (!slots) return;
       Object.keys(slots).forEach(k => {
         if (slots[k] !== uid) return;
-        if (cid === keepId && k === (S.equips[uid] || {}).slot) return;   // 自己本来就穿在这个槽，保留
+        if (cid === keepId && k === (S.equips[uid] ||  getProxied({})).slot) return;   // 自己本来就穿在这个槽，保留
         slots[k] = null;
         removed++;
       });
@@ -1532,7 +2045,7 @@ window.Core = (function () {
   function numOr(v, dft) { const n = Number(v); return Number.isFinite(n) ? n : dft; }
   function clampNum(v, min, max, dft) { return Math.min(max, Math.max(min, numOr(v, dft === undefined ? min : dft))); }
   function sanitizeSave() {
-    ['chars', 'items', 'equips', 'serums'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
+     getProxied(['chars', 'items', 'equips', 'serums']).forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] =  getProxied({}); });
     Object.keys(S.chars).forEach(id => { if (!D.charById[id]) delete S.chars[id]; });
     Object.keys(S.items).forEach(k => { if (!D.ITEMS[k]) delete S.items[k]; });
     Object.keys(S.equips).forEach(uid => {
@@ -1551,7 +2064,7 @@ window.Core = (function () {
       if (!ok) { delete S.equips[uid]; return; }
       e.enhance = clampNum(e.enhance, 0, 99);
     });
-    Object.keys(S.cur || {}).forEach(k => { S.cur[k] = Math.max(0, numOr(S.cur[k], 0)); });
+    Object.keys(S.cur ||  getProxied({})).forEach(k => { S.cur[k] = Math.max(0, numOr(S.cur[k], 0)); });
     S.player.level = clampNum(S.player.level, 0, D.PLAYER_MAX_LV);
     S.player.exp = Math.max(0, numOr(S.player.exp, 0));
     S.player.attrPoints = Math.max(0, numOr(S.player.attrPoints, 0));
@@ -1560,27 +2073,27 @@ window.Core = (function () {
     S.player.realm = clampNum(S.player.realm, 0, D.REALM_STAGE_COUNT);
     S.player.geneLock = clampNum(S.player.geneLock, 0, D.GENE_LOCKS.length);
     S.player.reincarnations = Math.max(0, numOr(S.player.reincarnations, 0));
-    S.player.skillLv = (S.player.skillLv || [0, 0, 0]).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
+    S.player.skillLv = (S.player.skillLv ||  getProxied([0, 0, 0])).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
     while (S.player.skillLv.length < 3) S.player.skillLv.push(0);
-    S.player.attrs = S.player.attrs || {};
+    S.player.attrs = S.player.attrs ||  getProxied({});
     D.ATTR_META.forEach(a => { S.player.attrs[a.id] = Math.max(0, numOr(S.player.attrs[a.id], 0)); });
     D.BUILDINGS.forEach(b => { S.buildings[b.id] = clampNum(S.buildings[b.id], 0, 99); });
     S.auth = clampNum(S.auth, 0, D.AUTHORITY_MAX);
-    S.sect = { lv: clampNum(S.sect && S.sect.lv, 0, D.SECT_MAX), exp: Math.max(0, numOr(S.sect && S.sect.exp, 0)) };
-    S.corridor = { floor: clampNum(S.corridor && S.corridor.floor, 1, 9999), best: clampNum(S.corridor && S.corridor.best, 0, 9999) };
-    S.arena = Object.assign({ floor: 1, best: 1, date: '', used: 0 }, S.arena || {});
+    S.sect =  getProxied({ lv: clampNum(S.sect && S.sect.lv, 0, D.SECT_MAX), exp: Math.max(0, numOr(S.sect && S.sect.exp, 0)) });
+    S.corridor =  getProxied({ floor: clampNum(S.corridor && S.corridor.floor, 1, 9999), best: clampNum(S.corridor && S.corridor.best, 0, 9999) });
+    S.arena = Object.assign( getProxied({ floor: 1, best: 1, date: '', used: 0 }), S.arena ||  getProxied({}));
     S.arena.floor = clampNum(S.arena.floor, 1, 9999);
     S.arena.used = Math.max(0, numOr(S.arena.used, 0));
-    Object.keys(S.keji || {}).forEach(k => { if (!D.kejiById(k)) delete S.keji[k]; });
+    Object.keys(S.keji ||  getProxied({})).forEach(k => { if (!D.kejiById(k)) delete S.keji[k]; });
     Object.values(S.chars).forEach(c => {
       c.lv = clampNum(c.lv, 0, D.PLAYER_MAX_LV);
       c.star = clampNum(c.star, 1, D.RARITY_MAXSTAR[D.charById[c.id] && D.charById[c.id].rarity] || 6);
       c.shards = Math.max(0, numOr(c.shards, 0));
       c.bloodlineLv = clampNum(c.bloodlineLv, 0, D.BLOODLINE_MAX);
-      c.skillLv = (c.skillLv || [0, 0, 0]).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
+      c.skillLv = (c.skillLv ||  getProxied([0, 0, 0])).slice(0, 3).map((v, i) => clampNum(v, 0, D.SKILL_MAX_BY_INDEX[i]));
       while (c.skillLv.length < 3) c.skillLv.push(0);
     });
-    Object.keys((S.beast && S.beast.owned) || {}).forEach(id => {
+    Object.keys((S.beast && S.beast.owned) ||  getProxied({})).forEach(id => {
       const b = S.beast.owned[id];
       if (!D.beastById(id)) { delete S.beast.owned[id]; return; }
       b.lv = clampNum(b.lv, 0, D.BEAST_MAX_LV);
@@ -1598,8 +2111,8 @@ window.Core = (function () {
       const pr = S.pendingRun;
       pr.stage = clampNum(pr.stage, 1, 12);
       pr.wave = clampNum(pr.wave, 0, 2);
-      if (!Array.isArray(pr.waves) || !pr.waves.length) pr.waves = ['combat'];
-      pr.hpPct = pr.hpPct && typeof pr.hpPct === 'object' ? pr.hpPct : {};
+      if (!Array.isArray(pr.waves) || !pr.waves.length) pr.waves =  getProxied(['combat']);
+      pr.hpPct = pr.hpPct && typeof pr.hpPct === 'object' ? pr.hpPct :  getProxied({});
       Object.keys(pr.hpPct).forEach(k => { pr.hpPct[k] = clampNum(pr.hpPct[k], 0, 1); });
       if (!D.WORLDS.some(w => w.id === pr.worldId)) S.pendingRun = null;
     } else if (S.pendingRun !== undefined) {
@@ -1607,11 +2120,11 @@ window.Core = (function () {
     }
   }
   function dedupeEquips() {
-    const seen = new Set();
+    const seen =  getProxied(new Set());
     let fixed = 0;
-    const party = Array.isArray(S.party) ? S.party.filter(Boolean) : [];
-    const order = ['@player'].concat(party, Object.keys(S.equipped || {}));
-    const done = {};
+    const party = Array.isArray(S.party) ? S.party.filter(Boolean) :  getProxied([]);
+    const order =  getProxied(['@player']).concat(party, Object.keys(S.equipped ||  getProxied({})));
+    const done =  getProxied({});
     order.forEach(cid => {
       if (done[cid]) return;
       done[cid] = true;
@@ -1629,10 +2142,10 @@ window.Core = (function () {
   // 装备锁定：锁上的装备不会被分解（含批量分解），避免手滑拆掉主力装备
   function toggleEquipLock(uid) {
     const eq = S.equips[uid];
-    if (!eq) return { ok: false };
+    if (!eq) return  getProxied({ ok: false });
     eq.lock = !eq.lock;
     save();
-    return { ok: true, lock: eq.lock };
+    return  getProxied({ ok: true, lock: eq.lock });
   }
   // 一键最优装备：按"能不能穿 + 词条价值"给主角与全队自动选装，已锁定的装备照常可以给人穿
   /* ================= 装备评分（V9.6.126 父亲大人："装备加个评分吧……排序就按评分"）=================
@@ -1646,7 +2159,12 @@ window.Core = (function () {
     const st = equipStats(eq);
     let s = st.flat.atk * 2 + st.flat.def * 1.2 + st.flat.hp * 0.2 + st.flat.spd * 3 + (st.flat.critPct || 0) * 2000;
     Object.entries(st.affix).forEach(([k, v]) => {
-      const w = { atkPct: 1200, hpPct: 500, defPct: 900, skillPct: 1000, critPct: 1500, critDmg: 600, spdPct: 900, evaPct: 700, resPct: 300, lifesteal: 800 }[k] || 200;
+      /* V1.1.13（0927-E · 总监 §3.3 第四行）：**`spiritPct` 原来落在这张表的兜底 200（全场最低）** ——
+         而 `skillMult = 1 + 精神×0.006 + pct.skillPct`（本文件 effectiveStats），
+         `ATK_ATTR` 里 healer / support 的主攻击属性**就是 spirit**（data.js）。
+         也就是说：评分表把"修真 / 念动力最想要的词条"判成全场最差 —— **与血统设计自相矛盾**。
+         给正式权重 1000（与技能伤害同档）。 */
+      const w =  getProxied({ atkPct: 1200, hpPct: 500, defPct: 900, skillPct: 1000, critPct: 1500, critDmg: 600, spdPct: 900, evaPct: 700, resPct: 300, lifesteal: 800, spiritPct: 1000 })[k] || 200;
       s += v * w;
     });
     /* V9.6.129（父亲大人："装备评分还能显示到小数点后好几位，不要有小数点，直接显示到个位数"）：
@@ -1665,18 +2183,18 @@ window.Core = (function () {
        ③ 绝不碰其他任何人的装备（这条是硬规则，测试守着）。
      charId 传 '@player' 或伙伴 id = 只给这一个人配；不传 = 全体上阵成员各配一次。 */
   function autoEquipBest(charId) {
-    const targets = charId ? [charId] : ['@player'].concat(S.party.filter(Boolean));
+    const targets = charId ?  getProxied([charId]) :  getProxied(['@player']).concat(S.party.filter(Boolean));
     // 谁身上穿着什么：这一份一开始就锁死，只有"被换下来的那件"会解禁
-    const worn = new Set();
+    const worn =  getProxied(new Set());
     Object.keys(S.equipped).forEach(cid => {
-      const cur = S.equipped[cid] || {};
+      const cur = S.equipped[cid] ||  getProxied({});
       Object.keys(cur).forEach(slot => { if (cur[slot]) worn.add(cur[slot]); });
     });
     let changed = 0;
-    const detail = [];
+    const detail =  getProxied([]);
     targets.forEach(cid => {
       if (cid !== '@player' && !S.chars[cid]) return;
-      const cur = S.equipped[cid] || (S.equipped[cid] = { weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null });
+      const cur = S.equipped[cid] || (S.equipped[cid] =  getProxied({ weapon: null, head: null, armor: null, hands: null, legs: null, accessory: null }));
       const slots = cid === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS;
       slots.forEach(slot => {
         const oldUid = cur[slot];
@@ -1702,7 +2220,7 @@ window.Core = (function () {
       });
     });
     save();
-    return { ok: true, changed, members: targets.length, detail };
+    return  getProxied({ ok: true, changed, members: targets.length, detail });
   }
   // 穿戴规则：专属限本人；血统套装与血统神装都要求**同血统**；槽位受角色类型限制
   function canEquip(charId, eq) {
@@ -1711,14 +2229,14 @@ window.Core = (function () {
     if (charId !== '@player' && !S.chars[charId]) return false;
     /* 血统套装 / 血统神装：只有**同血统**的人穿得上（V9.6.81 起两条线同一条规矩）。
        这是"凑齐一套"的代价 —— 六件都得是这支血统，别人代穿不算。 */
-    const bl = charId === '@player' ? S.player.bloodline : (D.charById[charId] || {}).bloodline;
+    const bl = charId === '@player' ? S.player.bloodline : (D.charById[charId] ||  getProxied({})).bloodline;
     if (eq.bloodSet && eq.bloodSet !== bl) return false;
     if (eq.godSet && eq.godSet !== bl) return false;
     /* ⚠ 老存档兜底：V9.6.81 之前的装备带的是 `classSet`（定位名，如 warrior）。
        migrate() 会把它换成血统，但**万一有漏网的**（手动改档 / 更老的版本），
        这里按 LEGACY_KIND_SET 现算一次，别让玩家看到"穿不上又不知道为什么"。 */
     if (eq.classSet) {
-      const mapped = (D.LEGACY_KIND_SET || {})[eq.classSet];
+      const mapped = (D.LEGACY_KIND_SET ||  getProxied({}))[eq.classSet];
       if (!mapped || mapped !== bl) return false;
     }
     return (charId === '@player' ? D.PLAYER_SLOTS : D.RECRUIT_SLOTS).includes(eq.slot);
@@ -1732,7 +2250,7 @@ window.Core = (function () {
   function enhanceCost(eq) {
     const base = Math.round((100 + eq.enhance * 60) * D.EQUIP_RARITY_MULT[eq.rarity]);
     const discount = Math.min(0.4, S.buildings.workshop * 0.01);
-    return { points: Math.ceil(base * (1 - discount)), otherworld: 2 + Math.floor(eq.enhance / 5) * 2 };
+    return  getProxied({ points: Math.ceil(base * (1 - discount)), otherworld: 2 + Math.floor(eq.enhance / 5) * 2 });
   }
   /* V9.5.89（十七度自审）：**报价**和**实扣**必须是同一份数据。
      原来界面只显示 enhanceCost（点数 + 结晶），而 enhance() 在没材料时还要把代用点数加进点数、
@@ -1744,44 +2262,44 @@ window.Core = (function () {
     if (!eq) return null;
     const cost = enhanceCost(eq);
     const mat = enhanceMat(eq);
-    return {
+    return  getProxied({
       maxed: eq.enhance >= 20,
       points: cost.points + (mat.has ? 0 : mat.subPoints),   // 真正会扣的点数（含代用）
       basePoints: cost.points,
       substitute: mat.has ? 0 : mat.subPoints,
       otherworld: cost.otherworld,
       itemId: mat.itemId,
-      itemName: (D.ITEMS[mat.itemId] || {}).name || mat.itemId,
+      itemName: (D.ITEMS[mat.itemId] ||  getProxied({})).name || mat.itemId,
       matHave: mat.has,
       matOwned: S.items[mat.itemId] || 0,
       tier: mat.tier,
       rate: D.ENHANCE_RATE[Math.min(eq.enhance, D.ENHANCE_RATE.length - 1)],
-    };
+    });
   }
   // 强化所需材料：无材料时按 tier 折算点数代用
   function enhanceMat(eq) {
     const tier = D.enhanceMatTier(eq.enhance);
     const itemId = 'mat_t' + tier;
     const has = (S.items[itemId] || 0) > 0;
-    return { itemId, tier, has, subPoints: has ? 0 : D.MAT_SUBSTITUTE_POINTS[tier] };
+    return  getProxied({ itemId, tier, has, subPoints: has ? 0 : D.MAT_SUBSTITUTE_POINTS[tier] });
   }
   function enhance(uid) {
     const eq = S.equips[uid];
-    if (!eq) return { ok: false, msg: '装备不存在' };
-    if (!isUnlocked('enhance')) return { ok: false, msg: `🔒 ${unlockTip('enhance')}` };
-    if (eq.enhance >= 20) return { ok: false, msg: '已满强化' };
+    if (!eq) return  getProxied({ ok: false, msg: '装备不存在' });
+    if (!isUnlocked('enhance')) return  getProxied({ ok: false, msg: `🔒 ${unlockTip('enhance')}` });
+    if (eq.enhance >= 20) return  getProxied({ ok: false, msg: '已满强化' });
     const q = enhanceQuote(uid);                 // 与界面同一份报价
-    const cost = { points: q.points, otherworld: q.otherworld };
+    const cost =  getProxied({ points: q.points, otherworld: q.otherworld });
     // 先判够不够，再扣材料——顺序反了会白吞材料（档案里的同类问题）
     if (!canAfford(cost)) {
       /* V9.6.112（真流程审计）：报错要说清**差哪一种**。
          原来不管差点数还是差异界结晶都写"点数不足" —— 玩家兜里 2 万点数、
          只差 2 个 ◆，屏幕上却说"点数不足"，只会当成 bug 或者以为自己看错了。 */
-      const short = [];
+      const short =  getProxied([]);
       if ((S.cur.points || 0) < q.points) short.push('点数 ◉' + q.points);
       if ((S.cur.otherworld || 0) < q.otherworld) short.push('异界结晶 ◆' + q.otherworld);
       const lack = short.length ? short.join(' + ') : '材料';
-      return { ok: false, msg: q.matHave ? (`不够 ${lack}`) : (`不够 ${lack}（无${q.itemName}，需额外代用 ◉ ${q.substitute}）`) };
+      return  getProxied({ ok: false, msg: q.matHave ? (`不够 ${lack}`) : (`不够 ${lack}（无${q.itemName}，需额外代用 ◉ ${q.substitute}）`) });
     }
     if (q.matHave) {
       S.items[q.itemId]--;
@@ -1794,15 +2312,182 @@ window.Core = (function () {
     if (Math.random() < rate) {
       eq.enhance++;
       save();
-      return { ok: true, msg: `强化成功 +${eq.enhance}` };
+      return  getProxied({ ok: true, msg: `强化成功 +${eq.enhance}` });
     }
     save();
-    return { ok: false, fail: true, msg: `强化失败（成功率 ${Math.round(rate * 100)}%），装备未降级` };
+    return  getProxied({ ok: false, fail: true, msg: `强化失败（成功率 ${Math.round(rate * 100)}%），装备未降级` });
+  }
+  /* ================= V1.1.8（戊组 A13-F · 重铸石）=================
+     口径（《收口2》§1.4 的 A13-F/A13-N）：
+       · **重 roll 副词条的「数值」** —— 只换数值、**不换词条种类**（想要别的种类得换一件装备）；
+       · **锁定过的装备不可重摇**（锁 = 别动它，与"一键最优装备 / 分解"同一条规矩）；
+       · 消耗 ＝ **1 块当前档材料 ＋ ◉3,000**（临时保守值，偏贵；数值轮只改 `REFORGE_POINTS` 与那条公式）。
+     三条硬判据（`test_game` 里逐个断言）：① 重铸 20 次后**词条种类集合不变**；
+       ② 数值**全在 `AFFIX_POOL` 区间内**（走 `D.rollAffixValue`，与生成装备同一个函数）；
+       ③ **强化等级与锁定状态不变**（重铸只碰 `affixes[].v` 那一个字段）。 */
+  /* ================= V1.1.13（0927-E · 总监 D 单 §四 · 两档重铸 ＋ 锁定 ＋ 炉火）=================
+     档 A「重摇数值」：只重摇**未锁定**词条的 `v`（`k` 不变）—— 老口径，保留；
+     档 C「重抽词条」：未锁定词条的**种类 ＋ 数值**一起重抽（走 `D.rollAffixKey` 部位加权池，
+       排除"已锁的"与"这次已经抽到的"，所以一件装备上不会出现两条同名词条）；
+     档 B「锁定」是**附加**在 A/C 上的：每锁 1 条 ＋1 颗石（最多锁 n−1 条 —— 至少留 1 条参与）。
+     炉火：每做一次**档 A** `eq.forge.n += 1`；`n` 到 `REFORGE_PITY−1` 时下一次档 A 触发保底 ——
+       对本次参与重摇的每一条取 `max(新值, 旧值)` 并清零（**档 C 不计数也不清零**）。
+     ⚠️ 只碰 `affixes` / `forge` / `affixLock` 三个字段：`base / enhance / lock / set / bloodSet / godSet / rarity`
+        一个都不动（这条是既有保证，V1.1.13 继续钉住 —— test_game 里有断言）。
+     ⚠️ `eq.lock`（整件保护）优先级最高：锁定的装备**两档都不能重铸**（要先解锁）。
+     ⚠️ 词条锁用**新字段 `eq.affixLock`**（下标数组）—— **绝不复用 `eq.lock`**：
+        一个字段两个意思会同时砸掉"一键最优装备 / 批量分解 / 重铸"三处已有断言（总监 §4.2 命名铁律）。
+     ⚠️ 专属装备（`eq.charId`）**不能做档 C**：词条种类是它设计的一部分（`sig.affixes`），
+        重抽等于把它改成另一件装备。档 A 可用（数值重摇不影响它的身份）。 */
+  function reforgeModeOf(mode) { return mode === 'kind' ? 'kind' : 'value'; }
+  /* 一件装备的**词条总评**（q 均值，0~1）—— 界面的"词条总评"、重铸前后对比、历史最好
+     三处都读它，只算一处（`D.affixQ` 是 q 的唯一口径）。 */
+  function affixMeanQ(eq) {
+    const list = (eq && eq.affixes) || [];
+    if (!list.length) return 0;
+    let s = 0;
+    list.forEach(a => { s += D.affixQ ? D.affixQ(a.k, eq.rarity, a.v) : 0; });
+    return +(s / list.length).toFixed(3);
+  }
+  function affixLocksOf(eq) {
+    const n = (eq.affixes || []).length;
+    return (eq.affixLock ||  getProxied([])).filter(i => typeof i === 'number' && i >= 0 && i < n);
+  }
+  function reforgeCost(eq, opts) {
+    const mode = reforgeModeOf((opts ||  getProxied({})).mode);
+    const tier = D.enhanceMatTier(eq.enhance || 0);
+    const locks = affixLocksOf(eq).length;
+    const stoneN = (mode === 'kind' ? (D.REFORGE_KIND_STONE || 3) : 1) + locks * (D.REFORGE_LOCK_STONE || 1);
+    const itemN = mode === 'kind' ? (D.REFORGE_KIND_MAT || 2) : 1;
+    const points = mode === 'kind' ? (D.REFORGE_KIND_POINTS || 9000) : (D.REFORGE_POINTS || 3000);
+    const item = 'mat_t' + tier;
+    const matHave = S.items[item] || 0;
+    /* 材料不足照**强化那条现成的路**代用（`MAT_SUBSTITUTE_POINTS`）——
+       ⚠️ **不许用材料替代"重铸石"本身**：石头是这套机制唯一的闸门（总监 §5.2）。 */
+    const short = Math.max(0, itemN - matHave);
+    const substitute = short * ((D.MAT_SUBSTITUTE_POINTS ||  getProxied([]))[tier] || 0);
+    return  getProxied({
+      mode, locks, tier, item, itemN, points,
+      stone: D.REFORGE_ITEM || 'reforge_stone', stoneN,
+      matHave, short, substitute,
+    });
+  }
+  function reforgeQuote(uid, opts) {
+    const eq = S.equips[uid];
+    if (!eq) return null;
+    const mode = reforgeModeOf((opts ||  getProxied({})).mode);
+    const c = reforgeCost(eq, { mode });
+    const locks = affixLocksOf(eq);
+    const n = (eq.affixes || []).length;
+    const forgeN = (eq.forge && eq.forge.n) || 0;
+    const perAffix = (eq.affixes || []).map((a, i) => {
+      const pool = (D.AFFIX_POOL ||  getProxied({}))[a.k] ||  getProxied({});
+      const q = D.affixQ ? D.affixQ(a.k, eq.rarity, a.v) : 0;      // 本档可达区间里的位置（0~1）
+      return  getProxied({
+        i, k: a.k, v: a.v, name: pool.name || a.k,
+        q: +q.toFixed(3), tier: D.affixTierName ? D.affixTierName(q) : '',
+        locked: locks.indexOf(i) >= 0,
+      });
+    });
+    const meanQ = perAffix.length ? perAffix.reduce((s, x) => s + x.q, 0) / perAffix.length : 0;
+    return  getProxied({
+      uid, mode, locked: !!eq.lock, can: !eq.lock,
+      points: c.points, item: c.item, itemN: c.itemN, tier: c.tier,
+      substitute: c.substitute, short: c.short, matHave: c.matHave,
+      stone: c.stone, stoneN: c.stoneN, stoneHave: S.items[c.stone] || 0,
+      locks, canLock: n - locks.length > 1,                       // 至少留 1 条参与
+      kindable: !eq.charId,                                       // 专属装备不能重抽词条
+      perAffix, meanQ: +meanQ.toFixed(3), tierAvg: D.affixTierName ? D.affixTierName(meanQ) : '',
+      forgeN, pityAt: (D.REFORGE_PITY || 6) - 1, pityReady: forgeN >= (D.REFORGE_PITY || 6) - 1,
+      affixes: perAffix,
+    });
+  }
+  /* 词条锁开关（档 B）。**唯一入口** —— 界面只调它，不许自己去改 `eq.affixLock`。 */
+  function setAffixLock(uid, i, on) {
+    const eq = S.equips[uid];
+    if (!eq) return  getProxied({ ok: false, msg: '装备不存在' });
+    const n = (eq.affixes || []).length;
+    if (!(i >= 0 && i < n)) return  getProxied({ ok: false, msg: '没有这条词条' });
+    const cur = affixLocksOf(eq);
+    if (on) {
+      if (cur.indexOf(i) < 0) {
+        if (cur.length >= n - 1) return  getProxied({ ok: false, msg: `最多锁 ${n - 1} 条 —— 至少要留 1 条参与重铸` });
+        cur.push(i);
+      }
+    } else {
+      const at = cur.indexOf(i);
+      if (at >= 0) cur.splice(at, 1);
+    }
+    eq.affixLock = cur.slice().sort((a, b) => a - b);
+    save();
+    return  getProxied({ ok: true, affixLock: eq.affixLock });
+  }
+  function reforgeEquip(uid, opts) {
+    const eq = S.equips[uid];
+    if (!eq) return  getProxied({ ok: false, msg: '装备不存在' });
+    if (eq.lock) return  getProxied({ ok: false, msg: '这件装备已锁定 —— 先解锁再重铸（锁=别动它）' });
+    if (!eq.affixes || !eq.affixes.length) return  getProxied({ ok: false, msg: '这件装备没有副词条，重铸不了' });
+    const mode = reforgeModeOf((opts ||  getProxied({})).mode);
+    if (mode === 'kind' && eq.charId) return  getProxied({ ok: false, msg: '专属装备不能重抽词条（词条种类是它的设计的一部分）' });
+    const q = reforgeQuote(uid, { mode });              // 与界面同一份报价（含锁定条数）
+    const stoneName = (D.ITEMS[q.stone] ||  getProxied({})).name || q.stone;
+    if (q.stoneHave < q.stoneN) {
+      return  getProxied({ ok: false, msg: `${stoneName} 不足（${q.stoneHave}/${q.stoneN}）` });
+    }
+    const payPoints = q.points + (q.short > 0 ? q.substitute : 0);
+    if ((S.cur.points || 0) < payPoints) {
+      return  getProxied({ ok: false, msg: q.short > 0
+        ? `◉ 点数不足（需 ${fmtNum(payPoints)}，含材料代用 ◉${fmtNum(q.substitute)}）`
+        : `◉ 点数不足（需 ${fmtNum(payPoints)}）` });
+    }
+    /* 先扣料再摇（顺序反了会"摇完才发现不够"）：石头 / 材料（不够就点数代用）/ 点数 */
+    addItem(q.stone, -q.stoneN);
+    if (q.short <= 0) addItem(q.item, -q.itemN);
+    addCur('points', -payPoints);
+    const before = eq.affixes.map(a => a.v);
+    const beforeKinds = eq.affixes.map(a => a.k);
+    const meanBefore = q.meanQ;
+    const n0 = (eq.forge && eq.forge.n) || 0;
+    const locks = q.locks;
+    let pityHit = false;
+    if (mode === 'kind') {
+      const used = locks.map(i => eq.affixes[i].k);
+      eq.affixes.forEach((a, i) => {
+        if (locks.indexOf(i) >= 0) return;              // 锁定的**一个字节都不动**
+        const k = D.rollAffixKey(eq.slot, used);
+        if (!k) return;
+        used.push(k);
+        a.k = k;
+        a.v = D.rollAffixValue(k, eq.rarity);
+      });
+    } else {
+      pityHit = n0 >= (D.REFORGE_PITY || 6) - 1;
+      eq.affixes.forEach((a, i) => {
+        if (locks.indexOf(i) >= 0) return;
+        const nv = D.rollAffixValue(a.k, eq.rarity);
+        a.v = pityHit ? Math.max(nv, a.v) : nv;         // 炉火保底：必不倒退
+      });
+    }
+    /* `forge.n` 只被**档 A** 推进（档 C 不计数也不清零）；`forge.best` 记**历史最好的总评** ——
+       "这次有没有刷新记录"是总监 §4.4 第 3 条要求的对比卡内容之一。 */
+    if (!eq.forge) eq.forge = { n: 0, best: 0 };
+    if (mode === 'value') eq.forge.n = pityHit ? 0 : Math.min(n0 + 1, (D.REFORGE_PITY || 6) - 1);
+    const meanAfter = affixMeanQ(eq);
+    const newBest = meanAfter > (eq.forge.best || 0);
+    if (newBest) eq.forge.best = meanAfter;
+    save();
+    return  getProxied({
+      ok: true, uid, mode, before, beforeKinds, pityHit,
+      meanBefore, meanAfter, newBest, best: eq.forge.best || 0,
+      affixes: eq.affixes.map(a => ( getProxied({ k: a.k, v: a.v }))),
+      msg: mode === 'kind' ? '重抽完成：词条种类与数值都换了'
+        : (pityHit ? '🔥 炉火保底：这次必不倒退' : '重铸完成：词条种类不变，数值已重摇'),
+    });
   }
   function decompose(uid) {
     const eq = S.equips[uid];
-    if (!eq) return { ok: false };
-    if (eq.lock) return { ok: false, msg: '这件装备已锁定，先解锁再分解' };
+    if (!eq) return  getProxied({ ok: false });
+    if (eq.lock) return  getProxied({ ok: false, msg: '这件装备已锁定，先解锁再分解' });
     let gain = D.DECOMPOSE_GAIN[eq.rarity];
     gain += Math.floor(eq.enhance * 3);   // 强化投入部分返还
     // 若装备中先卸下
@@ -1812,7 +2497,7 @@ window.Core = (function () {
     delete S.equips[uid];
     addCur('otherworld', gain);
     save();
-    return { ok: true, gain };
+    return  getProxied({ ok: true, gain });
   }
   // 批量分解：一次结算、一次存档
   function decomposeMany(uids) {
@@ -1829,24 +2514,24 @@ window.Core = (function () {
       count++;
     });
     if (count) { addCur('otherworld', gain); save(); }
-    return { ok: count > 0, gain, count };
+    return  getProxied({ ok: count > 0, gain, count });
   }
   /* --- 编队预设：3 组槽位，一键保存 / 一键套用 --- */
   function savePreset(idx) {
-    if (idx < 0 || idx > 2) return { ok: false, msg: '预设不存在' };
+    if (idx < 0 || idx > 2) return  getProxied({ ok: false, msg: '预设不存在' });
     S.presets[idx] = S.party.slice();
     save();
-    return { ok: true, msg: `已保存到预设 ${idx + 1}` };
+    return  getProxied({ ok: true, msg: `已保存到预设 ${idx + 1}` });
   }
   function applyPreset(idx) {
     const p = S.presets[idx];
-    if (!p) return { ok: false, msg: '该预设还是空的' };
+    if (!p) return  getProxied({ ok: false, msg: '该预设还是空的' });
     S.party = normalizeParty(p, 'front');      // 老预设（4 格）与新预设（5 格）都能套
     save();
-    return { ok: true, msg: `已套用预设 ${idx + 1}` };
+    return  getProxied({ ok: true, msg: `已套用预设 ${idx + 1}` });
   }
   /* 装备槽的固定顺序（**只在评分相同时**当兜底，保证顺序稳定） */
-  const EQUIP_SLOT_ORDER = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
+  const EQUIP_SLOT_ORDER =  getProxied(['weapon', 'head', 'armor', 'hands', 'legs', 'accessory']);
   /* 背包里的装备排序（V9.6.123 父亲大人："装备的排序方式要像伙伴那样"）：
      伙伴是 **上阵 → 等级 → 稀有度 → 星级**；装备按同一种"形状"来：
        **强化等级（投资）→ 品质 → 部位（固定序）→ 名称**。
@@ -1855,13 +2540,13 @@ window.Core = (function () {
      ⚠️ 品质必须用 EQUIP_RARITIES（含 MYTH），不能用角色用的 RARITIES ——
      用错表的话神装 indexOf 是 -1，会被排到最后（以前 inventoryEquips 就是这个毛病）。 */
   function sortEquips(list) {
-    return (list || []).slice().sort((a, b) =>
+    return (list ||  getProxied([])).slice().sort((a, b) =>
       equipScore(b) - equipScore(a)                                   // V9.6.126：按评分（高→低，和"一键最优装备"同一份分）
       || EQUIP_SLOT_ORDER.indexOf(a.slot) - EQUIP_SLOT_ORDER.indexOf(b.slot)
       || String(a.uid || '').localeCompare(String(b.uid || '')));     // 完全同分也稳定
   }
   function inventoryEquips() {
-    const equippedUids = new Set();
+    const equippedUids =  getProxied(new Set());
     Object.values(S.equipped).forEach(slots => Object.values(slots).forEach(u => u && equippedUids.add(u)));
     return sortEquips(Object.values(S.equips));
   }
@@ -1869,8 +2554,8 @@ window.Core = (function () {
   /* ================= 站位（前排 / 后排） =================
      规则只有一条：**谁站前排谁挨打**——敌人优先攻击前排，前排没人了才打后排。
      所以谁想站哪一排是玩家的战术选择：主角也不例外。 */
-  const ROW_NAME = { front: '前排', back: '后排' };
-  function rowOfSlots(row) { return row === 'front' ? [0, 1] : [2, 3, 4]; }
+  const ROW_NAME =  getProxied({ front: '前排', back: '后排' });
+  function rowOfSlots(row) { return row === 'front' ?  getProxied([0, 1]) :  getProxied([2, 3, 4]); }
   // 主角站在哪一排：看他自己占的是哪一格（0/1 前排，2/3/4 后排）
   function playerRow() {
     const i = S.party.indexOf('@player');
@@ -1878,24 +2563,24 @@ window.Core = (function () {
   }
   function setPlayerRow(row) {
     const r = row === 'back' ? 'back' : 'front';
-    if (playerRow() === r) return { ok: false, msg: `主角已经在${ROW_NAME[r]}了` };
+    if (playerRow() === r) return  getProxied({ ok: false, msg: `主角已经在${ROW_NAME[r]}了` });
     const mv = moveMemberRow('@player', r);
     if (!mv.ok) return mv;
     S.player.row = r;      // 兼容：老字段跟着走，读旧档的人也能看对
     save();
-    return { ok: true, msg: `主角已换到${ROW_NAME[r]}` };
+    return  getProxied({ ok: true, msg: `主角已换到${ROW_NAME[r]}` });
   }
   // 两个上阵位互换（含空位）：把人挪到另一排，或者同排换顺序
   function swapPartySlots(a, b) {
     a = +a; b = +b;
     const n = S.party.length;
-    if (!(a >= 0 && a < n && b >= 0 && b < n)) return { ok: false, msg: '位置不对' };
-    if (a === b) return { ok: false, msg: '选的是同一个位置' };
-    if (!S.party[a] && !S.party[b]) return { ok: false, msg: '两个位置都是空的' };
+    if (!(a >= 0 && a < n && b >= 0 && b < n)) return  getProxied({ ok: false, msg: '位置不对' });
+    if (a === b) return  getProxied({ ok: false, msg: '选的是同一个位置' });
+    if (!S.party[a] && !S.party[b]) return  getProxied({ ok: false, msg: '两个位置都是空的' });
     const tmp = S.party[a]; S.party[a] = S.party[b]; S.party[b] = tmp;
     syncPlayerRow();
     save();
-    return { ok: true, msg: '已换位', party: S.party.slice() };
+    return  getProxied({ ok: true, msg: '已换位', party: S.party.slice() });
   }
   // 老字段 S.player.row 与"主角占哪一格"保持一致（主角站位以 S.party 为准，这里只是同步）
   function syncPlayerRow() {
@@ -1904,17 +2589,17 @@ window.Core = (function () {
   // 把某名上阵成员移到另一排：目标排有空位就搬过去，没空位就和那一排第一个换
   function moveMemberRow(id, row) {
     const from = S.party.indexOf(id);
-    if (from < 0) return { ok: false, msg: '这名伙伴不在队伍里' };
+    if (from < 0) return  getProxied({ ok: false, msg: '这名伙伴不在队伍里' });
     const r = row === 'front' ? 'front' : 'back';
     const want = rowOfSlots(r);
-    if (want.includes(from)) return { ok: false, msg: `已经在${ROW_NAME[r]}了` };
+    if (want.includes(from)) return  getProxied({ ok: false, msg: `已经在${ROW_NAME[r]}了` });
     const empty = want.find(i => !S.party[i]);
     if (empty !== undefined) {
       S.party[empty] = S.party[from];
       S.party[from] = null;
       syncPlayerRow();
       save();
-      return { ok: true, msg: `已移到${ROW_NAME[r]}`, party: S.party.slice() };
+      return  getProxied({ ok: true, msg: `已移到${ROW_NAME[r]}`, party: S.party.slice() });
     }
     const other = want[0];
     const swapped = S.party[other];
@@ -1923,11 +2608,11 @@ window.Core = (function () {
     syncPlayerRow();
     save();
     const nm = swapped ? charName(swapped) : '队友';
-    return { ok: true, msg: `已与「${nm}」换位`, party: S.party.slice() };
+    return  getProxied({ ok: true, msg: `已与「${nm}」换位`, party: S.party.slice() });
   }
   // 谁站在哪一排：界面用（队伍页标签、战斗前的站位预览都读这一处）
   function rowLayout() {
-    const out = { front: [], back: [] };
+    const out =  getProxied({ front:  getProxied([]), back:  getProxied([]) });
     S.party.forEach((id, i) => { if (id) out[i < 2 ? 'front' : 'back'].push(id); });
     return out;
   }
@@ -1939,12 +2624,12 @@ window.Core = (function () {
   function parsePos(p) {
     if (p === 'P' || p === '@player') {
       const i = S.party.indexOf('@player');
-      return i < 0 ? null : { idx: i, protag: true };
+      return i < 0 ? null :  getProxied({ idx: i, protag: true });
     }
-    if (p === 'row:front' || p === 'row:back') return { row: String(p).slice(4) };
+    if (p === 'row:front' || p === 'row:back') return  getProxied({ row: String(p).slice(4) });
     if (p === '' || p === null || p === undefined) return null;
     const n = +p;
-    return (n >= 0 && n < S.party.length) ? { idx: n } : null;
+    return (n >= 0 && n < S.party.length) ?  getProxied({ idx: n }) : null;
   }
   function posRow(p) {
     const v = parsePos(p);
@@ -1957,15 +2642,15 @@ window.Core = (function () {
   //   落在整排标题上＝把这一格上的人搬到那一排（有空位进空位，满员和最前面那位换）
   function swapPositions(a, b) {
     const pa = parsePos(a), pb = parsePos(b);
-    if (!pa || !pb) return { ok: false, msg: '位置不对' };
+    if (!pa || !pb) return  getProxied({ ok: false, msg: '位置不对' });
     if (pb.row) {
-      if (pa.row) return { ok: false, msg: '位置不对' };
+      if (pa.row) return  getProxied({ ok: false, msg: '位置不对' });
       const id = S.party[pa.idx];
-      if (!id) return { ok: false, msg: '这个位置是空的' };
+      if (!id) return  getProxied({ ok: false, msg: '这个位置是空的' });
       return moveMemberRow(id, pb.row);
     }
-    if (pa.row) return { ok: false, msg: '位置不对' };
-    if (pa.idx === pb.idx) return { ok: false, msg: '选的是同一个位置' };
+    if (pa.row) return  getProxied({ ok: false, msg: '位置不对' });
+    if (pa.idx === pb.idx) return  getProxied({ ok: false, msg: '选的是同一个位置' });
     return swapPartySlots(pa.idx, pb.idx);
   }
 
@@ -1986,7 +2671,9 @@ window.Core = (function () {
   }
   // 该池该稀有度能出哪些人（限定池锁阵营；该档位在本阵营里没人就退回全量，避免抽空）
   function charsOfRarity(rar, pool) {
-    let list = D.characters.filter(c => c.rarity === rar && !c.hidden);
+    /* 2026-09-27（父亲大人：「就没有隐藏角色这种概念」）：`!c.hidden` 这道滤网整个撤掉 ——
+       原先被它挡在池外的 6 位 UR（楚衍 / 郑遥 / 零式 / 无相 / 终焉 / 灯阁代行者）现在正常出。 */
+    let list = D.characters.filter(c => c.rarity === rar);
     if (pool === 'limited') {
       const up = poolUpChar('limited');
       if (up) {
@@ -1997,14 +2684,14 @@ window.Core = (function () {
     return list;
   }
   function pickCharOfRarity(rar, pool, opts) {
-    opts = opts || {};
+    opts = opts ||  getProxied({});
     let list = charsOfRarity(rar, pool);
-    if (!list.length) list = D.characters.filter(c => c.rarity === rar && !c.hidden);
+    if (!list.length) list = D.characters.filter(c => c.rarity === rar);
     if (!list.length) list = D.characters;
     // 限定池的 SSR：一半概率直接给当期 UP；保底触发时 100% 给当期 UP
     if (pool === 'limited' && rar === 'SSR') {
       const up = poolUpChar('limited');
-      if (up && (opts.forceUp || Math.random() < D.RECRUIT_POOLS.limited.upRatio)) list = [up];
+      if (up && (opts.forceUp || Math.random() < D.RECRUIT_POOLS.limited.upRatio)) list =  getProxied([up]);
     }
     // 高级池的 SSR/UR 优先给没拥有过的角色（"补图鉴"就是这个池子的定位）
     if (opts.prioritizeNew) {
@@ -2014,8 +2701,8 @@ window.Core = (function () {
     return list[Math.floor(Math.random() * list.length)];
   }
   function pityOf(pool) {
-    S.recruit.pity = S.recruit.pity || {};
-    const p = S.recruit.pity[pool] || (S.recruit.pity[pool] = { ssr: 0, ur: 0, up: 0 });
+    S.recruit.pity = S.recruit.pity ||  getProxied({});
+    const p = S.recruit.pity[pool] || (S.recruit.pity[pool] =  getProxied({ ssr: 0, ur: 0, up: 0 }));
     p.ssr = p.ssr || 0; p.ur = p.ur || 0; p.up = p.up || 0;
     return p;
   }
@@ -2023,24 +2710,24 @@ window.Core = (function () {
   function pityView(pool) {
     if (pool === 'normal' || !D.RECRUIT_POOLS[pool]) return null;
     const p = pityOf(pool);
-    return {
-      ssr: { n: p.ssr, cap: D.PITY.SSR },
-      ur: { n: p.ur, cap: D.PITY.UR },
-      up: pool === 'limited' ? { n: p.up, cap: D.PITY_UP } : null,
-    };
+    return  getProxied({
+      ssr:  getProxied({ n: p.ssr, cap: D.PITY.SSR }),
+      ur:  getProxied({ n: p.ur, cap: D.PITY.UR }),
+      up: pool === 'limited' ?  getProxied({ n: p.up, cap: D.PITY_UP }) : null,
+    });
   }
   // opts.noCost：十连已整笔扣费，单抽不再重复扣（见 recruitTen）
   // opts.noGrant：只决定"抽到谁"，先不入库——十连要先确认有没有 SR 再一起发，
   //   否者补保底时会白送第 11 个人（V9.2 修）
   function recruitOnce(pool, opts) {
-    opts = opts || {};
+    opts = opts ||  getProxied({});
     const p = D.RECRUIT_POOLS[pool];
-    if (!p) return { error: '卡池不存在' };
+    if (!p) return  getProxied({ error: '卡池不存在' });
     let usedTicket = null;
     if (!opts.noCost) {
       // 招募券优先于货币：有对应券就先扣券（券是玩法掉出来的，货币是攒出来的）
       if (p.ticket && (S.items[p.ticket] || 0) > 0) { removeItem(p.ticket, 1); usedTicket = p.ticket; }
-      else if (!spend(p.cost)) return { error: '货币不足（也没有对应的招募券）' };
+      else if (!spend(p.cost)) return  getProxied({ error: '货币不足（也没有对应的招募券）' });
     }
     S.stats.recruits++;
     task('recruit1', 1);
@@ -2055,10 +2742,10 @@ window.Core = (function () {
       else if (pit.ssr >= D.PITY.SSR && D.RARITIES.indexOf(rar) < 3) rar = 'SSR';
       if (pool === 'limited' && pit.up >= D.PITY_UP) { rar = 'SSR'; forceUp = true; }
     }
-    const base = pickCharOfRarity(rar, pool, {
+    const base = pickCharOfRarity(rar, pool,  getProxied({
       forceUp,
       prioritizeNew: !!p.prioritizeNew && D.RARITIES.indexOf(rar) >= 3,
-    });
+    }));
     if (pool !== 'normal') {
       const pit = pityOf(pool);
       const up = poolUpChar(pool);
@@ -2066,69 +2753,69 @@ window.Core = (function () {
       if (D.RARITIES.indexOf(base.rarity) >= 4) pit.ur = 0;
       if (up && base.id === up.id) pit.up = 0;
     }
-    const res = opts.noGrant ? { isNew: false } : addChar(base.id);
+    const res = opts.noGrant ?  getProxied({ isNew: false }) : addChar(base.id);
     if (!opts.noGrant) save();
     const upChar = poolUpChar(pool);
-    return {
-      id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0,
+    return  getProxied({
+      id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0, to: res.to || 'self',
       isUp: !!(upChar && base.id === upChar.id), usedTicket,
-    };
+    });
   }
   // 某个池现在有多少张券（界面显示"券 N 张"用）
   function ticketOf(pool) {
     const p = D.RECRUIT_POOLS[pool];
-    return p && p.ticket ? { id: p.ticket, n: S.items[p.ticket] || 0 } : null;
+    return p && p.ticket ?  getProxied({ id: p.ticket, n: S.items[p.ticket] || 0 }) : null;
   }
   function recruitTen(pool) {
     const p = D.RECRUIT_POOLS[pool];
-    if (!p) return { error: '卡池不存在' };
+    if (!p) return  getProxied({ error: '卡池不存在' });
     const cost = p.ten || p.cost;
     // 十连是一次交易，规则只有一条：要么 10 张券，要么全额货币，不支持混付（界面也这么写）。
     let usedTickets = 0;
     if (p.ticket && (S.items[p.ticket] || 0) >= 10) { removeItem(p.ticket, 10); usedTickets = 10; }
     else {
-      if (!canAfford(cost)) return { error: '货币不足（招募券也不足 10 张）' };
+      if (!canAfford(cost)) return  getProxied({ error: '货币不足（招募券也不足 10 张）' });
       spend(cost);
     }
     // 先抽完 10 次再统一入库：这样"十连保底 SR"是把最后一次换掉，
     // 而不是额外再补一个人（旧版会白送第 11 个）
-    const picks = [];
+    const picks =  getProxied([]);
     for (let i = 0; i < 10; i++) {
-      const r = recruitOnce(pool, { noCost: true, noGrant: true });
-      if (r.error) return { error: r.error, results: [] };
+      const r = recruitOnce(pool,  getProxied({ noCost: true, noGrant: true }));
+      if (r.error) return  getProxied({ error: r.error, results:  getProxied([]) });
       picks.push(r);
     }
     if (!picks.some(r => D.RARITIES.indexOf(r.rarity) >= 2)) {
       const base = pickCharOfRarity('SR', pool);
-      picks[picks.length - 1] = { id: base.id, name: base.name, rarity: base.rarity, pityFix: true };
+      picks[picks.length - 1] =  getProxied({ id: base.id, name: base.name, rarity: base.rarity, pityFix: true });
     }
     const results = picks.map(r => {
       const res = addChar(r.id);
-      return Object.assign({}, r, { isNew: res.isNew, shards: res.shards || 0 });
+      return Object.assign( getProxied({}), r,  getProxied({ isNew: res.isNew, shards: res.shards || 0, to: res.to || 'self' }));
     });
     save();
-    return { results, usedTickets };
+    return  getProxied({ results, usedTickets });
   }
   /* 每日免费抽（V9.5.51 父亲大人）：
      普通池：每天 3 次，且**两次之间隔 10 分钟**；高级池：每天 1 次；
      限定池没有免费。次数和"上次用的时间"都按自然日刷新（和每日任务同一把钟）。 */
-  const FREE_RULES = { normal: { daily: 3, gapSec: 600 }, advanced: { daily: 1, gapSec: 0 } };
+  const FREE_RULES =  getProxied({ normal:  getProxied({ daily: 3, gapSec: 600 }), advanced:  getProxied({ daily: 1, gapSec: 0 }) });
   function freeState(pool) {
     const rule = FREE_RULES[pool];
-    if (!rule) return { daily: 0, used: 0, left: 0, ready: false, waitSec: 0 };
+    if (!rule) return  getProxied({ daily: 0, used: 0, left: 0, ready: false, waitSec: 0 });
     const today = dailyDate();
     const f = S.recruit.free;
-    if (f.date !== today) { f.date = today; f.normal = { used: 0, at: 0 }; f.advanced = { used: 0, at: 0 }; }
-    const st = f[pool] || (f[pool] = { used: 0, at: 0 });
+    if (f.date !== today) { f.date = today; f.normal =  getProxied({ used: 0, at: 0 }); f.advanced =  getProxied({ used: 0, at: 0 }); }
+    const st = f[pool] || (f[pool] =  getProxied({ used: 0, at: 0 }));
     const left = Math.max(0, rule.daily - st.used);
     // 次数用完就不再报冷却（界面也就不会再显示倒计时）
     const wait = (rule.gapSec && left > 0) ? Math.max(0, Math.ceil((st.at + rule.gapSec * 1000 - Date.now()) / 1000)) : 0;
-    return { daily: rule.daily, used: st.used, left, ready: left > 0 && wait <= 0, waitSec: wait };
+    return  getProxied({ daily: rule.daily, used: st.used, left, ready: left > 0 && wait <= 0, waitSec: wait });
   }
   const freeRecruitAvailable = (pool = 'normal') => freeState(pool).ready;
   function freeRecruit(pool = 'normal') {
     const st = freeState(pool);
-    if (!st.ready) return { error: st.left <= 0 ? '今日免费次数已用完' : '还要再等一会儿' };
+    if (!st.ready) return  getProxied({ error: st.left <= 0 ? '今日免费次数已用完' : '还要再等一会儿' });
     S.recruit.free[pool].used = st.used + 1;
     S.recruit.free[pool].at = Date.now();
     const rar = rollRarityInPool(pool);                       // 出率跟该池同源
@@ -2137,16 +2824,29 @@ window.Core = (function () {
     S.stats.recruits++;
     task('recruit1', 1);
     save();
-    return { id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0, free: true, pool };
+    return  getProxied({ id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0, to: res.to || 'self', free: true, pool });
+  }
+  /* ================= V1.1.8（乙组 B7 · 高级池看广告免费 1 抽）=================
+     口径（终版 §3.1 第 7 步）：**10 次/天**、每次免 1 抽（等价 ◆200）。
+     实现：与"每日免费抽"**分两条账**（`freeRecruit` 用 `S.recruit.free`，这条用广告配额），
+     抽卡本身走同一段逻辑（出率 / 保底 / 计入 `stats.recruits` 与日常"招募 1 次"）——
+     所以"免费抽"和"广告抽"在抽卡这件事上完全同源，只有"谁付钱"不同。 */
+  function adRecruitAdv() {
+    /* **复用 `recruitOnce` 的 noCost 通道**（出率 / 保底 / 入库 / 计入日常全在里面）——
+       不另写一遍抽卡逻辑：那种"两套拼法"正是这个项目反复踩的坑（本轮尺子也在盯）。
+       与"每日免费抽"的唯一差别是账记在哪：那条记 `S.recruit.free`，这条记广告配额（在 wx-adapter 里）。 */
+    const r = recruitOnce('advanced',  getProxied({ noCost: true }));
+    if (r.error) return r;
+    return Object.assign(r,  getProxied({ free: true, pool: 'advanced' }));
   }
   function ssrTicketUse(charId) {
     const base = D.charById[charId];
-    if (!base || base.rarity !== 'SSR' || S.ssrTicket <= 0) return { ok: false, msg: '无法选择' };
+    if (!base || base.rarity !== 'SSR' || S.ssrTicket <= 0) return  getProxied({ ok: false, msg: '无法选择' });
     S.ssrTicket--;
     addChar(charId);
     S.stats.recruits++;
     save();
-    return { ok: true, msg: `获得 ${base.name}` };
+    return  getProxied({ ok: true, msg: `获得 ${base.name}` });
   }
 
   /* ================= 挂机 ================= */
@@ -2157,14 +2857,45 @@ window.Core = (function () {
     const au = authority();
     const kb = kejiBonus();
     const coreBonus = (1 + S.buildings.core * 0.02 + (S.player.geneLock >= 1 ? 0.10 : 0) + au.idlePct + kb.idlePct) * graceIdleMult() * signIdleMult();
-    return {
-      pointsPerMin: (10 + lv * 0.3) * coreBonus,
+    return  getProxied({
+      /* ================= V1.1.9（续13 · P0-4 挂机基数改成跟进度走）=================
+         父亲大人拍板「挂机基数改成跟进度走」，依据＝《整体数值审核报告》§一 1.2 第 1/2 条：
+           ① **基础奖励只看玩家等级，而转生会把等级清零** —— `longrun_sim 90` 实测第 24 天转生一次，
+              挂机基础从 40/分（Lv100）掉回 10/分（Lv0）。玩家在打 W16~W20 的图，挂机却按新手档给。
+           ② ◆（异界结晶）那条 `1 + floor(lv/50)` 只有 1/2/3 三档，后期 3/10 分 = 432/天，
+              而同期扫荡守关是 10,602/天（**24 倍**）—— 挂着"会给结晶"的名，实际只占日产出 4%。
+         改法（照报告 §十一 P0 #4 / #5 的原文公式）：
+           · `pointsPerMin`：`(10 + lv*0.3)` → **`(10 + max(lv, 进度档) * 0.3)`**
+           · `otherworldPer10Min`：`1 + floor(lv/50)` → **`1 + floor(进度档/36)`**
+         其中"进度档"＝ **历史最高通关世界的下标 × 6**（W01=0 … W36=210，见 `progressTier()`）。
+         老档影响：**只赚不亏**（基数只会变高）；且因为取的是"历史最高"，转生之后不会腰斩。
+         ⚠️ `expPerMin` 这一条**没动**：经验本来就该跟着当前等级走（等级是它的"挡位"），
+            报告也只点了点数与结晶两条。 */
+      pointsPerMin: (10 + Math.max(lv, progressTier()) * 0.3) * coreBonus,
       // V9.5.65（策划体检）：经验斜率 0.5 → 0.7、底数 8 → 10。
       // 旧值配合 80×Lv^1.32 的经验表，纯挂机到 Lv.20 要 33 小时；现在约 13 小时。
       expPerMin: (10 + lv * 0.7) * (1 + S.buildings.training * 0.03 + au.expPct + kb.expPct) * graceExpMult(),
-      otherworldPer10Min: 1 + Math.floor(lv / 50),
-    };
+      otherworldPer10Min: 1 + Math.floor(progressTier() / 36),
+    });
   }
+  /* 挂机基数用的"进度档"＝历史最高通关世界 × 6（见 idleBaseRates 的注释）。
+     取 `S.player.bestWorldIdx`（转生不清），并且**与当前进度取大**：
+     万一老档的字段没跟上（或手改过存档），当场还能按现在打到的图算，不会亏。 */
+  function bestWorldIdx() {
+    let hi = Math.max(0, S.player.bestWorldIdx || 0);
+    const ws = S.worlds ||  getProxied({});
+    Object.keys(ws).forEach((wid) => {
+      const st = ws[wid];
+      if (!st || !st.stages) return;
+      const done = ['normal', 'hard', 'hell'].some((d) => {
+        const arr = st.stages[d];
+        return Array.isArray(arr) && arr.length >= 12 && arr.every((x) => x > 0);
+      });
+      if (done) hi = Math.max(hi, D.WORLDS.findIndex((w) => w.id === wid));
+    });
+    return Math.max(0, hi);
+  }
+  function progressTier() { return bestWorldIdx() * 6; }
   /* ================= 挂机分工 ================= */
   // 4 条产线各派一名领队（不能用已上阵的主力，给板凳角色一个去处）。
   // 领队战力越高，这条线产出越高；没派领队 = 这条线不产出。
@@ -2183,27 +2914,27 @@ window.Core = (function () {
   }
   // 各产线"自己那一份"的产出（在基础挂机之外额外加，所以要先算基础值，避免自我引用）
   function idleLineContrib() {
-    const bonuses = {};
+    const bonuses =  getProxied({});
     D.IDLE_LINES.forEach(l => { bonuses[l.id] = idleLineBonus(l.id); });
     const base = idleBaseRates();
-    return {
+    return  getProxied({
       bonuses,
       points: base.pointsPerMin * bonuses.explore,
       exp: base.expPerMin * bonuses.cultivate,
       otherworld: base.otherworldPer10Min * bonuses.guard,
       matPerMin: bonuses.gather > 0 ? D.IDLE_MAT_PER_MIN * (1 + bonuses.gather) : 0,
-    };
+    });
   }
   function idleRates() {
     const base = idleBaseRates();
     const c = idleLineContrib();
-    return {
+    return  getProxied({
       pointsPerMin: base.pointsPerMin + c.points,
       expPerMin: base.expPerMin + c.exp,
       otherworldPer10Min: base.otherworldPer10Min + c.otherworld,
       matPerMin: c.matPerMin,
       lineBonuses: c.bonuses,
-    };
+    });
   }
   // 界面用：每条线现在派了谁、加成多少、产出多少
   function idleLines() {
@@ -2220,20 +2951,20 @@ window.Core = (function () {
       else per = `+${c.matPerMin.toFixed(1)} 材料 / 分`;
       const st = leaderId ? effectiveStats(leaderId) : null;
       const attrValue = (st && st.attrs && l.attr) ? Math.round(st.attrs[l.attr] || 0) : 0;
-      return { line: l, leaderId, bonus, attrValue, per: leaderId ? per : '未派领队，不产出' };
+      return  getProxied({ line: l, leaderId, bonus, attrValue, per: leaderId ? per : '未派领队，不产出' });
     });
   }
   // 派遣 / 撤下领队：上阵主力不能派（他们要出战），同一个人不能同时管两条线
   function setIdleLeader(lineId, charId) {
-    if (!D.IDLE_LINES.some(l => l.id === lineId)) return { ok: false, msg: '没有这条产线' };
-    if (!charId) { S.idle.lines[lineId] = null; save(); return { ok: true, msg: '已撤下领队' }; }
-    if (!S.chars[charId]) return { ok: false, msg: '没有这名伙伴' };
-    if (S.party.includes(charId)) return { ok: false, msg: '上阵主力不能派去挂机，先把他换下来' };
+    if (!D.IDLE_LINES.some(l => l.id === lineId)) return  getProxied({ ok: false, msg: '没有这条产线' });
+    if (!charId) { S.idle.lines[lineId] = null; save(); return  getProxied({ ok: true, msg: '已撤下领队' }); }
+    if (!S.chars[charId]) return  getProxied({ ok: false, msg: '没有这名伙伴' });
+    if (S.party.includes(charId)) return  getProxied({ ok: false, msg: '上阵主力不能派去挂机，先把他换下来' });
     const other = D.IDLE_LINES.find(l => l.id !== lineId && S.idle.lines[l.id] === charId);
-    if (other) return { ok: false, msg: `他已经在「${other.name}」了` };
+    if (other) return  getProxied({ ok: false, msg: `他已经在「${other.name}」了` });
     S.idle.lines[lineId] = charId;
     save();
-    return { ok: true, msg: `${charName(charId)} 已派往「${D.IDLE_LINES.find(l => l.id === lineId).name}」` };
+    return  getProxied({ ok: true, msg: `${charName(charId)} 已派往「${D.IDLE_LINES.find(l => l.id === lineId).name}」` });
   }
   function offlineCapHours() {
     /* 基础上线 6 小时；三条加成**点满加起来正好 +6 小时** → 满配刚好 12 小时（父亲大人定的）：
@@ -2254,18 +2985,18 @@ window.Core = (function () {
     const now = Date.now();
     const last = S.idle.lastTs || now;
     offlineSettled = true;    // 从这一刻起，存盘可以正常把 lastTs 推到"现在"（V9.6.92）
-    if (now < last - 60000) { S.idle.lastTs = now; return { cheat: true }; }   // 防改时间
+    if (now < last - 60000) { S.idle.lastTs = now; return  getProxied({ cheat: true }); }   // 防改时间
     const elapsedSec = Math.min((now - last) / 1000, offlineCapHours() * 3600);
     if (elapsedSec < 60) { S.idle.lastTs = now; return null; }
     const eff = offlineEfficiency();
     const r = idleRates();
     const mins = elapsedSec / 60 * eff;
-    const gains = {
+    const gains =  getProxied({
       points: Math.round(r.pointsPerMin * mins),
       exp: Math.round(r.expPerMin * mins),
       otherworld: Math.floor(elapsedSec / 600) * r.otherworldPer10Min,
       mat: Math.floor((r.matPerMin || 0) * mins),
-    };
+    });
     /* ⚠️ 离线收益必须**在这里**入账。
        以前入账写在 UI.showOfflineGains 里（那是"弹结算窗"的地方），而 main.js 只在
        离线 ≥5 分钟时才调它——于是离线 1~5 分钟的收益算完就被丢掉，lastTs 却已经推到当前时间，
@@ -2276,11 +3007,44 @@ window.Core = (function () {
     const matOut = grantIdleMat(gains.mat);
     if (matOut && matOut.count > 0) { gains.matItem = matOut.item; gains.matCount = matOut.count; gains.mat = matOut.count; }
     else { gains.matFull = !!(matOut && matOut.full); gains.matStashed = (matOut && matOut.stashed) || 0; gains.mat = 0; }
+    /* ================= V1.1.8（乙组 B4 · 离线翻倍）=================
+       父亲大人的口径：**全额 ×2、不限次数**；【定】**每个离线结算窗口只能翻一次**。
+       落地：把"这一次结算给了多少"原样记下来（秒数 ＋ 各项实际到账数），
+       广告翻倍就是**照这份记录再发一份** —— 所以：
+         · 翻的一定是"这一次真的拿到的"，不是重算一遍（重算会跟当时的效率/加成对不上）；
+         · `doubled` 标记保证同一个窗口**只翻一次**（不然回主页还能反复点）；
+         · 下一次 `settleOffline` 会把记录整条换掉（新窗口、doubled 复位）。 */
+    S.idle.lastSettle =  getProxied({
+      sec: elapsedSec,
+      points: gains.points, exp: gains.exp, otherworld: gains.otherworld,
+      matItem: gains.matItem || null, matCount: gains.matCount || 0,
+      doubled: false, at: now,
+    });
     S.idle.lastTs = now;
     travelAccrue(elapsedSec);      // 离线时间同样攒"游历奇遇"
     addSectExp(Math.floor(elapsedSec / 60 * D.SECT_EXP.perMin));
     save();
-    return { seconds: elapsedSec, gains, efficiency: eff };
+    return  getProxied({ seconds: elapsedSec, gains, efficiency: eff });
+  }
+  /* 离线翻倍（B4）：把最近一次离线结算**再发一份**；同一个窗口只许翻一次。 */
+  function lastOfflineSettle() { return S.idle.lastSettle || null; }
+  function claimOfflineDouble() {
+    const ls = S.idle.lastSettle;
+    if (!ls) return  getProxied({ ok: false, msg: '这次没有可翻倍的离线收益' });
+    if (ls.doubled) return  getProxied({ ok: false, msg: '这次离线收益已经翻过倍了' });
+    ls.doubled = true;
+    addCur('points', ls.points || 0);
+    addCur('otherworld', ls.otherworld || 0);
+    addPlayerExp(ls.exp || 0);
+    const again =  getProxied({ points: ls.points || 0, exp: ls.exp || 0, otherworld: ls.otherworld || 0, matItem: null, matCount: 0 });
+    /* 材料照**当时那一档**再发一份（`grantIdleMat` 会按"现在的等级"重新取档 —— 那可能不是同一种材料）。
+       装不下就进待领箱（同一套"宁可少收也不吞"）。 */
+    if (ls.matItem && ls.matCount) {
+      if (addItem(ls.matItem, ls.matCount)) { again.matItem = ls.matItem; again.matCount = ls.matCount; }
+      else { stashItem(ls.matItem, ls.matCount); again.matStashed = ls.matCount; }
+    }
+    save();
+    return  getProxied({ ok: true, gains: again, sec: ls.sec, msg: '离线收益已翻倍' });
   }
   // 在线挂机：每秒累计
   /* V9.5.80（自审）：**在线挂机也要吃同一个上限**。
@@ -2297,18 +3061,18 @@ window.Core = (function () {
   function idleBankGains() {
     const r = idleRates();
     const mins = S.idle.bankSec / 60;
-    return {
+    return  getProxied({
       points: Math.floor(r.pointsPerMin * mins),
       exp: Math.floor(r.expPerMin * mins),
       otherworld: Math.floor(Math.floor(S.idle.bankSec / 600) * r.otherworldPer10Min),
       mat: Math.floor((r.matPerMin || 0) * mins),
       seconds: S.idle.bankSec,
-    };
+    });
   }
   // 采集产线产出的材料按玩家等级换成对应档位（越往后材料越高级，但数量按 2 的幂递减）
   function idleMatItem() {
     const tier = Math.min(5, 1 + Math.floor(S.player.level / 20));
-    return { item: 'mat_t' + tier, tier };
+    return  getProxied({ item: 'mat_t' + tier, tier });
   }
   // 折算并入库；背包满就整批跳过（宁可少收，也不吞玩家的东西）
   function grantIdleMat(units) {
@@ -2317,9 +3081,22 @@ window.Core = (function () {
     const count = Math.floor(units / Math.pow(2, mi.tier - 1));
     if (count <= 0) return null;
     // 背包满：不吞玩家的东西，先记进待领箱（清出格子后在背包页一键领回）
-    if (!addItem(mi.item, count)) { stashItem(mi.item, count); return { item: mi.item, count: 0, tier: mi.tier, full: true, stashed: count }; }
-    return { item: mi.item, count, tier: mi.tier };
+    if (!addItem(mi.item, count)) { stashItem(mi.item, count); return  getProxied({ item: mi.item, count: 0, tier: mi.tier, full: true, stashed: count }); }
+    return  getProxied({ item: mi.item, count, tier: mi.tier });
   }
+  /* ================= V1.1.16（M 轮 · 挂机结算 ＋ 看广告双倍领取）=================
+     父亲大人：「现在这个领取奖励也可以像战斗的结算那样把有什么奖励列举出来，然后两个选项，
+     一个领取奖励，一个看广告双倍领取奖励，**这个看广告双倍领取的次数也是不限次数**」。
+     【定】挂机银行那一份也能翻倍，口径与离线翻倍（乙组 B4）**同源**，不是第二套算法：
+       · 广告槽仍走 `offline_double`（它在 `wx-adapter` 的 FREE_SLOTS 里：**不查日配额、不占总闸**）；
+       · 翻的一定是"**这一次真的到账的那一份**"（照记录原样再发一份，不重算 ——
+         重算会跟当时的产线领队 / 建筑加成对不上，玩家看到的就是"翻倍后还没原来多"）；
+       · **同一个窗口只能翻一次**（`used` 标记）；挂机银行一清空就是新的一轮 ⇒
+         "每轮翻一次"＝"想翻几次都有得翻"，与"广告不限次数"并不冲突。
+     ⚠️ 记录存在 `S.idle.lastIdleClaim`（与离线那条 `S.idle.lastSettle` 同一个位置、同一套思路）：
+        换档 / 新档会**跟着换**，不会出现"拿上一份档的账再发一份"（放模块变量就会）。
+        调用方也必须是"先真领一次、再翻"（界面那条路就是这样，见 sc-home）。 */
+  function lastIdleClaimOf() { return (S.idle && S.idle.lastIdleClaim) || null; }
   function claimIdle() {
     const g = idleBankGains();
     addCur('points', g.points);
@@ -2331,15 +3108,70 @@ window.Core = (function () {
        现在按同样的比例补上；离线那条走 elapsedSec、这条走 bankSec，两个时间窗互不重叠，不会重复计。 */
     addSectExp(Math.floor(S.idle.bankSec / 60 * D.SECT_EXP.perMin));
     // 采集产线的材料：按档位折算，背包满就跳过（不吞玩家的东西，只是这一轮收不进来）
+    /* 材料那一份要连"进包还是进待领箱"一起记下来（背包满时 `grantIdleMat` 只回 count:0 ＋ stashed），
+       否则双倍那一份就不知道该往哪儿发（吞掉玩家的材料＝最不该的错）。 */
+    let matItem = null, matCount = 0, matStash = 0;
     if (g.mat > 0) {
       const m = grantIdleMat(g.mat);
-      if (m && m.count > 0) { g.matItem = m.item; g.matCount = m.count; g.mat = m.count; }
-      else { g.matFull = !!(m && m.full); g.matStashed = (m && m.stashed) || 0; g.mat = 0; }
+      if (m && m.count > 0) { g.matItem = m.item; g.matCount = m.count; g.mat = m.count; matItem = m.item; matCount = m.count; }
+      else {
+        g.matFull = !!(m && m.full); g.matStashed = (m && m.stashed) || 0; g.mat = 0;
+        matItem = (m && m.item) || null; matStash = (m && m.stashed) || 0;
+      }
     }
     S.idle.bankSec = 0;
     task('idle1', 1);
+    S.idle.lastIdleClaim =  getProxied({
+      points: g.points, exp: g.exp, otherworld: g.otherworld,
+      matItem, matCount, matStash, sec: g.seconds || 0, at: Date.now(), used: false,
+    });
     save();
     return g;
+  }
+  /* 挂机收益翻倍：把最近一次挂机结算**原样再发一份**；同一个窗口只许翻一次。 */
+  function claimIdleDouble() {
+    const ls = (S.idle && S.idle.lastIdleClaim) || null;
+    if (!ls) return  getProxied({ ok: false, msg: '这次没有可翻倍的挂机收益' });
+    if (ls.used) return  getProxied({ ok: false, msg: '这次挂机收益已经翻过倍了' });
+    /* 只认"刚刚那一次领取"：这份记录只在内存里，跨档（换存档 / 新档）后它就是**上一份档的账**，
+       照它再发一份＝凭空发资源。界面那条路本来就是"先真领一次、再翻"，所以只要把窗口
+       开得比"看一条广告 ＋ 面板停留"宽就够了（10 分钟，正常 15~40 秒就走完）。 */
+    if (!ls.at || Date.now() - ls.at > 10 * 60 * 1000) return  getProxied({ ok: false, msg: '这一次的挂机收益已经过期，重新收一次再翻' });
+    ls.used = true;
+    addCur('points', ls.points || 0);
+    addCur('otherworld', ls.otherworld || 0);
+    addPlayerExp(ls.exp || 0);
+    const again =  getProxied({ points: ls.points || 0, exp: ls.exp || 0, otherworld: ls.otherworld || 0, matItem: null, matCount: 0 });
+    if (ls.matItem && ls.matCount) {
+      if (addItem(ls.matItem, ls.matCount)) { again.matItem = ls.matItem; again.matCount = ls.matCount; }
+      else { stashItem(ls.matItem, ls.matCount); again.matStashed = ls.matCount; }
+    }
+    if (ls.matItem && ls.matStash) {
+      stashItem(ls.matItem, ls.matStash);
+      again.matStashed = (again.matStashed || 0) + ls.matStash;
+    }
+    save();
+    return  getProxied({ ok: true, gains: again, sec: ls.sec, msg: '挂机收益已翻倍' });
+  }
+  /* ================= V1.1.8（乙组 B5 · 挂机加速）=================
+     口径（终版 §3.1 第 5 步）：**3 次/天**、每次 **2 小时挂机产出**，**直接发**、不写进挂机银行。
+     折算与 `idleBankGains()` 同一套公式（挂机 2 小时 ＝ 120 分钟；◆ 每 10 分钟一档 ×12），
+     所以"广告加速两小时"和"真挂两小时"在产出上完全同源（差别只有：不吃离线上限、不进银行）。
+     ⚠️ 只发 ◉/EXP/◆ 这三样（与离线那条同一口径）；**不发材料** ——
+        材料线有它自己的节拍（药园/副本/产线），塞进来会让"材料日产量"那张账对不上。 */
+  function adIdleBoost() {
+    const r = idleRates();
+    const mins = 120;
+    const gains =  getProxied({
+      points: Math.round(r.pointsPerMin * mins),
+      exp: Math.round(r.expPerMin * mins),
+      otherworld: Math.floor(mins / 10) * r.otherworldPer10Min,
+    });
+    addCur('points', gains.points);
+    addCur('otherworld', gains.otherworld);
+    addPlayerExp(gains.exp);
+    save();
+    return  getProxied({ ok: true, gains, seconds: mins * 60 });
   }
   function addPlayerExp(n) {
     // V9.5.86：同样的道理——非有限数会让经验变成 Infinity/-Infinity，字符串会拼接成 '0abc'
@@ -2383,7 +3215,7 @@ window.Core = (function () {
      （副作用：以后如果要从别处发技能点，得改成加项而不是覆盖，注释留在这里提醒。） */
   function skillPointsForLevel() {
     const cap = D.SKILL_MAX_BY_INDEX.reduce((a, b) => a + b, 0);
-    const spent = (S.player.skillLv || [0, 0, 0]).reduce((a, b) => a + b, 0);
+    const spent = (S.player.skillLv ||  getProxied([0, 0, 0])).reduce((a, b) => a + b, 0);
     return Math.max(0, Math.min(S.player.level || 0, cap) - spent);
   }
 
@@ -2393,48 +3225,48 @@ window.Core = (function () {
     return (S.player.bloodline && D.BLOODLINE_SKILLS[S.player.bloodline]) || D.PROTAGONIST.skills;
   }
   function allocateSkill(idx) {
-    const lv = S.player.skillLv || (S.player.skillLv = [0, 0, 0]);
-    if (idx < 0 || idx > 2) return { ok: false, msg: '技能不存在' };
-    if (lv[idx] >= D.SKILL_MAX_BY_INDEX[idx]) return { ok: false, msg: '已满级' };
-    if ((S.player.skillPoints || 0) < 1) return { ok: false, msg: '没有可用技能点' };
+    const lv = S.player.skillLv || (S.player.skillLv =  getProxied([0, 0, 0]));
+    if (idx < 0 || idx > 2) return  getProxied({ ok: false, msg: '技能不存在' });
+    if (lv[idx] >= D.SKILL_MAX_BY_INDEX[idx]) return  getProxied({ ok: false, msg: '已满级' });
+    if ((S.player.skillPoints || 0) < 1) return  getProxied({ ok: false, msg: '没有可用技能点' });
     S.player.skillPoints--;
     lv[idx]++;
     save();
-    return { ok: true, msg: `技能升到 Lv.${lv[idx]}` };
+    return  getProxied({ ok: true, msg: `技能升到 Lv.${lv[idx]}` });
   }
   function resetSkills() {
     /* V9.5.71（自审）：技能从 1 基改成 0 基之后这里漏改了——
        原来退的是 sum(等级-1)、重置成 [1,1,1]，而技能等级从 0 起算意味着：
        退 2 点却把三条技能又放回 1 级（净赚 3 级），反复洗点可以白刷技能等级。
        现在按 0 基口径：退 sum(等级)、重置成 [0,0,0]。 */
-    const lv = S.player.skillLv || [0, 0, 0];
+    const lv = S.player.skillLv ||  getProxied([0, 0, 0]);
     const refund = lv.reduce((s, x) => s + x, 0);
-    if (refund <= 0) return { ok: false, msg: '尚未加点' };
-    S.player.skillLv = [0, 0, 0];
+    if (refund <= 0) return  getProxied({ ok: false, msg: '尚未加点' });
+    S.player.skillLv =  getProxied([0, 0, 0]);
     S.player.skillPoints = (S.player.skillPoints || 0) + refund;
     save();
-    return { ok: true, msg: `已重置，返还 ${refund} 点技能点` };
+    return  getProxied({ ok: true, msg: `已重置，返还 ${refund} 点技能点` });
   }
 
   // 六维属性点分配（每点 +ATTR_POINT_VALUE 维值）
   function allocateAttr(attrId, n = 1) {
-    if (!D.ATTR_META.some(a => a.id === attrId)) return { ok: false, msg: '属性不存在' };
+    if (!D.ATTR_META.some(a => a.id === attrId)) return  getProxied({ ok: false, msg: '属性不存在' });
     n = Math.min(n, S.player.attrPoints || 0);
-    if (n <= 0) return { ok: false, msg: '没有可用属性点' };
+    if (n <= 0) return  getProxied({ ok: false, msg: '没有可用属性点' });
     S.player.attrPoints -= n;
     S.player.attrs[attrId] = (S.player.attrs[attrId] || 0) + n;
     save();
-    return { ok: true, msg: `${D.ATTR_META.find(a => a.id === attrId).name} +${n * D.ATTR_POINT_VALUE}` };
+    return  getProxied({ ok: true, msg: `${D.ATTR_META.find(a => a.id === attrId).name} +${n * D.ATTR_POINT_VALUE}` });
   }
   // 六维洗点：把已经分出去的属性点全部退回"可用点数"，免费、可反复洗。
   // 和 resetSkills 对称：加错了不该逼人重开档。
   function resetAttrs() {
     const spent = D.ATTR_META.reduce((s, a) => s + ((S.player.attrs && S.player.attrs[a.id]) || 0), 0);
-    if (spent <= 0) return { ok: false, msg: '还没分配过属性点' };
+    if (spent <= 0) return  getProxied({ ok: false, msg: '还没分配过属性点' });
     S.player.attrs = ATTR_ZERO();
     S.player.attrPoints = (S.player.attrPoints || 0) + spent;
     save();
-    return { ok: true, msg: `已洗点，退回 ${spent} 点属性点` };
+    return  getProxied({ ok: true, msg: `已洗点，退回 ${spent} 点属性点` });
   }
 
   /* ================= 多主角（新建角色体验不同血统） ================= */
@@ -2449,20 +3281,25 @@ window.Core = (function () {
      ⚠️ 往里加字段时，**值不是标量的那几个必须在 snapshot/restore 里各拷一份**
      （attrs / talents 是对象、skillLv 是数组）：直接传引用＝两个主角共用同一个对象，
      改一个动两个，比"没重置"更难查。 */
-  const PROTAGONIST_KEYS = ['name', 'level', 'exp', 'bloodline', 'bloodlineLv', 'attrPoints', 'attrs',
-    'skillPoints', 'skillLv', 'realm', 'talents', 'reincarnations', 'geneLock', 'row'];
+  const PROTAGONIST_KEYS =  getProxied(['name', 'level', 'exp', 'bloodline', 'bloodlineLv', 'attrPoints', 'attrs',
+    'skillPoints', 'skillLv', 'realm', 'talents', 'reincarnations', 'geneLock', 'row',
+    /* V1.1.9（续13 · P0-4）：`bestWorldIdx`（历史最高通关世界）也是 `S.player` 上的一个字段 ——
+       不列进来的话，`test_game` 那条"快照必须覆盖 S.player 的每一个字段"当场红（本轮实测踩到），
+       而且新建主角会**继承上一任的进度档**（和 V1.0.3 那五个字段同一个坑）。
+       口径：进度档跟着"这个世界打到哪"，新建主角＝新档，所以它也回 0。 */
+    'bestWorldIdx']);
   function snapshotProtagonist() {
-    const p = {};
+    const p =  getProxied({});
     PROTAGONIST_KEYS.forEach(k => { p[k] = S.player[k]; });
     p.attrs = Object.assign(ATTR_ZERO(), p.attrs);
-    p.skillLv = (p.skillLv || [0, 0, 0]).slice();
+    p.skillLv = (p.skillLv ||  getProxied([0, 0, 0])).slice();
     p.talents = Object.assign(TALENT_ZERO(), p.talents);    // 深拷：不然两个主角共用同一个天赋对象
     return p;
   }
   function restoreProtagonist(p) {
     PROTAGONIST_KEYS.forEach(k => { S.player[k] = p[k]; });
     S.player.attrs = Object.assign(ATTR_ZERO(), p.attrs);
-    S.player.skillLv = (p.skillLv || [0, 0, 0]).slice();
+    S.player.skillLv = (p.skillLv ||  getProxied([0, 0, 0])).slice();
     S.player.talents = Object.assign(TALENT_ZERO(), p.talents);
     /* 老档的 altPlayers 快照里没有这几个字段（名单是这一版才补的）——
        取不到就按**新档初值**补，绝不留 undefined（境界 / 铭刻 / 站位读到 undefined
@@ -2471,41 +3308,42 @@ window.Core = (function () {
     S.player.reincarnations = p.reincarnations || 0;
     S.player.geneLock = p.geneLock || 0;
     S.player.row = p.row || 'front';
+    S.player.bestWorldIdx = Math.max(0, p.bestWorldIdx || 0);   // V1.1.9（续13）：老快照没这个字段 → 按新档初值
   }
   function protagonistList() {
-    return [
-      Object.assign(snapshotProtagonist(), { current: true }),
-      ...S.altPlayers.map((p, i) => Object.assign({}, p, { altIndex: i })),
-    ];
+    return  getProxied([
+      Object.assign(snapshotProtagonist(),  getProxied({ current: true })),
+      ...S.altPlayers.map((p, i) => Object.assign( getProxied({}), p,  getProxied({ altIndex: i }))),
+    ]);
   }
   function createProtagonist(name) {
     name = (name || '').trim();
-    if (!name) return { ok: false, msg: '名字不能为空' };
-    if (S.altPlayers.length >= 6) return { ok: false, msg: '最多创建 6 个额外主角' };
+    if (!name) return  getProxied({ ok: false, msg: '名字不能为空' });
+    if (S.altPlayers.length >= 6) return  getProxied({ ok: false, msg: '最多创建 6 个额外主角' });
     S.altPlayers.push(snapshotProtagonist());
     restoreProtagonist(freshProtagonist(name));
     save();
-    return { ok: true, msg: `新主角「${name}」已创建，天赋与命格从 Lv.1 重新选` };
+    return  getProxied({ ok: true, msg: `新主角「${name}」已创建，天赋与命格从 Lv.1 重新选` });
   }
   function switchProtagonist(altIndex) {
     const alt = S.altPlayers[altIndex];
-    if (!alt) return { ok: false, msg: '主角不存在' };
+    if (!alt) return  getProxied({ ok: false, msg: '主角不存在' });
     const cur = snapshotProtagonist();
     S.altPlayers[altIndex] = cur;
     restoreProtagonist(alt);
     save();
-    return { ok: true, msg: `已切换为「${S.player.name}」` };
+    return  getProxied({ ok: true, msg: `已切换为「${S.player.name}」` });
   }
 
   /* ================= 建筑 ================= */
   function upgradeBuilding(id) {
     const lv = S.buildings[id];
-    if (lv >= 50) return { ok: false, msg: '已满级' };
-    const cost = { points: D.buildingCost(id, lv) };
-    if (!spend(cost)) return { ok: false, msg: '点数不足' };
+    if (lv >= 50) return  getProxied({ ok: false, msg: '已满级' });
+    const cost =  getProxied({ points: D.buildingCost(id, lv) });
+    if (!spend(cost)) return  getProxied({ ok: false, msg: '点数不足' });
     S.buildings[id]++;
     save();
-    return { ok: true, msg: `升到 Lv.${S.buildings[id]}` };
+    return  getProxied({ ok: true, msg: `升到 Lv.${S.buildings[id]}` });
   }
 
   /* ================= 灯阁权限（对标《道友修仙》的"洞府"） ================= */
@@ -2515,14 +3353,14 @@ window.Core = (function () {
   function authorityInfo() {
     const lv = S.auth || 0;
     const max = D.AUTHORITY_MAX;
-    return {
+    return  getProxied({
       lv, max,
       maxed: lv >= max,
       cost: lv >= max ? null : D.authorityCost(lv),
       now: authority(),
       nextDesc: lv >= max ? null : D.AUTHORITY[lv].desc,
       rows: D.AUTHORITY,
-    };
+    });
   }
   /* 权限等级的解锁判定：D.authorityReq(lv) 给出"通关 XX·普通"，
      这里对照玩家的世界进度（普通难度 12 关全清才算通关那张图）。 */
@@ -2536,16 +3374,26 @@ window.Core = (function () {
   }
   function upgradeAuthority() {
     const lv = S.auth || 0;
-    if (lv >= D.AUTHORITY_MAX) return { ok: false, msg: '灯阁权限已满级' };
+    if (lv >= D.AUTHORITY_MAX) return  getProxied({ ok: false, msg: '灯阁权限已满级' });
     /* V9.6.133：权限 20 级 → 每一级都要**跟着进度**解锁（通关第 N 张图），不再一次点到顶 */
     const req = D.authorityReq ? D.authorityReq(lv + 1) : '';
-    if (req && !authorityReqMet(lv + 1)) return { ok: false, msg: '还没解锁：' + req };
+    if (req && !authorityReqMet(lv + 1)) return  getProxied({ ok: false, msg: '还没解锁：' + req });
     const cost = D.authorityCost(lv);
-    if (!canAfford(cost)) return { ok: false, msg: `材料不足：需要 ${cost.holy} 圣洁晶石 + ${cost.otherworld} 异界结晶` };
-    spend(cost);
+    /* ⚠️ 货币与材料**分两个对象**走：`canAfford / spend` 只认货币键，
+       把 `mat / matN` 混进去会被当成"货币数量不足"而永远点不动（`S.cur.mat` 是 undefined）。 */
+    const cur =  getProxied({ holy: cost.holy, otherworld: cost.otherworld });
+    if (!canAfford(cur)) return  getProxied({ ok: false, msg: `材料不足：需要 ${cost.holy} 圣洁晶石 + ${cost.otherworld} 异界结晶` });
+    /* V1.1.4（A12-F · 灯阁权限接「灯油」）：每级 3 块（《收口2》§3.1），20 级共 60 块。
+       仍然"先判料、再扣钱"：货币是不可逆的，材料是可补的。 */
+    const matN = cost.matN || 0;
+    if (matN && (S.items[cost.mat] || 0) < matN) {
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[cost.mat] ||  getProxied({})).name || cost.mat} 不足（${S.items[cost.mat] || 0}/${matN}）` });
+    }
+    spend(cur);
+    if (matN) addItem(cost.mat, -matN);
     S.auth = lv + 1;
     save();
-    return { ok: true, msg: `灯阁权限提升到 Lv.${S.auth}` };
+    return  getProxied({ ok: true, msg: `灯阁权限提升到 Lv.${S.auth}` });
   }
 
   /* ================= 灯阁评级（对标《道友修仙》的"宗门等级"） =================
@@ -2558,19 +3406,19 @@ window.Core = (function () {
     const lv = (S.sect && S.sect.lv) || 0;
     const exp = (S.sect && S.sect.exp) || 0;
     const need = D.sectExpNeed(lv);
-    return {
+    return  getProxied({
       lv, exp, need, max: D.SECT_MAX, maxed: lv >= D.SECT_MAX,
       pct: D.sectBonusPct(lv),                 // 当前全队加成（数值，不是对象）
       nextPct: D.sectBonusPct(Math.min(D.SECT_MAX, lv + 1)),
       rate: D.SECT_PCT_PER_LV,
       gain: D.SECT_EXP,
-    };
+    });
   }
   // 每级：全队全属性 +0.5%（与铭刻 / 血统 / 血清同为百分比区，加算）
   function sectBonusPct() {
-    if (!S.sect) return { atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 };
+    if (!S.sect) return  getProxied({ atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 });
     const v = D.sectBonusPct(S.sect.lv || 0);
-    return { atkPct: v, hpPct: v, defPct: v, spdPct: v, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 };
+    return  getProxied({ atkPct: v, hpPct: v, defPct: v, spdPct: v, critPct: 0, critDmg: 0, skillPct: 0, evaPct: 0 });
   }
   function applySect(pct) {
     const s = sectBonusPct();
@@ -2579,7 +3427,7 @@ window.Core = (function () {
   // 涨评级经验；返回本次升了几级（UI 用来提示"评级提升"）
   function addSectExp(n) {
     if (!n || n <= 0) return 0;
-    if (!S.sect) S.sect = { lv: 0, exp: 0 };
+    if (!S.sect) S.sect =  getProxied({ lv: 0, exp: 0 });
     if (S.sect.lv >= D.SECT_MAX) return 0;
     S.sect.exp += n;
     let up = 0;
@@ -2607,7 +3455,7 @@ window.Core = (function () {
   }
   // 所有秘术的加成汇总：战斗键进 pct，产出键单独给
   function kejiBonus() {
-    const out = { combat: {}, idlePct: 0, expPct: 0, dropPct: 0, offlinePct: 0 };
+    const out =  getProxied({ combat:  getProxied({}), idlePct: 0, expPct: 0, dropPct: 0, offlinePct: 0 });
     D.KEJI.forEach(k => {
       const lv = kejiLv(k.id);
       if (!lv) return;
@@ -2623,23 +3471,35 @@ window.Core = (function () {
   }
   function kejiUp(id, times = 1) {
     const k = D.kejiById(id);
-    if (!k) return { ok: false, msg: '没有这条秘术' };
+    if (!k) return  getProxied({ ok: false, msg: '没有这条秘术' });
     let done = 0;
     for (let i = 0; i < times; i++) {
       const cost = kejiCostOf(id);
       if (cost === null) break;
       if ((S.cur[D.KEJI_COIN] || 0) < cost) break;
+      /* V1.1.4（A12-F · 秘术阁接「秘卷残章」）：每 5 级补 1 张（《收口2》§3.1）。
+         放在循环里逐级判（不是"批量前判一次"）—— 连点 10 级会正好吃掉 2 张，与逐级点完全一致。 */
+      const matId = D.KEJI_MAT, matN = D.kejiMatNeed(kejiLv(id));
+      if (matN && (S.items[matId] || 0) < matN) {
+        if (!done) return  getProxied({ ok: false, msg: `${(D.ITEMS[matId] ||  getProxied({})).name || matId} 不足（${S.items[matId] || 0}/${matN}）` });
+        break;
+      }
       addCur(D.KEJI_COIN, -cost);
+      if (matN) addItem(matId, -matN);
       S.keji[id] = kejiLv(id) + 1;
       done++;
     }
     if (!done) {
       const cost = kejiCostOf(id);
-      return { ok: false, msg: cost === null ? `${k.name} 已满级` : `${curMeta(D.KEJI_COIN).name}不足（需要 ${cost}）` };
+      const matN = D.kejiMatNeed(kejiLv(id));
+      const matId = D.KEJI_MAT;
+      return  getProxied({ ok: false, msg: cost === null ? `${k.name} 已满级`
+        : (matN && (S.items[matId] || 0) < matN ? `${(D.ITEMS[matId] ||  getProxied({})).name || matId} 不足（${S.items[matId] || 0}/${matN}）`
+          : `${curMeta(D.KEJI_COIN).name}不足（需要 ${cost}）`) });
     }
     const lv = kejiLv(id);
     save();
-    return { ok: true, msg: `${k.name} 提升到 Lv.${lv}（${k.info} +${(k.rate * lv * 100).toFixed(1)}%）`, lv, done };
+    return  getProxied({ ok: true, msg: `${k.name} 提升到 Lv.${lv}（${k.info} +${(k.rate * lv * 100).toFixed(1)}%）`, lv, done });
   }
 
   /* ================= 挂机游历奇遇（对标《道友修仙》的 YouLi） =================
@@ -2648,7 +3508,7 @@ window.Core = (function () {
      所以不会攒着一堆没领的；跨天（自然日）重新从第一次开始。
      攒满停在"待触发"，不会过期丢东西。界面上不写这套说明，玩家看进度条就行。 */
   function travelBank() {
-    if (!S.travel) S.travel = { bankSec: 0, pending: null, got: 0, round: 0, day: '' };
+    if (!S.travel) S.travel =  getProxied({ bankSec: 0, pending: null, got: 0, round: 0, day: '' });
     const t = S.travel;
     if (typeof t.round !== 'number') t.round = 0;
     if (typeof t.day !== 'string') t.day = '';
@@ -2673,7 +3533,7 @@ window.Core = (function () {
     const t = travelBank();
     travelDayRoll(t);
     const every = travelEverySec();
-    return { sec: t.bankSec, every, round: t.round, pct: Math.min(1, t.bankSec / every), pending: t.pending };
+    return  getProxied({ sec: t.bankSec, every, round: t.round, pct: Math.min(1, t.bankSec / every), pending: t.pending });
   }
   // 累计挂机时长（在线 + 离线都算）；有没领的压着就不计时（领完才重新计）
   function travelAccrue(sec) {
@@ -2696,7 +3556,7 @@ window.Core = (function () {
   function claimTravel() {
     const t = travelBank();
     const tv = pendingTravel();
-    if (!tv) return { ok: false, msg: '还没有新的游历' };
+    if (!tv) return  getProxied({ ok: false, msg: '还没有新的游历' });
     applyRewardObj(tv.effect);
     const rolled = travelDayRoll(t);      // 跨天才来领：这一轮按新的一天从头算
     t.pending = null;
@@ -2704,21 +3564,31 @@ window.Core = (function () {
     t.bankSec = 0;
     t.got = (t.got || 0) + 1;
     save();
-    return { ok: true, msg: `${tv.name}：${travelRewardText(tv)}`, travel: tv };
+    return  getProxied({ ok: true, msg: `${tv.name}：${travelRewardText(tv)}`, travel: tv });
   }
   function travelRewardText(tv) {
     return rewardTextOf(tv.effect);
   }
   // 把效果对象写成一行可读文字（说明由效果派生，不另写一套文案）
   function rewardTextOf(eff) {
-    const parts = [];
+    const parts =  getProxied([]);
     // V9.6.134：货币 8 → 4
-    const curKeys = ['points', 'otherworld', 'holy', 'rp'];
+    const curKeys =  getProxied(['points', 'otherworld', 'holy', 'rp']);
     curKeys.forEach(k => { if (eff[k]) parts.push(`${curMeta(k).icon}${eff[k]}`); });
-    if (eff.item) [].concat(eff.item).forEach(id => parts.push(`${(D.ITEMS[id] || {}).name || id}×1`));
+    /* V1.1.13（0927-E）：同一件道具出现多次要**并成一件**（「重铸石×2」），
+       不许写成「重铸石×1 · 重铸石×1」—— 周常 / 悬赏这轮开始会一次发好几颗同样的石头。 */
+    if (eff.item) {
+      const cnt =  getProxied({});
+      const order = [];
+       getProxied([]).concat(eff.item).forEach(id => { if (cnt[id] === undefined) { cnt[id] = 0; order.push(id); } cnt[id]++; });
+      order.forEach(id => {
+        const nm = (D.ITEMS[id] ||  getProxied({})).name || id;
+        parts.push(cnt[id] > 1 ? `${nm}×${cnt[id]}` : `${nm}×1`);
+      });
+    }
     return parts.join(' · ') || '空手而归';
   }
-  function curMeta(id) { return D.CURRENCIES.find(c => c.id === id) || { name: id, icon: '' }; }
+  function curMeta(id) { return D.CURRENCIES.find(c => c.id === id) ||  getProxied({ name: id, icon: '' }); }
 
   /* ================= 药园（对标《道友修仙》洞府里的"药园"） ================= */
   // 种下去等时间，回来收材料——给"点数"开一个稳定出口，也给强化材料一条不用刷副本的路。
@@ -2731,13 +3601,13 @@ window.Core = (function () {
     /* 原来 `D.GARDEN.map` 只产出 4 项（4 种灵田一一对应 4 块地）——
        扩地不是加"新种类"，而是**同一种可以多种一块**：第 i 块地固定取第 i%4 种灵田，
        所以 8 块 = 下品/中品/上品/极品各 2 块。这样不用给每块地再做一个"选种子"的界面。 */
-    const out = [];
+    const out =  getProxied([]);
     for (let i = 0; i < D.GARDEN_MAX; i++) {
       const g = D.GARDEN[i % D.GARDEN.length];
       const plot = S.garden[i] || null;
       const locked = i >= total;
       const leftMs = plot ? Math.max(0, plot.at - Date.now()) : 0;
-      out.push({ idx: i, kind: g, plot, locked, req: locked ? (D.GARDEN_PLOT_REQ[i - D.GARDEN_PLOTS] || {}).name : '', leftMs, ready: !!plot && leftMs <= 0 });
+      out.push( getProxied({ idx: i, kind: g, plot, locked, req: locked ? (D.GARDEN_PLOT_REQ[i - D.GARDEN_PLOTS] ||  getProxied({})).name : '', leftMs, ready: !!plot && leftMs <= 0 }));
     }
     return out;
   }
@@ -2751,29 +3621,38 @@ window.Core = (function () {
     return Math.min(D.GARDEN_MAX, n);
   }
   function plantGarden(idx, gardenId) {
-    if (idx >= gardenPlots()) return { ok: false, msg: `这块地还没开（${(D.GARDEN_PLOT_REQ[idx - D.GARDEN_PLOTS] || {}).name || '继续推图'}）` };
+    if (idx >= gardenPlots()) return  getProxied({ ok: false, msg: `这块地还没开（${(D.GARDEN_PLOT_REQ[idx - D.GARDEN_PLOTS] ||  getProxied({})).name || '继续推图'}）` });
     const g = D.GARDEN.find(x => x.id === gardenId);
-    if (!g) return { ok: false, msg: '没有这种灵田' };
-    if (S.garden[idx]) return { ok: false, msg: '这块地还种着东西' };
-    if (!canAfford({ points: g.points })) return { ok: false, msg: `◉ 点数不足（需要 ${fmtNum(g.points)}）` };
-    spend({ points: g.points });
-    S.garden[idx] = { id: g.id, at: Date.now() + g.sec * 1000 };
+    if (!g) return  getProxied({ ok: false, msg: '没有这种灵田' });
+    if (S.garden[idx]) return  getProxied({ ok: false, msg: '这块地还种着东西' });
+    if (!canAfford( getProxied({ points: g.points }))) return  getProxied({ ok: false, msg: `◉ 点数不足（需要 ${fmtNum(g.points)}）` });
+    /* V1.1.4（A12-F · 药园接「灵植种」）：每块地 1 颗（《收口2》§3.1）。
+       收成时回收 70%（见 harvestGarden）→ 播 10 收 7，自循环；缺口由副本材料档与市集补（不设卡）。 */
+    const seedId = D.GARDEN_SEED, seedN = D.GARDEN_SEED_N || 1;
+    if ((S.items[seedId] || 0) < seedN) {
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[seedId] ||  getProxied({})).name || seedId} 不足（${S.items[seedId] || 0}/${seedN}，市集可买）` });
+    }
+    spend( getProxied({ points: g.points }));
+    addItem(seedId, -seedN);
+    S.garden[idx] =  getProxied({ id: g.id, at: Date.now() + g.sec * 1000 });
     save();
-    return { ok: true, msg: `已种下「${g.name}」，${Math.round(g.sec / 60)} 分钟后可收` };
+    return  getProxied({ ok: true, msg: `已种下「${g.name}」，${Math.round(g.sec / 60)} 分钟后可收` });
   }
   // 收获一块地；熟了才让收（没熟的提示还剩多久）
   function harvestGarden(idx) {
     const p = S.garden[idx];
-    if (!p) return { ok: false, msg: '这块地是空的' };
-    if (Date.now() < p.at) return { ok: false, msg: `还没熟（剩 ${Math.ceil((p.at - Date.now()) / 1000)} 秒）` };
+    if (!p) return  getProxied({ ok: false, msg: '这块地是空的' });
+    if (Date.now() < p.at) return  getProxied({ ok: false, msg: `还没熟（剩 ${Math.ceil((p.at - Date.now()) / 1000)} 秒）` });
     const g = D.GARDEN.find(x => x.id === p.id);
-    const got = [];
+    const got =  getProxied([]);
     // 收获一律保底：装得下进背包，装不下进待领箱——绝不出现"地清了、东西没了"
     const take = (id, n) => {
-      const nm = `${(D.ITEMS[id] || {}).name || id}×${n}`;
+      const nm = `${(D.ITEMS[id] ||  getProxied({})).name || id}×${n}`;
       if (addItem(id, n)) { got.push(nm); return; }
       stashItem(id, n);
-      got.push(`${nm}（背包满，已存待领箱）`);
+      /* V1.1.15（2026-09-27）：文案与背包页那张卡片同一口径（📮 待领箱），
+         别处只说"背包满"玩家不知道东西去哪了。 */
+      got.push(`${nm}（📮 已存待领箱）`);
     };
     take(g.out.item, g.out.n);
     if (g.extra && Math.random() < g.extra.p) {
@@ -2781,33 +3660,40 @@ window.Core = (function () {
       take(g.extra.item, g.extra.n);
       got[before] = '稀有 ' + got[before];
     }
+    /* V1.1.4（A12-F）：「收成回收 70%」——把这一茬用掉的种子里 70% 还回去。
+       一块地只用 1 颗，所以 0.7 不能靠 `floor`（那会永远还 0 颗、药园当场变纯消耗）；
+       按"整颗保底 + 小数部分按概率进位"算：播 10 收 7 就是这条式子的长期结果。
+       比例只此一处（`D.GARDEN_SEED_RECYCLE`），改它等于改药园的"永动程度"——属数值轮。 */
+    const backRaw = (D.GARDEN_SEED_N || 1) * (D.GARDEN_SEED_RECYCLE || 0);
+    const back = Math.floor(backRaw) + (Math.random() < (backRaw - Math.floor(backRaw)) ? 1 : 0);
+    if (back > 0) take(D.GARDEN_SEED, back);
     S.garden[idx] = null;
     save();
-    return { ok: true, msg: `收获：${got.join(' · ')}`, got };
+    return  getProxied({ ok: true, msg: `收获：${got.join(' · ')}`, got });
   }
   function harvestAllGarden() {
-    const out = [];
+    const out =  getProxied([]);
     gardenState().forEach(s => { if (s.ready) { const r = harvestGarden(s.idx); if (r.ok) out.push(r.msg); } });
-    return { ok: out.length > 0, msg: out.length ? `收了 ${out.length} 块地` : '没有成熟的地', list: out };
+    return  getProxied({ ok: out.length > 0, msg: out.length ? `收了 ${out.length} 块地` : '没有成熟的地', list: out });
   }
 
   /* ================= 斗法台（对标《道友修仙》的斗法 / Arena） =================
      单机没真 PVP，所以守擂者按你自己的队伍战力换算——层数越高越强，每天 5 次。 */
   function arenaState() {
-    if (!S.arena) S.arena = { floor: 1, best: 1, date: '', used: 0 };
+    if (!S.arena) S.arena =  getProxied({ floor: 1, best: 1, date: '', used: 0 });
     if (S.arena.date !== dailyDate()) { S.arena.date = dailyDate(); S.arena.used = 0; }
     const floor = S.arena.floor;
-    return {
+    return  getProxied({
       floor, best: S.arena.best, used: S.arena.used, cap: D.ARENA_DAILY,
       left: Math.max(0, D.ARENA_DAILY - S.arena.used),
       reward: D.arenaReward(floor),
       enemies: D.arenaEnemy(floor, teamPower()),
-    };
+    });
   }
   // 打完一台：赢则升台拿奖励，输则退一台（保底第 1 台，不会卡死）
   function arenaSettle(win) {
     const st = arenaState();
-    if (st.left <= 0) return { ok: false, msg: '今日斗法次数已用完' };
+    if (st.left <= 0) return  getProxied({ ok: false, msg: '今日斗法次数已用完' });
     S.arena.used++;
     task('arena1', 1);          // 每日任务：斗法台守擂 1 次
     let msg;
@@ -2825,23 +3711,23 @@ window.Core = (function () {
       msg = '守擂失败，退一台再来（次数照常消耗）';
     }
     save();
-    return { ok: true, win, msg, floor: S.arena.floor, left: Math.max(0, D.ARENA_DAILY - S.arena.used) };
+    return  getProxied({ ok: true, win, msg, floor: S.arena.floor, left: Math.max(0, D.ARENA_DAILY - S.arena.used) });
   }
 
   /* ================= 法宝（对标《道友修仙》的法宝） =================
      装备给数值，法宝给效果：主角带 1 件，按效果并进属性区 / 战斗额外区。 */
   function fabaoState() {
-    if (!S.fabao) S.fabao = { own: [], on: null };
-    return {
+    if (!S.fabao) S.fabao =  getProxied({ own:  getProxied([]), on: null });
+    return  getProxied({
       own: S.fabao.own.slice(), on: S.fabao.on,
-      list: D.FABAO.map(f => Object.assign({}, f, { owned: S.fabao.own.includes(f.id), active: S.fabao.on === f.id, lv: fabaoLv(f.id), maxLv: D.FABAO_MAX_LV })),
-    };
+      list: D.FABAO.map(f => Object.assign( getProxied({}), f,  getProxied({ owned: S.fabao.own.includes(f.id), active: S.fabao.on === f.id, lv: fabaoLv(f.id), maxLv: D.FABAO_MAX_LV }))),
+    });
   }
   function buyFabao(id) {
     const f = D.fabaoById(id);
-    if (!f) return { ok: false, msg: '没有这件法宝' };
-    if (!S.fabao) S.fabao = { own: [], on: null };
-    if (S.fabao.own.includes(id)) return { ok: false, msg: `已经有「${f.name}」了` };
+    if (!f) return  getProxied({ ok: false, msg: '没有这件法宝' });
+    if (!S.fabao) S.fabao =  getProxied({ own:  getProxied([]), on: null });
+    if (S.fabao.own.includes(id)) return  getProxied({ ok: false, msg: `已经有「${f.name}」了` });
     /* V9.6.112（真流程审计抓到的死结）：法宝原来是**扣 ◆ 异界结晶**，最便宜的一件要 1000 ◆ ——
        而新号打完整个世界才拿 200 ◆，主线却把"获得 1 件法宝"排在**第 4 关刚开完**的时候：
        界面上按钮全是灰的（买不起就不登记热区），引导指不到任何东西，这一步永远完不成，
@@ -2849,19 +3735,19 @@ window.Core = (function () {
        改回**◉ 点数**（这也是引导文案一直在写的口径：「法宝：花 ◉ 点数买一件」）——
        ◉ 是前期就充裕的货币，价格量级（1000~15000）本来就是按点数定的。
        秘术阁继续扣 ◆（13 起）——那条线是真正的 ◆ 消耗口。 */
-    if ((S.cur.points || 0) < f.cost) return { ok: false, msg: `◉ 点数不足（需要 ${f.cost}）` };
+    if ((S.cur.points || 0) < f.cost) return  getProxied({ ok: false, msg: `◉ 点数不足（需要 ${f.cost}）` });
     addCur('points', -f.cost);
     S.fabao.own.push(id);
     if (!S.fabao.on) S.fabao.on = id;
     save();
-    return { ok: true, msg: `得到法宝「${f.name}」：${f.desc}` };
+    return  getProxied({ ok: true, msg: `得到法宝「${f.name}」：${f.desc}` });
   }
   function wearFabao(id) {
-    if (!S.fabao) S.fabao = { own: [], on: null };
-    if (id && !S.fabao.own.includes(id)) return { ok: false, msg: '还没有这件法宝' };
+    if (!S.fabao) S.fabao =  getProxied({ own:  getProxied([]), on: null });
+    if (id && !S.fabao.own.includes(id)) return  getProxied({ ok: false, msg: '还没有这件法宝' });
     S.fabao.on = id || null;
     save();
-    return { ok: true, msg: id ? `已佩戴「${D.fabaoById(id).name}」` : '已摘下法宝' };
+    return  getProxied({ ok: true, msg: id ? `已佩戴「${D.fabaoById(id).name}」` : '已摘下法宝' });
   }
   /* ---------- 法宝祭炼 / 坐骑喂养（V9.6.130）----------
      两条线的共同点：**买/驯服只是起点**，之后还要能一直往里投 —— 不然前期做完就成摆设。 */
@@ -2869,48 +3755,48 @@ window.Core = (function () {
   function mountLv(id) { return (S.mount && S.mount.lvMap && S.mount.lvMap[id]) || 0; }
   function refineFabao(id) {
     const f = D.fabaoById(id);
-    if (!f) return { ok: false, msg: '没有这件法宝' };
-    if (!S.fabao || !S.fabao.own.includes(id)) return { ok: false, msg: '还没有这件法宝' };
+    if (!f) return  getProxied({ ok: false, msg: '没有这件法宝' });
+    if (!S.fabao || !S.fabao.own.includes(id)) return  getProxied({ ok: false, msg: '还没有这件法宝' });
     const lv = fabaoLv(id);
-    if (lv >= D.FABAO_MAX_LV) return { ok: false, msg: '已经祭炼到顶（' + D.FABAO_MAX_LV + ' 级）' };
+    if (lv >= D.FABAO_MAX_LV) return  getProxied({ ok: false, msg: '已经祭炼到顶（' + D.FABAO_MAX_LV + ' 级）' });
     const c = D.fabaoRefineCost(f, lv);
-    if ((S.cur.otherworld || 0) < c.otherworld) return { ok: false, msg: `◆ 异界结晶不足（需要 ${c.otherworld}）` };
-    if ((S.items[c.mat] || 0) < c.matN) return { ok: false, msg: `${(D.ITEMS[c.mat] || {}).name || c.mat} 不足（需要 ${c.matN}）` };
+    if ((S.cur.otherworld || 0) < c.otherworld) return  getProxied({ ok: false, msg: `◆ 异界结晶不足（需要 ${c.otherworld}）` });
+    if ((S.items[c.mat] || 0) < c.matN) return  getProxied({ ok: false, msg: `${(D.ITEMS[c.mat] ||  getProxied({})).name || c.mat} 不足（需要 ${c.matN}）` });
     addCur('otherworld', -c.otherworld);
     addItem(c.mat, -c.matN);
-    if (!S.fabao.lvMap) S.fabao.lvMap = {};
+    if (!S.fabao.lvMap) S.fabao.lvMap =  getProxied({});
     S.fabao.lvMap[id] = lv + 1;
     save();
-    return { ok: true, msg: `「${f.name}」祭炼到 ${lv + 1} 级（效果 +${Math.round((lv + 1) * D.FABAO_LV_PCT * 100)}%）` };
+    return  getProxied({ ok: true, msg: `「${f.name}」祭炼到 ${lv + 1} 级（效果 +${Math.round((lv + 1) * D.FABAO_LV_PCT * 100)}%）` });
   }
   function feedMount(id) {
     const m = D.mountById(id);
-    if (!m) return { ok: false, msg: '没有这匹坐骑' };
-    if (!S.mount || !S.mount.own.includes(id)) return { ok: false, msg: '还没有这匹坐骑' };
+    if (!m) return  getProxied({ ok: false, msg: '没有这匹坐骑' });
+    if (!S.mount || !S.mount.own.includes(id)) return  getProxied({ ok: false, msg: '还没有这匹坐骑' });
     const lv = mountLv(id);
     const max = D.MOUNT_MAX_LV[m.rarity] || 10;
-    if (lv >= max) return { ok: false, msg: `已经喂到顶（${max} 级，${m.rarity} 档上限）` };
+    if (lv >= max) return  getProxied({ ok: false, msg: `已经喂到顶（${max} 级，${m.rarity} 档上限）` });
     const c = D.mountFeedCost(m, lv);
-    if ((S.cur.points || 0) < c.points) return { ok: false, msg: `◉ 点数不足（需要 ${c.points}）` };
-    if ((S.items[c.mat] || 0) < c.matN) return { ok: false, msg: `${(D.ITEMS[c.mat] || {}).name || c.mat} 不足（需要 ${c.matN}）` };
+    if ((S.cur.points || 0) < c.points) return  getProxied({ ok: false, msg: `◉ 点数不足（需要 ${c.points}）` });
+    if ((S.items[c.mat] || 0) < c.matN) return  getProxied({ ok: false, msg: `${(D.ITEMS[c.mat] ||  getProxied({})).name || c.mat} 不足（需要 ${c.matN}）` });
     addCur('points', -c.points);
     addItem(c.mat, -c.matN);
-    if (!S.mount.lvMap) S.mount.lvMap = {};
+    if (!S.mount.lvMap) S.mount.lvMap =  getProxied({});
     S.mount.lvMap[id] = lv + 1;
     save();
-    return { ok: true, msg: `「${m.name}」喂养到 ${lv + 1} 级（全属性 +${((lv + 1) * D.MOUNT_LV_PCT * 100).toFixed(1)}%）` };
+    return  getProxied({ ok: true, msg: `「${m.name}」喂养到 ${lv + 1} 级（全属性 +${((lv + 1) * D.MOUNT_LV_PCT * 100).toFixed(1)}%）` });
   }
   /* 法宝效果随祭炼等级放大：每级 +5% 的效果量 */
   function fabaoEffMul(id) { return 1 + fabaoLv(id) * D.FABAO_LV_PCT; }
   /* 坐骑：基础 pct + 等级给的"全属性"加成 */
   function mountBonusPct(id) {
     const m = D.mountById(id);
-    if (!m) return {};
-    const out = Object.assign({}, m.pct);
+    if (!m) return  getProxied({});
+    const out = Object.assign( getProxied({}), m.pct);
     /* ⚠️ allPct 只有"血统加成"那条路会展开（见 effectiveStats 里的 bl.allPct）——
        坐骑这条线必须在这里自己展开成四条百分比，否则喂养了却不涨属性（尺子当场抓到过）。 */
     const add = mountLv(id) * D.MOUNT_LV_PCT;
-    if (add) ['atkPct', 'hpPct', 'defPct', 'spdPct'].forEach((k) => { out[k] = (out[k] || 0) + add; });
+    if (add)  getProxied(['atkPct', 'hpPct', 'defPct', 'spdPct']).forEach((k) => { out[k] = (out[k] || 0) + add; });
     return out;
   }
 
@@ -2930,41 +3816,41 @@ window.Core = (function () {
   /* ================= 坐骑（对标《道友修仙》的坐骑） =================
      法宝给"效果"、坐骑给"基础数值"：驯服一匹全队（含主角）永久加成，随时能换乘。 */
   function mountState() {
-    if (!S.mount) S.mount = { own: [], on: null };
-    return {
+    if (!S.mount) S.mount =  getProxied({ own:  getProxied([]), on: null });
+    return  getProxied({
       own: S.mount.own.slice(), on: S.mount.on,
-      list: D.MOUNTS.map(m => Object.assign({}, m, { owned: S.mount.own.includes(m.id), active: S.mount.on === m.id, lv: mountLv(m.id), maxLv: D.MOUNT_MAX_LV[m.rarity] || 10 })),
-    };
+      list: D.MOUNTS.map(m => Object.assign( getProxied({}), m,  getProxied({ owned: S.mount.own.includes(m.id), active: S.mount.on === m.id, lv: mountLv(m.id), maxLv: D.MOUNT_MAX_LV[m.rarity] || 10 }))),
+    });
   }
   function buyMount(id) {
     const m = D.mountById(id);
-    if (!m) return { ok: false, msg: '没有这匹坐骑' };
-    if (!S.mount) S.mount = { own: [], on: null };
-    if (S.mount.own.includes(id)) return { ok: false, msg: `已经有「${m.name}」了` };
+    if (!m) return  getProxied({ ok: false, msg: '没有这匹坐骑' });
+    if (!S.mount) S.mount =  getProxied({ own:  getProxied([]), on: null });
+    if (S.mount.own.includes(id)) return  getProxied({ ok: false, msg: `已经有「${m.name}」了` });
     // 货币部分走 canAfford / spend，材料部分走背包（两者口径分开，报错能指明缺哪一样）
-    const curCost = Object.assign({}, m.cost);
+    const curCost = Object.assign( getProxied({}), m.cost);
     delete curCost.mat; delete curCost.matN;
     if (!canAfford(curCost)) {
       const lack = Object.entries(curCost).filter(([k, v]) => (S.cur[k] || 0) < v)
         .map(([k, v]) => `${curMeta(k).name} ${fmtNum(v)}`).join(' + ');
-      return { ok: false, msg: `货币不足：需要 ${lack}` };
+      return  getProxied({ ok: false, msg: `货币不足：需要 ${lack}` });
     }
     if (m.cost.mat && (S.items[m.cost.mat] || 0) < m.cost.matN) {
-      return { ok: false, msg: `${(D.ITEMS[m.cost.mat] || {}).name || m.cost.mat}不足（需要 ${m.cost.matN}，现有 ${S.items[m.cost.mat] || 0}）` };
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[m.cost.mat] ||  getProxied({})).name || m.cost.mat}不足（需要 ${m.cost.matN}，现有 ${S.items[m.cost.mat] || 0}）` });
     }
     spend(curCost);
     if (m.cost.mat) removeItem(m.cost.mat, m.cost.matN);
     S.mount.own.push(id);
     if (!S.mount.on) S.mount.on = id;
     save();
-    return { ok: true, msg: `驯服了坐骑「${m.name}」：${m.desc}` };
+    return  getProxied({ ok: true, msg: `驯服了坐骑「${m.name}」：${m.desc}` });
   }
   function wearMount(id) {
-    if (!S.mount) S.mount = { own: [], on: null };
-    if (id && !S.mount.own.includes(id)) return { ok: false, msg: '还没有这匹坐骑' };
+    if (!S.mount) S.mount =  getProxied({ own:  getProxied([]), on: null });
+    if (id && !S.mount.own.includes(id)) return  getProxied({ ok: false, msg: '还没有这匹坐骑' });
     S.mount.on = id || null;
     save();
-    return { ok: true, msg: id ? `已乘骑「${D.mountById(id).name}」` : '已下坐骑' };
+    return  getProxied({ ok: true, msg: id ? `已乘骑「${D.mountById(id).name}」` : '已下坐骑' });
   }
   // 坐骑加成：全队（含主角）通用，所以在两条属性计算路径里都要调用
   function applyMount(pct) {
@@ -2980,28 +3866,28 @@ window.Core = (function () {
      V1.0.1 改壳（创意总监 H1）：对外一律叫"点灯"，函数名与字段名（drawSign / signState /
      S.sign）**一个都没改** —— 它们不进玩家眼睛，改它们等于白担一次存档风险。 */
   function signState() {
-    if (!S.sign) S.sign = { date: '', tier: '', idlePct: 0, drawn: 0 };
+    if (!S.sign) S.sign =  getProxied({ date: '', tier: '', idlePct: 0, drawn: 0 });
     const today = dailyDate();
     const fresh = S.sign.date === today;
-    return {
+    return  getProxied({
       fresh, drawn: S.sign.drawn || 0,
       tier: fresh ? S.sign.tier : '', idlePct: fresh ? (S.sign.idlePct || 0) : 0,
       pick: fresh ? (D.SIGNS.find(s => s.tier === S.sign.tier) || null) : null,
       canDraw: !fresh,
       total: (S.stats && S.stats.signs) || 0,
-    };
+    });
   }
   function drawSign() {
     const st = signState();
-    if (!st.canDraw) return { ok: false, msg: '今天的灯已经点过了，明天再来' };
+    if (!st.canDraw) return  getProxied({ ok: false, msg: '今天的灯已经点过了，明天再来' });
     const s = D.rollSign();
-    S.sign = { date: dailyDate(), tier: s.tier, idlePct: s.idlePct, drawn: (S.sign.drawn || 0) + 1 };
+    S.sign =  getProxied({ date: dailyDate(), tier: s.tier, idlePct: s.idlePct, drawn: (S.sign.drawn || 0) + 1 });
     S.stats.signDraws = (S.stats.signDraws || 0) + 1;   // 主线「点灯」用（drawn 只记今天）
     applyRewardObj(s.gain);
     S.stats.signs = (S.stats.signs || 0) + 1;
     task('sign1', 1);           // 每日任务：点灯 1 次
     save();
-    return { ok: true, sign: s, msg: `点亮【${s.tier}】：${s.text}` };
+    return  getProxied({ ok: true, sign: s, msg: `点亮【${s.tier}】：${s.text}` });
   }
   // 今日灯焰的挂机加成：只加成当天，隔天自动失效（按日期判定，不做定时器）
   function signIdleMult() {
@@ -3017,7 +3903,7 @@ window.Core = (function () {
     const w = D.WORLDS.find(x => x.id === id);
     if (w && w.reincarn && (S.player.reincarnations || 0) < w.reincarn) return;   // 条件没到：保持锁着
     if (!S.worlds[id]) {
-      S.worlds[id] = { unlocked: true, stages: { normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) } };
+      S.worlds[id] =  getProxied({ unlocked: true, stages:  getProxied({ normal: Array(12).fill(0), hard: Array(12).fill(0), hell: Array(12).fill(0) }) });
     } else if (!S.worlds[id].unlocked) {
       S.worlds[id].unlocked = true;
     }
@@ -3044,6 +3930,9 @@ window.Core = (function () {
       // ⚠️ 通关奖励只能领一次：之前这里缺了"第一次"判断，
       // 重复刷已满进度的第 12 关会一次次重发（等于无限刷高级货币），V9.2 修。
       const fcKey = worldId + '_' + diff;
+      /* V1.1.9（续13 · P0-4）：顺手把"历史最高通关世界"抬上去（挂机基数按它算，转生不清）。
+         只涨不跌 —— 所以用 max，直接赋值会在"转生后重打前几个世界"时把进度档打回去。 */
+      S.player.bestWorldIdx = Math.max(S.player.bestWorldIdx || 0, wi);
       if (!S.worldFirstClear[fcKey]) {
         S.worldFirstClear[fcKey] = true;
         firstClearReward = D.FIRST_CLEAR[diff];
@@ -3057,11 +3946,11 @@ window.Core = (function () {
     const sectUp = addSectExp(sectGain);
     const newUnlocks = refreshUnlocks();
     save();
-    return { first, firstClearReward, newUnlocks, sectGain, sectUp };
+    return  getProxied({ first, firstClearReward, newUnlocks, sectGain, sectUp });
   }
   // 根据当前进度刷新功能解锁，返回本次新解锁的功能名列表
   function refreshUnlocks() {
-    const newly = [];
+    const newly =  getProxied([]);
     D.UNLOCKS.forEach(u => {
       if (S.unlocks[u.id]) return;
       const w = S.worlds[u.world];
@@ -3082,11 +3971,11 @@ window.Core = (function () {
   }
   /* ================= 主线任务 ================= */
   function mainQuestState() {
-    return D.MAIN_QUESTS.map(q => ({
+    return D.MAIN_QUESTS.map(q => ( getProxied({
       q,
       done: q.check(S),
       claimed: S.quests.claimed.includes(q.id),
-    }));
+    })));
   }
   function currentQuest() {
     const list = mainQuestState();
@@ -3094,13 +3983,13 @@ window.Core = (function () {
   }
   function claimQuest(id) {
     const q = D.MAIN_QUESTS.find(x => x.id === id);
-    if (!q || S.quests.claimed.includes(id)) return { ok: false };
-    if (!q.check(S)) return { ok: false, msg: '尚未完成' };
+    if (!q || S.quests.claimed.includes(id)) return  getProxied({ ok: false });
+    if (!q.check(S)) return  getProxied({ ok: false, msg: '尚未完成' });
     S.quests.claimed.push(id);
     applyRewardObj(q.reward);
     // 任务上写的 unlock 是真的会发出去的（之前只写在表里没人执行，等于装饰）。
     // 返回"这次真正解锁了哪几个"，界面照着弹——避免弹的是隔壁那个任务的内容。
-    const unlocked = [];
+    const unlocked =  getProxied([]);
     String(q.unlock || '').split(',').filter(Boolean).forEach(uid => {
       if (S.unlocks[uid]) return;
       S.unlocks[uid] = true;
@@ -3108,7 +3997,7 @@ window.Core = (function () {
       if (u) unlocked.push(u.name);
     });
     save();
-    return { ok: true, unlocked };
+    return  getProxied({ ok: true, unlocked });
   }
   function stageUnlocked(worldId, diff, stageIdx) {
     const w = S.worlds[worldId];
@@ -3122,48 +4011,114 @@ window.Core = (function () {
   /* ================= 商店 ================= */
   // 商品解锁条件：req.world 需要先通关该世界（普通难度）——高阶材料/经验模块按进度上架
   function shopReq(it) {
-    if (!it || !it.req || !it.req.world) return { ok: true };
+    if (!it || !it.req || !it.req.world) return  getProxied({ ok: true });
     const w = it.req.world;
-    if (worldCleared(w, 'normal')) return { ok: true };
+    if (worldCleared(w, 'normal')) return  getProxied({ ok: true });
     const wd = D.WORLDS.find(x => x.id === w);
-    return { ok: false, req: `通关 ${wd ? wd.name : w}·普通` };
+    return  getProxied({ ok: false, req: `通关 ${wd ? wd.name : w}·普通` });
   }
-  function buyShopItem(shopId, idx) {
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："最多一次买 100 个，
+     然后要自动算身上的货币最多买几个"）=================
+     **这一行商品、按你身上的钱最多能买几个** —— 四道上限一起卡，取最小的那个：
+       ① 钱（单价 × N ≤ 现有货币）；② 今日库存（stock − 已买）；③ 背包放不放得下
+       （按 `count × N` 判，含"单格 100 上限、超了要占第二格"那条）；④ **单次上限 100**。
+     界面那颗「买满」就是读它 —— 玩家不用自己心算"我这点钱能买几个"。 */
+  function shopMaxQty(shopId, idx) {
+    const shop = D.SHOPS[shopId];
+    const it = shop && shop.items[idx];
+    if (!it) return 0;
+    const avail = shopReq(it);
+    if (!avail.ok) return 0;
+    const key = shopId + '_' + idx + '_' + dailyDate();
+    const bought0 = S.shop.bought[key] || 0;
+    const unit = it.count || 1;
+    let cap = 100;                                                            // ④ 单次上限
+    if (it.stock > 0) cap = Math.min(cap, Math.max(0, it.stock - bought0));   // ② 库存
+    cap = Math.min(cap, Math.floor((S.cur[shop.currency] || 0) / Math.max(1, it.price)));   // ① 钱
+    if (it.item) {                                                            // ③ 背包
+      let k = cap;
+      while (k > 1 && !canAddItem(it.item, unit * k)) k--;
+      cap = (cap > 0 && !canAddItem(it.item, unit)) ? 0 : k;
+    }
+    return Math.max(0, cap);
+  }
+  function buyShopItem(shopId, idx, qty) {
     const shop = D.SHOPS[shopId];
     const it = shop.items[idx];
-    if (!it) return { ok: false, msg: '商品不存在' };
+    if (!it) return  getProxied({ ok: false, msg: '商品不存在' });
     const avail = shopReq(it);
-    if (!avail.ok) return { ok: false, msg: `🔒 ${avail.req} 后解锁` };
-    const key = shopId + '_' + idx + '_' + dailyDate();
-    if (it.stock > 0 && (S.shop.bought[key] || 0) >= it.stock) return { ok: false, msg: '今日已售罄' };
-    // 背包满时先拦下来，避免"钱扣了、道具没进包"
-    if (it.item && !canAddItem(it.item)) return { ok: false, msg: '背包已满，先扩容或分解装备' };
-    if (!spend({ [shop.currency]: it.price })) return { ok: false, msg: '货币不足' };
-    S.shop.bought[key] = (S.shop.bought[key] || 0) + 1;
-    if (it.item && !addItem(it.item, it.count || 1)) {
-      addCur(shop.currency, it.price);            // 兜底退款，双保险
-      return { ok: false, msg: '背包已满，已退还货币' };
+    if (!avail.ok) return  getProxied({ ok: false, msg: `🔒 ${avail.req} 后解锁` });
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："购物加多个购买数量"）=================
+       一次买 N 个（`qty` 省略＝1 ⇒ 老调用点零改动、行为一模一样）。三道上限一起卡，
+       谁的额度先到就报谁，别让玩家"点了没反应"：
+         ① 今日库存（`stock` − 已买）；② 钱够不够（价 × N）；③ 背包放不放得下（`count` × N）。
+       ⚠️ 不走"自动缩量"：买 10 个只放得下 6 个时**直接报错并说清还差多少**，
+          比"悄悄买 6 个"清楚（这条与本项目"宁可少收也不吞"同源：要么按你要的买成，要么明说）。 */
+    /* `qty`：省略/1 = 买 1 个；0 或 'max' = **按"钱最多能买几个"自动算**；上限 100。
+       要的比 100 多 → 就按 100 买，并在回执里说清（不静默改数）。 */
+    let capped = false;
+    let n;
+    if (qty === 0 || qty === 'max') {
+      n = shopMaxQty(shopId, idx);
+      if (n <= 0) return  getProxied({ ok: false, msg: '买不了：钱不够 / 今日售罄 / 背包放不下' });
+    } else {
+      n = Math.max(1, Math.floor(qty || 1));
+      if (n > 100) { n = 100; capped = true; }
     }
-    if (it.currencyGain) Object.entries(it.currencyGain).forEach(([k, v]) => addCur(k, v));
-    if (it.shardRandom) {
+    const key = shopId + '_' + idx + '_' + dailyDate();
+    const bought0 = S.shop.bought[key] || 0;
+    if (it.stock > 0 && bought0 + n > it.stock) {
+      const left = Math.max(0, it.stock - bought0);
+      return  getProxied({ ok: false, msg: left ? `今日只还剩 ${left} 个（你要买 ${n} 个）` : '今日已售罄' });
+    }
+    // 背包满时先拦下来，避免"钱扣了、道具没进包"
+    const unit = it.count || 1;
+    if (it.item && !canAddItem(it.item, unit * n)) return  getProxied({ ok: false, msg: `背包放不下 ×${n}，先扩容或分解装备` });
+    const cost = it.price * n;
+    if (!spend( getProxied({ [shop.currency]: cost }))) return  getProxied({ ok: false, msg: n > 1 ? `货币不足（×${n} 需 ${cost}）` : '货币不足' });
+    S.shop.bought[key] = bought0 + n;
+    if (it.item && !addItem(it.item, unit * n)) {
+      addCur(shop.currency, cost);                // 兜底退款，双保险
+      return  getProxied({ ok: false, msg: '背包已满，已退还货币' });
+    }
+    if (it.currencyGain) Object.entries(it.currencyGain).forEach(([k, v]) => addCur(k, v * n));
+    if (it.shardRandom) for (let q = 0; q < n; q++) {
       const c = pickCharOfRarity(it.shardRandom, 'normal');
+      /* V1.1.14（0927-F）：买到的碎片也按新规矩走 —— 进**他**那份；他已经满星才转通用池。
+         toast 要说清进的是哪一边（否则玩家会以为"我买的是通用碎片"。） */
+      const ch0 = S.chars[c.id];
+      it._lastPool = !!(ch0 && (ch0.star || 1) >= (D.RARITY_MAXSTAR[c.rarity] || 6));
       addShards(c.id, it.shardCount);
       it._lastShard = c.name;
+      it._lastRarity = c.rarity;
     }
     save();
-    return { ok: true, msg: '购买成功' + (it._lastShard ? `（${it._lastShard}碎片）` : '') };
+    return  getProxied({ ok: true, qty: n, msg: '购买成功' + (n > 1 ? (' ×' + n) : '') + (capped ? '（单次上限 100）' : '') + (it._lastShard
+      ? (it._lastPool ? `（${it._lastShard} 已满星 → ${it._lastRarity} 通用碎片 +${it.shardCount}）` : `（${it._lastShard} 碎片 +${it.shardCount}）`)
+      : '') });
   }
   function openBox(itemId) {
     const item = D.ITEMS[itemId];
-    if (!item || item.type !== 'box') return { ok: false, msg: '不是宝箱' };
-    if (!removeItem(itemId)) return { ok: false, msg: '没有该宝箱' };
-    // UR 箱：10% 开出伙伴专属装备（UR，六支血统各一件，见 data.js 的 SIGNATURE_EQUIPS）
+    if (!item || item.type !== 'box') return  getProxied({ ok: false, msg: '不是宝箱' });
+    if (!removeItem(itemId)) return  getProxied({ ok: false, msg: '没有该宝箱' });
+    /* V1.1.4（A12 材料包）：三档材料包走**同一个开箱入口**（两端的"开启"按钮都调 openBoxes），
+       所以在这里分岔。开出表只有一处（`D.MAT_PACKS`），这里只管摇与入库。 */
+    if (item.matPack) return openMatPack(item.matPack);
+    // UR 箱：10% 开出伙伴专属装备（UR · 本命 36 件，见 data.js 的 SIGNATURE_EQUIPS）
     if (item.rarity === 'UR' && Math.random() < 0.10) {
-      const sigId = Math.floor(Math.random() * D.SIGNATURE_EQUIPS.length);
+      /* 2026-09-27（父亲大人要的"收集感"）：36 件里**优先给还没拥有过的那件**，
+         全拿到之后转 ◆ 折现（不再硬塞重复件）。挑件这一句在数据层（`D.pickSignatureEquip`），
+         `grantSignatureEquip` 仍然是"给我第几件、就发第几件"的笨函数。 */
+      const sigId = D.pickSignatureEquip((S.codex && S.codex.equipNames) ||  getProxied([]));
+      if (sigId < 0) {
+        addCur('otherworld', D.DECOMPOSE_GAIN.UR);
+        save();
+        return  getProxied({ ok: true, sold: true, gain: D.DECOMPOSE_GAIN.UR, allSignature: true });
+      }
       const sigRes = grantSignatureEquip(sigId);
       save();
-      if (sigRes.equip) return { ok: true, equip: sigRes.equip, signature: true };
-      if (sigRes.sold) return { ok: true, sold: true, gain: sigRes.gain || 0 };
+      if (sigRes.equip) return  getProxied({ ok: true, equip: sigRes.equip, signature: true });
+      if (sigRes.sold) return  getProxied({ ok: true, sold: true, gain: sigRes.gain || 0 });
     }
     /* V9.6.79（自审抓到的坑）：这里原来固定从**前三个世界**里抽一个当装备档位 ——
        于是后期花 2000 异界结晶买的 UR 箱，开出来的武器攻击只有 84~164，
@@ -3176,9 +4131,11 @@ window.Core = (function () {
        ① 档位 = 当前进度那张图（见 boxSourceWorld）；
        ② 而且**主要出那张图的世界套装**（原来跟野外掉落同一套随机：60% 世界套装 / 40% 血统套装，
           开箱的人往往就是冲着"这一段的套装"去的，所以箱子给到 80%）。 */
-    const res = grantEquip(worldId, rarity, undefined, { preferWorldSet: true });
+    const res = grantEquip(worldId, rarity, undefined,  getProxied({ preferWorldSet: true }));
     save();
-    return { ok: true, equip: res.equip, sold: res.sold, gain: res.gain || 0 };
+    /* V1.1.15：装备格满时装备进**装备待领箱**（不再折现）——带 stashed 让界面说清"去哪领" */
+    return  getProxied({ ok: true, equip: res.equip, stashed: !!res.stashed, eq: res.eq || null,
+      sold: res.sold, gain: res.gain || 0, bagFull: !!res.bagFull });
   }
   /* 开箱按"你打到哪"给档位 = **已解锁的最高世界**（父亲大人："以开箱时的当前进度为准"）。
      注意是"已解锁"而不是"已通关"：走到第 20 张图里、哪怕还没打完，箱子也该开 20 的货。
@@ -3193,25 +4150,64 @@ window.Core = (function () {
     return (unlocked || D.WORLDS[0]).id;
   }
   // 批量开箱：逐个结算并汇总
+  /* ================= V1.1.4（A12 材料包 · 开箱）=================
+     一个箱子 = 按权重池摇 `draws` 次，每次出一种材料（《收口2》§3.2：3 / 4 / 5 块）。
+     两条纪律：① **装不下就进待领箱**（箱子已经被吃掉了，东西不能凭空消失 —— 这是本项目的
+     "宁可少收也不吞"口径）；② 返回的 `pack` 是"拿到了哪些 id"的清单，界面据此报出具体名字。 */
+  function openMatPack(kind) {
+    const pack = (D.MAT_PACKS ||  getProxied({}))[kind] || (D.MAT_PACKS ||  getProxied({})).low;
+    if (!pack) return  getProxied({ ok: false, msg: '没有这种材料包' });
+    const total = pack.pool.reduce((a, p) => a + p[1], 0);
+    const got =  getProxied([]), stashed =  getProxied([]);
+    for (let i = 0; i < pack.draws; i++) {
+      let r = Math.random() * total, pick = pack.pool[0][0];
+      for (let j = 0; j < pack.pool.length; j++) { r -= pack.pool[j][1]; if (r <= 0) { pick = pack.pool[j][0]; break; } }
+      if (addItem(pick, 1)) got.push(pick);
+      else { stashItem(pick, 1); stashed.push(pick); }
+    }
+    save();
+    /* 名字与件数合并成一句（连开 10 包时不要把同一件东西念 10 遍）。 */
+    const tally = list => {
+      const m =  getProxied({});
+      list.forEach(id => { m[id] = (m[id] || 0) + 1; });
+      return Object.keys(m).map(id => ((D.ITEMS[id] ||  getProxied({})).name || id) + '×' + m[id]).join(' · ');
+    };
+    const msg = `${pack.name}：${tally(got) || '—'}` + (stashed.length ? `（另有 ${stashed.length} 件装不下，📮 已存待领箱）` : '');
+    return  getProxied({ ok: got.length > 0 || stashed.length > 0, pack: got, stashed, msg });
+  }
   function openBoxes(itemId, n = 1) {
     const have = S.items[itemId] || 0;
-    if (have < 1) return { ok: false, msg: '没有该宝箱' };
+    if (have < 1) return  getProxied({ ok: false, msg: '没有该宝箱' });
     const use = Math.max(1, Math.min(n, have));
-    const equips = [];
+    const equips =  getProxied([]);
     let sold = 0, soldGain = 0;
+    let eqStashed = 0;                      // 进装备待领箱的件数（V1.1.15）
+    /* V1.1.4：材料包开出来的是**材料**（不是装备），单独一列汇总 ——
+       否则批量开 10 包之后界面只能说一句"已开启"，玩家不知道自己拿到了什么。 */
+    const mats =  getProxied([]);
+    let packMsg = '';
+    let stopMsg = '';                       // 「装备格满了、箱子没开」那类"提前收工"的原因（要带给玩家看）
     for (let i = 0; i < use; i++) {
       const r = openBox(itemId);
-      if (!r.ok) break;
+      if (!r.ok) { stopMsg = r.msg || stopMsg; break; }
       if (r.equip) equips.push(r.equip);
+      if (r.stashed) eqStashed++;
       if (r.sold) { sold++; soldGain += r.gain || 0; }
+      if (r.pack) r.pack.forEach(id => mats.push(id));
+      if (r.msg) packMsg = r.msg;
     }
-    return { ok: equips.length + sold > 0, equips, sold, soldGain, count: equips.length + sold };
+    return  getProxied({ ok: equips.length + sold + mats.length > 0, equips, sold, soldGain, mats,
+      /* ⚠️ 原来这里只带 packMsg，**开箱被拒的原因（r.msg）被丢掉了** —— 玩家点了没反应、
+         连"格子满了"都不知道。现在把 stopMsg 带出去（界面直接 toast 它）。 */
+      msg: packMsg || stopMsg || (eqStashed ? ('装备格已满：' + eqStashed + ' 件装备已存进「📮 待领箱」，扩容后可领回') : undefined),
+      eqStashed: eqStashed,
+      count: equips.length + sold + mats.length + eqStashed });
   }
   // 每日刷新的"今天是哪天"。**必须用本地日期**：
   // 之前用 toISOString()（UTC），北京时间要等到早上 8 点才翻新，
   // 而周常、免费招募走的是本地时间——同一天里两套钟，界面写着"每天 0 点重置"却对不上（V9.2 修）。
   function dailyDate() {
-    const d = new Date();
+    const d =  getProxied(new Date());
     const p = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
@@ -3224,12 +4220,25 @@ window.Core = (function () {
      网页版目前没有任何地方发额外额度（bonus 恒为 0），所以玩家碰不到；但这是"一接活动就露头"的坑，
      而且"同一个规则写三遍"本身就是错的。现在三处都调 ensureSweepDay()。 */
   function ensureSweepDay() {
-    if (S.sweep.date !== dailyDate()) { S.sweep.date = dailyDate(); S.sweep.count = 0; S.sweep.bonus = 0; }
+    /* 跨天归零：三本账一起清（日上限那本不用清，它是常量）—— 含 V1.1.8 加的"广告额度" `adBonus`。 */
+    if (S.sweep.date !== dailyDate()) { S.sweep.date = dailyDate(); S.sweep.count = 0; S.sweep.bonus = 0; S.sweep.adBonus = 0; }
   }
   // 今日剩余扫荡次数（跨天自动重置）
   function sweepLeft() {
     ensureSweepDay();
-    return Math.max(0, sweepCap() + (S.sweep.bonus || 0) - (S.sweep.count || 0));
+    /* V1.1.8（乙组 B6）：**"广告额度"与"日上限"分开记**（《总落地清单》§1 点名）——
+       日上限（`sweepCap()` ＝ 基础 10 ＋ 灯阁权限）与"额外额度"（`bonus`）各是一本账，
+       广告买来的 10 次记在**第三本** `adBonus` 上：不挤占日上限、跨天清零、不受权限线影响。 */
+    return Math.max(0, sweepCap() + (S.sweep.bonus || 0) + (S.sweep.adBonus || 0) - (S.sweep.count || 0));
+  }
+  /* 广告买扫荡：+10 次（B6；"3 次/天"由 wx-adapter 的 LIMITS 管，"只对已通关关卡"由界面把关） */
+  function addAdSweepBonus(n) {
+    ensureSweepDay();
+    const k = Math.max(0, Math.floor(n || 0));
+    if (!k) return 0;
+    S.sweep.adBonus = (S.sweep.adBonus || 0) + k;
+    save();
+    return S.sweep.adBonus;
   }
   // 今日额外扫荡额度 +n（跨天先归零，避免昨天的额度留到今天）
   function addSweepBonus(n) {
@@ -3245,27 +4254,55 @@ window.Core = (function () {
   function ensureDaily() {
     const today = dailyDate();
     if (S.tasks.date !== today) {
-      S.tasks.date = today; S.tasks.daily = {}; S.tasks.claimed = {}; S.tasks.allClaimed = false;
+      if (S.tasks.date) carryOverDailies();        // 跨天：先把昨天"做完没领"的补发掉（见下）
+      S.tasks.date = today; S.tasks.daily =  getProxied({}); S.tasks.claimed =  getProxied({}); S.tasks.allClaimed = false;
     }
     ensureWeekly();
   }
+  /* ================= V1.1.18（N4 · 留存环：跨天不再把"昨天做完没领"的奖励吃掉）=================
+     父亲大人拍板「把留存环做了」；策划总监 N 单的 N4：这里跨天那一句原来把 `daily / claimed`
+     整个清空 —— 昨天**做完但忘了点「领取」**的那几条，奖励**当场蒸发**。
+     这是"惩罚性缺口"：玩家第二天回来发现"我明明做完了却没拿到"，对次日回访是纯负面。
+     修法：跨天**之前**先把"已达成且未领"的补发掉，走全项目唯一的发奖入口 `applyRewardObj`
+     （货币直接入账、道具走 `addItem`，装不下自动进「📮 待领箱」）—— **不新写第二套设施**，
+     也**不弹窗**（不打扰）；玩家该得的东西自己就到账/进箱了。
+     ⚠️ 只结清**一份**：`S.tasks.date` 一换就等于结清，不会跨好几天累积补发。
+     上限算得死：一天最多 8 条每日任务（合计 ◉3,000 ＋ ◆70 ＋ ✦20）＋ 全清那份，
+     占日收入（◉≈39,946 / ◆≈3,600 / ✦≈145）不到 10% —— 不破坏经济。 */
+  function carryOverDailies() {
+    const list = D.DAILY_TASKS || [];
+    const daily = S.tasks.daily || {};
+    const claimed = S.tasks.claimed || {};
+    let n = 0, done = 0;
+    list.forEach(t => {
+      if ((daily[t.id] || 0) < t.target) return;
+      done++;
+      if (claimed[t.id]) return;                   // 领过的照旧不补
+      applyRewardObj(t.reward);
+      n++;
+    });
+    /* 全清那份同理：八条都做完却忘了点「全部领取」→ 一起补上 */
+    if (done >= list.length && list.length && !S.tasks.allClaimed) { applyRewardObj(D.DAILY_ALL_REWARD); n++; }
+    if (n) notice('昨日有 ' + n + ' 项日常奖励已自动补发（已存入待领箱或直接入账）');
+    return n;
+  }
   // 周一为一周起点；跨周自动清空周常进度
   function weekKey() {
-    const d = new Date();
+    const d =  getProxied(new Date());
     const day = (d.getDay() + 6) % 7;
-    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    const monday =  getProxied(new Date(d.getFullYear(), d.getMonth(), d.getDate() - day));
     const p = n => String(n).padStart(2, '0');
     return `${monday.getFullYear()}-${p(monday.getMonth() + 1)}-${p(monday.getDate())}`;
   }
   function ensureWeekly() {
     const k = weekKey();
     if (S.tasks.weekKey !== k) {
-      S.tasks.weekKey = k; S.tasks.weekly = {}; S.tasks.weeklyClaimed = {}; S.tasks.weeklyAllClaimed = false;
+      S.tasks.weekKey = k; S.tasks.weekly =  getProxied({}); S.tasks.weeklyClaimed =  getProxied({}); S.tasks.weeklyAllClaimed = false;
     }
   }
   // 每日任务的进度同时喂给对应周常（同一套动作，不额外要求玩家改变玩法）
   // 每日任务 → 周常进度来源的映射（新加的求签 / 斗法台不进周常，所以 src 留空）
-  const TASK_SRC = { battle5: 'battle', idle1: 'idle', enhance1: 'enhance', recruit1: 'recruit', dungeon1: 'dungeon', item1: 'item', sign1: null, arena1: null };
+  const TASK_SRC =  getProxied({ battle5: 'battle', idle1: 'idle', enhance1: 'enhance', recruit1: 'recruit', dungeon1: 'dungeon', item1: 'item', sign1: null, arena1: null });
   function weeklyTick(src, n) {
     if (!src) return;
     ensureWeekly();
@@ -3278,68 +4315,68 @@ window.Core = (function () {
   }
   function weeklyState() {
     ensureWeekly();
-    return D.WEEKLY_TASKS.map(t => ({
+    return D.WEEKLY_TASKS.map(t => ( getProxied({
       t, prog: S.tasks.weekly[t.id] || 0, done: (S.tasks.weekly[t.id] || 0) >= t.target, claimed: !!S.tasks.weeklyClaimed[t.id],
-    }));
+    })));
   }
   function claimWeekly(id) {
     ensureWeekly();
     const t = D.WEEKLY_TASKS.find(x => x.id === id);
-    if (!t || S.tasks.weeklyClaimed[id]) return { ok: false, msg: '已领取' };
-    if ((S.tasks.weekly[id] || 0) < t.target) return { ok: false, msg: '本周还没完成' };
+    if (!t || S.tasks.weeklyClaimed[id]) return  getProxied({ ok: false, msg: '已领取' });
+    if ((S.tasks.weekly[id] || 0) < t.target) return  getProxied({ ok: false, msg: '本周还没完成' });
     S.tasks.weeklyClaimed[id] = true;
     applyRewardObj(t.reward);
     save();
-    return { ok: true, msg: '周常奖励已领取' };
+    return  getProxied({ ok: true, msg: '周常奖励已领取' });
   }
   function claimAllWeekly() {
     ensureWeekly();
-    if (S.tasks.weeklyAllClaimed) return { ok: false, msg: '已领取' };
-    if (!D.WEEKLY_TASKS.every(t => (S.tasks.weekly[t.id] || 0) >= t.target)) return { ok: false, msg: '本周任务尚未全部完成' };
+    if (S.tasks.weeklyAllClaimed) return  getProxied({ ok: false, msg: '已领取' });
+    if (!D.WEEKLY_TASKS.every(t => (S.tasks.weekly[t.id] || 0) >= t.target)) return  getProxied({ ok: false, msg: '本周任务尚未全部完成' });
     S.tasks.weeklyAllClaimed = true;
     applyRewardObj(D.WEEKLY_ALL_REWARD);
     save();
-    return { ok: true, msg: '周常全清奖励已领取' };
+    return  getProxied({ ok: true, msg: '周常全清奖励已领取' });
   }
   /* ================= 成就 ================= */
   function achievementState() {
-    return D.ACHIEVEMENTS.map(a => ({ a, done: !!a.check(S), claimed: !!S.achievements[a.id] }));
+    return D.ACHIEVEMENTS.map(a => ( getProxied({ a, done: !!a.check(S), claimed: !!S.achievements[a.id] })));
   }
   function achievementSummary() {
     const st = achievementState();
-    return { total: st.length, claimed: st.filter(x => x.claimed).length, done: st.filter(x => x.done).length, list: st };
+    return  getProxied({ total: st.length, claimed: st.filter(x => x.claimed).length, done: st.filter(x => x.done).length, list: st });
   }
   function claimAchievement(id) {
     const a = D.ACHIEVEMENTS.find(x => x.id === id);
-    if (!a) return { ok: false, msg: '成就不存在' };
-    if (S.achievements[a.id]) return { ok: false, msg: '已领取' };
-    if (!a.check(S)) return { ok: false, msg: '尚未达成' };
+    if (!a) return  getProxied({ ok: false, msg: '成就不存在' });
+    if (S.achievements[a.id]) return  getProxied({ ok: false, msg: '已领取' });
+    if (!a.check(S)) return  getProxied({ ok: false, msg: '尚未达成' });
     S.achievements[a.id] = true;
     applyRewardObj(a.reward);
     save();
-    return { ok: true, msg: `🏅 成就达成：${a.name}`, name: a.name };
+    return  getProxied({ ok: true, msg: `🏅 成就达成：${a.name}`, name: a.name });
   }
   function claimTask(id) {
     ensureDaily();
     const t = D.DAILY_TASKS.find(x => x.id === id);
-    if (!t || S.tasks.claimed[id]) return { ok: false };
-    if ((S.tasks.daily[id] || 0) < t.target) return { ok: false, msg: '未完成' };
+    if (!t || S.tasks.claimed[id]) return  getProxied({ ok: false });
+    if ((S.tasks.daily[id] || 0) < t.target) return  getProxied({ ok: false, msg: '未完成' });
     S.tasks.claimed[id] = true;
     S.stats.taskClaims = (S.stats.taskClaims || 0) + 1;   // 主线「领赏」用
     applyRewardObj(t.reward);
     save();
-    return { ok: true };
+    return  getProxied({ ok: true });
   }
   function claimAllTasks() {
     ensureDaily();
-    if (S.tasks.allClaimed) return { ok: false, msg: '已领取' };
+    if (S.tasks.allClaimed) return  getProxied({ ok: false, msg: '已领取' });
     const allDone = D.DAILY_TASKS.every(t => (S.tasks.daily[t.id] || 0) >= t.target);
-    if (!allDone) return { ok: false, msg: '尚未完成全部任务' };
+    if (!allDone) return  getProxied({ ok: false, msg: '尚未完成全部任务' });
     S.tasks.allClaimed = true;
     S.stats.taskClaims = (S.stats.taskClaims || 0) + 1;   // 一键全领也算领过
     applyRewardObj(D.DAILY_ALL_REWARD);
     save();
-    return { ok: true };
+    return  getProxied({ ok: true });
   }
   function loginReward() {
     const today = dailyDate();
@@ -3351,24 +4388,108 @@ window.Core = (function () {
     const r = D.LOGIN_REWARDS[S.login.day - 1];
     applyRewardObj(r);
     save();
-    return { day: S.login.day, reward: r, round: S.login.round || 1, cycleDays: D.LOGIN_REWARDS.length };
+    return  getProxied({ day: S.login.day, reward: r, round: S.login.round || 1, cycleDays: D.LOGIN_REWARDS.length });
+  }
+  /* ================= V1.1.18（N5 · 留存环：回归礼）=================
+     父亲大人拍板「把留存环做了」；策划总监 N 单的 N5：断了一阵子再回来，给一份"回来的理由"。
+     · **不用新判定字段**：`S.login.lastClaim`（已有）与今天差 ≥2 个自然日
+       ⇔ 至少有一整天完全没上线（只要上过线，开机那次七日登录就会把 lastClaim 写成当天）。
+     · **防重发只用一位**：`S.login.comeback`（记"哪一天发过"）—— 老档由 `migrate` 里那句
+       `S.login = Object.assign(def.login, S.login||{})` 自动补空，不动 packSave/unpackSave 五个口子。
+     · **发奖走全项目唯一的 `applyRewardObj`**（货币入账、道具入包/进待领箱）。
+     · **在开机那一刻就发**（不是等弹窗被点开）：进程被杀在弹窗前也不丢；弹窗只负责"报账"。
+     · **必须封顶**：≥7 天与 30 天发的一样 —— 否则等于反向激励"晾一周再回来"。 */
+  function dayGapDays(from, to) {
+    const a = String(from || '').split('-').map(Number);
+    const b = String(to || '').split('-').map(Number);
+    if (a.length !== 3 || b.length !== 3 || a.some(isNaN) || b.some(isNaN)) return 0;
+    return Math.round((Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 86400000);
+  }
+  function comebackRewardOf(days) {
+    /* 数值（策划总监定的表，折算成"天产量"）：2~3 天 0.83 · 4~6 天 1.87 · ≥7 天 3.37 */
+    if (days >= 7) return  getProxied({ points: 100000, otherworld: 1000, holy: 80, item: ['ticket_normal', 'ticket_normal', 'ticket_normal'] });
+    if (days >= 4) return  getProxied({ points: 60000, otherworld: 600, holy: 30 });
+    return  getProxied({ points: 30000, otherworld: 300 });
+  }
+  function comebackState() {
+    const today = dailyDate();
+    if (!S.login || !S.login.lastClaim) return null;       // 新号（还没领过签到）不算回归
+    if (S.login.comeback === today) return null;           // 今天已经发过
+    const days = dayGapDays(S.login.lastClaim, today);
+    if (days < 2) return null;
+    return  getProxied({ days: days, reward: comebackRewardOf(days) });
+  }
+  /* 开机调一次：真发（幂等 —— 当天发过就不再发），返回"发了什么"给弹窗报账 */
+  function grantComeback() {
+    const st = comebackState();
+    if (!st) return null;
+    S.login.comeback = dailyDate();
+    applyRewardObj(st.reward);
+    save();
+    return  getProxied({ days: st.days, reward: st.reward });
+  }
+  /* ================= V1.1.8（乙组 B8 · 签到全双倍）=================
+     口径（终版 §3.1 第 8 步）：**1 次/天**、**只翻当天那一格**、**不补历史**。
+    实现：把当天那一格的奖励**原样再发一份**（走 `applyRewardObj` 同一个入口 → ✦ 与招募券都在里面 ✓），
+     用 `S.login.doubledDay` 记住"哪一天翻过"：
+       · 同一天再点 → 拒绝（"今天的签到已经翻过倍了"）；
+       · 第二天进来 → 新的一天，可以再翻；
+       · 昨天没翻的**不补**（只认今天）。 */
+  function claimLoginDouble() {
+    const today = dailyDate();
+    if (!S.login.day) return  getProxied({ ok: false, msg: '今天还没签到' });
+    if (S.login.doubledDay === today) return  getProxied({ ok: false, msg: '今天的签到已经翻过倍了' });
+    const r = D.LOGIN_REWARDS[S.login.day - 1];
+    if (!r) return  getProxied({ ok: false, msg: '没有可翻倍的签到奖励' });
+    S.login.doubledDay = today;
+    applyRewardObj(r);
+    save();
+    return  getProxied({ ok: true, day: S.login.day, reward: r, msg: '签到奖励已翻倍' });
   }
 
   /* ================= 转生 ================= */
+  /* ================= V1.1.8（丙组 B9 · 战斗倍速）=================
+     父亲大人的口径（终版 §1.3，他知情选的乙方案）：**免费只剩 1× / 2×**；
+     第 3 下 → 看广告 → **30 分钟 ×5**；**不限次数、不计总闸**（纯时间权益，不给资源）。
+     落地口径：**`S.settings.speed` 只在广告有效期内为 5**（到期自动回落）——
+       所以存两样：`speed`（免费选的那个档，只许 1/2）＋ `speedUntil`（广告窗口的截止毫秒）。
+       真正生效的档由 `effSpeed()` 算，**全项目只此一处**（战斗页、以后的任何地方都读它）。
+     ⚠️ 老档里可能存着 3 或 5（免费 3× 时代）→ 一律回落成 2（免费档上限就是 2）。 */
+  const SPEED_AD_MS = 30 * 60 * 1000;
+  function effSpeed() {
+    const st = S.settings ||  getProxied({});
+    if (st.speedUntil && Date.now() < st.speedUntil) return 5;
+    const s = st.speed || 1;
+    /* V1.1.9（续12 复核补的）：原来写 `s >= 5 ? 2 : s` —— **只兜住了 5，漏了 3**。
+       免费 3× 时代的老档里 `speed:3` 照样生效（按钮显示"2×速度"、实际跑 3×，纯静默错），
+       而这段注释本来就写着"老档里可能存着 3 或 5 → 一律回落成 2"。**改成按注释口径收口**：
+       免费档只可能是 1 / 2；5 只从上面的 `speedUntil` 分支来。 */
+    return s >= 2 ? 2 : 1;
+  }
+  function grantSpeedAd() {
+    if (!S.settings) S.settings =  getProxied({});
+    S.settings.speedUntil = Date.now() + SPEED_AD_MS;
+    save();
+    return S.settings.speedUntil;
+  }
+  function speedLeftSec() {
+    const u = (S.settings ||  getProxied({})).speedUntil || 0;
+    return Math.max(0, Math.ceil((u - Date.now()) / 1000));
+  }
   /* 这一次转生要什么（V9.6.76：从"三次都要铭刻 5 阶"改成阶梯，见 D.REINCARN_REQS 的说明） */
   function reincarnNeed(count) {
-    const list = D.REINCARN_REQS || [];
-    if (!list.length) return { lv: 100, geneLock: 5, core: 30 };
+    const list = D.REINCARN_REQS ||  getProxied([]);
+    if (!list.length) return  getProxied({ lv: 100, geneLock: 5, core: 30 });
     const i = Math.min(Math.max(0, count === undefined ? (S.player.reincarnations || 0) : count), list.length - 1);
     return list[i];
   }
   function reincarnGap(count) {
     const r = reincarnNeed(count);
-    return {
+    return  getProxied({
       lv: Math.max(0, r.lv - S.player.level),
       geneLock: Math.max(0, r.geneLock - S.player.geneLock),
       core: Math.max(0, r.core - (S.buildings.core || 0)),
-    };
+    });
   }
   function canReincarnate() {
     const g = reincarnGap();
@@ -3377,7 +4498,7 @@ window.Core = (function () {
   function reincarnate() {
     if (!canReincarnate()) {
       const r = reincarnNeed();
-      return { ok: false, msg: `条件未满足（玩家 Lv.${r.lv} + 铭刻 ${r.geneLock} 阶 + 灯芯 Lv.${r.core}）` };
+      return  getProxied({ ok: false, msg: `条件未满足（玩家 Lv.${r.lv} + 铭刻 ${r.geneLock} 阶 + 灯芯 Lv.${r.core}）` });
     }
     const n = S.player.reincarnations + 1;
     const rp = Math.floor(100 * Math.pow(n, 1.15));
@@ -3391,50 +4512,70 @@ window.Core = (function () {
     S.player.level = 0; S.player.exp = 0;
     S.player.skillPoints = skillPointsForLevel();
     attrPointsForLevel();                 // V1.0.1：六维点也按等级重算（原来累加，重练会再发一遍）
-    S.worlds = {};
+    S.worlds =  getProxied({});
     /* V1.0.1（游戏策划总监会诊查出，**转生成了负收益事件**）：
        这里原来只清 `S.worlds`，**`worldFirstClear` 留着** —— 于是转生后重打 12 个世界的
        首通奖励**一点都拿不到**，✦ 从 326/天 掉到 54/天（−83%），灯阁权限（159 天）
        转生后基本点不动。转生本来就是"重来一遍"，世界里的一次性奖励理应跟着重开。 */
-    S.worldFirstClear = {};
+    S.worldFirstClear =  getProxied({});
     unlockWorld('W01');
     S.corridor.floor = 1;
     save();
-    return { ok: true, rp, count: n };
+    return  getProxied({ ok: true, rp, count: n });
   }
   function buyTalent(branch) {
     const lv = S.player.talents[branch];
-    if (lv >= 10) return { ok: false, msg: '已满级' };
+    if (lv >= 10) return  getProxied({ ok: false, msg: '已满级' });
     const cost = D.TALENT_COSTS[lv];
-    if (S.cur.rp < cost) return { ok: false, msg: `转生点不足（${S.cur.rp}/${cost}）` };
+    if (S.cur.rp < cost) return  getProxied({ ok: false, msg: `转生点不足（${S.cur.rp}/${cost}）` });
     S.cur.rp -= cost;
     S.player.talents[branch]++;
     save();
-    return { ok: true };
+    return  getProxied({ ok: true });
   }
 
   /* ================= 图鉴收集 ================= */
   function codexState() {
-    const owned = S.codex.chars.filter(id => D.charById[id]).length;
-    return {
-      // 总数只算"抽得到的人"：隐藏角色永远拿不到，算进去会让图鉴永远集不满
-      owned, total: D.characters.filter(c => !c.hidden).length,
-      rewards: D.CODEX_REWARDS.map(r => ({
-        n: r.n, reward: r.reward,
-        reached: owned >= r.n,
-        claimed: S.codex.claimed.includes(r.n),
-      })),
-    };
+    /* V1.1.3（A10 图鉴两卷）：按**卷表**遍历（卷数不写死）。
+       2026-09-27（父亲大人："就没有隐藏角色这种概念"）：伙伴卷不再是"只算抽得到的"，
+       而是**全体伙伴** —— 那 6 位 UR 已经正常进池，图鉴也就能收满了。 */
+    const volumes = D.CODEX_VOLUMES.map(v => {
+      const all = v.list();
+      const have = (S.codex[v.key] ||  getProxied([])).filter(id => v.id !== 'chars' || D.charById[id]);
+      const owned = have.length;
+      return  getProxied({
+        id: v.id, name: v.name, key: v.key, owned, total: all.length,
+        rewards: v.rewards.map(r => ( getProxied({
+          n: r.n, reward: r.reward, vol: v.id, volName: v.name,
+          reached: owned >= r.n,
+          /* 老档的领取记录是**裸数字**（那时只有伙伴卷）→ 这里两种都认，不迁移也不会重复发 */
+          claimed: S.codex.claimed.includes(v.id + ':' + r.n) || (v.id === 'chars' && S.codex.claimed.includes(r.n)),
+        }))),
+      });
+    });
+    const c0 = volumes[0];
+    return  getProxied({
+      volumes,
+      // 老调用点（首页红点等）读的还是这三个扁平字段 —— 指伙伴卷
+      owned: c0.owned, total: c0.total, rewards: c0.rewards,
+      claimable: volumes.reduce((a, v) => a + v.rewards.filter(r => r.reached && !r.claimed).length, 0),
+    });
   }
-  function claimCodexReward(n) {
-    const r = D.CODEX_REWARDS.find(x => x.n === n);
-    if (!r) return { ok: false, msg: '奖励不存在' };
-    if (S.codex.claimed.includes(n)) return { ok: false, msg: '已领取' };
-    if (S.codex.chars.filter(id => D.charById[id]).length < n) return { ok: false, msg: `还差 ${n - codexState().owned} 名伙伴` };
-    S.codex.claimed.push(n);
+  function claimCodexReward(volId, n) {
+    /* 老签名兼容：claimCodexReward(20) ＝ 伙伴卷那一档。 */
+    if (n === undefined) { n = volId; volId = 'chars'; }
+    const vol = D.CODEX_VOLUMES.filter(x => x.id === volId)[0];
+    const r = vol && vol.rewards.find(x => x.n === n);
+    if (!r) return  getProxied({ ok: false, msg: '奖励不存在' });
+    const st = (codexState().volumes.filter(x => x.id === volId)[0]) ||  getProxied({ owned: 0, name: volId });
+    if (S.codex.claimed.includes(volId + ':' + n) || (volId === 'chars' && S.codex.claimed.includes(n))) {
+      return  getProxied({ ok: false, msg: '已领取' });
+    }
+    if (st.owned < n) return  getProxied({ ok: false, msg: `还差 ${n - st.owned} 个${st.name}` });
+    S.codex.claimed.push(volId + ':' + n);
     applyRewardObj(r.reward);
     save();
-    return { ok: true, msg: `图鉴奖励已领取（${n} 名）` };
+    return  getProxied({ ok: true, msg: `图鉴奖励已领取（${st.name} ${n} 个）` });
   }
 
   /* ================= 今日概览 / 收取奖励 ================= */
@@ -3443,11 +4584,11 @@ window.Core = (function () {
   function todayState() {
     ensureDaily();
     const bank = idleBankGains();
-    const daily = D.DAILY_TASKS.map(t => ({
+    const daily = D.DAILY_TASKS.map(t => ( getProxied({
       t, prog: S.tasks.daily[t.id] || 0,
       done: (S.tasks.daily[t.id] || 0) >= t.target,
       claimed: !!S.tasks.claimed[t.id],
-    }));
+    })));
     const weekly = weeklyState();
     const dailyClaimable = daily.filter(x => x.done && !x.claimed).length;
     const weeklyClaimable = weekly.filter(x => x.done && !x.claimed).length
@@ -3455,7 +4596,7 @@ window.Core = (function () {
     const achClaimable = achievementState().filter(a => a.done && !a.claimed).length;
     const codexClaimable = codexState().rewards.filter(r => r.reached && !r.claimed).length;
     const idleReady = bank.seconds >= 60;
-    return {
+    return  getProxied({
       idle: bank, idleReady, idleSeconds: bank.seconds,
       dailyDone: daily.filter(x => x.done).length, dailyTotal: daily.length, dailyClaimable,
       weeklyClaimable, achClaimable, codexClaimable,
@@ -3463,38 +4604,58 @@ window.Core = (function () {
       freeRecruitReady: (freeRecruitAvailable('normal') || freeRecruitAvailable('advanced')) && isUnlocked('recruit'),
       signReady: signState().canDraw,          // 今日还没求签 → 首页给个提醒
       claimable: (idleReady ? 1 : 0) + dailyClaimable + weeklyClaimable + achClaimable + codexClaimable,
-    };
+    });
   }
   // 收取奖励：把"已经达成、躺在那儿等点"的奖励一次全领掉。
   // 不做"帮你花"，只做"帮你收"——收取不会失败，也不会改变任何进度。
-  function claimEverything() {
+  /* ================= V1.1.5（A1 · 一键领取）=================
+     父亲大人：「任务那里可以加个**一键领取**的功能，就不用一个个点了」。
+     《定调与口径》§2 第 7 条的落法：**不新写第二套**，给这个已有的"一键收"入口加一个 scope：
+       · scope = 'all'（默认，首页挂机卡那颗「收取奖励」用）＝ 挂机 ＋ 每日(含全清) ＋ 周常(含全清)
+                                                    ＋ 成就 ＋ 图鉴（**与改动前逐字相同**）；
+       · scope = 'task'（任务页页头那颗「一键领取」）＝ **悬赏 ＋ 每日(含全清) ＋ 周常(含全清)**，
+                                                     **不含挂机、不含主线、不含成就/图鉴**
+                                                    （主线必须"一步一领"，这是他这一条的本意）。
+     为什么悬赏只进 'task' 不进 'all'：'all' 是首页挂机卡的动作，改它等于顺手改掉另一颗按钮的语义与
+     长线模拟的模型（`longrun_sim` 拿它当"一天的收尾"）—— 这一轮只动他点名的那一处。
+     差额仍由**前后快照**算（不依赖各领取函数回报数值），所以永远不会漏发/重发。 */
+  function claimEverything(scope) {
     ensureDaily();
-    const beforeCur = Object.assign({}, S.cur);
-    const beforeItems = Object.assign({}, S.items);
-    const detail = { idle: null, tasks: 0, allDaily: false, weekly: 0, allWeekly: false, ach: 0, codex: 0 };
-    // 先收挂机：挂机本身会推进"领挂机"这条日常，所以必须排在任务之前
-    const bank = idleBankGains();
-    if (bank.seconds >= 60) detail.idle = claimIdle();
+    const onlyTasks = scope === 'task';
+    const beforeCur = Object.assign( getProxied({}), S.cur);
+    const beforeItems = Object.assign( getProxied({}), S.items);
+    const detail =  getProxied({ idle: null, bounty: 0, tasks: 0, allDaily: false, weekly: 0, allWeekly: false, ach: 0, codex: 0 });
+    if (onlyTasks) {
+      /* 悬赏是"会过期的东西"，排在每日/周常前面收（《定调与口径》§3.3 的"按到期压力"同一口径）。 */
+      const bst = bountyState();
+      bst.list.forEach(x => { if (x.done && !x.claimed && !x.expired && claimBounty(x.b.id).ok) detail.bounty++; });
+    } else {
+      // 先收挂机：挂机本身会推进"领挂机"这条日常，所以必须排在任务之前
+      const bank = idleBankGains();
+      if (bank.seconds >= 60) detail.idle = claimIdle();
+    }
     D.DAILY_TASKS.forEach(t => { if (claimTask(t.id).ok) detail.tasks++; });
     if (claimAllTasks().ok) detail.allDaily = true;
     D.WEEKLY_TASKS.forEach(t => { if (claimWeekly(t.id).ok) detail.weekly++; });
     if (claimAllWeekly().ok) detail.allWeekly = true;
-    D.ACHIEVEMENTS.forEach(a => { if (claimAchievement(a.id).ok) detail.ach++; });
-    D.CODEX_REWARDS.forEach(r => { if (claimCodexReward(r.n).ok) detail.codex++; });
+    if (!onlyTasks) {
+      D.ACHIEVEMENTS.forEach(a => { if (claimAchievement(a.id).ok) detail.ach++; });
+      D.CODEX_REWARDS.forEach(r => { if (claimCodexReward(r.n).ok) detail.codex++; });
+    }
     // 差额由"前后快照"算出来，不依赖各领取函数回报数值——永远和账户实际变化一致
-    const gains = { cur: {}, items: {} };
+    const gains =  getProxied({ cur:  getProxied({}), items:  getProxied({}) });
     Object.keys(S.cur).forEach(k => { const d = (S.cur[k] || 0) - (beforeCur[k] || 0); if (d) gains.cur[k] = d; });
     Object.keys(S.items).forEach(k => { const d = (S.items[k] || 0) - (beforeItems[k] || 0); if (d) gains.items[k] = d; });
     save();
-    const total = (detail.idle ? 1 : 0) + detail.tasks + (detail.allDaily ? 1 : 0)
+    const total = (detail.idle ? 1 : 0) + detail.bounty + detail.tasks + (detail.allDaily ? 1 : 0)
       + detail.weekly + (detail.allWeekly ? 1 : 0) + detail.ach + detail.codex;
-    return { detail, gains, seconds: detail.idle ? detail.idle.seconds : 0, total };
+    return  getProxied({ detail, gains, seconds: detail.idle ? detail.idle.seconds : 0, total });
   }
   // 下一关：同难度往后推一格；打完第 12 关顺延到下一难度，难度打完顺延到下一世界
   function nextStage(worldId, diff, stageIdx) {
     if (!S.worlds[worldId] || !S.worlds[worldId].unlocked) return null;
     if (stageIdx + 1 < 12) {
-      const r = { worldId, diff, stageIdx: stageIdx + 1 };
+      const r =  getProxied({ worldId, diff, stageIdx: stageIdx + 1 });
       return stageUnlocked(r.worldId, r.diff, r.stageIdx) ? r : null;
     }
     /* V9.6.116（父亲大人："每个世界推到第 12 关就不要有自动下一关了，只能返回，
@@ -3511,87 +4672,74 @@ window.Core = (function () {
   // 悬赏按当前进度动态生成（D.makeBounties），生成结果存进存档，本期固定不再变。
   // 每条从本期起点开始各算各的截止时间；过期作废，全部结束后可以开新一轮。
   function bountyCheck(b) {
-    const p = b.param || {};
-    switch (b.kind) {
-      case 'stage': return !!(S.worlds[p.world] && S.worlds[p.world].stages[p.diff || 'normal'][p.stage - 1] > 0);
-      case 'level': return S.player.level >= p.n;
-      case 'chars': return Object.keys(S.chars).length >= p.n;
-      case 'ssr': return Object.keys(S.chars).filter(id => {
-        const c = D.charById[id];
-        return c && ['SSR', 'UR'].includes(c.rarity);
-      }).length >= p.n;
-      case 'enhance': return (S.stats.enhances || 0) >= p.n;
-      case 'corridor': return (S.corridor.best || 0) >= p.n;
-      case 'beast': return Object.keys(S.beast.owned || {}).length >= p.n;
-      case 'realm': return (S.player.realm || 0) >= p.n;
-      default: return false;
-    }
+    // V1.0.5：判据搬到 data.js（D.bountyDone）——生成端与这里共用同一份，不再两处各写一套
+    return D.bountyDone(S, b);
   }
   function bountyState() {
     if (!Array.isArray(S.bounty.list) || !S.bounty.list.length) S.bounty.list = D.makeBounties(S);
     const now = Date.now();
     const start = (S.bounty && S.bounty.start) || now;
-    const claimed = (S.bounty && S.bounty.claimed) || {};
+    const claimed = (S.bounty && S.bounty.claimed) ||  getProxied({});
     const list = S.bounty.list.map(b => {
       const deadline = start + b.hours * 3600e3;
       const leftMs = deadline - now;
-      return { b, deadline, leftMs, expired: leftMs <= 0, done: bountyCheck(b), claimed: !!claimed[b.id] };
+      return  getProxied({ b, deadline, leftMs, expired: leftMs <= 0, done: bountyCheck(b), claimed: !!claimed[b.id] });
     });
-    return {
+    return  getProxied({
       list, start,
       claimable: list.filter(x => x.done && !x.claimed && !x.expired).length,
       allOver: list.every(x => x.claimed || x.expired),
-    };
+    });
   }
   function claimBounty(id) {
     const item = bountyState().list.find(x => x.b.id === id);
-    if (!item) return { ok: false, msg: '悬赏不存在' };
-    if (item.claimed) return { ok: false, msg: '已经领过了' };
-    if (item.expired) return { ok: false, msg: '这条悬赏已经过期' };
-    if (!item.done) return { ok: false, msg: '目标还没完成' };
+    if (!item) return  getProxied({ ok: false, msg: '悬赏不存在' });
+    if (item.claimed) return  getProxied({ ok: false, msg: '已经领过了' });
+    if (item.expired) return  getProxied({ ok: false, msg: '这条悬赏已经过期' });
+    if (!item.done) return  getProxied({ ok: false, msg: '目标还没完成' });
     S.bounty.claimed[id] = true;
     applyRewardObj(item.b.reward);
     save();
-    return { ok: true, msg: `悬赏达成：${item.b.name}`, reward: item.b.reward, name: item.b.name };
+    return  getProxied({ ok: true, msg: `悬赏达成：${item.b.name}`, reward: item.b.reward, name: item.b.name });
   }
   function renewBounties() {
-    if (!bountyState().allOver) return { ok: false, msg: '还有悬赏没结束（没领或没过期）' };
-    S.bounty = { start: Date.now(), claimed: {}, list: D.makeBounties(S) };
+    if (!bountyState().allOver) return  getProxied({ ok: false, msg: '还有悬赏没结束（没领或没过期）' });
+    S.bounty =  getProxied({ start: Date.now(), claimed:  getProxied({}), list: D.makeBounties(S) });
     save();
-    return { ok: true, msg: '新一期悬赏已按你的进度刷新' };
+    return  getProxied({ ok: true, msg: '新一期悬赏已按你的进度刷新' });
   }
 
   /* ================= 伴生体（第二条养成线） ================= */
   // 上阵 1 只：给全队属性加成 + 一个被动 + 五行克制（进本看世界属性）。
   // 孵化花兽魂石，重复获得转兽魂，兽魂升等级 —— 和角色的"抽卡→碎片→升星"是同一套结构。
   function beastState() {
-    const owned = S.beast.owned || {};
+    const owned = S.beast.owned ||  getProxied({});
     const list = Object.keys(owned).map(id => {
       const b = D.beastById(id);
       if (!b) return null;
       const lv = owned[id].lv || 0;      // V9.5.81：伴生体也是 0 基
-      return {
+      return  getProxied({
         id, b, lv, soul: owned[id].soul || 0,
         active: S.beast.active === id,
         pct: D.beastPctAt(b, lv),
         maxLv: lv >= D.BEAST_MAX_LV,
-      };
+      });
     }).filter(Boolean).sort((a, b) => D.RARITIES.indexOf(b.b.rarity) - D.RARITIES.indexOf(a.b.rarity) || b.lv - a.lv);
-    return {
+    return  getProxied({
       list, count: list.length,
       active: S.beast.active || null,
       activeBeast: S.beast.active ? D.beastById(S.beast.active) : null,
       eggs: S.items[D.BEAST_EGG_ITEM] || 0,
       eggCost: D.BEAST_EGG_COST,
       canHatch: (S.items[D.BEAST_EGG_ITEM] || 0) >= D.BEAST_EGG_COST,
-    };
+    });
   }
   // 随行伴生体的属性加成（会被 effectiveStats / effectivePlayerStats / 战斗一起用）
   function beastPct() {
     const id = S.beast.active;
     const owned = id && S.beast.owned[id];
     const b = id ? D.beastById(id) : null;
-    if (!owned || !b) return {};
+    if (!owned || !b) return  getProxied({});
     return D.beastPctAt(b, owned.lv || 0);   // V9.5.81：同上
   }
   function activeBeastElem() {
@@ -3602,19 +4750,19 @@ window.Core = (function () {
   function elementMultiplier(worldId) {
     const mine = activeBeastElem();
     const foe = D.worldElement(worldId);
-    if (!mine || !foe) return { mine: null, foe: null, mult: 1, state: 'none' };
-    if (D.ELEMENT_COUNTER[mine] === foe) return { mine, foe, mult: 1 + D.ELEMENT_BONUS, state: 'up' };
-    if (D.ELEMENT_COUNTER[foe] === mine) return { mine, foe, mult: 1 - D.ELEMENT_PENALTY, state: 'down' };
-    return { mine, foe, mult: 1, state: 'even' };
+    if (!mine || !foe) return  getProxied({ mine: null, foe: null, mult: 1, state: 'none' });
+    if (D.ELEMENT_COUNTER[mine] === foe) return  getProxied({ mine, foe, mult: 1 + D.ELEMENT_BONUS, state: 'up' });
+    if (D.ELEMENT_COUNTER[foe] === mine) return  getProxied({ mine, foe, mult: 1 - D.ELEMENT_PENALTY, state: 'down' });
+    return  getProxied({ mine, foe, mult: 1, state: 'even' });
   }
   function hatchBeast(n) {
     n = Math.max(1, Math.floor(n || 1));
     const need = D.BEAST_EGG_COST * n;
     const have = S.items[D.BEAST_EGG_ITEM] || 0;
-    if (have < need) return { ok: false, msg: `兽魂石不足：孵 ${n} 只要 ${need} 颗（现有 ${have}）` };
+    if (have < need) return  getProxied({ ok: false, msg: `兽魂石不足：孵 ${n} 只要 ${need} 颗（现有 ${have}）` });
     S.items[D.BEAST_EGG_ITEM] -= need;
     if (S.items[D.BEAST_EGG_ITEM] <= 0) delete S.items[D.BEAST_EGG_ITEM];
-    const got = [];
+    const got =  getProxied([]);
     for (let i = 0; i < n; i++) {
       let r = Math.random(), acc = 0, rar = 'N';
       for (const [k, v] of Object.entries(D.BEAST_RARITY_RATE)) { acc += v; if (r <= acc) { rar = k; break; } }
@@ -3623,35 +4771,35 @@ window.Core = (function () {
       const cur = S.beast.owned[b.id];
       if (cur) {
         cur.soul = (cur.soul || 0) + 2;
-        got.push({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: true, soul: cur.soul });
+        got.push( getProxied({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: true, soul: cur.soul }));
       } else {
-        S.beast.owned[b.id] = { lv: 0, soul: 0 };   // V9.5.69：伴生体也从 0 级起
-        got.push({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: false });
+        S.beast.owned[b.id] =  getProxied({ lv: 0, soul: 0 });   // V9.5.69：伴生体也从 0 级起
+        got.push( getProxied({ id: b.id, name: b.name, rarity: b.rarity, elem: b.elem, dup: false }));
       }
     }
     // 第一只自动随行，省一步操作
     if (!S.beast.active && got.length) S.beast.active = got[0].id;
     S.stats.beasts = (S.stats.beasts || 0) + n;
     save();
-    return { ok: true, got, count: n, msg: `孵化 ${n} 只伴生体` };
+    return  getProxied({ ok: true, got, count: n, msg: `孵化 ${n} 只伴生体` });
   }
   function setActiveBeast(id) {
-    if (id && !S.beast.owned[id]) return { ok: false, msg: '还没有这只伴生体' };
+    if (id && !S.beast.owned[id]) return  getProxied({ ok: false, msg: '还没有这只伴生体' });
     S.beast.active = id || null;
     save();
-    return { ok: true, msg: id ? `${D.beastById(id).name} 已随行` : '已收回伴生体' };
+    return  getProxied({ ok: true, msg: id ? `${D.beastById(id).name} 已随行` : '已收回伴生体' });
   }
   function beastLevelUp(id) {
     const cur = S.beast.owned[id];
     const b = D.beastById(id);
-    if (!cur || !b) return { ok: false, msg: '还没有这只伴生体' };
-    if ((cur.lv || 0) >= D.BEAST_MAX_LV) return { ok: false, msg: '已经是满级' };
+    if (!cur || !b) return  getProxied({ ok: false, msg: '还没有这只伴生体' });
+    if ((cur.lv || 0) >= D.BEAST_MAX_LV) return  getProxied({ ok: false, msg: '已经是满级' });
     const need = D.BEAST_SOUL_PER_LV * ((cur.lv || 0) + 1);
-    if ((cur.soul || 0) < need) return { ok: false, msg: `兽魂不足：升到 Lv.${(cur.lv || 0) + 1} 需要 ${need} 兽魂（现有 ${cur.soul || 0}）` };
+    if ((cur.soul || 0) < need) return  getProxied({ ok: false, msg: `兽魂不足：升到 Lv.${(cur.lv || 0) + 1} 需要 ${need} 兽魂（现有 ${cur.soul || 0}）` });
     cur.soul -= need;
     cur.lv = (cur.lv || 0) + 1;
     save();
-    return { ok: true, msg: `${b.name} 升到 Lv.${cur.lv}`, lv: cur.lv };
+    return  getProxied({ ok: true, msg: `${b.name} 升到 Lv.${cur.lv}`, lv: cur.lv });
   }
 
   /* ================= 境界（渡劫） ================= */
@@ -3661,7 +4809,7 @@ window.Core = (function () {
     const next = D.REALMS[realm] || null;
     const tier = next ? Math.min(5, 1 + Math.floor(next.lv / 20)) : 5;
     const matItem = 'mat_t' + tier;
-    return {
+    return  getProxied({
       realm, next,
       // 境界名跟着血统走：'血将后期' / '筑基初期' …（没选血统时为空，界面上先引导选血统）
       bloodline: S.player.bloodline || null,
@@ -3674,38 +4822,38 @@ window.Core = (function () {
       haveMat: next ? (S.items[matItem] || 0) : 0,
       points: next ? next.cost.points : 0,
       rate: next ? next.rate : 0,
-    };
+    });
   }
   function realmBonusPct() { return (S.player.realm || 0) * D.REALM_PCT; }
   function attemptRealm() {
     const st = realmState();
-    if (!st.hasBloodline) return { ok: false, msg: '先选定命格——境界线跟着命格走，没命格就没有境界' };
-    if (!st.next) return { ok: false, msg: '已经到达最终境界' };
-    if (!st.levelOk) return { ok: false, msg: `先升到 Lv.${st.next.lv}（当前 Lv.${S.player.level}）` };
+    if (!st.hasBloodline) return  getProxied({ ok: false, msg: '先选定命格——境界线跟着命格走，没命格就没有境界' });
+    if (!st.next) return  getProxied({ ok: false, msg: '已经到达最终境界' });
+    if (!st.levelOk) return  getProxied({ ok: false, msg: `先升到 Lv.${st.next.lv}（当前 Lv.${S.player.level}）` });
     if (st.haveMat < st.matN) {
-      return { ok: false, msg: `渡劫材料不足：需要 ${D.ITEMS[st.matItem].name} ×${st.matN}（现有 ${st.haveMat}）` };
+      return  getProxied({ ok: false, msg: `渡劫材料不足：需要 ${D.ITEMS[st.matItem].name} ×${st.matN}（现有 ${st.haveMat}）` });
     }
-    if (!canAfford({ points: st.points })) return { ok: false, msg: `点数不足：需要 ◉ ${fmtNum(st.points)}` };
+    if (!canAfford( getProxied({ points: st.points }))) return  getProxied({ ok: false, msg: `点数不足：需要 ◉ ${fmtNum(st.points)}` });
     // 先扣消耗：失败也扣，这是"天道不收白食"；但等级不掉，所以永远有下一次
     S.items[st.matItem] -= st.matN;
     if (S.items[st.matItem] <= 0) delete S.items[st.matItem];
-    spend({ points: st.points });
+    spend( getProxied({ points: st.points }));
     const success = Math.random() < st.next.rate;
     if (success) S.player.realm = st.realm + 1;
     save();
-    return {
+    return  getProxied({
       ok: true, success, name: st.nextName, rate: st.next.rate,
       realm: S.player.realm, bonusPct: realmBonusPct(),
       msg: success
         ? `渡劫成功：突破「${st.nextName}」，主角属性永久 +${(D.REALM_PCT * 100).toFixed(1)}%`
         : `渡劫失败：消耗已扣除，但等级不掉，再来一次就好`,
-    };
+    });
   }
 
   /* ================= 战斗结算钩子 ================= */
   /* --- 副本进度落盘：刷新 / 切后台被系统回收后可以接着打 ---- */
   function setPendingRun(data) {
-    S.pendingRun = data ? JSON.parse(JSON.stringify(data)) : null;
+    S.pendingRun = data ?  getProxied(JSON.parse(JSON.stringify(data))) : null;
     save();
   }
   function clearPendingRun() { S.pendingRun = null; save(); }
@@ -3748,14 +4896,19 @@ window.Core = (function () {
     addPlayerExp(Math.round((exp || 0) * graceExpMult()));
   }
 
-  return {
+  return  getProxied({
     get S() { return S; },
-    save, load, newGame, wipeSave, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
-    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore, shardPoolOf, addShardPool, addShardsToPool,
-    setNoticeListener, stashItem, stashCount, stashList, claimStash,
+    save, load, newGame, wipeSave, ensureState, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
+    /* V1.1.15（P0 存档）：读档诊断 / 从备份恢复（设置页用） */
+    saveDiag, backupInfo, restoreFromBackup, loadIssue,
+    addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
+    shardPoolOf, addShardPool, addShardsToPool, shardsOf, starInfo,
+    setNoticeListener, stashItem, stashCount, stashList, stashNeedCells, claimStash,
+    /* V1.1.15：装备待领箱（满格时掉的/开出来的装备先存这儿，扩容后领回） */
+    stashEquip, stashEqCount, stashEqList, claimStashEq,
     bagUsage, buyBagCap,
     tallyCur, addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
-    craftSerum, useSerum, serumTaken, serumApplied, serumUnlocked, serumUnlockTip,
+    craftSerum, craftReforgeStone, useSerum, serumTaken, serumApplied, serumUnlocked, serumUnlockTip,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,
     effectivePlayerStats, playerPower, choosePlayerBloodline, upgradePlayerBloodline,
@@ -3763,12 +4916,21 @@ window.Core = (function () {
     grantEquip, grantSignatureEquip, equipItem, canEquip, unequipItem, enhanceCost, enhance, decompose, decomposeMany, inventoryEquips,
     enhanceQuote, bloodlineQuote,
     toggleEquipLock, autoEquipBest, equipScore, savePreset, applyPreset,
+    /* V1.1.8（戊组 A13-F）：重铸石 —— 报价与重铸（界面只调这两个，判据都在这里） */
+    reforgeQuote, reforgeEquip, reforgeCost, setAffixLock, affixLocksOf, affixMeanQ,
     unequipEverywhere, equipWearer, dedupeEquips,
     playerRow, setPlayerRow, swapPartySlots, moveMemberRow, rowLayout, ROW_NAME, rowOfSlots, normalizeParty,
     parsePos, posRow, swapPositions,
     recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
     idleRates, idleBaseRates, idleLines, idleLineBonus, setIdleLeader, idleMatItem, grantIdleMat,
-    settleOffline, onlineTick, idleBankGains, claimIdle, addPlayerExp, offlineCapHours, offlineEfficiency, idleFull,
+    progressTier, bestWorldIdx,
+    settleOffline, onlineTick, idleBankGains, claimIdle, claimIdleDouble, lastIdleClaimOf, addPlayerExp, offlineCapHours, offlineEfficiency, idleFull,
+    /* V1.1.8（乙组 B4/B5/B6/B7/B8）：五个广告点位的**逻辑层入口**（界面只管展示与调用，判据都在这里） */
+    lastOfflineSettle, claimOfflineDouble, adIdleBoost, addAdSweepBonus, adRecruitAdv, claimLoginDouble,
+    /* V1.1.18（N5 · 留存环）：回归礼（开机发一次，弹窗只报账） */
+    comebackState, grantComeback, comebackRewardOf, dayGapDays,
+    /* V1.1.8（丙组 B9）：倍速的**唯一口径入口**（免费 1/2 ＋ 广告窗口内的 5） */
+    effSpeed, grantSpeedAd, speedLeftSec, SPEED_AD_MS,
     upgradeBuilding, authority, authorityInfo, upgradeAuthority, authorityReqMet,
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
@@ -3781,10 +4943,10 @@ window.Core = (function () {
     refreshUnlocks, isUnlocked, unlockTip, skillPointsForLevel,
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
-    buyShopItem, openBox, openBoxes, boxSourceWorld, dailyDate, sweepLeft, enhanceMat,
+    buyShopItem, shopMaxQty, openBox, openBoxes, openMatPack, boxSourceWorld, dailyDate, sweepLeft, enhanceMat,
     addSweepBonus, ensureSweepDay,
     shopReq,
-    ensureDaily, task, claimTask, claimAllTasks, loginReward,
+    ensureDaily, task, claimTask, claimAllTasks, loginReward, ensureSweepDay,
     ensureWeekly, weeklyState, claimWeekly, claimAllWeekly, weekKey,
     achievementState, achievementSummary, claimAchievement,
     todayState, claimEverything, nextStage,
@@ -3794,5 +4956,5 @@ window.Core = (function () {
     canReincarnate, reincarnate, reincarnNeed, reincarnGap, buyTalent,
     codexState, claimCodexReward,
     battleSettle, addCharExp, addPlayerBattleExp, graceExpMult, graceDropMult, graceIdleMult, talentAll,
-  };
+  });
 })();

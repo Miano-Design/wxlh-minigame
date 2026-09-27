@@ -62,12 +62,15 @@ let pass = 0, fail = 0;
 const liveTimers = new Set();
 const _setTimeout = global.setTimeout, _setInterval = global.setInterval;
 const _clearTimeout = global.clearTimeout, _clearInterval = global.clearInterval;
+const WB = require('./_web_basis');
 global.setTimeout = function (fn, ms) { const h = _setTimeout(function () { liveTimers.delete(h); return fn.apply(this, arguments); }, ms); liveTimers.add(h); return h; };
 global.setInterval = function (fn, ms) { const h = _setInterval(fn, ms); liveTimers.add(h); return h; };
 global.clearTimeout = function (h) { liveTimers.delete(h); return _clearTimeout(h); };
 global.clearInterval = function (h) { liveTimers.delete(h); return _clearInterval(h); };
 
 const t = (name, ok, extra) => {
+  /* V1.1.11（网页版归档）：名字带「网页版」的条目（对表）→ ⏭ 跳过、不计失败。 */
+  if (!WB.OK && /网页版/.test(name)) { WB.skip(name); return; }
   if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); }
   else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); }
 };
@@ -255,7 +258,7 @@ console.log('\n=== 战斗页生命周期审计 ===');
     t('⑦ 小游戏无缝衔接的波数用 run.wave + 1（不再照抄网页版的 +2）',
       /sub: '第 ' \+ \(run\.wave \+ 1\) \+ '\/' \+ run\.waves\.length \+ ' 波'/.test(src),
       /run\.wave \+ 2/.test(src) ? '**还写着 +2（会每波都显示最后一波）**' : '公式正确');
-    const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+    const web = WB.read('js/ui.js');
     t('⑦b 网页版用 R.wave + 2（它的 ++ 在 afterWave 里，晚一拍）—— 两边公式天生差 1，别互抄',
       /第 \$\{Math\.min\(R\.wave \+ 2, R\.waves\.length\)\}\//.test(web), '网页版口径未变');
     const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');

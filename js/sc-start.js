@@ -1,6 +1,6 @@
 /* 开局三步（照网页版 js/ui.js 的 showTutorial / showCharCreate / bloodlineModal 逐句抄）
    ------------------------------------------------------------------------------
-   ① 欢迎（必须签契约）→ ② 起名 → ③ 选血统 → 首页。
+   ① 欢迎（必须签契约）→ ② 起名 → ③ 选血统 → **主画面（gate）** → 点【进入残域】→ 首页。
    网页版这三步是不可跳过的弹窗（没有 ×、遮罩点不掉、返回键也关不掉）；
    小游戏这边本来就是分页，天然跳不过去。
 */
@@ -8,76 +8,79 @@
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
 
-  /* ================= ⓪ 开机合规闸（V1.0.3 · AI 视觉工程师 · 提审硬要求） =================
-     依据《微信小游戏平台运营规范》特别规范：
-       · 2.6.2《健康游戏忠告》—— 必须在**游戏开始前**、画面的**显著位置全文登载**；
-       · 2.6.1 —— 在游戏开始前、忠告**之后**设专门页面，标明游戏著作权人 / 出版服务单位 /
-                 批准文号 / 出版物号等；
-       · 6.1 适龄提示 —— 显著、可读。
-     小游戏原来是一条都没有（rg 著作权 / 健康游戏忠告 全库 0 命中），适龄提示只在开机首屏闪 1.5 秒。
-     现在照网页版同一条流程（ui.js:showComplianceGate）做**两页**：
-       notice     ——《健康游戏忠告》全文 ＋ 适龄徽标 ＋ 「下一步」；
-       copyright  ——【著作权人信息】专门页 ＋ 适龄徽标 ＋ 「进入灯阁」。
+  /* ================= ⓪ 主画面（V1.0.6 · 设计师 · 两块收口） =================
+     父亲大人 2026-09-23 原话：「著作权不要啊，个人的没有这个，适龄好像到时上线小程序会自己打，
+     这些等审核通过再说吧」；问他忠告留不留，答：「留着呗」。
+     同日再改口径：「健康游戏是独立的弹窗，不要跟主画面做到一起」—— 时机他选 **C＝冷启动先弹**。
+     主画面**只剩两块**：品牌 →【进入残域】（与网页版 #boot 逐样对齐）。
+     《健康游戏忠告》四句搬进**独立弹窗** `U.healthNotice`（uiw.js），由 game.js 在冷启动时
+     先弹、关掉才往下走（老档：弹窗 → 主画面；新档：弹窗 → 欢迎/签契约 → 起名 → 选命格 → 主画面）。
+     撤掉的两块（连落位一起撤）：
+       · 适龄提示徽标（含「看全文 ›」那颗）—— 网页版那颗同步撤；⚠️ **「设置与存档」里那张
+         适龄卡保留**（父亲大人点名留的，文案仍取自 D.COMPLIANCE.ageFull）；
+       · 著作权人信息——主画面那一行、那颗入口、以及它点开的 `copyright` 专门页
+         （设置页里那份也一起撤；个人主体没有这一项，等审核通过再说）。
+     ⚠️ 忠告那四句**一字不省、同屏、不滚动、不用点开** —— 合规岗 2026-09-23 现抓官方原文后拍死：
+        特别规范 2.6.2 ＋《微信小程序平台常见拒绝情形》3.6.6 要的是"游戏开始前、显著位置
+        **全文登载**"，摘要＋点开、要滚动才看全，都判"不是全文登载"。
+        （"先弹"不算违规：弹窗排在玩家碰得到任何玩法之前，四句全在，且不用滚动、不用点开第二层。）
      两条硬口径：
        · **文案一个字都不在本文件里** —— 全部来自 data.js 的 `D.COMPLIANCE`（两端同一份来源，
          本文件只负责排版；尺子 page_text_audit 会查有没有手抄）；
-       · **必须点出来**（没有超时、没有自动让位）：开机那 1.5 秒的首屏过去之后，
-         画面就停在 notice 上，唯一的出口是按钮 —— 与网页版同一条。 */
-  /* 适龄徽标：两页都**常驻**（老做法只有开机首屏一闪），点一下看全文。
-     底色 CV.C.panel ＋ 文字 CV.C.text2 ≥4.5:1（与网页版 #gate .gate-age 同一档；
-     尺子 visual_audit 的对比度那条两端各钉一次）。 */
-  function ageBadge() {
-    const h = 40 * CV.SCALE, top = U.y;
-    CV.round(U.pad(), top, U.cw(), h, CV.RADIUS_SM, CV.C.panel, CV.a(CV.C.gold, .5));
-    CV.text(CV.fit(D.COMPLIANCE.ageBadge, U.cw() - 90 * CV.SCALE, CV.FS.lg), U.pad() + 12 * CV.SCALE, top + h / 2,
-      { size: CV.FS.lg, color: CV.C.text2, bold: true });
-    CV.text('看全文 ›', U.pad() + U.cw() - 12 * CV.SCALE, top + h / 2,
-      { size: CV.FS.md, color: CV.C.gold, align: 'right' });
-    CV.hit('age_more', U.pad(), top, U.cw(), h);
-    U.y = top + h + CV.SP[3];
-  }
-  CV.on('age_more', function () {
-    /* 全文（与网页版逐字一致）：只看不改状态 —— 关掉它，合规闸还在原地 */
-    U.confirm('适龄提示', D.COMPLIANCE.ageFull, null, { cancel: false, okLabel: '知道了' });
+       · **主画面不自己让位**（没有超时、没有自动跳走）：开机那 1.5 秒首屏过去之后就停在这一页，
+         唯一的出口是【进入残域】—— 与网页版同一条。 */
+
+  /* ---------- 主画面（老档的开机第一页 / 新档走完建档三步的落点） ----------
+     与网页版 #boot 逐样对齐：品牌 →【进入残域】。
+     **忠告不在这里**（父亲大人：不要跟主画面做到一起）—— 它是 uiw.js 的 U.healthNotice 弹窗，
+     开机那一会儿盖在这一页上面；关掉才看得见这一页。 */
+  CV.register('gate', function () {
+    U.begin();
+    /* V1.0.6（父亲大人 2026-09-23：「这个文字和按钮不应该居中在画面吗，都在上面好看吗」）：
+       品牌（两行活字）＋【进入残域】是**一个整体块**，整块排在画面纵向中部 —— 不是只把按钮挪下去。
+       居中范围＝**安全可视窗**：上沿从 `safeTop + 8` 起（cv.js 的内容层就从这里开始画，
+       8 是那圈裁剪留白），下沿到 `H - safeBottom` 为止 —— 于是顶部不撞胶囊那一行、底部不撞 home 条，
+       短屏 / 长屏都不用"为了躲安全区把块推回顶部"。
+       块高 = 标题 0.7×d3 ＋ 副标题 30S ＋ 收尾 12S ＋ 段距 SP[4] ＋ 按钮 44S（与下面逐项对应）。
+       尺子：scripts/layout_audit.js 的《构图》那一节（320×568 / 390×844 / 430×932 各算一遍，40%~60%）。 */
+    const S = CV.SCALE;
+    const viewTop = CV.safeTop + 8;
+    const viewH = CV.H - CV.safeBottom - viewTop;
+    /* V1.1.11（父亲大人 09-27：「这个是我做的主画面标题…换掉电脑字，记得适配不同手机的屏幕」）：
+       品牌从**两行活字**换成他的题字图（`U.brandTitle`，宽度按屏宽 86%、短屏再夹一道高度上限）。
+       ⇒ 块高里那一条 `DISP.d3×0.7` 换成 `U.brandTitleH(brandW)`，其余项不变；
+       「提灯入残域」作为副题**仍是活字**（图里只有那四个字，没有这句）。 */
+    const brandW = Math.min(CV.W * 0.86, 560 * S);
+    const brandH = U.brandTitleH(brandW);
+    const blockH = brandH + 6 * S + 30 * S + 12 * S + CV.SP[4] + U.BTN_H * S;
+    /* 落位再收半步：**光学中心**——几何居中看着偏下，本室惯用比几何中心高一点（约 5% 屏高）；
+       这一下也正好让开主视觉里右下那尊提灯者（真图里它的头部上沿约在 58% 处，
+       块底压在 53% 左右才留得出净距 —— **主体不许被色块/文字压**，那是红线，不是偏好）。
+       V1.1.11（换成题字图之后）：块高从"一行活字"长到"一张图"（132px 级），
+       原来的 `(viewH - blockH)/2 - OPTICAL` 会把整块顶到 40% 线以上（尺子当场报 39.9%）。
+       改成**直接对准目标中心线**：可视窗中心再抬 5% 屏高 —— 换任何块高，中心都落在它该在的地方。 */
+    const centerY = viewTop + viewH / 2 - CV.H * 0.05;
+    U.space(Math.max(CV.SP[4], centerY - blockH / 2 - viewTop));
+    /* 品牌：与网页版 #boot 的 .boot-title / .boot-say 同两行**活字**
+       （主视觉底图里一个字都没有 —— 图带字＝同一件美术两份定义）。 */
+    U.draw(function () {
+      const y0 = U.y;
+      U.brandTitle(CV.W / 2 - brandW / 2, y0, brandW);       // 题字图（图没到位时自动退回活字）
+      const ty = y0 + brandH + 6 * CV.SCALE;
+      CV.text('提灯入残域', CV.W / 2, ty + 30 * CV.SCALE, { size: CV.FS.lg, align: 'center', color: CV.C.text2, ls: 4 });
+      U.y = ty + 30 * CV.SCALE + 12 * CV.SCALE;
+    });
+    U.space(CV.SP[4]);
+    /* 唯一的出口：与网页版 mainScreenHtml 的 `data-enter` 同一件事（1.0.3 那两道"必须点才放行"的
+       闸已按合规岗的判断取消，但这一页也不自己跳走）。 */
+    U.btnRow([{ label: D.COMPLIANCE.enterLabel, style: 'primary', id: 'gate_enter' }]);
   });
 
-  CV.register('notice', function () {
-    U.begin();
-    U.space(Math.max(24 * CV.SCALE, CV.H * 0.06));
-    ageBadge();
-    U.card(function () {
-      U.h3(D.COMPLIANCE.healthTitle);
-      /* 四句**逐句一行、一句不省**（法规要的是全文登载，缩写或只放链接都不算） */
-      D.COMPLIANCE.healthAdvice.forEach(function (line) {
-        U.hint(line, 4 * CV.SCALE, CV.C.text2);
-      });
-    });
-    U.space(CV.SP[3]);
-    U.btnRow([{ label: '下一步 · 著作权人信息', style: 'primary', id: 'notice_next' }]);
-    /* 步骤与小字与网页版**逐字一致**（对表尺子 parity_audit 会两边比对，谁少一句谁红） */
-    U.hint('第 1 / 2 步 · 《健康游戏忠告》全文', CV.SP[2], CV.C.dim);
-  });
-  CV.on('notice_next', function () { CV.reset('copyright'); });
-
-  CV.register('copyright', function () {
-    U.begin();
-    U.space(Math.max(16 * CV.SCALE, CV.H * 0.04));
-    ageBadge();
-    U.card(function () {
-      U.h3(D.COMPLIANCE.ownerTitle);
-      U.hint(D.COMPLIANCE.ownerNote, CV.SP[1]);
-      D.COMPLIANCE.ownerFields.forEach(function (f) {
-        /* 值留空 → 统一画「待填」（由父亲大人一处填、两端同时生效） */
-        U.kv(f.k, f.v || D.COMPLIANCE.ownerBlank, f.v ? CV.C.text2 : CV.C.dim);
-      });
-    });
-    U.space(CV.SP[3]);
-    U.btnRow([{ label: '进入灯阁', style: 'primary', id: 'gate_enter' }]);
-    U.hint('第 2 / 2 步 · 点「进入灯阁」开始游戏', CV.SP[2], CV.C.dim);
-  });
-  /* 放行：进 game.js 在开机时算好的那一页（欢迎 / 起名 / 选命格 / 首页）——
-     合规闸只负责挡在前面，不负责决定去哪一页。 */
-  CV.on('gate_enter', function () { CV.reset((G && G.NEXT_AFTER_NOTICE) || 'home'); });
+  /* V1.0.6：原来这里还有 2.6.1 的【著作权人信息】专门页（页名 `copyright`）与它的两颗跳转
+     （owner_more → copyright / owner_back → gate）。父亲大人 2026-09-23 拍板「著作权不要啊，
+     个人的没有这个……等审核通过再说吧」—— 整页连注册一起删掉。留着空页＝审核员点开一片空白。 */
+  /* 进残域：接上首页（开局三步 / 补步都已经走完了才到得了这一页）。 */
+  CV.on('gate_enter', function () { CV.reset('home'); });
 
   /* ================= ① 欢迎（网页版 showTutorial 的文案） ================= */
   CV.register('welcome', function () {
@@ -200,7 +203,9 @@
       U.confirm('确认命格', '选择「' + id + '」后不可更改，境界线将从「' + D.realmName(id, 0) + '」开始。确定吗？', function () {
         const r = Core.choosePlayerBloodline(id);
         CV.toast(r.msg || '已觉醒');
-        CV.reset('home');
+        /* V1.0.5：选完命格先到**主画面**，由玩家自己点【进入残域】进首页
+           （父亲大人："主画面可以在初次登陆选完血统出现"）。 */
+        CV.reset('gate');
       });
     });
   });

@@ -4,6 +4,7 @@
   "projectname": "wxlh-minigame",
   "compileType": "game",
   "libVersion": "3.5.0",
+  "cloudfunctionRoot": "cloudfunctions/",
   "setting": {
     "urlCheck": true,
     "es6": false,
@@ -34,6 +35,18 @@
     "ignore": [
       {
         "type": "file",
+        "value": "code.fortify.config.json"
+      },
+      {
+        "type": "file",
+        "value": "AGENTS.md"
+      },
+      {
+        "type": "folder",
+        "value": ".git"
+      },
+      {
+        "type": "file",
         "value": "README.md"
       },
       {
@@ -51,6 +64,10 @@
       {
         "type": "folder",
         "value": "scripts"
+      },
+      {
+        "type": "folder",
+        "value": "cloudfunctions"
       },
       {
         "type": "folder",

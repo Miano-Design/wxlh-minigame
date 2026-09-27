@@ -172,7 +172,9 @@ async function claimDailies() {
   tapId('tab:home'); await wait(60);
   if (!tapId('open_tasks')) { return 0; }
   await wait(150);
-  tapId('tasktab:daily'); await wait(120);
+  /* V1.1.5（A1）：任务页合并成一页（悬赏 → 每日 → 周常），`tasktab:daily` 这个页签**不存在了** ——
+     锚点/探针跟着改成"进来就能看到那 8 条每日"（《定调与口径》§7 点名的必改项）。
+     原来那一下 `tapId('tasktab:daily')` 现在只会落空，整个 claimDailies 就一条都领不到。 */
   for (let i = 0; i < 10; i++) {
     const h = (CV.hits || []).slice().reverse().find((x) => String(x.id).indexOf('task_claim:') === 0);
     if (!h) break;
@@ -374,6 +376,133 @@ console.log('\n=== 主线真玩一遍（带引导、带真动作）===');
     }
   }
   console.log('\n走过的步骤：' + visited.join(' → '));
+  /* ================= V1.1.5（A3 · 主线撤卡 ＋ 引导兜底）=================
+     父亲大人：「全都完成后就可以**直接把主线任务的卡片去掉**了，不要放在那占位」。
+     这一条**没法靠截图证明**（拍一张"空白处"什么都说明不了）——它有两个可机验的后果：
+       ① 27 步全部领完 → 主页**不许**再画主线卡（所以 `claim_quest` / `goto_quest` 两颗热区必须消失，
+          页面上也不许再出现「主线 · 已走完」这行占位文案）；
+       ② 指这张卡的引导（开场链 tut_blk4 与主页页面引导共用同一把钥匙）必须**换成兜底锚点**，
+          而且那个锚点在主页上要**真的指得到**（否则 coach_audit 记 miss、玩家看到一张没有指向的旁白卡）。
+     做法：全部领掉 → 回主页渲染 → 查热区与画出来的文案 → 再让引导登记一次，看它锚到了谁。 */
+  {
+    console.log('\n=== A3：主线全部走完之后（撤卡 ＋ 兜底锚点）===');
+    /* 先量一次"还有卡"时的主页内容总高（撤卡之后必须**变矮** —— 这才证明那张卡是整块没了，
+       而不是画了一张空的；"拍一张空白处"是证明不了这件事的）。 */
+    U.coachDrop && U.coachDrop();
+    CV.reset('home');
+    await settle(160);
+    const hWithCard = CV.contentH || 0;
+    const hitsBefore = (CV.hits || []).length;
+    (D.MAIN_QUESTS || []).forEach(function (q) { if (!Core.S.quests.claimed.includes(q.id)) Core.S.quests.claimed.push(q.id); });
+    Core.save();
+    /* 让开场链**正好停在 blk4 这一步**（前三步标已读过）—— 不然重跑整条链时弹的是 blk1，
+       下面两条断言就会"绿得没意义"（实测第一版就是这样：锚点落在 open_protag、文案是第 1 步的）。 */
+    Core.S.coachSeen = { tut_blk1: true, tut_blk1x: true, tut_blk2: true, tut_blk3: true };
+    Core.S.tourForce = true;                       // 开场链"领过奖就作废"那条规矩对这条探针不适用
+    CV.reset('home');
+    await settle(320);
+    const hits = CV.hits || [];
+    const hasQuestHit = hits.some(function (h) { return h.id === 'claim_quest' || h.id === 'goto_quest'; });
+    mark(!hasQuestHit, '主线全部走完：主页不再有主线卡（claim_quest / goto_quest 两颗热区都消失）',
+      (hasQuestHit ? '**还有那颗热区**' : '热区 0 颗') + ' · 主页热区 ' + hitsBefore + ' → ' + hits.length);
+    const hNoCard = CV.contentH || 0;
+    mark(hNoCard < hWithCard - 10, '那张卡是**整块**没画（主页内容总高变矮，不是画了张空的）',
+      Math.round(hWithCard) + ' → ' + Math.round(hNoCard));
+    /* 兜底锚点：这条引导现在应该锚到「任务」那一格（存在、可点），而不是空气 */
+    const cur = U.coachCurrent && U.coachCurrent();
+    const isBlk4 = !!cur && cur.key === 'tut_blk4';
+    mark(isBlk4, '撤卡之后重新走到的是**开场链最后一步**（探针自己先立住，不然下面两条是空断言）',
+      cur ? ('key=' + cur.key) : '（没有引导在弹）');
+    const anchorHit = isBlk4 ? findHit(cur.targetId) : null;
+    mark(!!anchorHit, 'tut_blk4 的锚点在撤卡之后仍有落点（兜底到「任务」那一格）',
+      anchorHit ? ('落到 ' + anchorHit.id) : ('**指不到**（target=' + (cur && cur.targetId) + '）'));
+    mark(isBlk4 && String(cur.text || '').indexOf('下面这条就是主线') < 0,
+      '撤卡之后引导换成了"去任务页收一下"的文案（不再说"下面这条就是主线"）',
+      cur ? String(cur.text).slice(0, 24) + '…' : '（这条已讲过，没重弹）');
+    U.coachDrop && U.coachDrop();
+  }
+  /* ================= V1.1.5（A1 · 领完停在原地）=================
+     父亲大人：「像任务那里，**每次领取完他就会回到最上面**，得再次下滑」。
+     这条必须机验，不然下次有人往引导里再加一句"把目标滚进视野"就又回来了：
+       ① 在任务页**滚到中段**，点一颗**当前看得到**的「领取」；
+       ② 领完那一下之后，滚动位置**不许跳**（±2px 以内）。
+     （真因是 uiw.js 的引导自动滚动每次都跑；现在每条引导只滚一次。） */
+  {
+    console.log('\n=== A1：任务页领完停在原地（不跳回顶部）===');
+    Core.newGame();
+    if (Core.ensureDaily) Core.ensureDaily();
+    Core.S.tasks.daily.battle5 = 5;                       // 造一条"能领"的日常
+    Core.S.tasks.daily.idle1 = 1;
+    U.coachDrop && U.coachDrop();
+    CV.reset('tasks');
+    await settle(220);
+    U.coachDrop && U.coachDrop();                          // 引导别来抢戏（本条的变量是滚动位置）
+    CV.scroll = 260; CV.render();                          // 滚到"每日"那一段
+    await wait(120);
+    U.coachDrop && U.coachDrop();
+    const beforeScroll = CV.scroll || 0;
+    const claimHit = (CV.hits || []).slice().reverse().find((h) => String(h.id).indexOf('task_claim:') === 0);
+    const canSee = claimHit && (claimHit.y - beforeScroll) > (CV.TOP + 8) && (claimHit.y - beforeScroll) < CV.H;
+    if (canSee) { tap(claimHit); await settle(260); }
+    const afterScroll = CV.scroll || 0;
+    mark(!!canSee, '探针立住：滚到中段时那颗「领取」确实在可视区里',
+      claimHit ? ('按钮在 y=' + Math.round(claimHit.y) + '，滚动 ' + Math.round(beforeScroll)) : '**页面上没有能领的按钮**');
+    mark(canSee && Math.abs(afterScroll - beforeScroll) <= 2,
+      '领一笔之后**停在原地**（滚动位置不跳，±2px）', Math.round(beforeScroll) + ' → ' + Math.round(afterScroll));
+
+    /* 场景 B（更接近真玩家）：**引导正挂着**的时候点高亮那颗「领取」。
+       这里要验的是"领取这个动作本身不带来跳顶"——若领取后立刻有**另一条**引导顶上来，
+       那一次滚动是它的"第一次出现"（父亲大人 V9.6.34 明确要过"让画面跟着滚到对应位置"），
+       所以只报出来、不算失败；**同一条引导重复滚**才是这一轮修掉的那个毛病。 */
+    Core.newGame();
+    if (Core.ensureDaily) Core.ensureDaily();
+    Core.S.tasks.daily.battle5 = 5;
+    Core.S.tasks.daily.idle1 = 1;
+    /* 让"当前这一步"正好是 q_tasks（领 1 次奖励）—— 这样它那条引导才会登记；
+       同时把模块解锁全打开（新档里 tasks 还没解锁，引导不会挂）。 */
+    D.UNLOCKS.forEach(function (u) { Core.S.unlocks[u.id] = true; });
+    const cut = (D.MAIN_QUESTS || []).findIndex(function (q) { return q.id === 'q_tasks'; });
+    if (cut > 0) (D.MAIN_QUESTS || []).slice(0, cut).forEach(function (q) { if (Core.S.quests.claimed.indexOf(q.id) < 0) Core.S.quests.claimed.push(q.id); });
+    if (Core.S.coachSeen) Object.keys(Core.S.coachSeen).forEach(function (k) { delete Core.S.coachSeen[k]; });
+    U.coachDrop && U.coachDrop();
+    CV.reset('tasks');
+    await settle(220);
+    const st0 = U.coachCurrent && U.coachCurrent();
+    const hi = st0 ? findHit(st0.targetId) : null;
+    let s2 = 0;
+    if (hi) {
+      CV.scroll = Math.max(0, Math.min(CV.maxScroll || 0, hi.y - 220));   // 把它滚进视野附近
+      CV.render(); await wait(120);
+      s2 = CV.scroll || 0;
+      tap(findHit(st0.targetId)); await settle(260);
+    }
+    const st1 = U.coachCurrent && U.coachCurrent();
+    const promoted = st1 && (!st0 || st1.key !== st0.key);
+    mark(!!hi, '探针立住：任务页上确实挂着一条引导（锚点在能领的那颗按钮上）',
+      st0 ? ('key=' + st0.key) : '**没有引导弹出来**');
+    mark(!hi || promoted || Math.abs((CV.scroll || 0) - s2) <= 2,
+      '引导挂着时领取：同一条引导**不会**把人拽回去（若换了新引导，那一次滚动是它第一次出现）',
+      '滚动 ' + Math.round(s2) + ' → ' + Math.round(CV.scroll || 0) + (promoted ? (' · 顶上来了新引导 ' + st1.key) : ''));
+    /* 场景 C：这一轮修复的**签名断言**（能抓住"有人把那条一次性守卫删了"）：
+       同一条引导挂着时，**单纯的原地重画不许移动画面** —— 旧代码每一帧都在做
+       "把高亮那颗重新滚进视野"，于是任何一次原地重画（领取、切换、哪怕是收个提示）
+       都会把画面拽走。做法：把滚动归零、让高亮落到视野下方，再重画一帧看它有没有被拽。
+       （新代码只在这条引导**第一次出现**时滚一次，所以这一帧必须纹丝不动。） */
+    if (hi && st0) {
+      /* 上一步把那一条消耗掉了 → 重新挂一条（清掉"看过"标记 + 重进这一页），
+         否则这一步是在"没有引导"的空环境下重画，**改坏也验不出来**（第一版就是这样）。 */
+      if (Core.S.coachSeen) delete Core.S.coachSeen[st0.key];
+      U.coachDrop && U.coachDrop();
+      CV.reset('tasks'); await settle(220);
+      const c2 = U.coachCurrent && U.coachCurrent();
+      CV.scroll = 0;
+      CV.render(); await wait(160);
+      mark(!!c2 && (CV.scroll || 0) === 0,
+        '同一条引导挂着时，原地重画**不移动画面**（旧代码会把高亮那颗滚回视野、把玩家拽走）',
+        (c2 ? '' : '（引导没挂上）') + '重画后滚动 ' + Math.round(CV.scroll || 0));
+    }
+    U.coachDrop && U.coachDrop();
+  }
   console.log('结论：' + (bad === 0 ? '整条主线"真玩一遍"没有卡点 ✓' : '有 ' + bad + ' 处要修 ✗') + '\n');
   process.exitCode = bad ? 1 : 0;
 })();

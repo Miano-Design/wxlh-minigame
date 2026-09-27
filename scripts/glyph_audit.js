@@ -18,6 +18,8 @@ const JS = path.resolve(__dirname, '../js');
 
 let pass = 0, fail = 0;
 const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
+/* V1.1.11（网页版归档）：⑤ 那两条是"两端同源"对表 —— 网页版没了就 ⏭ 跳过，其余照评。 */
+const WB = require('./_web_basis');
 
 /* ---------- 把 data.js 里的 BLOOD_GLYPH / BLOOD_THEME 取出来 ---------- */
 const src = fs.readFileSync(path.join(JS, 'data.js'), 'utf8');
@@ -182,12 +184,14 @@ console.log('\n=== 命格印记（六枚徽记）· 可数出来的四条 ===');
     out.length ? out.slice(0, 4).join('；') : '6 × 若干块，全在框内');
 
   /* ⑤ 两端同源 */
-  const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
+  const web = WB.read('js/ui.js');
   const mini = fs.readFileSync(path.join(JS, 'cv.js'), 'utf8');
-  t('⑤ 顶点表只有一份：两端渲染都从 D.BLOOD_GLYPH 取（谁都没自己写一套形状）',
-    /D\.BLOOD_GLYPH\[bl\]/.test(web) && /DATA\.BLOOD_GLYPH/.test(mini));
-  t('⑤ 三档调子两端同一套（网页版 fill-opacity ／ 小游戏 CV.a）',
-    /BL_TONE = \[1, 0\.55, 0\.3\]/.test(web) && /BL_TONE = \[1, \.55, \.30\]/.test(mini));
+  WB.OK ? t('⑤ 顶点表只有一份：两端渲染都从 D.BLOOD_GLYPH 取（谁都没自己写一套形状）',
+    /D\.BLOOD_GLYPH\[bl\]/.test(web) && /DATA\.BLOOD_GLYPH/.test(mini))
+    : WB.skip('⑤ 顶点表只有一份（两端同源）');
+  WB.OK ? t('⑤ 三档调子两端同一套（网页版 fill-opacity ／ 小游戏 CV.a）',
+    /BL_TONE = \[1, 0\.55, 0\.3\]/.test(web) && /BL_TONE = \[1, \.55, \.30\]/.test(mini))
+    : WB.skip('⑤ 三档调子两端同一套');
 
   /* ⑥ 锚色与相邻间隔：本轮一个都不许动（写死的是改之前的实测值） */
   const LAMP = { 狼人: '#6a9836', 修真: '#369b87', 绯红: '#cd6f7f', 科技: '#7b87d1', 念动力: '#b671cd', 泰坦: '#a8873b' };

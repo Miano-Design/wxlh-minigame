@@ -106,6 +106,15 @@ console.log('=== 装备详情页：四种装备都要把该画的卡画出来 ==
   const ts = drawEq(sig.uid);
   t('专属装备：写明了限本人', /专属/.test(ts), (ts.match(/专属[^|]*/) || ['(没有)'])[0]);
   t('专属装备：基础值和当前进度同档（不是死数 320）', sig.base.atk > 900, '攻 ' + sig.base.atk);
+  /* 2026-09-27（本命 36 件）：详情页要多一行"本命"标（父亲大人：「每人一套本命」），
+     而且**六个部位都要画得出来** —— 旧版 6 件全是武器，头/胸甲/手/腿/饰品这条路从没走过。 */
+  t('专属装备：写了本命标（本命 ＋ 角色名）', /本命/.test(ts) && ts.indexOf(Core.charName(sig.charId)) >= 0,
+    ts.indexOf(Core.charName(sig.charId)) >= 0 ? '本命 · ' + Core.charName(sig.charId) : '(没有本命标)');
+  const armorIdx = D.SIGNATURE_EQUIPS.findIndex((s) => s.slot === 'armor');
+  const sigArmor = Core.grantSignatureEquip(armorIdx).equip;
+  const ta = drawEq(sigArmor.uid);
+  t('本命：非武器部位（胸甲）也画得出来', /专属/.test(ta) && /本命/.test(ta) && /胸甲/.test(ta),
+    (ta.match(/胸甲/) || ['(没有)'])[0] + ' · ' + sigArmor.name);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

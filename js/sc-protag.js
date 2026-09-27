@@ -170,13 +170,25 @@
          灯色跟的是**大境界**（第 5 大境封顶，之后交给光晕）。 */
       const pbl = S.player.bloodline;
       const lamp = pbl ? CV.blLamp(pbl, Core.realmState().realm) : null;
-      const ty = U.y;
-      U.h3('🧬 命格', pbl ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒', lamp ? { color: lamp } : null);
-      if (lamp) U.draw(function () { CV.blGlyph(pbl, U.ix() + U.iw() - 8 * CV.SCALE, ty + CV.FS.f1 * 1.3 / 2, 14 * CV.SCALE, lamp); });
+      /* V1.0.6（父亲大人 09-24 反馈图 02「那一颗压在 Lv.1 / 50 上」）：
+         印记原来画在标题行**最右端**，正好盖住右对齐的等级数字（截图里 50 被吃掉了）。
+         改成网页版的站位 —— `🧬 命格` 后面跟着印记，右边那串等级字留给数字。 */
+      U.h3('🧬 命格', pbl ? 'Lv.' + S.player.bloodlineLv + ' / ' + D.BLOODLINE_MAX : '未觉醒',
+        lamp ? { color: lamp, glyph: { bl: pbl, color: lamp, size: CV.ICO * 0.75, after: true } } : null);
       if (S.player.bloodline) {
         U.hint(S.player.bloodline + '（' + ((D.BLOOD_THEME[S.player.bloodline] || {}).name || '') + '）：' + (D.BLOODLINES[S.player.bloodline] || {}).desc, 2 * CV.SCALE);
         U.space(CV.SP[1]);
         if (blCost) {
+          /* V1.1.4（A12-F · 主角命格也吃「血髓晶」）：与伙伴详情同一套 ——
+             材料单独一行（`have / need`），货币那串留在按钮上。
+             ⚠️ 两边必须同源：主角这条走 Core.bloodlineQuote 取料，逻辑层
+             `upgradePlayerBloodline` 也走同一个 quote，改一处不会漏另一处。 */
+          const blMat = (D.ITEMS[blCost.mat] || {}).name || blCost.mat;
+          const blHave = S.items[blCost.mat] || 0;
+          if (blCost.matN) {
+            U.kv(blMat, blHave + ' / ' + blCost.matN, blHave >= blCost.matN ? CV.C.green : CV.C.dim);
+            U.space(CV.SP[1]);
+          }
           U.btnRow([{ label: '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
         } else {
           U.hint('已满级', 2 * CV.SCALE);

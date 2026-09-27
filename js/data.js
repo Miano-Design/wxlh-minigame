@@ -29,6 +29,19 @@ window.DATA = (function () {
      低稀有度快点满（前期练手），顶级要攒一阵子（长线目标）—— 又因为同档通用，
      这 40 次不管抽到哪个 SSR 都算数。 */
   const STAR_COST = [0, 20, 40, 70, 110, 160];              // 1→2…5→6 所需碎片（满星合计：N 60 / R 130 / SR 240 / SSR·UR 400）
+  /* ================= V1.1.14（0927-F · 父亲大人拍板）=================
+     「**UR 就改成 200**」—— **只动 UR 这一档**（满星合计 400 → 200），N/R/SR/SSR 一个字不动。
+     ⚠️ `STAR_COST` 是**按星级共用**的一张表，而各档的星级上限不同（N3 / R4 / SR5 / SSR·UR6）——
+        直接把它砍一半会**同时**改掉 N/R/SR/SSR（那就不是"只动 UR"了）。
+        所以走"**哪一档走哪条成本曲线**"：UR 单独一条曲线，而且**每一步都正好是共享曲线的一半**
+        （10 = 20/2 · 20 = 40/2 · 35 = 70/2 · 55 = 110/2 · 80 = 160/2）→ 满星 **200** ✓。
+        写成"一半的硬值"而不是 `×0.5`：数值轮以后改共享表时，一眼能看出 UR 这条还对不对齐。 */
+  const STAR_COST_BY_RARITY = { UR: [0, 10, 20, 35, 55, 80] };
+  /* 取"这一档这一星"的成本 —— **全项目唯一出口**（报价、扣款、界面三处都读它，不许各算一份）。 */
+  function starCostOf(rarity, star) {
+    const tbl = STAR_COST_BY_RARITY[rarity] || STAR_COST;
+    return tbl[star] || 0;
+  }
   const DUP_SHARDS = 10;                                    // 重复抽到任何稀有度都只给 10 碎片（统一）
   const SHARD_RARITIES = ['N', 'R', 'SR', 'SSR', 'UR'];      // 碎片池按这五档分
   /* V9.6.86（父亲大人："阵营里的科技和血统里的科技重名，改。")：
@@ -113,7 +126,16 @@ window.DATA = (function () {
   const BAG_BASE_ITEM_CAP = 50;   // 道具（消耗品 / 宝箱 / 经验模块 / 血清 / 招募券）
   const BAG_BASE_MAT_CAP = 50;    // 材料（强化材料 + 兽魂石）
   const BAG_BASE_EQ_CAP = 50;     // 未穿戴的装备，每件 1 格
-  const BAG_BASE_CAP = 100;       // 老档迁移用（旧的合并池基础值）
+  const BAG_BASE_CAP = 50;        // 老档迁移用（旧的合并池基础值）——V1.1.1 起与上面三档同为 50
+  /* V1.1.1（父亲大人 0926 拍板）：「**并池容量还是 50**，**单格物品上限 100** 个，
+     超过 100 就会**占两格**，这样**扩容也用的上了**」。
+     · 一格最多装 `BAG_STACK_MAX` 个，第 101 个开始占**第二格**（同一件东西占多格，
+       界面上每格写满 100、最后一格写余数，点任意一格进的是**同一个详情页**）；
+     · 占用格数 = `Σ ceil(件数 / BAG_STACK_MAX)`；**只有一处定义**（下面是唯一那份常量，
+       界面与逻辑层都读它 —— 这条有尺子钉着）；
+     · 容量上限口径：`max(50, 已扩容值, 实际理论占用)` —— 任何改动都不许让老档"缩水"
+       （他明确"老档不做一次性宽限"，靠这个取大天然兜住：老档一读档，容量自动不低于它已经占的格数）。 */
+  const BAG_STACK_MAX = 100;
   /* V9.6.115（父亲大人："每日扫荡上限 10 次"）：60 → 10。
      扫荡是"重复劳动"，给多了等于把刷本收益按按钮发放；灯阁权限那条升级线仍然额外加次数
      （3 级 / 8 级各 +4 → 满级最多 18 次），这条加成是花材料买的，保留。 */
@@ -155,6 +177,185 @@ window.DATA = (function () {
     { id: 'holy',       name: '圣洁晶石', icon: '✦ ', color: '#ff9ecb' },
     { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#7ee0a3' },
   ];
+
+  /* ================= 图标形状（V1.0.6 · **一处定义，两端各渲染一次**） =================
+     父亲大人 2026-09-24 拍板「B，收口」：
+       · 底栏四格（灯阁/残域/执灯者/背包）与**四种货币**的图标，**形状只有这一处**，
+         两端都不许再各写一套（与 FACTION_GLYPH / BLOOD_GLYPH 同一个做法：数据层放几何，
+         界面层只负责把几何画出来）；
+       · 渲染各一次：网页版 → `ui.js` 的 `iconSvg()` 拼成 inline SVG；画布端 → `cv.js` 的
+         `CV.drawIcon()` 直接喂 2D ctx。两端同一份 op、同一线宽、同一圆角。
+     坐标系 **24×24**（左上 0,0）；描边型统一 strokeWidth **1.9**（货币那几颗是填充型）。
+     op 词表（够用就好，两端都只认这几个，**不许引 SVG path 解析**）：
+       ['line',  x1,y1,x2,y2, lw?]            直线
+       ['rect',  x,y,w,h,r,   lw?]            圆角矩形（描边）
+       ['arc',   cx,cy,r,a0,a1, lw?]          圆弧（角度制：0°＝右，顺时针为增）
+       ['circle',cx,cy,r,     lw?]            圆（描边）
+       ['poly',  [[x,y]…],    lw?]            折线（自动闭合，描边）
+       ['fpoly', [[x,y]…]]                    多边形（填充）
+       ['frect', x,y,w,h]                     矩形（填充）
+       ['ring',  cx,cy,rOut,rIn]              圆环（外圆挖内圆 ⇒ evenodd）
+       ['mark',  x1,y1,x2,y2, color, alpha]   盖在填充形上的记号线（菱形那道切面）
+     尺子：scripts/visual_audit.js（两端图标同源）＋ 小游戏端 scripts/visual_audit.js ⑦⑧。 */
+  const NAV_ICONS = {
+    /* 底栏四格（照父亲大人采纳的方案 B 草图：灯笼 / 交叉双剑 / 提灯的人 / 背包） */
+    home: {
+      name: '灯阁',
+      ops: [
+        ['arc', 12, 6.6, 2.6, 180, 360],      // 提梁
+        ['line', 8.2, 8.0, 15.8, 8.0],        // 上盖
+        ['rect', 9.2, 8.0, 5.6, 8.8, 1.5],    // 灯身
+        ['line', 8.2, 16.8, 15.8, 16.8],      // 下盖
+        ['line', 12, 16.8, 12, 19.2],         // 穗
+      ],
+    },
+    dungeon: {
+      name: '残域',
+      ops: [
+        ['line', 6.2, 17.8, 17.8, 6.2],       // 刃 A
+        ['line', 17.8, 17.8, 6.2, 6.2],       // 刃 B
+        ['line', 5.0, 16.6, 7.4, 19.0],       // 护手 A
+        ['line', 16.6, 19.0, 19.0, 16.6],     // 护手 B
+      ],
+    },
+    roster: {
+      name: '执灯者',
+      ops: [
+        ['circle', 7.0, 6.4, 2.2],            // 头
+        ['line', 7.0, 8.6, 7.0, 18.2],        // 身
+        ['line', 7.0, 11.6, 12.6, 11.6],      // 提灯的手
+        ['rect', 12.6, 11.6, 5.6, 6.6, 1.2],  // 灯身
+        ['arc', 15.4, 11.6, 1.4, 180, 360],   // 灯提梁
+        ['line', 15.4, 18.2, 15.4, 19.6],     // 灯穗
+      ],
+    },
+    bag: {
+      name: '背包',
+      ops: [
+        ['rect', 8.0, 8.6, 8.0, 10.2, 1.6],   // 包身
+        ['arc', 12, 8.6, 2.4, 180, 360],      // 提手
+        ['line', 8.0, 12.6, 16.0, 12.6],      // 盖缝
+        ['rect', 10.6, 12.6, 2.8, 2.6, 0.6],  // 扣
+      ],
+    },
+  };
+  /* 四种货币：几何**照画布端原有那四颗搬过来**（网页版从此与画布端同形）——
+     铜钱＝外圆挖内圆＋方孔；异界结晶＝竖菱形＋一道切面；圣洁晶石＝四角星；转生点＝双环。 */
+  const CUR_ICONS = {
+    points: [
+      ['ring', 12, 12, 10.8, 6.7],
+      ['frect', 9.75, 9.75, 4.5, 4.5],
+    ],
+    otherworld: [
+      ['fpoly', [[12, 0.96], [20.16, 12], [12, 23.04], [3.84, 12]]],
+      /* 切面线：**不写死白色**（visual_audit ②-1：色值只准进色板）—— 用图标自己的色、55% 透明，
+         两端都认（画布 op[5] 省略 = 用当前色；网页版同理走 currentColor）。 */
+      ['mark', 8.25, 6.92, 15.75, 17.08, null, 0.55],
+    ],
+    holy: [
+      ['fpoly', [[12, 0.48], [14.72, 9.28], [23.52, 12], [14.72, 14.72],
+        [12, 23.52], [9.28, 14.72], [0.48, 12], [9.28, 9.28]]],
+    ],
+    rp: [
+      ['circle', 6.72, 12, 5.28, 2.88],
+      ['circle', 17.28, 12, 5.28, 2.88],
+    ],
+  };
+  /* 描边型图标的统一线宽（24 视框里的单位）；两端都读这一个数 */
+  const ICON_STROKE = 1.9;
+  /* ================= 世界图标（V1.1.15 · 派单 I 第 2 条 · 视觉复审 §二·5 / §三·3）=================
+     起因（父亲大人 09-27 复审那条「世界格 emoji 偏弱」）：
+     36 个残域原来一律用 emoji，三机型上量出来 ——「🕷 在深绿格上几乎看不见」（黑蜘蛛压深色底）、
+     「🦠 只有一团绿」、「四个图标四种画风」，而它**旁边就是**底栏那套自绘矢量（灯阁/残域/执灯者/背包）
+     与四种**自绘货币**：同一屏两到三套图形语言，且各平台 emoji 长相不同（iOS 上比模拟器更艳更圆）。
+
+     口径（我的建议，本单落地）：**先做"最常用的 8~10 个"** —— 玩家从 W01 一路往上打，
+     开局那十几个世界才是他每天看见的；emoji 只留给后面还没做到的世界。
+     形状＝**该世界的机制**（不是它名字的字面）：突袭＝爪痕、陷阱＝齿轮、护盾＝盾、中毒＝毒滴……
+     判据是复审里那句「把任意两个图标并排缩小到 24px，还能不能说出哪个是哪个」。
+
+     结构照 CUR_ICONS（**直接就是 ops**，不是 {name, ops}）：表结构只有 iconOpsOf 一处知道。
+     `w.ico`（emoji）**一个字都不删** —— 它是没做到的世界那条兜底，也是图标唯一性尺子的比对源。 */
+  const WORLD_ICONS = {
+    /* W01 黏液巢穴 · 感染/中毒 → 毒滴 */
+    W01: [
+      ['arc', 12, 14.4, 5.8, 180, 360],       // 底半圆
+      ['line', 6.2, 14.4, 12, 4.0],           // 左侧收成尖顶
+      ['line', 17.8, 14.4, 12, 4.0],          // 右侧收成尖顶
+    ],
+    /* W02 潜影窟 · 突袭/裂伤 → 三道爪痕 */
+    W02: [
+      ['arc', 3.0, 12, 8.0, 300, 60],
+      ['arc', 7.6, 12, 8.0, 300, 60],
+      ['arc', 12.2, 12, 8.0, 300, 60],
+    ],
+    /* W03 怨声旧宅 · 恐惧/诅咒 → 旧宅（屋顶 ＋ 屋身 ＋ 门）
+       ⚠️ 第一版画的是"方形门 ＋ 头顶一道弧"，24px 下**读成了挂锁** —— 而这一格旁边就是
+       「已通关」的小标，锁形符号会说反话。换成房子轮廓（两道屋顶线 ＋ 屋身 ＋ 门）就没这问题。 */
+    W03: [
+      ['line', 4.6, 11.4, 12, 4.8],
+      ['line', 19.4, 11.4, 12, 4.8],
+      ['rect', 7.0, 11.4, 10.0, 8.6, 1.0],
+      ['rect', 10.4, 15.0, 3.2, 5.0, 0.6],
+    ],
+    /* W04 机关地宫 · 陷阱/眩晕 → 齿轮（轮齿 8 枚） */
+    W04: [
+      ['circle', 12, 12, 4.6],
+      ['circle', 12, 12, 1.5, 1.3],
+      ['line', 16.6, 12, 19.2, 12], ['line', 15.25, 15.25, 17.09, 17.09],
+      ['line', 12, 16.6, 12, 19.2], ['line', 8.75, 15.25, 6.91, 17.09],
+      ['line', 7.4, 12, 4.8, 12], ['line', 8.75, 8.75, 6.91, 6.91],
+      ['line', 12, 7.4, 12, 4.8], ['line', 15.25, 8.75, 17.09, 6.91],
+    ],
+    /* W05 无归客轮 · 濒死判定 → 船锚 */
+    W05: [
+      ['circle', 12, 4.6, 1.9],
+      ['line', 12, 6.5, 12, 19.0],
+      ['line', 8.2, 9.2, 15.8, 9.2],
+      ['arc', 12, 13.6, 5.4, 30, 150],
+    ],
+    /* W06 轨道废土带 · 护盾/炮击 → 盾 */
+    W06: [
+      ['poly', [[12, 3.6], [18.8, 6.4], [18.8, 11.8], [12, 20.4], [5.2, 11.8], [5.2, 6.4]]],
+      ['line', 12, 6.8, 12, 16.8],
+    ],
+    /* W07 酣眠迷境 · 睡眠/幻觉 → 月牙（外弧 ＋ 内弧，尖端收在一起） */
+    W07: [
+      ['arc', 12, 12, 8.6, 55, 305],
+      ['arc', 13.0, 12, 8.06, 61, 299],
+    ],
+    /* W08 哑雾小镇 · 浓雾 → 四道错开的雾线 */
+    W08: [
+      ['line', 4.4, 7.6, 14.2, 7.6],
+      ['line', 9.8, 11.2, 19.6, 11.2],
+      ['line', 4.4, 14.8, 14.2, 14.8],
+      ['line', 9.8, 18.4, 19.6, 18.4],
+    ],
+    /* W09 巨兽孤屿 · 撕裂/群攻 → 獠牙（三颗牙挂在同一道颚线上） */
+    W09: [
+      ['line', 4.6, 7.4, 19.4, 7.4],
+      ['poly', [[5.8, 7.4], [7.4, 14.2], [9.0, 7.4]]],
+      ['poly', [[10.5, 7.4], [12.0, 15.4], [13.5, 7.4]]],
+      ['poly', [[15.0, 7.4], [16.6, 14.2], [18.2, 7.4]]],
+    ],
+    /* W10 瘴沼深处 · 中毒/缠绕 → 藤蔓（折线 ＋ 两片叶） */
+    W10: [
+      ['line', 12.0, 3.8, 8.4, 8.2],
+      ['line', 8.4, 8.2, 15.6, 12.2],
+      ['line', 15.6, 12.2, 8.4, 16.2],
+      ['line', 8.4, 16.2, 12.0, 20.2],
+      ['circle', 5.8, 9.6, 1.6, 1.3],
+      ['circle', 18.2, 11.0, 1.6, 1.3],
+    ],
+  };
+  /* 取形状：**表结构只有这里知道**（nav 那两行是 {name, ops}；货币直接就是 ops）——
+    两端都只调这一个口，省得各自去猜结构（V1.0.6 就踩过一次：画布端按 {ops} 取货币，
+    取到 undefined，"找不到就不画"如实生效 → 顶栏四颗货币图标**当场消失**，是截图看出来的）。 */
+  const iconOpsOf = (kind, id) => {
+    const t = (kind === 'cur') ? CUR_ICONS : (kind === 'world') ? WORLD_ICONS : NAV_ICONS;
+    const e = t && t[id];
+    return e ? ((kind === 'nav') ? e.ops : e) : null;
+  };
 
   /* ================= 角色 ================= */
   // 定位 → 战斗模板
@@ -249,8 +450,8 @@ window.DATA = (function () {
     ['C056', '白昼', '雾乡', '念动力', '终极治疗', 'UR'],
     ['C057', '深渊', '灰原', '泰坦', '终极狂战', 'UR'],
     ['C058', '素问', '幽都', '修真', '终极控制', 'UR'],
-    ['C059', '楚衍', '雾乡', '修真', '精神支配', 'UR', 'hidden'],
-    ['C060', '郑遥', '灰原', '狼人', '终极狂战', 'UR', 'hidden'],
+    ['C059', '楚衍', '雾乡', '修真', '精神支配', 'UR'],
+    ['C060', '郑遥', '灰原', '狼人', '终极狂战', 'UR'],
     // ---- 第二梯队（对标 Hero 的 122 名）：到 120 名为止，稀有度按 R/SR/SSR/UR 铺开 ----
     ['C061', '骆青', '灰原', '狼人', '战士', 'R'],
     ['C062', '商羽', '雾乡', '狼人', '剑士', 'R'],
@@ -312,24 +513,24 @@ window.DATA = (function () {
     ['C114', '山吹时雨', '幽都', '念动力', '终极控制', 'UR'],
     ['C115', '白河秋', '灰原', '绯红', '终极刺客', 'UR'],
     ['C116', '天草洋吾', '雾乡', '修真', '元素大师', 'UR'],
-    ['C117', '零式', '锈港', '泰坦', '全能战士', 'UR', 'hidden'],
-    ['C118', '无相', '幽都', '修真', '精神支配', 'UR', 'hidden'],
-    ['C119', '终焉', '灰原', '泰坦', '终极狂战', 'UR', 'hidden'],
-    ['C120', '灯阁代行者', '雾乡', '狼人', '终极剑修', 'UR', 'hidden'],
+    ['C117', '零式', '锈港', '泰坦', '全能战士', 'UR'],
+    ['C118', '无相', '幽都', '修真', '精神支配', 'UR'],
+    ['C119', '终焉', '灰原', '泰坦', '终极狂战', 'UR'],
+    ['C120', '灯阁代行者', '雾乡', '狼人', '终极剑修', 'UR'],
   ];
   // 六维总和区间：给了明确数值的老角色照旧（地图里直接写死），没写的按这里的区间 + 定位权重生成。
   // N/R 的区间是从老角色的实际数值反推的（N 约 325、R 约 350~380），保证新老角色强度连续。
   const RARITY_TOTAL = { N: [300, 335], R: [340, 385], SR: [330, 390], SSR: [440, 500], UR: [540, 610] };
 
   const characters = CHAR_TABLE.map(row => {
-    const [id, name, faction, bloodline, role, rarity, hiddenOrA, b, c, d, e, f] = row;
+    const [id, name, faction, bloodline, role, rarity, a1, b, c, d, e, f] = row;
     /* V9.6.86：六维权重仍然按**原来那套细分定位**算（不然 120 个角色的属性会整体漂移），
        但 `kind`（战斗模板）与 `bloodline`（身份）在下面统一按功能重排 —— 血统就是定位。 */
     const rawKind = ROLE_KIND[role] || 'warrior';
     const kind = rawKind;
     let attrs;
-    if (typeof hiddenOrA === 'number') {
-      attrs = [hiddenOrA, b, c, d, e, f];
+    if (typeof a1 === 'number') {
+      attrs = [a1, b, c, d, e, f];
     } else {
       const [lo, hi] = RARITY_TOTAL[rarity];
       const total = ri(lo, hi);
@@ -339,7 +540,6 @@ window.DATA = (function () {
     }
     return {
       id, name, faction, bloodline, role, kind, rawKind, rarity,
-      hidden: hiddenOrA === 'hidden',
       attrs: { muscle: attrs[0], immune: attrs[1], cell: attrs[2], nerve: attrs[3], intelligence: attrs[4], spirit: attrs[5] },
       skills: null,   // 占位：BLOODLINE_SKILLS 定义完之后统一换成血统技能（V9.6.86 起伙伴也只有血统技能这一套）
     };
@@ -943,10 +1143,23 @@ window.DATA = (function () {
      ⚠ 装备品质和**伙伴稀有度是两条线**：D.RARITIES 是角色用的，别往里塞 MYTH，
        不然抽卡概率表、星级上限、重复碎片全都会被带偏。装备自己一条 EQUIP_RARITIES。 */
   const EQUIP_RARITIES = ['N', 'R', 'SR', 'SSR', 'UR', 'MYTH'];
-  const EQUIP_RARITY_NAME = { N: '普通', R: '精良', SR: '稀有', SSR: '史诗', UR: '传说', MYTH: '神话' };
+  /* V1.1.9（续13 · 乙组）：稀有度名只有**这一份** —— 装备与道具/材料共用（报告 §10.3 要求沿用同一套）。
+     `EQUIP_RARITY_NAME` 保留成它的别名，免得全项目几十处调用点都要改。 */
+  const RARITY_NAME = { N: '普通', R: '精良', SR: '稀有', SSR: '史诗', UR: '传说', MYTH: '神话' };
+  const EQUIP_RARITY_NAME = RARITY_NAME;
   const EQUIP_RARITY_MULT = { N: 1.00, R: 1.15, SR: 1.35, SSR: 1.65, UR: 2.00, MYTH: 2.80 };
   const EQUIP_AFFIX_COUNT = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, MYTH: 5 };
-  const DECOMPOSE_GAIN = { N: 5, R: 15, SR: 50, SSR: 180, UR: 600, MYTH: 2400 };
+  /* ================= V1.1.9（续13 · P0-3 堵"装备强制折现"）=================
+     改动：SSR 180 → **90** · UR 600 → **240** · MYTH 2400 → **960**（N / R / SR 不动）。
+     依据＝《整体数值审核报告》§三 3.2 第 1/3 条 ＋ §七 7.2 第 1 条（**本轮最大的经济缺口**）：
+       · **B6 的"扫荡 +30 次（看广告）"把装备产出从 21 件/天抬到 51 件/天**，而**装备格只有 50**；
+       · 于是 `grantEquip` 的"格满自动分解"（core.js）会**替玩家把一整天的装备折现** ——
+         只算广告那 30 件 ≈ **+14,277 ◆/天**，加原本 21 件 ≈ **+24,272 ◆/天**；
+       · 而 ◆ 的**基线日产只有 5,636** → 光这一条就是基线的 **4.3 倍**，B11 只对冲了神话、没对冲这条路。
+     口径：这不是削玩家（**历史价就是历史价，已分解的既往不追溯**），
+           是"不让广告的 +30 次扫荡把 ◆ 长线打穿"—— 与 B11 收神话**同一类对冲**。
+     反解：折现总额要回到基线量级 → 按"B6 把装备产出 ×2.4"反比收 UR/SSR 那两档（约 ×0.4~0.5）。 */
+  const DECOMPOSE_GAIN = { N: 5, R: 15, SR: 50, SSR: 90, UR: 240, MYTH: 960 };
   const ENHANCE_RATE = [1, 1, 1, 1, 1, 1, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25]; // +0→+1…+19→+20
   // 世界套装：2 件 / 3 件加成
   const SETS = {};
@@ -1027,23 +1240,6 @@ window.DATA = (function () {
     ranger: '科技', mage: '修真', controller: '修真', support: '念动力', healer: '念动力',
   };
 
-  /* ================= 伙伴专属装备（UR，绑定角色 · 六支血统各一件） =================
-     V9.6.83（父亲大人："伙伴专属现在有两个血族，念动力血统的没有，应该是选出各个血统的最强伙伴，
-     不要有重复血统的，这显得很看不起念动力偏爱血族似的"）。
-     旧清单是六名 SSR，其中血族两个人（沈夜 + 白夜）、念动力空缺，而且有几支还不是本血统最强的。
-     现在改成**六支血统各挑最强的那一位**，一人一件、不重复；因为最强的基本都在 UR 档，
-     所以这六件是 UR 专属（UR 有 100 抽保底、且优先给没拥有过的伙伴，长期一定拿得到）。
-     ⚠ 基础值不再写死 320 —— 那是"死数"，第 20 张图之后随便一件 UR 武器都碾压它，
-       等于把"专属"做成了纪念品。现在跟装备箱同口径：按你**当前进度**那张图的档位生成，
-       再乘 1.15（专属就该比同档普通 UR 好一点）。 */
-  const SIGNATURE_EQUIPS = [
-    { charId: 'C120', name: '代行之刃', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.18 }, { k: 'skillPct', v: 0.15 }], text: '灯阁代行者专属：本命飞剑（狼人·战士）' },
-    { charId: 'C059', name: '元素咏叹', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.24 }, { k: 'critPct', v: 0.06 }], text: '楚衍专属：精神共鸣凝成的法珠（修真·法师）' },
-    { charId: 'C115', name: '绯河刃',   slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.20 }, { k: 'critDmg', v: 0.30 }], text: '白河秋专属：绯红的极致一击（绯红·刺客）' },
-    { charId: 'C112', name: '星舰主炮', slot: 'weapon', affixes: [{ k: 'atkPct', v: 0.22 }, { k: 'critDmg', v: 0.22 }], text: '苍岚零专属：重火力压制（科技·射手）' },
-    { charId: 'C114', name: '心识之环', slot: 'weapon', affixes: [{ k: 'skillPct', v: 0.20 }, { k: 'spiritPct', v: 0.18 }], text: '山吹时雨专属：念动力的极致控制（念动力·辅助）' },
-    { charId: 'C117', name: '磐岩壁垒', slot: 'weapon', affixes: [{ k: 'hpPct', v: 0.20 }, { k: 'defPct', v: 0.18 }], text: '零式专属：不动如山的壁垒（泰坦·肉盾）' },
-  ];
   /* 2026-09-23（文案策划 · 提审合规；48 小时整改期）：**幽都（ghost）阵营的整套装备名换壳**。
      原词表整批踩《微信小程序平台运营规范》6.1.3「封建迷信 / 宗教」——
        器物与着装：护身**佛珠**（佛教法器）、**符**咒道袍 / **符**纸额带 / **符**咒护腕（道门的符）、
@@ -1126,8 +1322,250 @@ window.DATA = (function () {
        最想要的属性，掉出来的装备**一件都带不了**；而专属「心识之环」写着 spiritPct，
        界面上只能显示成英文键名（词条名表里查不到）。补进来，三件事一起解决。 */
     spiritPct: { name: '精神', min: 0.03, max: 0.22, pct: true },
+    /* ================= V1.1.13（0927-E · 总监 D 单 §3.3 第三行）=================
+       **速度**原来也不在词条池里：可「护腿 / 饰品」的基础属性里就有 spd（见 makeEquip 的 base 段），
+       科技血统的核心又是速度，而评分表里本来就留着 `spdPct: 900`（core.equipScore）——
+       说明当初是**漏了**，不是有意不给。补进来（区间与攻击力同宽：2%~20%）。
+       ⚠️ 这是**加词条**，会改变掉落价值的分布 → 总监 §九 S21 要求重跑数值尺子（已跑，见回单）。 */
+    spdPct: { name: '速度', min: 0.02, max: 0.20, pct: true },
   };
   const AFFIX_BY_RARITY = { N: 0.25, R: 0.4, SR: 0.6, SSR: 0.8, UR: 1.0, MYTH: 1.35 }; // 词条取值位置（区间内；神话可以越过区间上限，这是它的价值所在）
+  /* ================= V1.1.13（0927-E · 总监 D 单 §3.4 表 C · 部位加权池）=================
+     权重：**主属性 ×4 · 副属性 ×2 · 异类 ×1**（异类**不是 0** —— 留一点"惊喜"）。
+     ⚠️ 权重只管"**抽到哪一条**"，**不管取值**（取值仍走 `rollAffixValue`，两件事分开）。
+     为什么必须加（总监 §十一·反对 4）：不加的话，"重抽词条"洗出来的还是废条（武器出生命 / 防御），
+     玩家会得出"重铸是骗钱的"这个结论 —— 而这条结论救不回来。
+     类型：**DEFAULT（可偏离）** —— 数值轮若认为某格不对，改权重不用改结构。 */
+  const AFFIX_WEIGHT_BY_SLOT = {
+    weapon:    { atkPct: 4, critPct: 2, critDmg: 2, skillPct: 2, hpPct: 1, defPct: 1, resPct: 1, evaPct: 1, spiritPct: 2, spdPct: 1 },
+    hands:     { atkPct: 4, critPct: 2, critDmg: 2, skillPct: 2, hpPct: 1, defPct: 1, resPct: 1, evaPct: 2, spiritPct: 1, spdPct: 2 },
+    head:      { atkPct: 1, critPct: 1, critDmg: 1, skillPct: 1, hpPct: 2, defPct: 2, resPct: 2, evaPct: 1, spiritPct: 1, spdPct: 1 },
+    armor:     { atkPct: 1, critPct: 1, critDmg: 1, skillPct: 1, hpPct: 4, defPct: 2, resPct: 2, evaPct: 1, spiritPct: 1, spdPct: 1 },
+    legs:      { atkPct: 1, critPct: 1, critDmg: 1, skillPct: 1, hpPct: 2, defPct: 2, resPct: 1, evaPct: 4, spiritPct: 1, spdPct: 4 },
+    accessory: { atkPct: 2, critPct: 4, critDmg: 2, skillPct: 2, hpPct: 1, defPct: 1, resPct: 1, evaPct: 2, spiritPct: 2, spdPct: 2 },
+  };
+  /* 抽词条**键**的唯一出口（与 `rollAffixValue` 同一个风格：一件事只写一处）。
+     · `exclude`：已抽到 / 已锁定的键不再抽（**不放回**）；
+     · 权重按部位取，表里没有的部位或键一律退回权重 1（绝不 undefined、绝不抽不出来）；
+     · 池子抽空返回 `null`（调用方兜底），不会死循环。
+     ⚠️ 签名收成 `(slot, exclude)`：总监原稿写的是 `(slot, rarity, exclude)`，但 **rarity 对"抽哪条"没有任何作用**
+        （它管的是"几条"与"取值位置"）—— 留着它就是死参数（本项目对"写了没人读"的字段是零容忍的）。 */
+  function rollAffixKey(slot, exclude) {
+    const w = AFFIX_WEIGHT_BY_SLOT[slot] ||  getProxied({});
+    const cands = [];
+    let total = 0;
+    Object.keys(AFFIX_POOL).forEach(k => {
+      if (exclude && exclude.indexOf(k) >= 0) return;
+      const wt = typeof w[k] === 'number' ? w[k] : 1;
+      if (wt <= 0) return;
+      total += wt; cands.push([k, wt]);
+    });
+    if (!cands.length) return null;
+    let r = Math.random() * total;
+    for (let i = 0; i < cands.length; i++) { r -= cands[i][1]; if (r <= 0) return cands[i][0]; }
+    return cands[cands.length - 1][0];
+  }
+  /* V1.1.8（戊组 A13-F · 重铸石）：**词条取值只此一处** ——
+     装备生成（makeEquip）与"重铸"（core.reforgeEquip）都调它，
+     所以"重铸出来的数值一定落在 `AFFIX_POOL` 的区间里、且和这件装备当初的档位同源"这两条是**结构保证**的，
+     不靠两边各写一遍公式去对齐（那种"两套算法"正是这个项目反复踩的坑）。
+     `pos` ＝ 稀有度给的取值位置（0.7~1.0 之间随机浮动）→ 神话可以越过区间上限。 */
+  function rollAffixValue(k, rarity) {
+    const pool = AFFIX_POOL[k];
+    if (!pool) return 0;
+    const pos = (AFFIX_BY_RARITY[rarity] || 0.5) * (0.7 + Math.random() * 0.3);
+    return +(pool.min + (pool.max - pool.min) * pos).toFixed(3);
+  }
+
+  /* ================= 伙伴专属装备（本命 · UR · 一人一套 6 件） =================
+     V9.6.83（父亲大人："伙伴专属现在有两个血族，念动力血统的没有，应该是选出各个血统的最强伙伴，
+     不要有重复血统的，这显得很看不起念动力偏爱血族似的"）。
+     2026-09-27（父亲大人四条拍板：「专属词条 5 条 · 改绑第一 · 不要有隐藏角色 · 每人一套本命」）
+     —— 这一版把"六支血统各一件"扩成 **6 支血统 × 6 个部位 ＝ 36 件**：
+       · 每件 **5 条词条**（同档普通 UR 是 4 条 —— 这是"专属更强"的结构来源，不是靠把数字调高）；
+       · 绑**该血统的第一名**（2026-09-27 04:30 父亲大人修正：「第一不要排除隐藏角色啊，都说隐藏角色
+         也能正常抽出来咯，就没有隐藏角色这种概念」—— 按**含全部角色**的满级满星 power 取第一，
+         而且那 6 位已经整个进池了，见 `CHAR_TABLE` 上头那一段）；
+       · 每人一套：武器 / 头 / 胸甲 / 手 / 腿 / 饰品，六件都是他的本命。
+     ⚠ 基础值不再写死 320 —— 现在跟装备箱同口径：按你**当前进度**那张图的档位、
+       走**同一个部位公式**（`equipBase`），再乘 `SIGNATURE_BASE_MULT`（本命要比同档普通 UR 明显好一档，
+       系数是量出来的：见回单的 36 件数值表）。
+     ⚠️ 这一整段依赖 `BLOODLINE_EQUIP_NAMES` / `AFFIX_POOL` / `AFFIX_WEIGHT_BY_SLOT`，
+       所以它**必须放在词条表之后**（搬过一次：放在前面会 TDZ 报错）。 */
+  /* 六支血统 → 绑定那一位（＝该血统**含全部角色**的 power 第一名）。
+     这张表只是"落点"，**判据由尺子每次重算**（`scripts/data_audit.js` ⑨：全员满级满星 → Core.power 取第一）。 */
+  const SIGNATURE_BINDING = {
+    '狼人': 'C111',    // 黑田宗一
+    '修真': 'C059',    // 楚衍（修真第一，11263）
+    '绯红': 'C115',    // 白河秋
+    '科技': 'C112',    // 苍岚零
+    '念动力': 'C114',  // 山吹时雨
+    '泰坦': 'C117',    // 零式（泰坦第一，17233）
+  };
+  /* 老档迁移的一次性落点：**只有狼人那一件**要改绑 —— 旧的「代行之刃」绑的是 C120 灯阁代行者
+     （狼人第三），现在狼人第一是 C111 黑田宗一。
+     另两件（元素咏叹→C059 楚衍 / 磐岩壁垒→C117 零式）**本来就绑的第一**，04:30 修正后**不用改绑**
+     （它们各自就是修真/泰坦的第一名），所以这张表里没有它们。新档不会再走到这里，但表要留着。 */
+  const SIGNATURE_LEGACY_BINDING = { C120: 'C111' };
+  /* 每人的专属限定词（六个词根互不相同 ⇒ 36 个名字天然不重名；词根取角色名/本命意象，不取血统名） */
+  const SIGNATURE_LIMIT_WORD = { C111: '黑田', C059: '楚衍', C115: '绯河', C112: '苍岚', C114: '心识', C117: '零式' };
+  /* 旧 6 件里**留下来不改名**的 5 件（派单允许留用 `绯河刃 / 星舰主炮 / 心识之环`；
+     另两件 `元素咏叹 / 磐岩壁垒` 在 04:30 修正后**不再改绑**，名字也就没有改的理由 —— 一起留用，
+     老玩家手里那 5 件一个字不用换）。剩下一件是「代行之刃」（改绑 C120→C111），名字跟着换。 */
+  const SIGNATURE_KEEP_NAME = {
+    'C115|weapon': '绯河刃', 'C112|weapon': '星舰主炮', 'C114|weapon': '心识之环',
+    'C059|weapon': '元素咏叹', 'C117|weapon': '磐岩壁垒',
+  };
+  /* 每支血统"本命最想要"的四条（依据 `BLOODLINES[bl]` 的每级加成 ＋ 该血统的 role）：
+       狼人（战士）攻击/生命 → 攻击·暴伤·技能·生命 ｜ 修真（法师）技能/精神 → 技能·精神·攻击·暴伤
+       绯红（刺客）攻击/汲取 → 攻击·暴伤·暴击·技能 ｜ 科技（射手）攻击/暴击 → 攻击·暴击·速度·暴伤
+       念动力（辅助）精神/速度 → 精神·速度·技能·生命 ｜ 泰坦（肉盾）生命/防御 → 生命·防御·攻击·抗性
+         （泰坦第 3 条是**攻击**不是**抗性** —— 不是我不把抗性当本命：`equipScore` 自己给抗性的权重是
+           全场最低的 300，而四条前 3 条是每件都挂的"底色"；把 300 分的词条钉死在六件上，
+           泰坦的腿/饰品这两格会被拖到 1.26×（实测），够不着"本命该明显更强"那条线。
+           抗性留在第 4 条：头/胸甲这两处它自然进得来（部位权重 2），该有的地方一条不少。）
+     前 3 条**每件都有**（"本命"的统一底色），另 2 条按**部位加权池**（`AFFIX_WEIGHT_BY_SLOT`）补 ——
+     所以六件既是一套、又不至于六件一模一样。 */
+  const SIGNATURE_CORE = {
+    '狼人':   ['atkPct', 'critDmg', 'skillPct', 'hpPct'],
+    '修真':   ['skillPct', 'spiritPct', 'atkPct', 'critDmg'],
+    '绯红':   ['atkPct', 'critDmg', 'critPct', 'skillPct'],
+    '科技':   ['atkPct', 'critPct', 'spdPct', 'critDmg'],
+    '念动力': ['spiritPct', 'spdPct', 'skillPct', 'hpPct'],
+    '泰坦':   ['hpPct', 'defPct', 'atkPct', 'resPct'],
+  };
+  /* 取值位置：本命是"极品档" —— 只在**区间头部的 0.85~1.00**取，而且**不掷骰子**
+     （表是死的、可复现：界面 / 尺子 / 回单看到的是同一份数）。
+     位置按"评分权重"从高到低发（与 `core.equipScore` 同一张权重表）—— 一条词条值多少，由它自己说了算。 */
+  const SIGNATURE_AFFIX_POS = [1.00, 0.97, 0.94, 0.90, 0.86];
+  const SIGNATURE_SLOT_ORDER = ['weapon', 'head', 'armor', 'hands', 'legs', 'accessory'];
+  const SIGNATURE_SCORE_W = { atkPct: 1200, hpPct: 500, defPct: 900, skillPct: 1000, critPct: 1500, critDmg: 600, spdPct: 900, evaPct: 700, resPct: 300, spiritPct: 1000 };
+  /* 本命的基础值系数：同档普通 UR × **1.30**。
+     ⚠ 09-27 派单原文写的是"沿用现在的 ×1.15" —— 这一条**被我按实测推翻了**，理由是可算的：
+       专属比普通 UR 只多 1 条词条（5 条 vs 4 条），1.15 的底子撑不起派单同一段里那条硬指标
+       （"末期 W36 一件专属 ≈ 同档同部位普通 UR 的 1.30~1.45×"）——
+       实测 ×1.15 时末期六部位只有 **1.23~1.35**，×1.30 才是 1.33~1.42（数值表见回单）。
+       两条要求互相冲突，取"硬指标"（那是这一棒的目的），系数抬到 1.30。 */
+  const SIGNATURE_BASE_MULT = 1.30;
+  /* 老档把专属基础值从"×1.15 时代"补到"×1.30 时代"用的比例（只补差、只补一次，见 core.js migrate）
+     ＋ 逐件迁移标记 `sigRev` 的目标值（标记写进装备自己身上，不写进 defaultState —— 老档才认得出没迁过）。 */
+  const SIGNATURE_BASE_RATIO = SIGNATURE_BASE_MULT / 1.15;
+  const SIGNATURE_REV = 2;
+  /* 一件专属词条的算法（**确定性**，不调 Math.random）：
+       血统本命前 3 条 ＋ 该部位加权表里最重的 2 条（同权重时按条款价值排）
+       → 5 条按评分权重降序发位置 1.00 / 0.97 / 0.94 / 0.90 / 0.86。 */
+  function signatureAffixes(bl, slot) {
+    const core = SIGNATURE_CORE[bl] || [];
+    const w = AFFIX_WEIGHT_BY_SLOT[slot] || {};
+    const keys = core.slice(0, 3);
+    const val = (k) => (SIGNATURE_SCORE_W[k] || 200) * (AFFIX_POOL[k] ? AFFIX_POOL[k].max : 0);
+    Object.keys(AFFIX_POOL)
+      .filter((k) => keys.indexOf(k) < 0)
+      .sort((a, b) => ((w[b] || 1) - (w[a] || 1)) || (val(b) - val(a)))
+      .slice(0, 2)
+      .forEach((k) => keys.push(k));
+    return keys
+      .map((k) => ({ k, w: SIGNATURE_SCORE_W[k] || 200 }))
+      .sort((a, b) => b.w - a.w)
+      .map((o, i) => {
+        const p = AFFIX_POOL[o.k];
+        return { k: o.k, v: +(p.min + (p.max - p.min) * SIGNATURE_AFFIX_POS[i]).toFixed(3) };
+      });
+  }
+  const SIGNATURE_EQUIPS = (function () {
+    const out = [];
+    BLOODLINE_KEYS.forEach((bl) => {
+      const charId = SIGNATURE_BINDING[bl];
+      const ch = charById[charId] || {};
+      SIGNATURE_SLOT_ORDER.forEach((slot) => {
+        out.push({
+          charId: charId,
+          name: SIGNATURE_KEEP_NAME[charId + '|' + slot] || (SIGNATURE_LIMIT_WORD[charId] + '·' + BLOODLINE_EQUIP_NAMES[bl][slot][0]),
+          slot: slot,
+          affixes: signatureAffixes(bl, slot),
+          text: (ch.name || charId) + '专属：本命' + (EQUIP_SLOTS[slot] || slot) + '（' + bl + '·' + (ch.role || '') + '）',
+        });
+      });
+    });
+    return out;
+  })();
+  /* 老档迁移 / 掉落查询用的两条出口（都在数据层，调用方不再自己找表）：
+     · `signatureIdOf(eq)`：这件装备在新表里的下标 —— 先按名字、再按"旧绑定→新绑定"、最后按 charId+slot；
+     · `pickSignatureEquip(owned)`：36 件里**还没拥有过**的优先（收集线），全拿到返回 -1（调用方转 ◆ 折现）。
+       ⚠ 挑件是**调用方**的事，`Core.grantSignatureEquip` 仍然是"给我第几件、我就发第几件"。 */
+  function signatureIdOf(eq) {
+    if (!eq || !eq.charId) return -1;
+    const byName = SIGNATURE_EQUIPS.findIndex(s => s.name === eq.name);
+    if (byName >= 0) return byName;
+    const cid = SIGNATURE_LEGACY_BINDING[eq.charId] || eq.charId;
+    return SIGNATURE_EQUIPS.findIndex(s => s.charId === cid && s.slot === eq.slot);
+  }
+  function pickSignatureEquip(owned) {
+    const have = owned || [];
+    const cands = [];
+    for (let i = 0; i < SIGNATURE_EQUIPS.length; i++) {
+      if (have.indexOf(SIGNATURE_EQUIPS[i].name) < 0) cands.push(i);
+    }
+    if (!cands.length) return -1;
+    return cands[Math.floor(Math.random() * cands.length)];
+  }
+  /* ================= V1.1.12（父亲大人 09-27：「在属性的数值加一个**区间**，就让人知道这条属性
+       最少多少、最多多少，他才有一个**重铸的方向**」）=================
+     回答的是"我能摇出什么"—— 也就是**这件装备这个档位下，这条词条的可达范围**。
+     算式与 `rollAffixValue` **同源**（`pos ∈ [0.7R, R]`）：区间 = [min+(max-min)×0.7R, min+(max-min)×R]。
+     ⚠️ 只有 MYTH（R=1.35）能越过全区间上限 —— 这是它"神话更强"的来源，不是 bug。
+     页面只读这个出口，不许自己再算一遍（本项目"同一件事写两份"踩过 ≥6 次）。 */
+  function affixRange(k, rarity) {
+    const pool = AFFIX_POOL[k];
+    if (!pool) return null;
+    const R = AFFIX_BY_RARITY[rarity] || 0.5;
+    const span = pool.max - pool.min;
+    return { lo: +(pool.min + span * 0.7 * R).toFixed(3), hi: +(pool.min + span * R).toFixed(3) };
+  }
+  /* V1.1.13（0927-E · 总监 §八 表 D）：**词条档位标**（粗/良/优/极）与总评。
+     `q` ＝ 这条词条在"本档可达区间"里的位置（0 ＝ 区间下沿、1 ＝ 上沿）：
+       算式与 `affixRange` 同源 —— `q = (v − lo) ÷ (hi − lo)`，
+       所以"暴击率 +5.2%"和"攻击力 +16%"能**放在同一把尺子上比**（同 q ＝ 同成色）。
+     区间划分 0.33 / 0.66 / 0.90 → 均匀分布下大致 33% / 33% / 24% / 10%（"极"是 10% 的稀有事件）。
+     ⚠️ 阈值是总监**按位置定的、不是按战斗收益定的**（他 §十 自己标了"不确定"）——
+        数值轮用敏感度复核后只需改这张表。 */
+  const AFFIX_TIERS = [[0.90, '极'], [0.66, '优'], [0.33, '良'], [0, '粗']];
+  function affixTierName(q) {
+    const v = Math.max(0, Math.min(1, q));
+    for (let i = 0; i < AFFIX_TIERS.length; i++) if (v >= AFFIX_TIERS[i][0]) return AFFIX_TIERS[i][1];
+    return '粗';
+  }
+  function affixQ(k, rarity, val) {
+    const r = affixRange(k, rarity);
+    if (!r || r.hi <= r.lo) return 0;
+    return Math.max(0, Math.min(1, (val - r.lo) / (r.hi - r.lo)));
+  }
+  /* 重铸的两个常量（**临时值**，数值轮只改这两行）：
+     《收口2》§1.4 的 A13-N 口径 ＝「消耗 = 1 块当前档材料 ＋ ◉3,000（偏贵）」。
+     "当前档材料"复用 `enhanceMatTier(装备强化等级)` —— 与装备强化吃的是同一条材料线，
+     所以"重铸"和"强化"不会各要一种材料（那种设计会让两条线互相饿死）。 */
+  const REFORGE_ITEM = 'reforge_stone';
+  const REFORGE_POINTS = 3000;
+  /* ================= V1.1.13（0927-E · 总监 D 单 §八 表 A · 两档重铸 ＋ 锁定 ＋ 炉火）=================
+     表 A 原样落（数值轮只改这几行）：
+       · 档 A「重摇数值」：1 石 ＋ 1 块当前档材料 ＋ ◉3,000（＝上面那两个常量，不动）
+       · 档 B「锁定」：**每锁 1 条 ＋1 石**
+       · 档 C「重抽词条」（种类 ＋ 数值一起换，走部位加权池）：3 石 ＋ 2 块 ＋ ◉9,000
+       · 炉火：满 5 次 → **第 6 次必不倒退**（只对档 A 计数；档 C 不计数也不清零）
+     ⛔ **唯一不照表 A 的一条：每日限购**。总监建议 `REFORGE_STONE_DAILY_CAP = 2`（异界商店每日限购 2 颗），
+        **父亲大人 2026-09-27 明确否掉：「重铸石不限购」** → `SHOPS.otherworld` 那条保持 `stock: -1`，
+        所以这里**不建这个常量**（建了没人用就是死字段）。
+        代价（照写不照改）：不限量 ＝ 终局多一个 ◆ 出口、一天最高能买 22 颗（总监 §5.1 的实测口径），
+        "给终局设闸"因此只剩「当前档材料」这一条闸门 —— 这条线会被钱推快，账户越老越快。 */
+  const REFORGE_LOCK_STONE  = 1;     // 每锁 1 条 ＋1 颗
+  const REFORGE_KIND_STONE  = 3;     // 档 C 的石头
+  const REFORGE_KIND_MAT    = 2;     // 档 C 的当前档材料
+  const REFORGE_KIND_POINTS = 9000;  // 档 C 的 ◉
+  const REFORGE_PITY        = 6;     // 炉火：第 6 次必不倒退（前 5 次计数）
+  /* 表 B 来源②：**炼化台**配方（2×mat_t3 ＋ ◉4,000 → 1 颗，**不限次**）。
+     落在炼化台的理由（总监 §5.3）：炼化台的定位就是"材料富余才用"，它吃的是合成材料，
+     **天然与强化抢料** → 不用另设限购。⚠️ 4000 / 2 颗是**临时值**。 */
+  const REFORGE_CRAFT = { mat: 'mat_t3', matN: 2, points: 4000, out: 1 };
 
   /* ================= 血统神装（MYTH · 2/4/6 件） =================
      V9.6.76（父亲大人："装备不也有成长空间？不同套装，几套不同血统的神装"）——
@@ -1159,6 +1597,19 @@ window.DATA = (function () {
 
   // 装备实例生成：worldTier 1-36，rarity 指定，slot 指定
   // opts: { setType: 'plain'|'world'|'blood'|'god', bloodSet（血统名）, godSet（血统名） }
+  /* 装备基础值：**只此一处**。普通件与专属件都走它 —— "专属 = 同档普通 × 系数"这句话
+     因此是**结构保证**的（不是两张各写一遍、日后改一张忘一张的公式）。
+     `m` ＝ 已含稀有度的系数（普通件传 `EQUIP_RARITY_MULT[rarity]`，专属传
+     `EQUIP_RARITY_MULT.UR × SIGNATURE_BASE_MULT`）。 */
+  function equipBase(slot, tier, m) {
+    if (slot === 'weapon') return { atk: Math.round((22 + tier * 20) * m) };
+    if (slot === 'armor') return { def: Math.round((14 + tier * 13) * m), hp: Math.round((220 + tier * 200) * m) };
+    if (slot === 'accessory') return { spd: Math.round((8 + tier * 6) * m), critPct: +(0.02 * m).toFixed(3) };
+    if (slot === 'head') return { def: Math.round((8 + tier * 8) * m), hp: Math.round((120 + tier * 110) * m) };
+    if (slot === 'hands') return { atk: Math.round((10 + tier * 9) * m), critPct: +(0.01 * m).toFixed(3) };
+    if (slot === 'legs') return { spd: Math.round((6 + tier * 5) * m), def: Math.round((6 + tier * 5) * m) };
+    return {};
+  }
   function makeEquip(worldId, slot, rarity, uid, opts) {
     opts = opts || {};
     const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
@@ -1179,22 +1630,28 @@ window.DATA = (function () {
     if (setType === 'god') name = (GOD_SETS[godSet] || GOD_SETS[Object.keys(GOD_SETS)[0]]).name + '·' + pickName((blNames && blNames[slot]) || names);
     else if (effSetType === 'blood') name = bloodSet + '·' + pickName((blNames && blNames[slot]) || names);
     else name = pickName(names);
-    const base = {};
-    if (slot === 'weapon') base.atk = Math.round((22 + tier * 20) * mult);
-    if (slot === 'armor') { base.def = Math.round((14 + tier * 13) * mult); base.hp = Math.round((220 + tier * 200) * mult); }
-    if (slot === 'accessory') { base.spd = Math.round((8 + tier * 6) * mult); base.critPct = +(0.02 * mult).toFixed(3); }
-    if (slot === 'head') { base.def = Math.round((8 + tier * 8) * mult); base.hp = Math.round((120 + tier * 110) * mult); }
-    if (slot === 'hands') { base.atk = Math.round((10 + tier * 9) * mult); base.critPct = +(0.01 * mult).toFixed(3); }
-    if (slot === 'legs') { base.spd = Math.round((6 + tier * 5) * mult); base.def = Math.round((6 + tier * 5) * mult); }
+    const base = equipBase(slot, tier, mult);
     const affixes = [];
     const keys = Object.keys(AFFIX_POOL);
     const n = EQUIP_AFFIX_COUNT[rarity];
-    for (let i = 0; i < n; i++) {
-      const k = keys[Math.floor(Math.random() * keys.length)];
-      if (affixes.find(a => a.k === k)) continue;
-      const pool = AFFIX_POOL[k];
-      const pos = AFFIX_BY_RARITY[rarity] * (0.7 + Math.random() * 0.3);
-      affixes.push({ k, v: +(pool.min + (pool.max - pool.min) * pos).toFixed(3) });
+    /* ================= V1.1.12（父亲大人 09-27：「我看了现在**一样的装备词条数量也不是固定的**」）====
+       他看对了 —— 这是个**实装缺陷**（策划总监 0927-D 单 §2.2 也独立抓到了同一条）：
+       旧写法是"随机抽 n 次，抽到重复的就 `continue`" —— **那一次机会就白白丢了**，
+       于是 SR（标称 2 条）**平均只有 1.78 条**、UR（标称 4 条）平均 3.26 条，
+       玩家看到的就是"同为 SR，一件两条、一件一条"。
+       ⇒ 改成**洗牌取样**（从词条池里不放回地抽 n 个）：**稀有度标几条就是几条**。
+       注意池子只有 9 条、MYTH 要 5 条 —— 洗牌天然不会重样，也不会超界。 */
+    /* V1.1.13（0927-E · 总监 §3.4）：抽键改走 **`rollAffixKey`（部位加权 ＋ 不放回）** ——
+       ① 部位加权：武器更容易出攻向词条、胸甲更容易出生命（表 C）；
+       ② 不放回：**稀有度标几条就是几条**（康康 09-27 修的"洗牌取样"这一半保留，
+          只是把"均匀洗牌"换成"按权重不放回地抽"—— 池子 10 条、MYTH 要 5 条，不会抽空）。 */
+    const dealt = [];
+    for (let i = 0; i < Math.min(n, keys.length); i++) {
+      const k = rollAffixKey(slot, dealt);
+      if (!k) break;
+      dealt.push(k);
+      /* 取值走 `rollAffixValue`（与"重铸"同一个函数 —— 见它上面的注释） */
+      affixes.push({ k: k, v: rollAffixValue(k, rarity) });
     }
     return {
       uid, name, slot, rarity, enhance: 0, base, affixes,
@@ -1206,16 +1663,38 @@ window.DATA = (function () {
   }
 
   // 伙伴专属装备实例（基础值按玩家当前进度的档位生成）
-  /* worldId：这件专属按哪张图的档位生成（调用方传"玩家当前进度"，见 core.grantSignatureEquip） */
+  /* worldId：这件专属按哪张图的档位生成（调用方传"玩家当前进度"，见 core.grantSignatureEquip）
+     ⚠ 签名 `(sigId, uid, worldId)` **三个参数一个都不能少** —— core.grantSignatureEquip 与 dungeon.js
+       都按三个参数调；少传一个 worldId 会退化成 W01，专属评分当场掉到 1/10（康康踩过）。 */
   function makeSignatureEquip(sigId, uid, worldId) {
     const sig = SIGNATURE_EQUIPS[sigId];
     if (!sig) return null;
     const w = WORLDS.find(x => x.id === worldId) || WORLDS[0];
     const tier = WORLDS.indexOf(w) + 1;
-    /* 同档普通 UR 武器 = (22 + tier*20) × 2.00；专属再 ×1.15 —— "专属就该好一点" */
-    const base = { atk: Math.round((22 + tier * 20) * EQUIP_RARITY_MULT.UR * 1.15) };
-    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base, affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, bloodSet: null, bloodWorld: null, godSet: null, charId: sig.charId, sigText: sig.text };
+    /* 同档普通 UR = equipBase(slot, tier, 2.00)；专属再 ×SIGNATURE_BASE_MULT（部位公式与普通件同源） */
+    const base = equipBase(sig.slot, tier, EQUIP_RARITY_MULT.UR * SIGNATURE_BASE_MULT);
+    /* V1.1.15（2026-09-27 · 父亲大人："现在专属装备没有套装效果吗"）：专属补第 4 类套装归属。
+       原来 `set / bloodSet / godSet` 全是 null ⇒ **套装判定一条都进不去**，六件本命穿齐也没回报；
+       世界套装 6 件却给"攻击+20%·生命+20%"，专属反而"六件单件强、整体没有套"。
+       新增 `sigSet`（＝绑定角色 id）承载"本命套装"，效果表见下面的 SIGNATURE_SET。 */
+    return { uid, name: sig.name, slot: sig.slot, rarity: 'UR', enhance: 0, base, affixes: sig.affixes.map(a => Object.assign({}, a)), set: null, bloodSet: null, bloodWorld: null, godSet: null, sigSet: sig.charId, charId: sig.charId, sigText: sig.text };
   }
+
+  /* ================= 本命套装（V1.1.15 · 第 4 类套装）=================
+     6 件**同一位伙伴**的专属 → 2/4/6 三档（与世界套 / 血统套 / 血统神装同一套规矩）。
+     为什么它是"认人"的：专属本身只有本人能穿（`canEquip` 按 `charId` 锁死），
+     所以这套效果天然只对那一位伙伴生效、**不会外溢**；其它三类套装都是认血统。
+     数值刻意比世界套低半档（单件专属已经是同档普通 UR 的 1.30~1.45×）：
+       2 件：攻/防/血 各 +8% · 4 件：技能伤害 +15% · 6 件：攻击 +15% · 技能伤害 +15%（"本命觉醒"）
+     ⚠️ 6 件本来想给**机制型**特效（大绝倍率 +25% / 冷却 −1），那要动战斗引擎；
+        按"未验证的机制不许上"的纪律，这一轮先上数值档，机制型留给机制轮。 */
+  const SIGNATURE_SET = {
+    name: '本命套装',
+    b2: { atkPct: 0.08, defPct: 0.08, hpPct: 0.08 },
+    b4: { skillPct: 0.15 },
+    b6: { atkPct: 0.15, skillPct: 0.15 },
+    text: '2件:攻/防/血+8%　4件:技能伤害+15%　6件:攻击+15%·技能伤害+15%',
+  };
 
   /* ================= 道具 ================= */
   // where：使用场景（explore=副本探索中 / character=对招募角色 / anywhere=任意）
@@ -1239,25 +1718,25 @@ window.DATA = (function () {
        又占着商店货架和掉落位。与其到处补入口，不如整条线砍掉——战斗改成"一波接一波、
        只看阵容和养成"，补给不再是玩法的一部分。
        老存档里已经买到的，migrate() 会按原价退回 ◉ 点数（见 RETIRED_ITEMS）。 */
-    exp_s: { icon: '📘', name: '初级经验模块', type: 'exp', where: 'character', exp: 500, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +500', src: '灯阁市集、副本战斗掉落、每日任务' },
-    exp_m: { icon: '📕', name: '中级经验模块', type: 'exp', where: 'character', exp: 2000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +2,000', src: '灯阁市集、副本战斗掉落、每日/周常奖励' },
-    exp_l: { icon: '📖', name: '高级经验模块', type: 'exp', where: 'character', exp: 10000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +10,000', src: '灯阁市集（通关 W04 后解锁）、精英/Boss 掉落、周常奖励' },
-    exp_xl: { icon: '📜', name: '超级经验模块', type: 'exp', where: 'character', exp: 50000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +50,000', src: '灯阁市集（通关 W07 后解锁）、地狱 Boss 掉落、周常全清奖励' },
-    exp_xxl: { icon: '🎇', name: '究极经验模块', type: 'exp', where: 'character', exp: 200000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +200,000', src: '灯阁市集（通关 W15 后解锁）、W15+ 守关 Boss、周常全清、斗法台高阶' },
-    mat_t1: { icon: '⛏', name: '基础金属', type: 'material', tier: 1, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +0~+4 时消耗（不足可用点数代用）', src: 'W01~W05 精英/Boss、灯阁市集、故事商店' },
-    mat_t2: { icon: '🧱', name: '强化合金', type: 'material', tier: 2, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +5~+9 时消耗（不足可用点数代用）', src: 'W02~W06 精英/Boss、异界商店' },
-    mat_t3: { icon: '💠', name: '异界合金', type: 'material', tier: 3, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +10~+14 时消耗（不足可用点数代用）', src: 'W03~W07 精英/Boss、异界商店' },
-    mat_t4: { icon: '🧊', name: '虚空晶体', type: 'material', tier: 4, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +15~+19 时消耗（不足可用点数代用）', src: 'W04 起精英/Boss、异界商店（通关 W04 解锁）' },
-    mat_t5: { icon: '🏮', name: '灯阁残片', type: 'material', tier: 5, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：冲击 +20 时消耗（不足可用点数代用）', src: 'W05 起精英/Boss、异界商店（通关 W06 解锁）' },
-    box_r: { icon: '📦', name: 'R装备箱', type: 'box', rarity: 'R', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 R 品质装备', src: '灯阁市集、游历奇遇' },
-    box_sr: { icon: '🎁', name: 'SR装备箱', type: 'box', rarity: 'SR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SR 品质装备', src: '兑换大厅各店、每日任务、游历奇遇、药园' },
+    exp_s: { icon: '📘', name: '初级经验模块', type: 'exp', where: 'character', exp: 500, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +500', src: '市集、副本战斗掉落、每日任务' },
+    exp_m: { icon: '📕', name: '中级经验模块', type: 'exp', where: 'character', exp: 2000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +2,000', src: '市集、副本战斗掉落、每日/周常奖励' },
+    exp_l: { icon: '📖', name: '高级经验模块', type: 'exp', where: 'character', exp: 10000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +10,000', src: '市集（通关第 4 张图后解锁）、精英/Boss 掉落、周常奖励' },
+    exp_xl: { icon: '📜', name: '超级经验模块', type: 'exp', where: 'character', exp: 50000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +50,000', src: '市集（通关第 7 张图后解锁）、地狱 Boss 掉落、周常全清奖励' },
+    exp_xxl: { icon: '🎇', name: '究极经验模块', type: 'exp', where: 'character', exp: 200000, use: '背包里点这张道具卡，直接加进共享的伙伴经验池', desc: '伙伴经验 +200,000', src: '市集（通关第 15 张图后解锁）、第 15 张图起的守关 Boss、周常全清、斗法台高阶' },
+    mat_t1: { icon: '⛏', name: '基础金属', type: 'material', tier: 1, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +0~+4 时消耗（不足可用点数代用）', src: '第 1~5 张图的精英/Boss、市集、故事商店' },
+    mat_t2: { icon: '🧱', name: '强化合金', type: 'material', tier: 2, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +5~+9 时消耗（不足可用点数代用）', src: '第 2~6 张图的精英/Boss、异界商店' },
+    mat_t3: { icon: '💠', name: '异界合金', type: 'material', tier: 3, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +10~+14 时消耗（不足可用点数代用）', src: '第 3~7 张图的精英/Boss、异界商店' },
+    mat_t4: { icon: '🧊', name: '虚空晶体', type: 'material', tier: 4, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：装备 +15~+19 时消耗（不足可用点数代用）', src: '第 4 张图起的精英/Boss、异界商店（通关第 4 张图后解锁）' },
+    mat_t5: { icon: '🏮', name: '灯阁残片', type: 'material', tier: 5, use: '装备强化时自动优先消耗；不够时用点数代用', desc: '强化材料：冲击 +20 时消耗（不足可用点数代用）', src: '第 5 张图起的精英/Boss、异界商店（通关第 6 张图后解锁）' },
+    box_r: { icon: '📦', name: 'R装备箱', type: 'box', rarity: 'R', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 R 品质装备', src: '市集、游历奇遇' },
+    box_sr: { icon: '🎁', name: 'SR装备箱', type: 'box', rarity: 'SR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SR 品质装备', src: '市集各店、每日任务、游历奇遇、药园' },
     box_ssr: { icon: '🧧', name: 'SSR装备箱', type: 'box', rarity: 'SSR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 SSR 品质装备', src: '异界/深井商店、七日登录第 6 天' },
-    box_ur: { icon: '🗝', name: 'UR装备箱', type: 'box', rarity: 'UR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 UR 品质装备（档位＝你当前进度的世界，多为那一张图的套装）；10% 概率开出伙伴专属装备（UR，六支命格各一件）', src: '异界/深井商店（高阶货币）' },
+    box_ur: { icon: '🗝', name: 'UR装备箱', type: 'box', rarity: 'UR', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出一件 UR 品质装备（跟你当前进度同档，多为那一张图的套装）；10% 概率开出【本命】装备（UR · 6 支命格 × 6 个部位 ＝ 36 件，优先给你还没有的那件）', src: '异界/深井商店（高阶货币）' },
     /* V9.6.79（父亲大人："神装可以有购买，不过也得通关第二十个世界后才能购买，且只能购买装备箱，
        开箱也是概率掉落而已，装备箱也是随机装备箱，保底传说套装，但神装也是小概率出"）
        —— 血统神装箱：**只有它**能买到神话，而且买到的还是一个"箱"、开出来还得看运气。
        随机 = 部位随机、血统随机（和守关掉落同一条随机线），所以凑齐一套仍然要攒。 */
-    box_myth: { icon: '💎', name: '命格神装箱', type: 'box', rarity: 'MYTH', mythBox: true, use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '随机开出一件【传说】装备（档位＝你当前进度的世界套装），并有 15% 概率升格为【神话·命格神装】（部位与命格均随机）', src: '异界商店（通关残域第 20 个世界后解锁）' },
+    box_myth: { icon: '💎', name: '命格神装箱', type: 'box', rarity: 'MYTH', mythBox: true, use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '随机开出一件【传说】装备（跟你当前进度同档的世界套装），并有 15% 概率升格为【神话·命格神装】（部位与命格均随机）', src: '异界商店（通关残域第 20 个世界后解锁）' },
     /* V1.0.1（两轮修正，教训记在这里）：
        第一轮——原文写"副本 Boss（必掉）、精英（30%）、限时悬赏"，**数字是旧的**：
        V9.6.79 已把守关改成 10%、精英 5%（为了不让扫荡两天刷穿伴生体线）。
@@ -1267,7 +1746,47 @@ window.DATA = (function () {
        总监实跑 4000 次守关验证：掉 380 次 ≈ 9.5%。
        **教训：查"某样东西从哪来"，要 grep 它的**常量和定义**，不能只 grep 字面量。**
        现在按真实来源写全：守关 Boss 10% / 精英 5% / 药园（下品 15%、中品 25%）/ 游历奇遇 / 灯阁市集。 */
-    beast_egg: { icon: '🥚', name: '兽魂石', type: 'material', tier: 1, use: '在灯阁「🐾 伴生体」里孵化：10 颗孵 1 只', desc: '伴生体孵化材料：10 颗可以在兽栏孵化 1 只伴生体', src: '守关 Boss（10%）、精英怪（5%）、药园收成（概率）、游历奇遇、灯阁市集' },
+    beast_egg: { icon: '🥚', name: '兽魂石', type: 'material', tier: 1, use: '在灯阁「🐾 伴生体」里孵化：10 颗孵 1 只', desc: '伴生体孵化材料：10 颗可以在兽栏孵化 1 只伴生体', src: '守关 Boss（10%）、精英怪（5%）、药园收成（概率）、游历奇遇、市集' },
+    /* ================= V1.1.4（A12 材料 · 父亲大人两次点名「道具＋材料的品种丰富一些」）=================
+       《收口2》§3.1 立的规矩：**每一样新料都必须有一个"今天就在吃货币、但还没吃过材料"的真实去处**，
+       否则就是"加了一堆看得见、用不上的东西"。所以下面每一种都写清两栏，而且两栏都要能在代码里找到那行：
+         · `use`（去处）→ 铭刻 / 命格 / 灯阁权限 / 秘术阁 / 药园（各一处，见 core.js）
+         · `src`（来源）→ 副本额外掉落槽 / 扫荡 / 游历奇遇 / 药园回收 / 市集（见 dungeon.js / core.js / SHOPS）
+       ⚠️ 这 5 种**都不接现有 6 个消耗口**（装备强化 / 炼化台 / 法宝祭炼 / 坐骑 / 境界渡劫 / 伴生体
+          一律只吃 `mat_t1~t5` 与兽魂石）—— 现有口全按 `'mat_t'+tier` 取料；
+          id 也**刻意不叫 `mat_tN`**，所以结构上就吃不到（《收口2》§3.3 第 2/3 条）。
+       ⚠️ 它们**不进图鉴**（父亲大人已拍：图鉴只做伙伴＋装备两卷，《收口2》§3.5）。 */
+    minghun_sha:    { icon: '⌛', name: '铭魂砂',   type: 'material', tier: 5, use: '在「铭刻」里刻下一阶：每阶 2~13 块（20 阶合计 293 块）', desc: '铭刻材料：刻一阶吃一次，越往后越多', src: '守关 Boss 额外掉落（30%×1 颗）、深井每 10 层里程碑 2 颗' },
+    xuesui_jing:    { icon: '🔻', name: '血髓晶',   type: 'material', tier: 5, use: '在「命格」里升一级：逐级 1~6 块（每人 0→50 级合计 145 块）', desc: '命格材料：每升一级吃一次，前 5 级不吃', src: '精英怪额外掉落（15%×1 颗）、守关 Boss 额外槽按 2:1 分给它、深井每 10 层里程碑' },
+    dengyou:        { icon: '🍯', name: '灯油',     type: 'material', tier: 5, use: '在「灯阁权限」里点一级：每级 3 块', desc: '灯阁点灯的材料：权限每升一级吃 3 块（20 级共 60 块）', src: '游历奇遇（灯阁主题）、市集（◉ 可买，不设卡）' },
+    mijuan_canzhang:{ icon: '📃', name: '秘卷残章', type: 'material', tier: 5, use: '在「秘术阁」里每 5 级吃 1 张（42 条线合计 301 张）', desc: '秘术阁残卷：每 5 级补一张（用扫荡攒，不占副本掉落）', src: '扫荡产出（每 5 次扫荡 1 张）、材料包（中品 / 上品）' },
+    lingzhi_zhong:  { icon: '🌰', name: '灵植种',   type: 'material', tier: 5, use: '在「药园」里播种：每块地 1 颗', desc: '药园种子：播一块地吃 1 颗，收成时回收 70%（自循环，不会卡住药园）', src: '药园收成回收 70%、副本有概率掉落、市集（◉ 可买，不设卡）' },
+    /* 三档材料包（《收口2》§3.2）：这一轮"品种丰富"最有用的一件 —— 它给新料一条**可囤、可换、
+       开箱有即时反馈**的通道，也是"不想看广告也能拿到新料"的那条路（避免新料变成广告专属）。
+       ⚠️ 开出量的权重表在 `MAT_PACKS`（只那一处）；《收口2》§3.2 注明"3/4/5 块没做掉落验算、属数值轮"，
+          所以那张表整体是**临时值**，数值轮接手时只改它。 */
+    matpack_low:  { icon: '👝', name: '材料包·下品', type: 'box', matPack: 'low',  use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出 3 块低阶强化材料（基础金属 / 强化合金），并可能带出小额新料（灯油 / 灵植种）', src: '每日任务全清、市集、限时悬赏' },
+    matpack_mid:  { icon: '👜', name: '材料包·中品', type: 'box', matPack: 'mid',  use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出 4 块中阶强化材料（异界合金 / 虚空晶体），并可能带出中额新料（秘卷残章 / 灵植种）', src: '每周任务全清、异界商店、深井每 20 层' },
+    matpack_high: { icon: '💼', name: '材料包·上品', type: 'box', matPack: 'high', use: '背包里点这张道具卡即可开启，支持批量开箱', desc: '开出 5 块高阶强化材料（灯阁残片），并可能带出大额新料（铭魂砂 / 血髓晶）', src: '地狱难度守关 Boss（5%）、异界商店' },
+    /* ================= V1.1.8（戊组 A13-F · 重铸石）=================
+       用途：**重 roll 装备副词条的「数值」**——只换数值、**不换词条种类**（想要别的词条得换一件装备），
+            而且**锁定过的装备不可重摇**（锁 = 别动它，与"一键最优装备"那条规矩同源）。
+       类型刻意用一个**新 type `reforge`**：A11 的背包排序表最后留着"兜底组（以后新增的 type 自动落在最后）"，
+          所以它天然排在道具列表末尾，不用回来改排序表（那条注释当初点名举的例子正是"三期的重铸石"）。
+       来源：异界商店（◆ 可买）；以后要再加"炼化台配方 / 悬赏 / 周常"再往那几处补。 */
+    reforge_stone: { icon: '🔨', name: '重铸石', type: 'reforge', rarity: 'SR',
+      /* V1.1.13（0927-E）：文案跟着两档重铸重写 —— 老文案只说"数值重摇"，
+         现在多了一档"重抽词条"，而且**来源开了五条**（总监 §5.3 表 B）。 */
+      use: '在装备详情页「🔨 重铸」里用：档 A 重摇数值（1 颗）· 档 C 重抽词条种类＋数值（3 颗）· 每锁 1 条 ＋1 颗',
+      desc: '重铸材料：档 A 只重摇数值（种类不变）· 档 C 连种类一起重抽（走部位加权池）',
+      src: '异界商店（◆ 250 · 不限量）、炼化台（mat_t3×2 ＋ ◉4,000）、周常全清 ＋3、限时悬赏 ＋2、守关 Boss 8%' },
+  };
+  /* 材料包的开出表（**唯一一处**）：draws ＝ 开几块；pool ＝ [物品 id, 权重]。
+     纯权重池（不是"固定几块 T 若干+新料若干"），这样加/减新料只改这张表，不用回来改开箱代码。 */
+  const MAT_PACKS = {
+    low:  { name: '材料包·下品', draws: 3, pool: [['mat_t1', 40], ['mat_t2', 40], ['dengyou', 10], ['lingzhi_zhong', 10]] },
+    mid:  { name: '材料包·中品', draws: 4, pool: [['mat_t3', 40], ['mat_t4', 35], ['mijuan_canzhang', 15], ['lingzhi_zhong', 10]] },
+    high: { name: '材料包·上品', draws: 5, pool: [['mat_t5', 50], ['minghun_sha', 20], ['xuesui_jing', 15], ['mijuan_canzhang', 15]] },
   };
   // 强化等级 → 材料 tier（+0~4:T1，+5~9:T2，+10~14:T3，+15~19:T4，+19→20:T5）
   const enhanceMatTier = lv => Math.min(5, Math.floor(lv / 4) + 1);
@@ -1339,6 +1858,45 @@ window.DATA = (function () {
   });
   const SERUM_ITEM = id => 'serum_' + id;
 
+  /* ================= V1.1.9（续13 · 乙组）道具与材料的稀有度 =================
+     父亲大人：「道具材料也可以像装备那样分稀有度展示吧」；《整体数值审核报告》§十 给了**逐件分级表**
+     （材料 11 ＋ 道具 41 ＝ 52 件），他拍板「2 认」——**认这张表**。
+
+     ⚠️ **底线口径（报告 §10.3）：只分级、不改产出** ——
+        掉落权重 / 商店价 / 分解收益 / 强化消耗 / 炼化配方 **一个都不动**；
+        唯一的连带是**背包格子的描边色 / 名字色**与**组内排序**（见界面层）。
+     分级依据（报告 §十 开头，按权重）：① 获取难度 ② 用途层级 ③ 日产量稀缺度。
+     老档影响：**无感** —— 读档时按 id 查表，不需要迁移。
+     ⚠️ **5 只装备箱不在这张表里**：它们的 `rarity` 早就是"**开出什么品质**"的语义、
+        被 `openBox()` 直接读着（UR 箱有 10% 出专属那一条分支也吃它）。
+        在这里再写一遍等于给同一件东西留两个真相源 —— 所以箱子保留原字段，
+        并且 `data_audit` 里有一条断言专门钉"**box 之外的类型带 rarity 不许被开箱逻辑读到**"。 */
+  const ITEM_RARITY = {
+    /* 材料 11（报告 §10.1） */
+    mat_t1: 'N', mat_t2: 'R', mat_t3: 'SR', mat_t4: 'SSR', mat_t5: 'UR',
+    beast_egg: 'SR', minghun_sha: 'SSR', xuesui_jing: 'SSR',
+    dengyou: 'SR', mijuan_canzhang: 'R', lingzhi_zhong: 'N',
+    /* 招募券 3（§10.2：副本日常 / 精英-Boss / 只地狱 Boss+周常全清+悬赏） */
+    ticket_normal: 'R', ticket_adv: 'SR', ticket_lim: 'SSR',
+    /* 经验模块 5（按世界档位给） */
+    exp_s: 'N', exp_m: 'R', exp_l: 'SR', exp_xl: 'SSR', exp_xxl: 'UR',
+    /* 材料包 3（每日全清 / 周常·深井 / 地狱守关） */
+    matpack_low: 'R', matpack_mid: 'SR', matpack_high: 'SSR',
+    /* 重铸石 1（功能型消耗品：稀有但不顶） */
+    reforge_stone: 'SR',
+    /* 血清（§10.2）：一档通用 6 = SR · 一档专属 6 = SSR · 二档通用 6 = SSR · 二档专属 6 = UR */
+    serum_sr_atk: 'SR', serum_sr_def: 'SR', serum_sr_hp: 'SR',
+    serum_sr_spd: 'SR', serum_sr_crit: 'SR', serum_sr_skill: 'SR',
+    serum_sr_bl_vampire: 'SSR', serum_sr_bl_werewolf: 'SSR', serum_sr_bl_cultivator: 'SSR',
+    serum_sr_bl_titan: 'SSR', serum_sr_bl_tech: 'SSR', serum_sr_bl_psychic: 'SSR',
+    serum_sr2_atk: 'SSR', serum_sr2_def: 'SSR', serum_sr2_hp: 'SSR',
+    serum_sr2_spd: 'SSR', serum_sr2_crit: 'SSR', serum_sr2_skill: 'SSR',
+    serum_sr2_bl_vampire: 'UR', serum_sr2_bl_werewolf: 'UR', serum_sr2_bl_cultivator: 'UR',
+    serum_sr2_bl_titan: 'UR', serum_sr2_bl_tech: 'UR', serum_sr2_bl_psychic: 'UR',
+  };
+  /* 一处应用：只写 `rarity` 这一个字段，别的一律不碰（这就是"只分级不改产出"的落地形态）。 */
+  Object.keys(ITEM_RARITY).forEach(id => { if (ITEMS[id]) ITEMS[id].rarity = ITEM_RARITY[id]; });
+
   /* ================= 货币图鉴 ================= */
   /* 用途跟着稀有度分层（V1.0.1 父亲大人：按"获得程度"重排）：
      越常见的货币买越常规的东西，越稀有的只买最贵的东西。价格数字不一定更小，
@@ -1349,7 +1907,7 @@ window.DATA = (function () {
      ⚠️ 别拿"当前持有多少"当稀有度——◆ 是流水型（每天大进大出，钱都花在养成线上，
      余额自然低），✦ 是里程碑型（进得少、花得也少，攒着就显得多）。 */
   const CURRENCY_INFO = {
-    points:     { use: '日常全都用它——建筑升级、普通招募、灯阁市集、故事商店、药园播种、驯服坐骑、法宝购买、背包扩容',
+    points:     { use: '日常全都用它——建筑升级、普通招募、市集、故事商店、药园播种、驯服坐骑、法宝购买、背包扩容',
                   gain: '挂机、副本战斗、扫荡、任务、通关奖励、深井、斗法台（产量最多，随便花）' },
     otherworld: { use: '养成 + 高级招募——装备强化、秘术阁、法宝祭炼、高级招募，以及技能升级、命格升级、铭刻、深井商店',
                   gain: '分解装备、副本战斗、扫荡、Boss 战、悬赏、斗法台、深井（产量中等，够用但不宽裕）' },
@@ -1366,6 +1924,36 @@ window.DATA = (function () {
     { n: 20, reward: { points: 30000, holy: 400, otherworld: 100 } },
     { n: 30, reward: { points: 60000, holy: 800, otherworld: 300 } },
     { n: 40, reward: { points: 120000, holy: 1500, otherworld: 300 } },
+  ];
+  /* ================= 图鉴两卷（V1.1.3 · A10）=================
+     **卷表现场枚举**（材料《收口2》§4.3 第 5 条："图鉴卷数不许写死，以后加卷不用改界面"）：
+       · 伙伴卷 = **全体伙伴**（2026-09-27 父亲大人："就没有隐藏角色这种概念" —— 原先被 `hidden`
+         挡在池外的 6 位 UR 现在正常进卡池，图鉴自然也要收他们；口径从"能抽到的"改成"全部"）；
+       · 装备卷 = **装备名**（同一件装备的不同强化 / 词条算一种）。
+     装备名从**已有的四张名字表**现场收（世界套装 / 血统套装 / 神装 / 专属），不新写清单 ——
+     数据改了它自己跟着变，不会出现"表改了图鉴还停在旧总数"。
+     ⚠️ 装备卷的奖励阶梯**暂时沿用伙伴卷那一条**（没有新造数值）：奖励该给多少属数值轮，回单里点名。 */
+  function codexEquipNameList() {
+    const set = [];
+    const seen = {};
+    const add = (v) => {
+      if (typeof v === 'string') { if (v && !seen[v]) { seen[v] = 1; set.push(v); } return; }
+      if (Array.isArray(v)) { v.forEach(add); return; }
+      if (v && typeof v === 'object') {
+        /* 2026-09-27（本命 36 件那一轮顺手修）：带 `name` 的对象（神装套装 / 专属装备）**只收名字**。
+           旧写法是"把对象里所有字符串都摊平进来" —— 于是装备卷把 `C120`、`weapon`、`atkPct`、
+           甚至神装文案（"2件:攻击+12%…"）都当成可收集项，**分母里躺着 20+ 个永远集不到的名字**，
+           玩家怎么看都集不满。改法不动卷表结构，只改这一处摊平规则。 */
+        if (typeof v.name === 'string') { add(v.name); return; }
+        Object.keys(v).forEach(k => add(v[k]));
+      }
+    };
+    [EQUIP_NAMES, BLOODLINE_EQUIP_NAMES, GOD_SETS, SIGNATURE_EQUIPS].forEach(add);
+    return set;
+  }
+  const CODEX_VOLUMES = [
+    { id: 'chars', name: '伙伴', list: () => characters, key: 'chars', rewards: CODEX_REWARDS },
+    { id: 'equips', name: '装备', list: () => codexEquipNameList(), key: 'equipNames', rewards: CODEX_REWARDS },
   ];
 
   /* ================= 玩法指南（设置页 ❓ 入口） ================= */
@@ -1384,7 +1972,9 @@ window.DATA = (function () {
     ] },
     { id: 'party', title: '② 队伍与站位', body: [
       '上阵一共 5 格：**前排 2 格、后排 3 格**（固定不变）。主角必上阵，他自己占其中 1 格，另外 4 格给招募到的伙伴。',
-      '站位决定被打概率：**敌人优先攻击前排**，前排没人了才会打后排。所以前排适合坦度高、能扛的，后排适合脆皮输出与治疗。',
+      /* V1.0.5：原来只写"**敌人**优先攻击前排"——引擎两侧都改成先打前排之后（见 battle.js 的
+         pickTarget），这句话只留"敌人"就把机制说窄了一半，等于攻略骗人，所以改成双方。 */
+      '站位决定被打概率：**双方都优先攻击前排**，前排没人了才会打后排（点名技、全体技可以越过前排，专门用来处理躲在后排的精英与守关 Boss）。所以前排适合坦度高、能扛的，后排适合脆皮输出与治疗。',
       '**谁站哪一格由你说了算**：队伍页上 **长按**任意一格把他「抓起」，**按住拖到目标格子松手就放下**——落在谁身上就和谁换，落在空格就是搬过去，同排换顺序、跨排换前后都行；直接拖到「前排 / 后排」那行字上也能整排搬人（手指不方便拖动时，抓起后点一下目标位置也一样）。抓起来之后点顶部金色提示条上的「取消」就放回去。',
       '**主角也不例外**：主角那张牌长按起来一样能拖，拖到后排（第 3~5 格）他就站后排，拖回前排（第 1~2 格）就站前排。他够肉就放前排帮队伍挡刀，带的是输出装就放后排躲伤害。',
       '阵型：队伍页会把你现在站的阵**叫出名字**——三才阵 / 四象阵 / 五行归元阵 / 双柱阵 / 四海阵，每个都写清"要几个人、加成多少"；**必须上满 5 人**才可能成阵。',
@@ -1398,12 +1988,12 @@ window.DATA = (function () {
       '只有**同命格的人**穿得上，凑齐 2/4/6 件各有一档效果——末段想继续变强，就靠给主力一人配齐一套。',
       '命格神装箱：通关**第 20 个世界**后，异界商店才会上架（39000 异界结晶）。开出来保底是【传说】，' +
       '15% 概率升格成【神话·命格神装】——部位与命格都随机，所以凑套仍然要攒。',
-      '掉落的档位跟着世界走：W01~W02 只出精良、W03~W05 才有稀有、W06 起出史诗、W10 之后才见传说；' +
+      '掉落的好坏跟着你推到第几张图走：第 1~2 张图只出精良、第 3~5 张图才有稀有、第 6 张图起出史诗、第 10 张图之后才见传说；' +
       '同一种货，守关比精英好一档、精英比杂兵好一档，困难/地狱再各抬一档（但抬不破本段上限）。',
       '主角和每名伙伴都是 6 个槽位：武器 / 头部 / 胸甲 / 手部 / 腿部 / 饰品，六个部位都能穿。',
       '强化最高 +20，消耗对应等级的强化材料（不够时用点数代用）+ 异界结晶；强化失败不会降级。',
       '材料按强化等级分 5 档：+0~4 基础金属、+5~9 强化合金、+10~14 异界合金、+15~19 虚空晶体、+20 灯阁残片。',
-      'T4/T5 材料从 W04 / W05 之后的精英和 Boss 掉；通关 W04 / W06 后商店也会上架，不用死刷。',
+      '高阶材料（虚空晶体 / 灯阁残片）从第 4 / 5 张图之后的精英和 Boss 掉；通关第 4 / 6 张图后市集也会上架，不用死刷。',
       '世界套装 2 / 4 / 6 件激活额外效果（6 件效果要全身同一世界的套装）；命格套装也是 2 / 4 / 6 件，' +
       '第 10 张图起**每张图都有六支命格各自的套装**，只有同命格的人穿得上、而且只认同一张图的件；' +
       '命格神装（神话）2 / 4 / 6 件，规矩一样但只有神话档才有。',
@@ -1505,7 +2095,7 @@ window.DATA = (function () {
       '伴生体是第二条养成线：上阵 1 只，给**全队**加属性，主角也吃。',
       /* V1.0.1：原文的"必掉 1~3 颗 / 精英 30%"是**旧数字**（现为 10% / 5%），
          但"副本会掉"这件事是**真的** —— 详见 ITEMS.beast_egg 上面那段教训。 */
-      '孵化花「兽魂石」——**守关 Boss 10%** 掉 1 颗、**精英怪 5%**，**药园**收成时也有概率额外给（下品 15% / 中品 25%），**游历奇遇**会捡到，灯阁市集（通关 W03）也能买。10 颗孵 1 只，稀有度 N 50% / R 30% / SR 17% / SSR 3%。',
+      '孵化花「兽魂石」——**守关 Boss 10%** 掉 1 颗、**精英怪 5%**，**药园**收成时也有概率额外给（下品 15% / 中品 25%），**游历奇遇**会捡到，市集（通关第 3 张图后）也能买。10 颗孵 1 只，稀有度 N 50% / R 30% / SR 17% / SSR 3%。',
       '重复孵到同一只 → 转成**兽魂**；兽魂用来升阶，每升一阶在基础加成上再 +15%，满级 Lv.10。',
       '**五行克制**：每个残域有自己的属性，伴生体也有属性。金克木、木克土、土克水、水克火、火克金——带对了克制的伴生体进本，全队伤害 +15%，带反了 -8%。',
       '所以打不过某个世界时，先看一眼它的属性，换一只克它的伴生体再去，比硬堆战力便宜得多。',
@@ -1621,7 +2211,30 @@ window.DATA = (function () {
   // V9.5.70：整体压慢 ×1.5（结晶 10+5lv → 15+8lv；点数 2000×(lv+1) → 3000×(lv+1)）
   /* V9.6.134：血统结晶并入异界结晶 → 价格 ×28（血统结晶日收入 65，异界结晶池 1804，
      65×28 ≈ 1820 ≈ 池收入），"点满要几天"跟合并前一样。 */
-  const bloodlineCost = lv => ({ otherworld: 420 + lv * 224, points: 3000 * (lv + 1) });
+  /* ================= V1.1.4（A12-F · 命格 50 级换「血髓晶」）=================
+     《续2》§3.2 的"25% 搬料"落地，同样**写死进固定表**（《收口2》§4.3 第 3 条）：
+       · ◆ 侧 = 原价 × 0.75（◉ 侧**不动** —— 点数不是这一轮要动的钱包）；
+       · 血髓晶 = `BLOODLINE_MAT_TABLE[lv]`，逐级表 50 项，**0→50 级合计 145 块/人**。
+     ⚠️ 为什么是 50 个字面量而不是一个公式：《续2》§3.2 自己写明"逐级取整后求和是 145，
+        按公式连续值直接读会得 147.7 —— **以逐级表为准**"。写成表 = 玩家看到的、数值轮要改的、
+        尺子要核的，是同一个东西。
+     ⚠️ 前 5 级取 0：免得刚转生 / 刚招到的伙伴一上来就被材料卡住（《续2》§3.2 原话）。 */
+  const BLOODLINE_MAT = 'xuesui_jing';
+  const BLOODLINE_MAT_TABLE = [
+    0, 0, 0, 0, 0,                                         // Lv.0 → 5（前 5 级不吃料）
+    1, 1, 1, 1, 1, 1, 1,                                   // Lv.5 → 12
+    2, 2, 2, 2, 2, 2, 2, 2, 2,                             // Lv.12 → 21
+    3, 3, 3, 3, 3, 3, 3, 3, 3,                             // Lv.21 → 30
+    4, 4, 4, 4, 4, 4, 4, 4, 4,                             // Lv.30 → 39
+    5, 5, 5, 5, 5, 5, 5, 5, 5,                             // Lv.39 → 48
+    6, 6,                                                  // Lv.48 → 50
+  ];
+  const bloodlineCost = lv => ({
+    otherworld: Math.round((420 + lv * 224) * 0.75),
+    points: 3000 * (lv + 1),
+    mat: BLOODLINE_MAT,
+    matN: BLOODLINE_MAT_TABLE[Math.max(0, Math.min(BLOODLINE_MAT_TABLE.length - 1, lv | 0))] || 0,
+  });
 
   /* ================= 主角血统技能（觉醒后技能栏替换） ================= */
   // 结构与普通角色技能一致，战斗引擎直接可用
@@ -1630,25 +2243,33 @@ window.DATA = (function () {
       s1: { name: '破军斩', desc: '对单体造成 170% 伤害，并无视 25% 防御、附加破防 2 回合', cd: 3, type: 'dmg', mult: 1.7, pierce: 0.25, status: { id: 'sunder', turns: 2 }, target: 'enemy' },
       s2: { name: '战意咆哮', desc: '自身攻击+25%、暴击+10%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.25, critPct: 0.10, turns: 3 }, target: 'self' },
       ult: { name: '鏖战八方', desc: '对敌方全体造成 230% 伤害', type: 'dmg', mult: 2.3, target: 'allEnemies' },
-      passive: { name: '战意', desc: '攻击 +10%；残血时再 +20%' },
+      /* V1.1.1（材料《收口2》§1.4 A9）：**文案与实现对平** —— 原来这句写着"攻击 +10%，
+         残血再 +20%"，可引擎里只实装了后半句（battle.js 的 warrior 残血 ×1.2）。
+         修法选代价小、不动平衡的那一侧：**改文案**，只留真的在生效的那半句。 */
+      passive: { name: '战意', desc: '残血时攻击 +20%' },
     },
     '修真': {   // 法师：**通用法术**——修仙者与元素师都在这支血统里
       s1: { name: '灵能冲击', desc: '对单体造成 190% 伤害并附加灼烧 2 回合', cd: 3, type: 'dmg', mult: 1.9, status: { id: 'burn', turns: 2 }, target: 'enemy' },
       s2: { name: '聚灵阵', desc: '全队技能伤害 +15%，持续 3 回合', cd: 5, type: 'buff', buff: { skillPct: 0.15, turns: 3 }, target: 'team' },
       ult: { name: '万法归宗', desc: '对敌方全体造成 260% 伤害', type: 'dmg', mult: 2.6, target: 'allEnemies' },
-      passive: { name: '灵根', desc: '技能伤害 +12%' },
+      /* V1.1.1（同上）：这句"技能伤害 +12%"在引擎里**整条没有实装**（mage 没有任何被动分支）。
+         删掉这句，改写该血统真实成立的那件事：必杀是全体法术（下面 ult 的 target 就是 allEnemies）。 */
+      passive: { name: '灵根', desc: '以法术见长；必杀为全体法术' },
     },
     '绯红': {
       s1: { name: '猩红汲取', desc: '对单体造成 170% 伤害，并吸取伤害 25% 的生命', cd: 3, type: 'dmg', mult: 1.7, lifesteal: 0.25, target: 'enemy' },
       s2: { name: '绯怒', desc: '自身攻击+25%、汲取+15%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.25, lifesteal: 0.15, turns: 3 }, target: 'self' },
       ult: { name: '永夜绯宴', desc: '对敌方全体造成 260% 伤害，并吸取伤害 20% 的生命', type: 'dmg', mult: 2.6, lifesteal: 0.2, target: 'allEnemies' },
-      passive: { name: '绯红本能', desc: '汲取效果随命格等级提升；暴击率 +10%' },
+      /* V1.1.1（同上）："汲取随命格等级提升"没有实装（battle.js 的 vampire 分支在"血统=定位"之后
+         永不成立，core.js 那处也一起清了）；只留真的生效的暴击 +10%。 */
+      passive: { name: '绯红本能', desc: '暴击率 +10%' },
     },
     '科技': {
       s1: { name: '磁轨狙击', desc: '对单体造成 185% 伤害（高暴击）', cd: 3, type: 'dmg', mult: 1.85, target: 'enemy' },
       s2: { name: '过载核心', desc: '自身攻击+30%、暴击+20%，持续 3 回合', cd: 5, type: 'buff', buff: { atkPct: 0.3, critPct: 0.2, turns: 3 }, target: 'self' },
       ult: { name: '湮灭炮击', desc: '对单体造成 450% 伤害（无视 30% 防御）', type: 'dmg', mult: 4.5, pierce: 0.3, target: 'enemy' },
-      passive: { name: '机械专精', desc: '暴击伤害 +25%（攻击与暴击随命格等级提升）' },
+      /* V1.1.1（同上）：括号里那句"攻击与暴击随命格等级提升"没有实装，删掉；只留真的生效的暴伤 +25%。 */
+      passive: { name: '机械专精', desc: '暴击伤害 +25%' },
     },
     '念动力': {  // 辅助：治疗 + 增益 + 控场（父亲大人：控制不单独成职业，谁都能带控制技能）
       s1: { name: '安抚之光', desc: '治疗生命最低的队友 200% 精神', cd: 3, type: 'heal', mult: 2.0, target: 'lowest' },
@@ -1663,6 +2284,199 @@ window.DATA = (function () {
       passive: { name: '坚岩', desc: '受到伤害 -12%' },
     },
   };
+
+  /* ================= 伙伴机制池（V1.1.1 · 父亲大人 0926：「机制不是血统机制哦，是对应到不同的伙伴」）=================
+     为什么要这一层：V9.6.86「血统=定位」把 120 人收敛成 6 套技能，而且 `ch.skills = BLOODLINE_SKILLS[血统]`
+     是**同一个对象** —— 狼人 26 个人逐字相同，于是"只认血统就够了、不用看这个人"。他要的是
+     **同一支血统里任意两个人的出手方式都不一样**。
+     做法（材料《收口4-机制按伙伴》§1.2 的结构）：
+       · MECH_POOL ＝ 机制原子表（打击 / 治疗 / 功能 / 必杀 四族）；
+       · 每个人拿一个「打击（或治疗）＋ 功能 ＋ 必杀」三元组（CHAR_MECH，120 行，见下面装配）；
+       · 同血统内**两两不重复**（组合空间远大于单支血统人数）。
+     ⚠️ 两条硬约束（都做成尺子了，见 scripts/bloodline_audit.js）：
+       ① **原子只许用战斗引擎已有的通道**：type / target / mult / hits / pierce / status / buff /
+          lifesteal / execute —— 写了引擎不认的字段＝写了不生效（这个项目栽过多次）；
+       ② **本轮只落机制、不动平衡**：原子的 `scale` 是"相对该槽位血统基准倍率的系数"，
+          装配时 `mult = 血统基准 × scale`；多段按段数分摊（hits:2 → 每段 0.5）。
+          真正的倍率与 buff 数值留数值轮（材料《收口2》§1.5：只有倍率/比例算数值）。 */
+  const MECH_POOL = {
+    /* ---- 打击族：占 s1（本来 s1 就是"单体伤害"的血统）---- */
+    hit_single: { tag: '单点', name: '重压一击', type: 'dmg', target: 'enemy', scale: 1 },
+    hit_double: { tag: '连击', name: '裂骨二连斩', type: 'dmg', target: 'enemy', hits: 2, scale: 0.5 },
+    hit_triple: { tag: '连击', name: '碎星三连斩', type: 'dmg', target: 'enemy', hits: 3, scale: 0.34 },
+    hit_pierce: { tag: '破甲', name: '穿甲突刺', type: 'dmg', target: 'enemy', pierce: 0.35, scale: 1 },
+    hit_bleed: { tag: '裂伤', name: '裂伤之刃', type: 'dmg', target: 'enemy', status: { id: 'bleed', turns: 2 }, scale: 1 },
+    hit_burn: { tag: '灼烧', name: '灼魂之印', type: 'dmg', target: 'enemy', status: { id: 'burn', turns: 2 }, scale: 1 },
+    /* ⚠️ 原子名要过备案禁词表（`page_text_audit` 的 COMPLIANCE_TEXT）：原来的「镇魂重击 / 镇魂钟」
+       踩了"宗教科仪词"那一类（镇魂 / 缚灵 / 驱邪 …），已改成不带宗教味的说法 ——
+       这是尺子抓我自己的一条，记在回单里。 */
+    hit_stun: { tag: '眩晕', name: '震地重击', type: 'dmg', target: 'enemy', status: { id: 'stun', turns: 1, chance: 0.6 }, scale: 1 },
+    hit_exec: { tag: '斩杀', name: '断罪之刃', type: 'dmg', target: 'enemy', execute: true, scale: 1 },
+    /* ---- 治疗族：占"本来就以治疗起手"的血统（念动力）的 s1 ---- */
+    heal_low: { tag: '单疗', name: '抚光', type: 'heal', target: 'lowest', scale: 1 },
+    heal_team: { tag: '群疗', name: '普照之光', type: 'heal', target: 'team', scale: 0.55 },
+    heal_clean: { tag: '净化', name: '涤尘之光', type: 'cleanseHeal', target: 'lowest', scale: 1 },
+    heal_regen: { tag: '再生', name: '续命之环', type: 'heal', target: 'lowest', status: { id: 'regen', turns: 3 }, scale: 1 },
+    /* ---- 功能族：占 s2（buff / debuff / 护盾 / 充能）---- */
+    fn_self_atk: { tag: '自身攻', name: '战意沸腾', type: 'buff', target: 'self', buff: { atkPct: 0.28, critPct: 0.12, turns: 3 } },
+    fn_self_def: { tag: '自身守', name: '铁壁姿态', type: 'buff', target: 'self', buff: { defPct: 0.45, evaPct: 0.10, turns: 3 } },
+    fn_team_atk: { tag: '全队攻', name: '战鼓齐鸣', type: 'buff', target: 'team', buff: { atkPct: 0.15, turns: 3 } },
+    fn_team_skill: { tag: '全队增伤', name: '聚灵阵', type: 'buff', target: 'team', buff: { skillPct: 0.15, turns: 3 } },
+    fn_team_def: { tag: '全队守', name: '共鸣壁障', type: 'buff', target: 'team', buff: { evaPct: 0.15, defPct: 0.20, turns: 3 } },
+    fn_team_spd: { tag: '全队速', name: '疾行令', type: 'buff', target: 'team', buff: { spdPct: 0.18, turns: 3 } },
+    fn_weak: { tag: '削攻', name: '威压', type: 'debuff', target: 'allEnemies', buff: { atkPct: -0.20, turns: 3 } },
+    fn_shield: { tag: '护盾', name: '灯纱护盾', type: 'shield', target: 'self', mult: 0.22 },
+    fn_energy: { tag: '充能', name: '引灯共鸣', type: 'energy', target: 'topAlly', mult: 40 },
+    /* ---- 必杀族·全体伤害型：形状跟血统基准（那几支的必杀本来就是"全体伤害"），差异落在附带效果 ----
+       ⚠️ 这里**不许**把辅助型必杀（治疗/护盾/大增益）混进伤害血统的池子：材料《定调》§4.4 算过笔账 ——
+          必杀是伤害总量里最大的一项，把"全体 230%"换成"全体护盾"＝**替这个角色砍掉一大块输出**，
+          那不是"换个味道"，是真动平衡。所以：伤害血统只拿伤害型必杀，辅助血统（念动力/泰坦）才拿辅助型。 */
+    ult_burst: { tag: '全体爆发', name: '万法归一', type: 'dmg', target: 'allEnemies', scale: 1 },
+    ult_burn: { tag: '全体灼烧', name: '焚野', type: 'dmg', target: 'allEnemies', status: { id: 'burn', turns: 2 }, scale: 1 },
+    ult_stun: { tag: '全体眩晕', name: '震霆钟', type: 'dmg', target: 'allEnemies', status: { id: 'stun', turns: 1, chance: 0.5 }, scale: 1 },
+    ult_life: { tag: '全体汲取', name: '血食盛宴', type: 'dmg', target: 'allEnemies', lifesteal: 0.2, scale: 1 },
+    ult_exec: { tag: '全体斩杀', name: '天罚', type: 'dmg', target: 'allEnemies', execute: true, scale: 1 },
+    /* ---- 必杀族·辅助型：只有"本来就以辅助必杀起手"的血统拿这几条 ---- */
+    /* ⚠️ ult_heal 带**绝对倍率**：它会被"基准必杀是 buff"的血统（泰坦）拿去用，
+       而 buff 型基准没有 mult —— 只写 scale 会算出 NaN（尺子 ④-a 当场抓到过）。
+       2.4 ＝ 全队治疗 240% 精神，落在材料《定调》§4.4「必杀 全体 2.2~2.6」的区间里。 */
+    ult_heal: { tag: '全队治疗', name: '心灵共鸣', type: 'cleanseHeal', target: 'team', scale: 0.9, mult: 2.4 },
+    /* 同 ult_heal：这条也会被"基准必杀是 buff"的血统用，倍率必须**绝对**（0.25 ＝ 生命上限 25% 的护盾） */
+    ult_shield: { tag: '全队护盾', name: '不落灯罩', type: 'teamshield', target: 'team', mult: 0.25, buff: { defPct: 0.15, turns: 3 } },
+    ult_team: { tag: '全队大增益', name: '不动如山', type: 'buff', target: 'team', buff: { defPct: 0.30, atkPct: 0.15, turns: 3 } },
+    /* ---- 必杀族·单体型：科技那支的必杀本来就是单体炮击，不许改成全体（换形状＝白送强度档）---- */
+    ult_s_burst: { tag: '单体爆发', name: '湮灭贯击', type: 'dmg', target: 'enemy', scale: 1 },
+    ult_s_pierce: { tag: '单体破甲', name: '穿心炮', type: 'dmg', target: 'enemy', pierce: 0.35, scale: 1 },
+    ult_s_exec: { tag: '单体斩杀', name: '终焉一击', type: 'dmg', target: 'enemy', execute: true, scale: 1 },
+    ult_s_burn: { tag: '单体灼烧', name: '熔芯弹', type: 'dmg', target: 'enemy', status: { id: 'burn', turns: 2 }, scale: 1 },
+    ult_s_stun: { tag: '单体眩晕', name: '震爆弹', type: 'dmg', target: 'enemy', status: { id: 'stun', turns: 1, chance: 0.6 }, scale: 1 },
+    ult_s_bleed: { tag: '单体裂伤', name: '碎盾弹', type: 'dmg', target: 'enemy', status: { id: 'bleed', turns: 2 }, scale: 1 },
+  };
+  const MECH_HIT_IDS = ['hit_single', 'hit_double', 'hit_triple', 'hit_pierce', 'hit_bleed', 'hit_burn', 'hit_stun', 'hit_exec'];
+  const MECH_HEAL_IDS = ['heal_low', 'heal_team', 'heal_clean', 'heal_regen'];
+  const MECH_FN_IDS = ['fn_self_atk', 'fn_self_def', 'fn_team_atk', 'fn_team_skill', 'fn_team_def', 'fn_team_spd', 'fn_weak', 'fn_shield', 'fn_energy'];
+  const MECH_ULT_DPS_ALL_IDS = ['ult_burst', 'ult_burn', 'ult_stun', 'ult_life', 'ult_exec'];
+  const MECH_ULT_DPS_ONE_IDS = ['ult_s_burst', 'ult_s_pierce', 'ult_s_exec', 'ult_s_burn', 'ult_s_stun', 'ult_s_bleed'];
+  const MECH_ULT_SUP_IDS = ['ult_heal', 'ult_shield', 'ult_team'];
+  /* 必杀池怎么选：**由该血统基准必杀自己决定**（type==='dmg' → 伤害池；形状再分全体/单体），
+     不写死血统名 —— 以后加血统不会有人忘了往哪张表里塞。 */
+  function mechUltPool(base) {
+    if (base.ult.type !== 'dmg') return MECH_ULT_SUP_IDS;
+    return base.ult.target === 'allEnemies' ? MECH_ULT_DPS_ALL_IDS : MECH_ULT_DPS_ONE_IDS;
+  }
+  /* 机制标签（只用于"一眼看得出不同"的文案位，与父亲大人拍的"不做标签 UI"不冲突：
+     这三个 tag 只写进技能 desc 里当读得懂的一句话，不新增界面元素） */
+  const MECH_STATUS_CN = { burn: '灼烧', bleed: '裂伤', stun: '眩晕', poison: '中毒', regen: '再生', weak: '虚弱', sunder: '破防' };
+  const MECH_BUFF_CN = { atkPct: '攻击', defPct: '防御', spdPct: '速度', critPct: '暴击', skillPct: '技能伤害', evaPct: '闪避', lifesteal: '汲取', poisonOnHit: '附毒' };
+  /* 机制 → 一句人话（≤ 20 字，模板化：数字与状态都从**同一份字段**派生，不手写第二遍）
+     ⚠️ 这是"给人看的"与"真正生效的"同源的落点之一：desc 只读 spec 的字段。 */
+  function mechDesc(spec) {
+    const pct = v => Math.round(v * 100) + '%';
+    const st = spec.status ? ('【' + (MECH_STATUS_CN[spec.status.id] || spec.status.id) + '】' + spec.status.turns + ' 回合') : '';
+    const buffTxt = spec.buff ? Object.keys(spec.buff).filter(k => k !== 'turns' && MECH_BUFF_CN[k])
+      .map(k => MECH_BUFF_CN[k] + (spec.buff[k] > 0 ? '+' : '') + pct(spec.buff[k])).join('、') + '，' + spec.buff.turns + ' 回合' : '';
+    switch (spec.type) {
+      case 'dmg': {
+        const head = spec.target === 'allEnemies'
+          ? '对敌方全体造成 ' + pct(spec.mult) + ' 伤害'
+          : (spec.hits > 1 ? '对单体连击 ' + spec.hits + ' 段（每段 ' + pct(spec.mult) + '）'
+            : '对单体造成 ' + pct(spec.mult) + ' 伤害');
+        const tail = (spec.pierce ? '，无视 ' + pct(spec.pierce) + ' 防御' : '')
+          + (st ? '，附加' + st : '')
+          + (spec.execute ? '；目标残血追加斩杀' : '')
+          + (spec.lifesteal ? '，并汲取 ' + pct(spec.lifesteal) + ' 生命' : '');
+        return head + tail;
+      }
+      case 'heal': return (spec.target === 'team' ? '全队治疗 ' : '治疗生命最低的队友 ') + pct(spec.mult) + ' 精神' + (st ? '，附加' + st : '');
+      case 'cleanseHeal': return (spec.target === 'team' ? '全队治疗 ' : '治疗生命最低的队友 ') + pct(spec.mult) + ' 精神并清除 1 个异常';
+      case 'shield': return '自身获得相当于生命上限 ' + pct(spec.mult) + ' 的护盾';
+      case 'teamshield': return '全队获得相当于生命上限 ' + pct(spec.mult) + ' 的护盾' + (buffTxt ? '，' + buffTxt : '');
+      case 'buff': return (spec.target === 'team' ? '全队' : '自身') + buffTxt;
+      case 'debuff': return '敌方全体' + buffTxt;
+      case 'energy': return '给攻击最高的队友 +' + spec.mult + ' 点能量';
+      default: return spec.name;
+    }
+  }
+  /* 机制装配：把一个原子 + 该血统同槽位的基准技能 → 一份完整的技能（字段形状与 BLOODLINE_SKILLS 一致，
+     所以**界面与引擎一行都不用改**）。
+     · scale 型：mult ＝ 基准 mult × scale（多段按段数分摊 → 总输出与现状同量级）
+     · 绝对型（护盾 / 充能）：mult 就是原子自己的数（那是"生命上限的比例 / 能量点"，不是伤害倍率） */
+  function mechSkill(atomId, base, isUlt) {
+    const a = MECH_POOL[atomId];
+    if (!a) return base;
+    const sk = { name: a.name, tag: a.tag, type: a.type, target: a.target };
+    /* 倍率的取值顺序（NaN 是这一层最容易出的静默 bug —— 尺子 ④-a 抓的就是它）：
+       ① 原子带 scale 且**基准这一槽真有倍率** → 基准 × scale；
+       ② 否则用原子自己的绝对倍率（护盾/充能/被 buff 型血统拿去用的治疗原子）；
+       ③ 都没有 → 不写 mult（纯 buff / debuff 本来就不需要）。 */
+    /* ================= V1.1.15（2026-09-27 · 数值轮 · 总监建议）=================
+       **机制套整体收回 12%**。总监会诊（0927-A 报告 §五）：原子的"等值性"是好的
+       （原子之间差 ≤6%），但**整机制套比旧基准套快 9~27%** —— 那是一次**隐性加强**，
+       换技能之后所有伙伴都变强，而难度曲线、副本通过线都是按旧基准画的。
+       这里一处收口（不逐个改 24 个原子）：**只乘伤害倍率这一路**（scale 型），
+       绝对型（护盾 / 充能 / 纯 buff）不动 —— 它们本来就不是伤害。
+       ⚠️ 改完必须重跑 `balance_check` / `world_curve`（通过线会跟着动）。 */
+    /* ⚠️ 0.88 试过：`world_curve` 当场把 **W05 前期门槛顶破**（裸装 3 人全通要 Lv.85 > 门槛 80，
+       而改之前是"前六个世界全部达标"）—— 12% 对前期太狠。收到 **0.93**（≈7%），
+       既拿掉总监说的"隐性加强"大头，又不破前期通过线（改完 world_curve 复验过）。 */
+    const rel = (a.scale !== undefined && base.mult !== undefined) ? base.mult * a.scale * 0.93 : undefined;
+    const abs = (rel !== undefined && isFinite(rel)) ? rel : a.mult;
+    if (abs !== undefined && isFinite(abs)) sk.mult = Math.round(abs * 1000) / 1000;
+    if (a.hits) sk.hits = a.hits;
+    if (a.pierce) sk.pierce = a.pierce;
+    if (a.status) sk.status = Object.assign({}, a.status);
+    if (a.buff) sk.buff = Object.assign({}, a.buff);
+    if (a.lifesteal) sk.lifesteal = a.lifesteal;
+    if (a.execute) sk.execute = a.execute;
+    if (isUlt && base.cd) sk.cd = base.cd; else if (base.cd) sk.cd = base.cd;
+    sk.desc = mechDesc(sk);
+    return sk;
+  }
+  /* 机制分配表：CHAR_MECH[角色 id] = [打击（或治疗）, 功能, 必杀] 三个**原子 id**。
+     生成规则（确定性 · 可复现 · 保证同血统内两两不同）：
+       ① 同一支血统内按「细分定位分组 → 稀有度降序 → id」排序 —— 定位相近的人排在一起，
+          于是他们会拿到**相邻但不同**的机制（"同一血统里剑修和狂战出手不一样"这件事，
+          连两个剑修之间也成立）；
+       ② 三族各自轮转（打击步长 1、功能步长 2、必杀步长 3）—— 步长与族长度互质，
+          三元组在 8×9×8 ＝ 576 的空间里**不会撞车**（尺子会两两验一遍）；
+       ③ 必杀形状跟血统基准（全体 / 单体），治疗型血统的首槽走治疗族。 */
+  const CHAR_MECH = {};
+  (function buildCharMech() {
+    const byBl = {};
+    characters.forEach(ch => { (byBl[ch.bloodline] = byBl[ch.bloodline] || []).push(ch); });
+    Object.keys(byBl).forEach(bl => {
+      const base = BLOODLINE_SKILLS[bl];
+      if (!base) return;
+      const firstPool = (base.s1.type === 'heal' || base.s1.type === 'cleanseHeal') ? MECH_HEAL_IDS : MECH_HIT_IDS;
+      const ultPool = mechUltPool(base);
+      const list = byBl[bl].slice().sort((a, b) => {
+        const ra = a.role || '', rb = b.role || '';
+        if (ra !== rb) return ra < rb ? -1 : 1;
+        const qa = RARITIES.indexOf(b.rarity) - RARITIES.indexOf(a.rarity);
+        if (qa) return qa;
+        return String(a.id) < String(b.id) ? -1 : 1;
+      });
+      list.forEach((ch, i) => {
+        CHAR_MECH[ch.id] = [
+          firstPool[i % firstPool.length],
+          MECH_FN_IDS[(i * 2) % MECH_FN_IDS.length],
+          ultPool[i % ultPool.length],
+        ];
+      });
+    });
+  })();
+  /* 按机制装配一套完整技能（passive 仍走血统 —— 被动是血统身份，不是出手方式） */
+  function skillsForChar(ch, bl) {
+    const base = BLOODLINE_SKILLS[bl];
+    const m = CHAR_MECH[ch.id];
+    if (!base || !m) return base || null;
+    return {
+      s1: mechSkill(m[0], base.s1, false),
+      s2: mechSkill(m[1], base.s2, false),
+      ult: mechSkill(m[2], base.ult, true),
+      passive: base.passive,
+    };
+  }
 
   /* ================= 血统重排（V9.6.86）：血统 = 定位 =================
      父亲大人："战士狼人，修真法师，魔法不要了，肉盾你换一个。"
@@ -1684,7 +2498,11 @@ window.DATA = (function () {
     const mapped = BLOODLINE_OVERRIDE[ch.id] || LEGACY_KIND_BLOODLINE[ch.rawKind] || ch.bloodline;
     ch.bloodline = mapped;
     ch.kind = bloodlineKind(mapped);
-    ch.skills = BLOODLINE_SKILLS[mapped];
+    /* V1.1.1（父亲大人 0926：「机制不是血统机制哦，是对应到不同的伙伴」）：
+       原来这里是一行 `ch.skills = BLOODLINE_SKILLS[mapped]` —— 同一支血统的人**共用同一个对象**，
+       26 个狼人逐字相同。现在每人按 CHAR_MECH 的三元组装配（passive 仍走血统：被动是身份，不是出手方式）。
+       字段形状与 BLOODLINE_SKILLS 完全一致 → **界面与战斗引擎一行都不用改**。 */
+    ch.skills = skillsForChar(ch, mapped) || BLOODLINE_SKILLS[mapped];
     ch.faction = FACTION_FIX[ch.faction] || ch.faction;      // 阵营归一（老名字 → 新地名）
   });
   /* V9.6.130（父亲大人："铭刻加到 20 阶……各个功能都最好能跟着游戏进程一起发展，
@@ -1694,29 +2512,53 @@ window.DATA = (function () {
      成本 6250 起每阶 ×1.15（第 20 阶约 5 万血统结晶）—— 长线但追得上。 */
   const GENE_LOCK_NAMES = ['初醒', '强化', '突破', '超越', '完全解锁', '回响', '刻痕', '铭心', '贯脉',
     '破妄', '凝神', '铸体', '淬火', '登阶', '归元', '御虚', '承天', '凌绝', '无相', '灯主'];
+  /* ================= V1.1.4（A12-F · 铭刻 20 阶换「铭魂砂」）=================
+     《续2》§3.1 的"25% 搬料"落地，而且**写死进固定表**：《收口2》§4.3 第 3 条点名
+     "材料消耗不许用运行时公式 —— 写死进固定表，改一行就生效"。
+     下面这张 20 行表就是《续2》§3.1 那张表的**逐阶抄写**，两个数都别在别处再算一遍：
+       · `otherworld` ＝ 原价 × 0.75（25% 搬走之后 ◆ 侧剩下的那一份）；
+       · `matN`（铭魂砂）＝ 2~13 块/阶，**20 阶合计 293 块**（尺子 `cap_audit` 钉着这个和）。
+     ⚠️ 只对**新发生的解锁**生效：历史点过的阶不倒欠料、也不退那 25% 的 ◆（《续2》§3.5 第 1/2 条）。 */
+  const GENE_LOCK_MAT = 'minghun_sha';
+  const GENE_LOCK_TABLE = [
+    { otherworld: 2625,   matN: 2 },  { otherworld: 7875,   matN: 5 },
+    { otherworld: 21000,  matN: 14 }, { otherworld: 52500,  matN: 35 },
+    { otherworld: 131250, matN: 88 }, { otherworld: 10500,  matN: 7 },
+    { otherworld: 11100,  matN: 7 },  { otherworld: 11775,  matN: 8 },
+    { otherworld: 12375,  matN: 8 },  { otherworld: 13050,  matN: 9 },
+    { otherworld: 13650,  matN: 9 },  { otherworld: 14250,  matN: 10 },
+    { otherworld: 14925,  matN: 10 }, { otherworld: 15525,  matN: 10 },
+    { otherworld: 16200,  matN: 11 }, { otherworld: 16800,  matN: 11 },
+    { otherworld: 17400,  matN: 12 }, { otherworld: 18075,  matN: 12 },
+    { otherworld: 18675,  matN: 12 }, { otherworld: 19350,  matN: 13 },
+  ];
   const GENE_LOCKS = (function () {
     const first5 = [
       /* V9.6.134：把要求写成**结构化的字段**（w = 要通关的世界、lv = 要到的等级），
          `req` 只留给人看。以前 core.geneLockInfo 读的是两个写死的 5 元数组 ——
          于是 9.6.130 把铭刻扩到 20 阶之后，第 6 阶以后**永远点不动**（改一半的典型）。 */
-      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 黏液巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 3500 } },
-      { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', w: 'W03', lv: 20, cost: { otherworld: 10500 } },
-      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道废土带·普通', w: 'W06', lv: 40, cost: { otherworld: 28000 } },
-      { stage: 4, name: '超越', desc: '命格效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 70000 } },
-      { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', w: 'W12', lv: 80, cost: { otherworld: 175000 } },
+      { stage: 1, name: '初醒', desc: '全队全属性+5%，挂机收益+10%', req: '通关 黏液巢穴·普通', w: 'W01', lv: 1, cost: { otherworld: 2625 } },
+      { stage: 2, name: '强化', desc: '全队技能伤害+15%', req: '玩家Lv20 + 通关 怨声旧宅·普通', w: 'W03', lv: 20, cost: { otherworld: 7875 } },
+      { stage: 3, name: '突破', desc: '必杀技伤害+30%', req: '玩家Lv40 + 通关 轨道废土带·普通', w: 'W06', lv: 40, cost: { otherworld: 21000 } },
+      { stage: 4, name: '超越', desc: '命格效果+50%', req: '玩家Lv60 + 通关 巨兽孤屿·普通', w: 'W09', lv: 60, cost: { otherworld: 52500 } },
+      { stage: 5, name: '完全解锁', desc: '全属性+15%，离线上限 +4 小时', req: '玩家Lv80 + 通关 蚀环远征·普通', w: 'W12', lv: 80, cost: { otherworld: 131250 } },
     ];
-    const out = first5.slice();
+    /* 每阶都挂上材料（`mat`/`matN` 与 ◆ 同源，见上面的 GENE_LOCK_TABLE）——
+       界面与逻辑都读同一份，**不再各写一遍**（这个项目被"同一件事两处定义"咬过多次）。 */
+    const out = first5.map((g, i) => Object.assign(g, { mat: GENE_LOCK_MAT, matN: GENE_LOCK_TABLE[i].matN }));
     for (let st = 6; st <= 20; st++) {
       const worldIdx = Math.min(WORLDS.length - 1, st * 2 - 2);        // 6 阶→W10、20 阶→W36
       const pct = (st <= 12 ? 0.8 : 0.5) + (st % 2 === 0 ? 0.1 : 0);   // 递减：0.9/0.6 交替 → 15 阶约 +9.75%
       /* V9.6.133：cap_audit 报「6~20 阶按 ×1.15 递增，点满要 14.8 年」→ 曲线放平。
          按"血统结晶的日收入 × 一年"倒推，整条线压到约 320 天，跟其它养成线同量级。
-         V9.6.134：血统结晶并入异界结晶 → 整条线 ×28（同 bloodlineCost 的口径）。 */
-      const cost = Math.round((500 + (st - 6) * 30) * 28 / 100) * 100;
+         V9.6.134：血统结晶并入异界结晶 → 整条线 ×28（同 bloodlineCost 的口径）。
+         V1.1.4：整条曲线的**现值**已抄进 GENE_LOCK_TABLE（含 25% 搬料后的 ×0.75），
+         这里只读表、不再算数 —— 数改了只改那一张表。 */
+      const row = GENE_LOCK_TABLE[st - 1];
       out.push({ stage: st, name: GENE_LOCK_NAMES[st - 1] || ('铭刻 ' + st),
         desc: '全队全属性+' + pct.toFixed(1) + '%', req: '通关 ' + WORLDS[worldIdx].name + '·普通',
         w: WORLDS[worldIdx].id, lv: 0,
-        cost: { otherworld: cost }, allPct: pct / 100 });
+        cost: { otherworld: row.otherworld }, mat: GENE_LOCK_MAT, matN: row.matN, allPct: pct / 100 });
     }
     return out;
   })();
@@ -1839,6 +2681,12 @@ window.DATA = (function () {
   /* V9.6.134：异界结晶价格 ×1.55（并入技能芯片 / 血统结晶 / 深井徽记之后池子变大） */
   const KEJI_COST_MULT = 1.25 * 1.55;
   const kejiCost = (k, lv) => Math.round((k.base + k.step * lv) * KEJI_COST_MULT);
+  /* V1.1.4（A12-F · 秘术阁接「秘卷残章」）——《收口2》§3.1：**每 5 级 1 张**（42 条线共 301 张）。
+     账：§3.3 说 301 ÷ 4 张/天 ≈ 75 天，而秘术阁本身就是长线（42 条 × 20~60 级）→ 不会卡住。
+     `kejiMatNeed(lv)` 传的是**当前等级**，返回"升到下一级要吃几张"：升到 5/10/15… 那一级要 1 张。 */
+  const KEJI_MAT = 'mijuan_canzhang';
+  const KEJI_MAT_EVERY = 5;
+  const kejiMatNeed = lv => ((lv + 1) % KEJI_MAT_EVERY === 0 ? 1 : 0);
 
   /* ================= 挂机游历奇遇（对标《道友修仙》的 YouLi · 601 条） =================
      它的挂机不是"只涨数字"：挂机过程中会随机掉出"游历事件"，点一下拿东西。
@@ -1895,6 +2743,11 @@ window.DATA = (function () {
     { id: 'tv38', ico: '🧬', name: '赤玉现世',   w: 2,  desc: '地里渗出一块赤玉，握在手里发烫。', effect: { otherworld: 80 } },
     { id: 'tv39', ico: '🌕', name: '月华灌体',   w: 1,  desc: '月华落下来，把你整个人洗了一遍。', effect: { holy: 200, otherworld: 260, points: 6000 } },
     { id: 'tv40', ico: '🎇', name: '大道显化',   w: 1,  desc: '你眼前晃过一线大道，抓不住，但确实抓到了一把东西。', effect: { item: 'box_ur', holy: 300 } },
+    /* V1.1.4（A12-F · 「灯油」的来源之一）：《收口2》§3.1 给小料的来源是"游历奇遇（灯阁主题）"。
+       权重对照现有池算过：本池 40 条合计 236 权重、一天约 20 次奇遇 → w:14 ≈ **1.2 颗/天**，
+       落在 §3.3 那个"≤1.5/天"的上限里（灯阁权限线本身 119 天 → 材料先到位、不拖线）。
+       ⚠️ 权重是**临时值**：数值轮要调"灯油几天够"只改这一个 w。 */
+    { id: 'tv41', ico: '🛢', name: '灯阁添油',   w: 14, desc: '灯阁的长明灯快见底了，你在库房里翻到一罐还没开封的灯油。', effect: { points: 900, item: 'dengyou' } },
   ];
   const TRAVEL_TOTAL_W = TRAVELS.reduce((s, t) => s + t.w, 0);
   /* 游历奇遇的出场节奏（秒）：进游戏后第 5 分钟出第一次，之后 10 / 20 / 30 / 40 / 50 分钟，
@@ -1928,6 +2781,13 @@ window.DATA = (function () {
     { id: 'g3', name: '上品灵田', points: 12000, sec: 3600, out: { item: 'mat_t3', n: 12 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
     { id: 'g4', name: '极品灵田', points: 40000, sec: 7200, out: { item: 'mat_t4', n: 16 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
   ];
+  /* V1.1.4（A12-F · 药园接「灵植种」）——《收口2》§3.1：**每块地播 1 颗**，收成时**回收 70%**。
+     账（同一条 §3.1）：播 10 收 7 ≈ 自循环，"永远不会卡住药园"；缺口由**副本材料档**与**市集**补
+     （市集那条"不设卡"是关键 —— 新号手里一颗种子都没有时，得有个能买到的地方）。
+     ⚠️ `GARDEN_SEED_RECYCLE` 只此一处：改它就等于改药园的"永动程度"，是数值轮的地盘。 */
+  const GARDEN_SEED = 'lingzhi_zhong';
+  const GARDEN_SEED_N = 1;
+  const GARDEN_SEED_RECYCLE = 0.7;
   /* 一块地收成什么（V9.6.141）——**放在数据层**，两边界面共用一份。
      以前只有网页版 ui.js 里有一份 gardenYieldText()，小游戏那边自己拼字符串时用了
      一个不存在的字段（`seed.desc`），于是每一行都只剩「可种「下品灵田」：◉ 800 · 」
@@ -1958,9 +2818,13 @@ window.DATA = (function () {
      （V9.6.141：这正是父亲大人指出"药园排版明显有问题"的那一行。） */
   function gardenRowLines(kind, state, leftSec) {
     const head = state === 'empty'
-      ? ('可种「' + kind.name + '」：◉ ' + kind.points + ' · ' + Math.round(kind.sec / 60) + ' 分钟')
+      /* V1.1.4（A12-F · 药园接「灵植种」）：把"还要一颗种子"写进**这一行数据**里 ——
+         两端共用这一份文案，所以不会出现"网页版写了、小游戏没写"这种分叉。
+         收获那一截补一句"回收 70%"，否则玩家看到种子在减少会以为药园是纯消耗、
+         就不敢升级地块了（这一句是解释，不是数字展示，所以放在收成那一截）。 */
+      ? ('可种「' + kind.name + '」：◉ ' + kind.points + ' + ' + gardenItemName(GARDEN_SEED) + '×' + GARDEN_SEED_N + ' · ' + Math.round(kind.sec / 60) + ' 分钟')
       : (state === 'ready' ? '已成熟，可以收了' : ('成熟还需 ' + fmtClock(leftSec || 0)));
-    return [head, '收 ' + gardenYieldText(kind)];
+    return [head, '收 ' + gardenYieldText(kind) + (state === 'empty' ? '（种子回收 ' + Math.round(GARDEN_SEED_RECYCLE * 100) + '%）' : '')];
   }
   function gardenRowText(kind, state, leftSec) {
     return gardenRowLines(kind, state, leftSec).join(' → ');
@@ -2113,9 +2977,14 @@ window.DATA = (function () {
      整条线只剩 48 天，对一条 20 级永久加成线来说太便宜，所以起价 ×3.33 → 200。
      校准后 1 级 = 200 晶石 ≈ 1.4 天，约等于两次限定招募 —— 够肉、但不是点不动。 */
   const AUTHORITY_MAX = 20;
+  /* V1.1.4（A12-F · 灯阁权限接「灯油」）——《收口2》§3.1：**每级 3 块、20 级共 60 块**。
+     供需账（§3.3）：60 ÷ 1.5 颗/天 ≈ 40 天，而权限线本身 119 天 → **材料先到位**，
+     所以这条加成不该把权限线拖慢（那条线的"攒够要几天"没被这一改动摇）。 */
+  const AUTHORITY_MAT = 'dengyou';
+  const AUTHORITY_MAT_N = 3;
   const authorityCost = lv => {
     const base = 200 * Math.pow(1.16, lv);   // V1.0.1：60 → 200（见上面那段成本曲线）
-    return { holy: Math.round(base), otherworld: Math.round(base * 0.67) };
+    return { holy: Math.round(base), otherworld: Math.round(base * 0.67), mat: AUTHORITY_MAT, matN: AUTHORITY_MAT_N };
   };
   /* 每级解锁要通关哪张图（界面上直接写出来，别让玩家对着灰按钮猜） */
   const authorityReq = lv => {
@@ -2219,7 +3088,9 @@ window.DATA = (function () {
   const PITY_UP = 50;
   /* 当期 UP（V9.5.50 父亲大人问过机制后重整）：
      · 周期：**自然周**，每周一 00:00（本地时间）换一期；
-     · 顺序：全部 SSR（不含隐藏角色）按名单顺序**依次轮换**——不是随机，走完一轮再从头来；
+     · 顺序：**全部 SSR** 按名单顺序**依次轮换**——不是随机，走完一轮再从头来；
+       （2026-09-27 起没有"隐藏角色"这个概念了；这一条本来就只扫 SSR，所以轮换名单**没变**——
+         那 6 位是 UR。见回单 §八 的复核项 ①。）
      · 也就是说"下一期是谁"是确定的（当前角色后面的那一个）。 */
   const WEEK_MS = 7 * 86400e3;
   const weekStart = ts => {
@@ -2230,7 +3101,7 @@ window.DATA = (function () {
     return mon.getTime();
   };
   const weekIndex = ts => Math.round(weekStart(ts) / WEEK_MS);
-  const upPool = () => characters.filter(c => c.rarity === 'SSR' && !c.hidden);
+  const upPool = () => characters.filter(c => c.rarity === 'SSR');
   const recruitUpChar = (ts) => {
     const pool = upPool();
     if (!pool.length) return null;
@@ -2263,7 +3134,32 @@ window.DATA = (function () {
      （'本期固定不再变'），所以只改上面的 hours 只对**新开的期**生效，老档里那几条
      还挂着 72/96/120/168 小时的旧截止时间。这个 rev 就是给迁移用的：
      存档里的 rev 对不上 → 丢掉那一期，按新表重新生成。改动数值时把它 +1。 */
-  const BOUNTY_REV = 2;
+  /* V1.0.5：2 → 3（2026-09-23 游戏策划总监《经济三改》定稿）。
+     生成端换了规矩（生成时已达成的目标一律不发），**老档里那条躺着的"生成即可领"必须收掉**，
+     而存档里写的是"本期固定不再变"——只有 rev 对不上才会整期重生成（见 core.js 的 migrate）。
+     代价（总监已认）：老档本期 4 条重开、`claimed` 清空后已领过的可再领一次。 */
+  const BOUNTY_REV = 3;
+  /* V1.0.5：悬赏"生成即可领"的根因修法 —— 判据只留这一份，core.js 的 bountyCheck 调它。
+     口径从"现在达成了吗"改成"现在达成了 **而** 生成时还没达成"，才挡得住白领。 */
+  function bountyDone(S, b) {
+    const p = b.param || {};
+    switch (b.kind) {
+      case 'stage': return !!(S.worlds[p.world] && S.worlds[p.world].stages[p.diff || 'normal'][p.stage - 1] > 0);
+      case 'level': return (S.player.level || 0) >= p.n;
+      case 'chars': return Object.keys(S.chars || {}).length >= p.n;
+      case 'ssr': return Object.keys(S.chars || {}).filter(id => {
+        const c = charById[id];
+        return c && ['SSR', 'UR'].includes(c.rarity);
+      }).length >= p.n;
+      case 'enhance': return ((S.stats && S.stats.enhances) || 0) >= p.n;
+      case 'corridor': return ((S.corridor && S.corridor.best) || 0) >= p.n;
+      case 'beast': return Object.keys((S.beast && S.beast.owned) || {}).length >= p.n;
+      case 'realm': return ((S.player && S.player.realm) || 0) >= p.n;
+      case 'gene': return ((S.player && S.player.geneLock) || 0) >= p.n;
+      case 'battles': return (((S.stats && S.stats.battles) || 0)) >= p.n;
+      default: return false;
+    }
+  }
   const makeBounties = function (S) {
     const out = [];
     const push = (kind, param, name, desc, hours, reward) => {
@@ -2271,25 +3167,45 @@ window.DATA = (function () {
       out.push({ id: 'b' + (out.length + 1) + '_' + kind, kind, param, name, desc, hours, reward });
     };
     const lv = S.player.level || 1;
-    // 1) 推进：当前已解锁世界里第一个没通关的关卡
+    /* 1) 推进：当前已解锁世界里第一个没通关的关卡（**三个难度都算**）
+       V1.0.5：原来只看"普通"的未通关关，且该世界全通时兜底成 stage:12 ——
+       而判据只看 >0，于是"通关第 12 关"这条**生成即可领**（✦760＋◉26000＋高级券）。
+       现在兜底成"整个图里第一个没打完的关（含困难/地狱）"，真的没有这样的关，
+       就不发推进条，改发一条**生成时一定没达成**的兜底目标。 */
     let target = null;
     WORLDS.forEach(w => {
       if (target) return;
       const st = S.worlds && S.worlds[w.id];
       if (!st || !st.unlocked) return;
-      const idx = st.stages.normal.findIndex(s => !(s > 0));
-      target = idx >= 0 ? { w, stage: idx + 1 } : { w, stage: 12 };
+      for (const diff of ['normal', 'hard', 'hell']) {
+        const arr = (st.stages && st.stages[diff]) || [];
+        const idx = arr.findIndex(s => !(s > 0));
+        if (idx >= 0) { target = { w, diff, stage: idx + 1 }; return; }
+      }
     });
     if (target) {
-      push('stage', { world: target.w.id, diff: 'normal', stage: target.stage },
+      push('stage', { world: target.w.id, diff: target.diff, stage: target.stage },
         `推进 · ${target.w.name}`,
-        `通关「${target.w.name} · 普通」第 ${target.stage} 关`,
+        `通关「${target.w.name} · ${DIFFICULTY.find(d => d.id === target.diff).name}」第 ${target.stage} 关`,
         12, { holy: 400 + target.stage * 30, points: 8000 + target.stage * 1500, item: 'ticket_adv' });
     }
-    // 2) 等级：比当前高 5 级（每期都会往前推）
+    /* 2) 等级：比当前高 5 级（每期都会往前推）
+       V1.0.5：满级后 lv+5 会变成 Lv.105 这种**永远到不了**的死目标（每期必过期）——
+       满级就换一条真的能做的（铭刻往上一阶）。 */
     const lvTarget = Math.max(10, lv + 5);
-    push('level', { n: lvTarget }, '修炼有成', `玩家等级到达 Lv.${lvTarget}`, 24,
-      { holy: 500, points: 20000 + lvTarget * 500, item: 'ticket_normal' });
+    if (lvTarget <= PLAYER_MAX_LV) {
+      push('level', { n: lvTarget }, '修炼有成', `玩家等级到达 Lv.${lvTarget}`, 24,
+        { holy: 500, points: 20000 + lvTarget * 500, item: 'ticket_normal' });
+    } else {
+      /* V1.0.5（康康按总监《经济三改》回单的定稿收口）：满级后的兜底**必须是"无封顶、随时可做"的**。
+         上一稿这里发的是「铭刻推进到第 N+1 阶」，可铭刻只有 `GENE_LOCK_MAX = 20` 阶
+         （`data.js:1725`）—— 我拿总监自己的终局档探针跑了一遍，满配存档会收到
+         **`b1_gene「把铭刻推进到第 21 阶」`**：白领堵住了，死目标又漏进来了（他回单"不确定"里点了这条）。
+         改成 `S.stats.battles`（每场战斗 +1，见 `core.js:3715`，没有上限、任何阶段都能做）。 */
+      const n = Math.floor((((S.stats && S.stats.battles) || 0)) / 50) * 50 + 50;
+      push('battles', { n }, '久经战阵', `累计战斗 ${n} 场`, 24,
+        { holy: 500, otherworld: 2000, item: 'ticket_normal' });
+    }
     // 3) 强化：按已强化次数往上加
     const enhTarget = Math.max(10, Math.floor(((S.stats && S.stats.enhances) || 0) / 10) * 10 + 10);
     push('enhance', { n: enhTarget }, '强化达人', `累计强化装备 ${enhTarget} 次`, 24,
@@ -2320,6 +3236,19 @@ window.DATA = (function () {
       push('chars', { n: next }, '广纳英才', `拥有 ${next} 名伙伴`, 36,
         { holy: 1500, points: 80000, item: 'ticket_lim' });
     }
+    /* 收口闸：**生成时就已经达成的，一律不算目标**（同一份判据 bountyDone）。
+       这一层是兜底 —— 上面挑目标的逻辑以后怎么改，都不会再放出"白领"的悬赏。 */
+    const bestNow = (S.corridor && S.corridor.best) || 0;
+    out.forEach(b => {
+      if (!bountyDone(S, b)) return;
+      b.kind = 'corridor'; b.name = '深井再进'; b.desc = `深井到达第 ${bestNow + 3} 层`;
+      b.param = { n: bestNow + 3 };
+      b.reward = { holy: 500, otherworld: 30 };
+    });
+    /* V1.1.13（0927-E · 总监 §5.3 来源④）：**第 4 条**悬赏再挂 **2 颗重铸石**。
+       放在收口闸**之后** —— 收口闸会把"生成时已达成"的那条整个换掉（连奖励一起），
+       放在它前面就会被那一换冲掉。悬赏是"会过期的压力源"，把石头放这儿正好把玩家往重铸上推。 */
+    if (out[3]) out[3].reward.item = [].concat(out[3].reward.item || [], ['reforge_stone', 'reforge_stone']);
     return out;
   };
 
@@ -2428,7 +3357,7 @@ window.DATA = (function () {
   // req.world：需要先通关该世界（普通难度）才会解锁这一格商品；
   // 2026-09-12 补齐：高阶经验模块与 T4/T5 强化材料此前没有任何稳定来源，属于"看得到拿不到"。
   const SHOPS = {
-    god: { name: '灯阁市集', currency: 'points', items: [
+    god: { name: '市集', currency: 'points', items: [
       { item: 'exp_s', name: '初级经验模块', price: 500, stock: -1 },
       { item: 'exp_m', name: '中级经验模块', price: 2000, stock: -1 },
       { item: 'exp_l', name: '高级经验模块', price: 12000, stock: -1, req: { world: 'W04' } },
@@ -2438,6 +3367,17 @@ window.DATA = (function () {
       { item: 'mat_t1', name: '基础金属×10', price: 300, count: 10, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 6000, count: 5, stock: -1, req: { world: 'W04' } },
       { item: 'mat_t5', name: '灯阁残片×3', price: 15000, count: 3, stock: -1, req: { world: 'W06' } },
+      /* V1.1.4（A12-F · 三种新料的"不设卡"来源）：《收口2》§3.1 对**灯油**与**灵植种**
+         明确写"市集 ◉ 可买（**不设卡**）" —— 这一条是给"我一颗种子都没有、药园种不下去"
+         和"权限差三块灯油"这两种情况兜底的，所以**必须有**，而且不能定价到买不起。
+         定价对照：1 ◆ ≈ 16 ◉（项目现行换算律），所以一罐灯油 3,000 ◉ ≈ 188 ◆，
+         而灯阁权限一级本身是 200 ✦ ＋ 134 ◆（✦ 在故事商店 3,550 ◉/颗）→ 材料占比不到 1%，
+         "不设卡"成立。灵植种 400 ◉ 是照着最便宜那块地（下品灵田 800 ◉）的一半定的：
+         收成回收 70% ⇒ 一茬净耗 0.3 颗 ≈ 120 ◉ ⇒ 药园一茬的成本只比原来高约 15%（不改变它的定位）。
+         ⚠️ 这三个价都是**临时值**（《收口2》把"广告/材料单价"整体划给数值轮）。 */
+      { item: 'dengyou',       name: '灯油',     price: 3000, stock: -1 },
+      { item: 'lingzhi_zhong', name: '灵植种',   price: 400,  stock: -1 },
+      { item: 'matpack_low',   name: '材料包·下品', price: 3000, stock: -1 },
       /* V1.0.1（父亲大人："根据新的招募价，再去定别的物品的定价"）：
          按产量比 1 ◆ ≈ 16 ◉，10 ◆ 的成本约 160 ◉ —— 卖 600 ◉ 是"亏 3.75 倍"，
          属于"应急可以换、长期换亏"的合理区间。原来卖 2000 ◉（亏 12.6 倍）没人会碰。 */
@@ -2459,8 +3399,17 @@ window.DATA = (function () {
       { item: 'mat_t3', name: '异界合金×5', price: 100, count: 5, stock: -1 },
       { item: 'mat_t4', name: '虚空晶体×5', price: 300, count: 5, stock: -1, req: { world: 'W04' } },
       { item: 'mat_t5', name: '灯阁残片×3', price: 900, count: 3, stock: -1, req: { world: 'W06' } },
+      /* V1.1.8（戊组 A13-F · 重铸石的来源）：《收口2》§3.2 给"重铸石"的来源是
+         **炼化台配方 / 悬赏与周常 / 异界商店** —— 本轮先接**异界商店**这条（最省事、也不动悬赏/周常那两张表）。
+         定价对照同店的 mat_t5（300 ◆/块）：重铸石是"给一件装备重摇一次词条"的道具，定 250 ◆ ≈ 一次强化的量级。
+         ⚠️ 价格是**临时值**（数值轮接手）。 */
+      { item: 'reforge_stone', name: '重铸石', price: 250, stock: -1, req: { world: 'W04' } },
       { item: 'exp_l', name: '高级经验模块', price: 150, stock: -1, req: { world: 'W04' } },
       { item: 'exp_xxl', name: '究极经验模块', price: 4200, stock: -1, req: { world: 'W15' } },
+      /* V1.1.4（A12-F · 材料包·中品的"异界商店"那一格，《收口2》§3.2 来源列）。
+         定价与同店的 mat_t3×5 = 100 ◆ 同量级：一包 4 块（T3/T4 为主）≈ 400 ◆，
+         比直接买 T4（60 ◆/块）略贵一点 —— 商店是"应急的后备"，不是最优解。⚠️ 临时值。 */
+      { item: 'matpack_mid', name: '材料包·中品', price: 400, stock: -1, req: { world: 'W04' } },
     ] },
     /* V9.6.134：故事点并入点数 → 这家店改收 ◉，价格 ×71
        （故事点日收入 706，点数池 50418，706×71 ≈ 50126 ≈ 池收入）。
@@ -2502,7 +3451,10 @@ window.DATA = (function () {
     { id: 'sign1',    name: '点灯 1 次', target: 1, reward: { points: 600 } },
     { id: 'arena1',   name: '斗法台守擂 1 次', target: 1, reward: { otherworld: 40 } },
   ];
-  const DAILY_ALL_REWARD = { points: 5000, otherworld: 50, holy: 20, item: 'ticket_normal' };
+  /* V1.1.4（A12 材料包 · 下品的来源）：《收口2》§3.2 给"材料包·下品"的来源是
+     **每日全清 / 市集 / 悬赏**。三个里最稳的是"每日全清"（人人每天都做得到），所以挂在这儿。
+     `applyRewardObj` 本来就支持 `item` 传数组（两端同一份），不用改发奖代码。 */
+  const DAILY_ALL_REWARD = { points: 5000, otherworld: 50, holy: 20, item: ['ticket_normal', 'matpack_low'] };
   // 周常任务：与每日任务共用同一套进度来源（战斗/强化/副本/招募/道具/挂机），按自然周重置
   const WEEKLY_TASKS = [
     { id: 'w_battle',  name: '本周战斗 100 次', target: 100, src: 'battle', reward: { points: 8000, holy: 60 } },
@@ -2511,7 +3463,9 @@ window.DATA = (function () {
     { id: 'w_recruit', name: '本周招募 10 次', target: 10,      src: 'recruit', reward: { holy: 120, item: 'ticket_adv' } },
     { id: 'w_idle',    name: '本周领取挂机收益 7 次', target: 7, src: 'idle', reward: { points: 5600 } },
   ];
-  const WEEKLY_ALL_REWARD = { holy: 300, otherworld: 800, item: ['exp_xl', 'ticket_lim'] };
+  /* V1.1.4（A12 材料包 · 中品的来源）：《收口2》§3.2 = **周常 / 深井 / 异界商店**。 */
+  /* V1.1.13（0927-E · 总监 §5.3 来源③）：周常全清 ＋**3 颗重铸石**（摊薄 0.43 颗/天，量小但每周都摸得到）。 */
+  const WEEKLY_ALL_REWARD = { holy: 300, otherworld: 800, item: ['exp_xl', 'ticket_lim', 'matpack_mid', 'reforge_stone', 'reforge_stone', 'reforge_stone'] };
   // 成就：长线目标，覆盖战斗 / 养成 / 收集 / 挑战四条线
   const ACHIEVEMENTS = [
     { id: 'a_battle100', cat: '战斗', name: '百战之躯', desc: '累计战斗 100 场', check: S => S.stats.battles >= 100, reward: { points: 8000 } },
@@ -2559,7 +3513,15 @@ window.DATA = (function () {
        开局一次给 10 抽最稀有的池子偏厚，且当日余额一高就容易把"谁更稀有"看反
        （父亲大人就是这么误判的）。300 ≈ 2 天产量 / 3 次限定抽，够起步、不抹平稀有感。 */
     points: 20000, holy: 300,
-    items: { exp_s: 20 },
+    /* V1.1.5（A12 补漏 · quest_play_audit 抓出来的）：开局给 **3 颗灵植种**。
+       起因：A12 给药园加了"每块地 1 颗种子"，而种子的三个来源（副本材料档 10%、市集 400◉、
+       收成回收 70%）**都不能保证玩家在第一次播种之前手里有种子** —— 主线 q_garden
+       （「在药园种 1 次地」）就会卡住，`quest_play_audit` 实测："高亮指不到 garden_plant:*、
+       这一步永远做不完"。这跟《收口2》§3.1 自己写的"**永远不会卡住药园**"是两回事，必须补。
+       给 3 颗＝够种一轮（4 块地里先种 3 块）＋自循环（收成回收 70%）之后的缺口由副本/市集补。
+       ⚠️ 数量是**临时值**（数值轮可调），但"开局必须有种子"这条是功能性的、不能砍。
+       老档不另开迁移：他们的种子来自副本材料档与市集（不设卡），避免第三条迁移与 A11/A10/A12 互相踩。 */
+    items: { exp_s: 20, lingzhi_zhong: 3 },
   };
   /* 首通保底掉装备（V9.6.6 父亲大人）：开局不再白送一套 R 装备，
      改成 W01 普通前 6 关**每关首通保底掉 1 件** —— 打完正好凑齐六个部位，
@@ -2592,9 +3554,51 @@ window.DATA = (function () {
   };
 
   /* ================= 功能解锁（随关卡进度） ================= */
+  /* ================= V1.1.5（A2 · 主页两块顺序表）=================
+     父亲大人：「养成和日常你整理一下顺序，从常用到不常用重新排下序」。
+     《定调与口径》§3.2 把判据写死了（**不是凭感觉**），这一张表就是那条判据的落位：
+
+       常用度 ＝ 3×(出现在每日任务表里？) ＋ 2×(有倒计时 / 随时间自然累积、要回来收？)
+                ＋ 2×(每天有免费次数或次数上限？) ＋ 1×(吃稀缺资源，攒够才点？)
+                ＋ 1×(主线早期教过它？)
+       同分时按"玩家每天的自然动线"排（点灯 → 挂机 / 收园子 → 花资源）。
+
+     `w` 记的就是上面这条判据算出来的分（留档：以后要动顺序，**按它重算**，别再凭感觉挪）。
+     数组顺序＝§3.2 排定的最终顺序（判据分 ＋ 自然动线的合成结果），两端渲染**直接读数组**。
+     ⚠️ 顺序只动"显示位置"，不动任何功能、不改任何奖励。
+     ⚠️ 网页版界面层这一轮不动（它自己那份名单还写在 ui.js 里）→ 这一处**两端暂时不一致**，
+        已按《定调与口径》§6.5 记进回单，下次动网页版时切过来。 */
+  const HOME_GROUPS = [
+    { id: 'grow', name: '养成', members: [
+      /* [动作 id, 名字, 解锁门禁（null＝常显）, 常用度分] */
+      { id: 'open_garden',    name: '药园',     unlock: null,        w: 4 },  // 周期(2)＋主线(1)＋自然动线(1)
+      { id: 'open_arena',     name: '斗法台',   unlock: null,        w: 6 },  // 每日(3)＋每天上限(2)＋主线(1)
+      { id: 'open_party',     name: '队伍',     unlock: null,        w: 3 },  // 主线早期点名(1)＋看战力第一入口(2)
+      { id: 'open_grow',      name: '成长',     unlock: null,        w: 3 },  // 六条线总览（境界渡劫在里面）(3)
+      { id: 'open_buildings', name: '基地建设', unlock: 'buildings', w: 3 },  // 主线(1)＋有钱就点(2)
+      { id: 'open_keji',      name: '秘术阁',   unlock: null,        w: 2 },  // 主线(1)＋吃稀缺资源(1)
+      { id: 'open_fabao',     name: '法宝',     unlock: null,        w: 2 },  // 主线(1)＋有料就点(1)
+      { id: 'open_refine',    name: '炼化台',   unlock: null,        w: 1 },  // 材料富余才用
+      { id: 'open_mount',     name: '坐骑',     unlock: null,        w: 1 },  // 主线(1)
+      { id: 'open_sect',      name: '灯阁评级', unlock: null,        w: 0 },  // 自动涨，只来看一眼
+      { id: 'open_authority', name: '灯阁权限', unlock: 'buildings', w: 1 },  // 吃稀缺资源(1)
+      { id: 'open_genelock',  name: '铭刻',     unlock: 'geneLock',  w: 1 },  // 吃稀缺资源(1)，且卡进度
+      { id: 'open_beast',     name: '伴生体',   unlock: 'beast',     w: 0 },  // 攒 10 颗兽魂石才动一次
+      { id: 'open_codex',     name: '灯录',     unlock: 'recruit',   w: 0 },  // 里程碑才来领一次
+      { id: 'open_reincarn',  name: '转生天赋', unlock: 'reincarn',  w: 0 },  // 只在转生之后点
+    ] },
+    { id: 'daily', name: '日常', members: [
+      /* 合并之后「限时悬赏」不再单独占一格 —— 它进了「任务」页第一段（A1）。 */
+      { id: 'open_tasks',   name: '任务',     unlock: 'tasks',    w: 6 },  // 每日(3)＋悬赏倒计时(2)＋主线(1)
+      { id: 'open_sign',    name: '点灯',     unlock: null,       w: 4 },  // 每日(3)＋自然动线(1)：先点再挂
+      { id: 'open_recruit', name: '招募伙伴', unlock: 'recruit',  w: 3 },  // 每日(3)（每天免费 3+1 次）
+      { id: 'open_shop',    name: '市集', unlock: 'shop',     w: 1 },  // 打完本有材料就来换
+      { id: 'open_ach',     name: '成就',     unlock: null,       w: 0 },  // 达成时才来一次
+    ] },
+  ];
   const UNLOCKS = [
     { id: 'recruit',   name: '招募伙伴', world: 'W01', stage: 1,  tip: '通关 黏液巢穴·第1关 解锁' },
-    { id: 'shop',      name: '兑换大厅',   world: 'W01', stage: 2,  tip: '通关 黏液巢穴·第2关 解锁' },
+    { id: 'shop',      name: '市集',   world: 'W01', stage: 2,  tip: '通关 黏液巢穴·第2关 解锁' },
     { id: 'enhance',   name: '装备强化',   world: 'W01', stage: 3,  tip: '通关 黏液巢穴·第3关 解锁' },
     { id: 'buildings', name: '基地建设',   world: 'W01', stage: 4,  tip: '通关 黏液巢穴·第4关 解锁' },
     { id: 'tasks',     name: '每日任务',   world: 'W01', stage: 4,  tip: '通关 黏液巢穴·第4关 解锁' },
@@ -2800,9 +3804,25 @@ window.DATA = (function () {
   /* V9.6.134：货币 8 → 4 —— 原「深井徽记」与「血统结晶」都并入异界结晶。
      ⚠️ 这里原来是三个键（点数 / 徽记 / 血统结晶），合并后前两个会**同键**，
      写成 `{ points: a, points: b }` 后者盖前者、静默丢一份奖励，所以显式加起来。 */
+  /* V1.1.4（A12-F · 新料的第二个产出源）：《收口2》§3.1 给铭魂砂 / 血髓晶的第二个来源是
+     "**深井每 10 层里程碑 2 颗**"，§3.3 补一句"一次性，满 300 层共 60 颗，**不计入日产量**"。
+     分法：按需求比 2:1（293 : 145）排成一个 3 层循环 —— 每 3 个里程碑里 1 个给砂×2、
+     另 2 个给砂×1＋晶×1 ⇒ 3 个里程碑合计 **4 砂 + 2 晶 = 2:1**，每层都正好 2 颗、不多不少。
+     `floor % 20 === 0` 再加一个材料包·中品（《收口2》§3.2 把深井列进中品的来源）。
+     ⚠️ 这里只出"材料"，货币那两行一个字没动（老玩家的深井收益不变）。 */
+  const corridorMaterial = floor => {
+    if (floor % 10 !== 0) return null;
+    const cycle = ((floor / 10) - 1) % 3;
+    const out = cycle === 0
+      ? [{ id: 'minghun_sha', n: 2 }]
+      : [{ id: 'minghun_sha', n: 1 }, { id: 'xuesui_jing', n: 1 }];
+    if (floor % 20 === 0) out.push({ id: 'matpack_mid', n: 1 });
+    return out;
+  };
   const corridorReward = floor => ({
     points: Math.round(100 * Math.pow(1.04, Math.floor(floor / 10))) + 5,
     otherworld: (floor % 10 === 0 ? 3 : 1) + (floor % 50 === 0 ? 50 : 0),
+    mat: corridorMaterial(floor),
   });
 
   /* ================= 掉落稀有度 ================= */
@@ -2908,20 +3928,28 @@ window.DATA = (function () {
     return w;
   }
 
-  /* ================= 开机合规文案（2026-09-23 · 提审硬要求） =================
-     依据《微信小游戏平台运营规范》特别规范：
-       · 2.6.2《健康游戏忠告》—— 必须在**游戏开始前**、画面的**显著位置全文登载**；
-       · 2.6.1 —— 在游戏开始前、《健康游戏忠告》**之后**设专门页面，
-                 标明游戏著作权人 / 出版服务单位 / 批准文号 / 出版物号等；
-       · 6.1 适龄提示 —— 要显著、可读（正文对比度 ≥4.5:1）。
+  /* ================= 开机合规文案（2026-09-23 · 提审硬要求；V1.0.6 收口） =================
+     依据《微信小游戏平台运营规范》特别规范 **2.6.2**：
+       《健康游戏忠告》—— 必须在**游戏开始前**、画面的**显著位置全文登载**。
 
-     三条合起来的落位 ＝ **开机合规闸**（网页版 ui.js:showComplianceGate
-     / 小游戏 sc-start.js 的 notice ＋ copyright 两页）：
-     品牌首屏之后、任何游戏界面与弹窗之前，**必须点「进入」才放行** ——
-     没有超时、没有自动淡出（原来那版首屏只停 0.5s／1.5s，一闪而过不算"显著位置全文登载"）。
+     V1.0.5 落位（父亲大人：「开局的适龄和版权两个弹窗可以不要，主画面可以在初次登陆选完血统
+     出现，上面有个按钮写进入残域；之后登陆就直接主画面进残域」）：合规内容**常驻在主画面**上
+     （网页版 `#boot` / 小游戏 `gate` 页），主画面本身就是**冷启动的第一帧**
+     （不自动淡出、不从 DOM 摘掉），点【进入残域】之前玩家碰不到任何玩法。
+     合规岗 Q3 的判据：条文只要求"游戏开始前、显著位置全文登载"，**没有**要求"必须点一次才放行" ——
+     所以这一屏不必是闸，但**必须同屏、常驻、不滚动**（旧版"摘要＋点开看全文"会被判不是全文登载）。
 
-     ⚠️ 这一段是**法规原文**，不是文案：一字不许改、一句不许省、不许只放链接。
-        尺子：wxlh-game/scripts/copy_audit.js（合规段）＋ wxlh-minigame/scripts/page_text_audit.js。
+     V1.0.6 收口（父亲大人 2026-09-23 原话：「著作权不要啊，个人的没有这个，适龄好像到时上线
+     小程序会自己打，这些等审核通过再说吧」；问他忠告留不留，答「留着呗」）——
+     主画面上**只剩三块**：品牌 →《健康游戏忠告》四句全文 →【进入残域】。
+     随这一版从本表里删掉的字段（连落位一起撤，不留孤儿）：
+       · `ageBadge` —— 主画面那颗适龄徽标（含「看全文 ›」）；`ageFull` **保留**，
+         因为「设置与存档」那张适龄卡还在（父亲大人点名留的：平台要求在后台也要设一次）；
+       · `ownerTitle` / `ownerNote` / `ownerFields` / `ownerEntry` —— 著作权人信息那一行、
+         那颗入口、以及它点开的专门页（**含设置页里那份**）。
+
+     ⚠️ 忠告这一段是**法规原文**，不是文案：一字不许改、一句不许省、不许只放链接。
+        尺子：wxlh-game/scripts/copy_audit.js ⑪ ＋ wxlh-minigame/scripts/page_text_audit.js ③。
      两端同源：小游戏从 data.js 单向同步拿走（见 wxlh-minigame/scripts/sync-logic.js）。 */
   const HEALTH_ADVICE = [
     '抵制不良游戏，拒绝盗版游戏。',
@@ -2933,33 +3961,29 @@ window.DATA = (function () {
     healthTitle: '健康游戏忠告',
     healthAdvice: HEALTH_ADVICE,
     healthFull: HEALTH_ADVICE.join(''),          // 全文一条串（尺子逐字对表用）
-    ageBadge: '适龄提示：12 周岁以上',
+    /* 适龄全文：主画面那颗徽标已撤，**只留在「设置与存档」的适龄卡里**
+       （父亲大人点名保留：平台要求后台也要设一次，游戏内留着属加分）。 */
     ageFull: '本作含随机抽取与战斗内容，建议 12 周岁以上用户使用。',
-    ownerTitle: '著作权人信息',
-    ownerNote: '依据《微信小游戏平台运营规范》特别规范 2.6.1，本页标明游戏著作权人与出版信息。',
-    /* 2.6.1 专门页的字段：**数组顺序 ＝ 页面顺序**。
-       值先留空 → 两端统一画成「待填」，由父亲大人一处填写、两端同时生效
-       （填哪几个字段、每个字段写什么，见本轮回单）。 */
-    ownerBlank: '待填',
-    ownerFields: [
-      { k: '游戏名称', v: '残域灯阁' },          // 备案名（已定），外显名必须与之一致
-      { k: '著作权人', v: '' },
-      { k: '出版服务单位', v: '' },
-      { k: '批准文号', v: '' },
-      { k: '出版物号', v: '' },
-    ],
+    enterLabel: '进入残域',          // 主画面唯一的出口按钮（父亲大人的原话就是这四个字）
   };
 
   return {
-    ATTR_NAMES, RARITIES, RARITY_COLOR, STAR_MULT, RARITY_MAXSTAR, STAR_COST, DUP_SHARDS, SHARD_RARITIES, GENE_LOCK_MAX, MOUNT_MAX_LV, MOUNT_LV_PCT, mountFeedCost, FABAO_MAX_LV, FABAO_LV_PCT, fabaoRefineCost,
+    ATTR_NAMES, RARITIES, RARITY_COLOR, RARITY_NAME, ITEM_RARITY, STAR_MULT, RARITY_MAXSTAR, STAR_COST, STAR_COST_BY_RARITY, starCostOf, DUP_SHARDS, SHARD_RARITIES, GENE_LOCK_MAX, MOUNT_MAX_LV, MOUNT_LV_PCT, mountFeedCost, FABAO_MAX_LV, FABAO_LV_PCT, fabaoRefineCost,
     FACTIONS, FACTION_COUNTER, EXP_TABLE, LEVEL_POINTS, CURRENCIES, PLAYER_MAX_LV,
     ATTR_META, ATTR_POINTS_PER_LV, ATTR_POINT_VALUE, BLOODLINE_UNLOCK_LV,
     SKILL_POINT_EVERY_LV, SKILL_MAX, SKILL_MAX_BY_INDEX, SKILL_PCT_PER_LV,
     BAG_BASE_CAP, BAG_BASE_ITEM_CAP, BAG_BASE_MAT_CAP, BAG_BASE_EQ_CAP, BAG_EXPAND_SIZE, bagExpandCost, SWEEP_DAILY_CAP,
+    BAG_STACK_MAX,
     BLOODLINE_SKILLS, KIND_NAMES, BLOODLINE_SETS, BLOODLINE_SETS_BY_WORLD, BLOODLINE_MIN_WORLD,
+    /* V1.1.1：伙伴机制池与分配表（"机制按伙伴"的唯一真相；两端共用这一份） */
+    MECH_POOL, CHAR_MECH, MECH_HIT_IDS, MECH_HEAL_IDS, MECH_FN_IDS, MECH_ULT_DPS_ALL_IDS, MECH_ULT_DPS_ONE_IDS, MECH_ULT_SUP_IDS, mechUltPool,
+    mechDesc, skillsForChar,
     BLOODLINE_KIND, LEGACY_KIND_BLOODLINE, bloodlineKind, bloodlineRole, BLOOD_SET_TEMPLATE, FACTION_FIX,
     BLOODLINE_EQUIP_NAMES,
-    bloodlineSetKey, pctText, BLOODLINE_KEYS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip,
+    bloodlineSetKey, pctText, BLOODLINE_KEYS, LEGACY_KIND_SET, SIGNATURE_EQUIPS, makeSignatureEquip, SIGNATURE_SET,
+    /* 本命专属：绑定表 / 老档旧绑定 / 基础值系数 / 两条查询出口（迁移与掉落都读这里） */
+    SIGNATURE_BINDING, SIGNATURE_LEGACY_BINDING, SIGNATURE_BASE_MULT, SIGNATURE_BASE_RATIO, SIGNATURE_REV,
+    SIGNATURE_SLOT_ORDER, SIGNATURE_CORE, SIGNATURE_AFFIX_POS, signatureIdOf, pickSignatureEquip,
     ROLE_KIND, ATK_ATTR, characters, charById,
     WORLDS, DIFFICULTY, FIRST_CLEAR,
     WORLD_THEME_HUE, worldTint,          // 世界格底：五族色相 × 族内明度阶梯
@@ -2969,37 +3993,47 @@ window.DATA = (function () {
     AVATAR_FACTION_MARK, AVATAR_FACTION_TINT, avatarSpec, avatarParts,
     BATTLE_GEOM,                         // 战斗几何：两端同源（头像 / 条高 / 飘字字号与时长）
     PROTAG_NAMES, pickProtagName,         // 主角名（预设名单，无自由输入 · 平台审核要求）
-    EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, makeEquip,
+    EQUIP_SLOTS, EQUIP_RARITY_MULT, DECOMPOSE_GAIN, ENHANCE_RATE, SETS, AFFIX_POOL, AFFIX_WEIGHT_BY_SLOT,
+    rollAffixKey, rollAffixValue, affixRange, affixQ, affixTierName, AFFIX_TIERS, makeEquip,
+    REFORGE_ITEM, REFORGE_POINTS, REFORGE_LOCK_STONE, REFORGE_KIND_STONE, REFORGE_KIND_MAT, REFORGE_KIND_POINTS,
+    REFORGE_PITY, REFORGE_CRAFT,
     EQUIP_RARITIES, EQUIP_RARITY_NAME, GOD_SETS,
     RECRUIT_SLOTS, PLAYER_SLOTS, DROP_SLOTS, PROTAGONIST,
     ITEMS,
-    BLOODLINES, BLOODLINE_MAX, bloodlineCost, GENE_LOCKS, REINCARN_REQS,
+    /* V1.1.4（A12 新材料）：材料包开出表 ＋ 四个消耗口的"吃哪一样、吃几块"常量。
+       全部只在这一处定义，界面 / 逻辑 / 尺子都读这里（《收口2》§4.3 第 3/4 条）。 */
+    MAT_PACKS,
+    BLOODLINES, BLOODLINE_MAX, bloodlineCost, BLOODLINE_MAT, BLOODLINE_MAT_TABLE, GENE_LOCKS, GENE_LOCK_MAT, GENE_LOCK_TABLE, REINCARN_REQS,
     BUILDINGS, buildingCost,
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
-    KEJI, KEJI_COIN, kejiById, kejiCost,
+    KEJI, KEJI_COIN, kejiById, kejiCost, KEJI_MAT, KEJI_MAT_EVERY, kejiMatNeed,
     TRAVELS, TRAVEL_TOTAL_W, TRAVEL_STEPS_SEC,
-    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, gardenYieldText, gardenRowText, gardenRowLines, fmtClock,
+    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, GARDEN_SEED, GARDEN_SEED_N, GARDEN_SEED_RECYCLE, gardenYieldText, gardenRowText, gardenRowLines, fmtClock,
     ARENA_DAILY, arenaReward, arenaEnemy,
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,
     SIGNS, rollSign,
     RECRUIT_POOLS, PITY, PITY_UP, recruitUpChar, recruitUpNext, upTimeLeft, weekIndex,
     FORMATIONS, pityText,
-    AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV, authorityReq,
+    AUTHORITY, AUTHORITY_MAX, authorityCost, authorityBonus, AUTHORITY_PER_LV, authorityReq, AUTHORITY_MAT, AUTHORITY_MAT_N,
     IDLE_LINES, IDLE_LINE_ATTR_DIV, IDLE_MAT_PER_MIN,
-    makeBounties, BOUNTY_REV, REALMS, REALM_PCT, REALM_TIERS, REALM_MAJORS, REALM_STAGE_COUNT, realmName, realmChain,
+    makeBounties, BOUNTY_REV, bountyDone, REALMS, REALM_PCT, REALM_TIERS, REALM_MAJORS, REALM_STAGE_COUNT, realmName, realmChain,
     ELEMENTS, ELEMENT_ICON, ELEMENT_COUNTER, ELEMENT_BONUS, ELEMENT_PENALTY, worldElement,
     BEASTS, beastById, beastDesc, beastPctAt, BEAST_PCT_NAME, BEAST_RARITY_RATE,
     BEAST_EGG_ITEM, BEAST_EGG_COST, BEAST_MAX_LV, BEAST_SOUL_PER_LV, BEAST_LV_PCT,
     SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, STARTER, RETIRED_ITEMS, EARLY_GUARANTEE, earlyGuarantee,
+    HOME_GROUPS,                                  // V1.1.5（A2）：主页两块顺序（唯一真相，两端渲染读它）
     WEEKLY_TASKS, WEEKLY_ALL_REWARD, ACHIEVEMENTS,
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,
     COMPLIANCE,                                  // 开机合规：健康游戏忠告 / 适龄提示 / 著作权人信息（V1.0.3）
-    corridorEnemy, corridorReward, corridorMarks, corridorMarkBonus,
+    /* 图标形状：一处定义，两端各渲染一次（V1.0.6 · 父亲大人「B，收口」）
+       WORLD_ICONS = 已自绘的那批世界机制图标（V1.1.15）；没进表的走 w.ico（emoji）兜底 */
+    NAV_ICONS, CUR_ICONS, WORLD_ICONS, ICON_STROKE, iconOpsOf,
+    corridorEnemy, corridorReward, corridorMaterial, corridorMarks, corridorMarkBonus,
     CORRIDOR_MARK_STEP, CORRIDOR_MARK_CAP, CORRIDOR_MARK_PCT,
     DROP_BLOCKS, dropBlockOf, rollEquipRarity, dropChancesOf, dropCapOf, matTierWeights,
     UNLOCKS, MAIN_QUESTS,
-    CURRENCY_INFO, CODEX_REWARDS, enhanceMatTier, MAT_SUBSTITUTE_POINTS,
+    CURRENCY_INFO, CODEX_REWARDS, CODEX_VOLUMES, codexEquipNameList, enhanceMatTier, MAT_SUBSTITUTE_POINTS,
     GUIDE_CHAPTERS,
     SERUMS, serumById, SERUM_ITEM, SERUM_KEYS,
     _ri: ri,

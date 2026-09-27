@@ -53,6 +53,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const page = () => ((CV.top() || {}).name || '?');
 let pass = 0, fail = 0;
 const t = (name, ok, extra) => { if (ok) { pass++; console.log('  ✓ ' + name + (extra ? '  → ' + extra : '')); } else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); } };
+const WB = require('./_web_basis');
 
 function fresh() {
   Core.newGame(); Core.setPlayerName('回归体检'); Core.choosePlayerBloodline('修真');
@@ -157,16 +158,21 @@ console.log('\n=== 战斗"从哪来就回哪去" ===');
      "深井的自动下一关倒数和点击都无效，点完提示战斗进行中"（真因：进战斗前没清 busy 闸门）。 */
   {
     const bsrc = fs.readFileSync(path.join(JS, 'sc-battle.js'), 'utf8');
+    /* ⚠️ M 轮（2026-09-27）顺手修的一处**尺子自己过期**：这条原来只往后看 120 个字符，
+       而"收下奖励并返回"那句标签在源码里已经占掉一行多 —— **改动前就已经是红的**
+       （拿改动前的 sc-battle.js 单跑这条正则：同样 false）。这里只把窗口放宽到 400，
+       判据一个字没放松：仍旧要求"底下那颗整宽按钮 = battle_close"（默认值也算，见 `p.closeId ||`）。 */
     t('⑥ 结算按钮上下排列、统一宽度（不再左右并排）',
       /const BW = Math\.min\(320 \* CV\.SCALE, U\.iw\(\)\)/.test(bsrc)
       && /acts\.forEach\(function \(a, i\) \{[\s\S]{0,220}?U\.btn\(cx - BW \/ 2, y, BW, BH/.test(bsrc)
-      && /U\.btn\(cx - BW \/ 2, y, BW, BH,[\s\S]{0,120}?'battle_close'\)/.test(bsrc));
+      && /U\.btn\(cx - BW \/ 2, y, BW, BH,[\s\S]{0,400}?'battle_close'\)/.test(bsrc));
     const last = fs.readFileSync(path.join(JS, 'sc-last.js'), 'utf8');
     t('⑥b 深井"继续第 N 层"进战斗前会先清掉上一场的闸门（不再报"战斗进行中"）',
       /CV\.on\('corridor_fight'[\s\S]{0,400}?G\.BattleUI\.clear\(\)/.test(last));
-    const web = fs.readFileSync(path.resolve(JS, '../../wxlh-game/js/ui.js'), 'utf8');
-    t('⑥c 网页版同样是上下排列（.result-actions-col + 等宽按钮）',
-      /result-actions-col/.test(web) && /data-close>/.test(web));
+    const web = WB.read('js/ui.js');
+    WB.OK ? t('⑥c 网页版同样是上下排列（.result-actions-col + 等宽按钮）',
+      /result-actions-col/.test(web) && /data-close>/.test(web))
+      : WB.skip('⑥c 网页版同样是上下排列（对表）');
   }
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

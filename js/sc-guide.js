@@ -20,30 +20,80 @@
   }
 
   /* 指南正文里的 **加粗**（数据表里就这个约定）：拆成"普通 / 粗体"两截分别画，
-     不能像网页版那样交给 HTML —— 画布上得自己分段。 */
+     不能像网页版那样交给 HTML —— 画布上得自己分段。
+     ================= V1.1.9（父亲大人：「玩法指南进去后会卡」）=================
+     这一页正文 6200 多字，旧写法有三个"逐字"的坑，叠起来在真机上就是"卡"：
+       ① 每个字量**两次**宽（算折行一次、存宽度又一次）；
+       ② 折行用 `cur.reduce(...)` 把当前行**重新累加一遍** —— O(n²)；
+       ③ 画的时候**每个字一次 fillText** → 一屏渲染要 6000+ 次文字绘制。
+     现在三处一起改：**宽度查缓存**（同一个字只量一次）· 累加改**增量** ·
+     画的时候**按"同粗细的连续片段"整段画**（6000 次 → 两三百次）·
+     排版结果再按「文本 + 字号 + 可用宽」**缓存** —— 滚动时**只重画、不再重排**。 */
+  const _wCache = Object.create(null);        // 字宽缓存：size|bold|字 → 宽
+  const _layoutCache = Object.create(null);   // 排版缓存：size|宽|文本 → 行（含同粗细的片段）
+  function charW(ch, size, bold) {
+    const k = size + '|' + (bold ? 1 : 0) + '|' + ch;
+    let w = _wCache[k];
+    if (w === undefined) { w = _wCache[k] = CV.measure(ch, size, bold); }
+    return w;
+  }
+  /* 把"逐字的一行"压成"同粗细的连续片段" —— 画的时候一段一次 fillText */
+  function _runs(line) {
+    const runs = [];
+    line.forEach(function (c) {
+      const last = runs[runs.length - 1];
+      if (last && last.bold === c.bold) { last.t += c.ch; last.w += c.w; }
+      else runs.push({ t: c.ch, bold: c.bold, w: c.w });
+    });
+    return runs;
+  }
+  function layoutRich(text, size, maxW) {
+    const ck = size + '|' + Math.round(maxW) + '|' + text;
+    const hit = _layoutCache[ck];
+    if (hit) return hit;
+    const out = [];
+    let line = [], w = 0;
+    String(text).split('**').forEach(function (t, i) {
+      const bold = i % 2 === 1;
+      for (let k = 0; k < t.length; k++) {
+        const ch = t.charAt(k);
+        const cw = charW(ch, size, bold);
+        if (w + cw > maxW && line.length) { out.push({ runs: _runs(line), w: w }); line = []; w = 0; }
+        line.push({ ch: ch, bold: bold, w: cw });
+        w += cw;
+      }
+    });
+    if (line.length) out.push({ runs: _runs(line), w: w });
+    _layoutCache[ck] = out;
+    return out;
+  }
   function richLine(text, size, color, gapTop) {
     const lh = size * 1.85, top = U.y + (gapTop || 0);
-    const parts = String(text).split('**');
-    const segs = parts.map((t, i) => ({ t, bold: i % 2 === 1 })).filter((s) => s.t);
-    /* 逐字折行：一小段一小段地量，超宽就换行 */
-    const lines = [];
-    let cur = [];
-    segs.forEach(function (s) {
-      s.t.split('').forEach(function (ch) {
-        const w = cur.reduce((a, c) => a + (c.w || 0), 0) + CV.measure(ch, size, s.bold);
-        if (w > U.iw() - 8 && cur.length) { lines.push(cur); cur = []; }
-        cur.push({ ch, bold: s.bold, w: CV.measure(ch, size, s.bold) });
-      });
-    });
-    if (cur.length) lines.push(cur);
+    const lines = layoutRich(text, size, U.iw() - 8);
     U.draw(function () {
       lines.forEach(function (ln, i) {
-        let x = U.ix() + 4, cy = top + lh * (i + 0.5);
-        ln.forEach(function (c) { CV.text(c.ch, x, cy, { size, color: color || CV.C.text, bold: c.bold }); x += c.w; });
+        let x = U.ix() + 4;
+        const cy = top + lh * (i + 0.5);
+        /* V1.1.15（2026-09-27 · 父亲大人："界面滑动有点卡卡的，是我手机卡还是游戏卡"）：
+           **视口外的行不画**。这一页正文 6200 字，原来整篇都在发 fillText（一帧 800+ 次），
+           而屏幕只看得见十几行 —— 滚到哪画到哪，一帧的文字绘制直接砍掉一大半。
+           尺子：`scripts/perf_audit.js`（guide 那一行）。 */
+        if (!onScreen(cy, lh)) return;
+        ln.runs.forEach(function (r) {
+          CV.text(r.t, x, cy, { size: size, color: color || CV.C.text, bold: r.bold });
+          x += r.w;
+        });
       });
     });
     U.y = top + lines.length * lh;
     return lines.length * lh;
+  }
+
+  /* 内容坐标 → 屏幕：内容区在 render 里 translate 了 `CV.TOP + 8 - scroll`。
+     上下各留 40px 余量（标题吸顶条、半行露头都不该被裁掉）。 */
+  function onScreen(y, h) {
+    const top = (CV.scroll || 0) - (CV.TOP + 8);
+    return (y + (h || 0)) >= top - 40 && y <= top + CV.H + 40;
   }
 
   /* ---------- 玩法指南（网页版 guideModal） ---------- */

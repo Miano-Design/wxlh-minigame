@@ -1,4 +1,4 @@
-/* 成长 + 兑换大厅 —— 照网页版 js/ui.js 的 growScreen / shopModal 复刻
+/* 成长 + 市集 —— 照网页版 js/ui.js 的 growScreen / shopModal 复刻
    ------------------------------------------------------------------------------
    成长：十三条养成线一条一行（网页版 .grow-row：图标 22 + 名称 + 说明 + 右侧当前值金色右对齐），
          未解锁的那几条也照样列出来（点进去给"通关X解锁"的提示）。
@@ -12,6 +12,10 @@
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const curName = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.name : k; };
   let shopTab = 'god';
+  /* V1.1.15（2026-09-27 · 父亲大人口径）：购买数量弹窗的状态 —— 买哪一行、当前选几个。
+     `buyDialog = null` 表示没弹窗；非 null 时市集页会**只画这张小弹窗**（暗底＋居中卡片，
+     天然模态：底下的商品行连热区都不登记，点不穿）。 */
+  let buyQty = 1, buyIdx = -1, buyDialog = null;
 
   /* ---------- 成长 ---------- */
   CV.register('grow', function () {
@@ -89,13 +93,14 @@
   });
   CV.on('grow_back', function () { CV.pop(); });
 
-  /* ---------- 兑换大厅 ---------- */
+  /* ---------- 市集（原「兑换大厅」· V1.1.9 正名：数据里一直叫「灯阁市集」，
+     父亲大人找不到「兑换大厅」这个名字 —— 入口名、屏标题、来源文案统一成「市集」） ---------- */
   CV.register('shop', function () {
     const S = Core.S;
     const shop = D.SHOPS[shopTab];
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'shop_back');
-    CV.text('兑换大厅', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
+    CV.text('市集', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     /* 店铺胶囊（横排，放不下就先不画） */
     const keys = Object.keys(D.SHOPS);
@@ -115,7 +120,16 @@
       x += w + gap;
     });
     U.y += pillH + CV.SP[1];
-    U.hint('本店用 ' + curIcon(shop.currency) + curName(shop.currency) + ' 结算', 2 * CV.SCALE);
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："购物加多个购买数量"）=================
+       这一行**先选数量**，再点下面各行的「购买」—— 一次买 N 个。
+       为什么不做成"每行弹一个数量框"：四家店一屏十几行，每买一件都弹一次框会更烦；
+       放成"顶部选一次、各行通用"最省手（也和扫荡页那排 ×1/×5/×10 的用法一致）。
+       选中的数量会顺着 `Core.buyShopItem(shop, i, buyQty)` 下去，库存 / 钱 / 背包三道上限都在 core 里卡。 */
+    /* V1.1.15（2026-09-27 · 父亲大人更正："我意思是购买的时候，选择物品购买后，再出来弹窗"）：
+       原来那排固定档位（×1/×5/×10/×100/买满）**撤掉** —— 数量改成**点某一行购买后弹窗里选**：
+       `−` / 数字 / `+` 三个位置，数字**点一下能手动输入**（只收数字），
+       输入超过"你买得起的上限"就**自动压到上限**（例：输 99 但只买得起 50 → 变 50）。 */
+    U.hint('本店用 ' + curIcon(shop.currency) + curName(shop.currency) + ' 结算 · 点下面的「购买」再选数量', 2 * CV.SCALE);
     U.space(CV.SP[1]);
     U.card(function () {
       shop.items.forEach(function (it, i) {
@@ -126,6 +140,11 @@
         const top = U.y;
         U.listRow({
           t1: it.name,
+          /* V1.1.9（续13 · 乙组）：市集货架的名字也按**稀有度色**画（`U.listRow` 已支持 `t1Color`，见 uiw.js）——
+             "想买的东西贵不贵"在货架上一眼看得出来，不用一件件点进详情。
+             ⚠️ 货架行本身**不带 rarity**（`SHOPS[].items` 只有 `{item, name, price, stock}`）→
+                要按 `it.item` 回查 `D.ITEMS`，查不到就退回默认色（深井商店那几行没走这个入口也一样安全）。 */
+          t1Color: ((D.ITEMS[it.item] || {}).rarity ? ((D.RARITY_COLOR || {})[(D.ITEMS[it.item] || {}).rarity] || CV.C.text) : CV.C.text),
           t2: curIcon(shop.currency) + ' ' + fmt(it.price)
             + (it.stock > 0 ? (' · 每日限' + it.stock + '（已购' + bought + '）') : '')
             + (req.ok ? '' : (' · 🔒 ' + req.req + '后上架')),
@@ -137,6 +156,11 @@
           req.ok ? (soldOut ? '已售罄' : '购买') : '未解锁', 'ghost', can ? 'buy:' + i : '');
       });
     });
+    /* V1.1.15（2026-09-27 · 父亲大人："背景也不用遮罩，就正常的弹窗"）：
+       内容**照常画**（弹窗浮在内容之上、不再整屏压暗）；画完这一页后
+       **把本页登记的热区清掉**再画弹窗 —— 底下的商品行点不穿（模态成立），
+       而底栏/顶栏是 `CV.render` 在内容层之外补登记的，照旧可用（想切页随时能切）。 */
+    if (buyDialog) { CV.hits = []; drawBuyDialog(); }
   });
   CV.on('shop_back', function () { CV.pop(); });
   /* 供别的页面打开指定店铺（深井商店） */
@@ -144,11 +168,109 @@
   Object.keys(D.SHOPS || {}).forEach(function (k) {
     CV.on('shoptab:' + k, function () { shopTab = k; CV.render(); });
   });
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function (i) {
+  /* V1.1.5（A12 补漏 · `tap_audit` 抓出来的真 bug）：这一排处理器原来**写死下标 [0…11]**。
+     A12 往「灯阁市集」加了 3 件货（灯油 / 灵植种 / 材料包·下品，排在下标 9/10/11）之后，
+     原来那三件（异界结晶×10 / 随机R装备 / 随机SR装备）就被挤到 12/13/14 —— **没有处理器**，
+     界面上"看着能点、点了没反应"（tap_audit 的 3 个死键正是它们）。
+     改成按**最长的那个店铺**算：以后加货、加店都不用再回来改这一行
+     （同一条毛病在这个项目上犯过：凡"按数量写死的下标"都要改成按数据算）。 */
+  const SHOP_ROWS = Object.keys(D.SHOPS || {}).reduce(function (a, k) {
+    return Math.max(a, ((D.SHOPS[k] || {}).items || []).length);
+  }, 0);
+  for (let i = 0; i < SHOP_ROWS; i++) (function (i) {
     CV.on('buy:' + i, function () {
-      const r = Core.buyShopItem(shopTab, i);
-      CV.toast(r.msg || (r.ok ? '购买成功' : '买不了'));
+      /* V1.1.15：点「购买」→ 在当前页上**弹出小弹窗**选数量（不再直接买 1 个、也不进二级页） */
+      const max = Core.shopMaxQty(shopTab, i);
+      if (max <= 0) { CV.toast('买不了：钱不够 / 今日售罄 / 背包放不下'); CV.render(); return; }
+      buyIdx = i; buyQty = 1; buyDialog = true;
       CV.render();
     });
+  })(i);
+
+  /* ================= 购买数量弹窗（V1.1.15 · 父亲大人口径）=================
+     三个位置：`−` / 数字 / `+`。
+       · `−` `+` 各加减 1（到 1 / 上限就停）；
+       · **数字点一下 = 手动输入**（只收数字，走 `wx.showKeyboard({type:'number'})`）；
+       · 输入超过上限 → **自动压到上限**（他举的例子：输 99、只买得起 50 → 变 50）；
+       · 上限 = `Core.shopMaxQty(...)`（钱 / 今日库存 / 背包空间 / 单次 100，取最小）。
+     ⚠️ 数字输入只收 0-9（会把其它字符统统剔掉）—— 这条是防"手滑输入奇怪字符"，
+        与起名页那次 UGC 事故无关（那里是自由文本，这里是纯数字）。 */
+  /* ================= 购买小弹窗（V1.1.15 · 父亲大人："购买一个小弹窗就行了，不用二级界面"）=================
+     ⚠️ 三个毛病一个根因（2026-09-27 他报"不在画面中心 / 背景也不用遮罩 / 卡死了"）：
+        我第一版**用屏幕坐标画、又用 `hitMode='screen'` 登记热区**，可这层画布早被内容层
+        `translate(0, TOP+8-scroll)` 偏过了 —— 于是
+          · 卡片位置整块偏掉（不在画面中心）；
+          · 更要命的是**看到的位置 ≠ 能点的位置**，点上去没反应，看着就是"卡死"。
+        现在统一成**内容坐标**（`CV.hit` 用默认的 content 模式会自己换算屏幕坐标），
+        绘制与热区必然对齐；并按要求**去掉整屏遮罩**，只有一张居中卡片。
+     · `−` `+` 到 1 或到上限即停（到界那颗不登记热区＝点不动）；
+     · 数字点一下＝手动输入（系统数字键盘，只收数字），超上限自动压到上限。 */
+  function drawBuyDialog() {
+    const shop = D.SHOPS[shopTab], it = shop && shop.items[buyIdx];
+    const max = Core.shopMaxQty(shopTab, buyIdx);
+    /* V1.1.15（2026-09-27 · 父亲大人："弹窗不精致，太粗犷了"）：
+       上一版是我**手搓坐标**画的（纯色面板 ＋ 平描边 ＋ 纯色按钮）—— 必然"平、粗"。
+       现在**全部走项目自己的组件语言**（这也是两端一致的前提）：
+         · 卡片 → `CV.card`：它自带**顶部 1px 白色高光**（网页版 `inset 0 1px 0 #ffffff08`），
+           卡片"有没有厚度"就看这一下，手搓时漏掉就显平；
+         · `−` `+` → `U.btn(..., 'ghost')`：描边按钮，**禁用态自带 0.34 透明**且不登记热区（点不动）；
+         · 中间数字 → `CV.card({fill: panel2})` 底 ＋ 金色粗体（比两侧"高一档"，一眼看出是主输入位）；
+         · 底部两颗 → `U.btn` 的 `ghost` / `primary`（primary 是**金色渐变 ＋ 白字**，
+           与我手搓的"纯 accent 底 ＋ 深字"完全不是一套）；
+         · 内距一律走 `CV.SP[]` 体系，标题照 `U.h3` 的"金色竖条 ＋ 粗体"。 */
+    const oy = (CV.TOP + 8) - (CV.scroll || 0);        // 屏幕 → 内容坐标的偏移（内容层 translate 过）
+    const bw = Math.min(CV.W - 40, 320), bx = (CV.W - bw) / 2;
+    const pad = CV.SP[2], gap = CV.SP[1];
+    const titleH = CV.FS.f1 * 1.35;
+    const cellH = 46 * CV.SCALE, btnH = U.BTN_H * CV.SCALE;
+    /* V1.1.15（2026-09-27 · 父亲大人："弹窗的小字注释不要，然后按钮写购买就行了"）：
+       删掉「商品名 · 最多 N 个」那行小字（数量就显示在上面，`＋` 到上限即停，
+       不再多一行解释）；按钮文案也从「买 N 个」收成「购买」。高度跟着减一行。 */
+    const bh = pad + titleH + gap + cellH + gap + btnH + pad;
+    const by = (CV.H - bh) / 2 - oy;                   // 真屏幕中心 → 内容坐标
+    CV.card(bx, by, bw, bh, { radius: CV.RADIUS_LG || CV.RADIUS });   // ← 自带顶部高光
+    const ix = bx + pad, iw = bw - pad * 2;
+    /* 标题：金竖条 ＋ 粗体（照 U.h3） */
+    const ty0 = by + pad;
+    CV.round(ix, ty0 + 2 * CV.SCALE, 3, titleH - 4 * CV.SCALE, 1.5, CV.C.gold, null);
+    CV.text('购买数量', ix + 10 * CV.SCALE, ty0 + titleH / 2, { size: CV.FS.f1, bold: true });
+    /* − / 数字 / + */
+    const ty2 = ty0 + titleH + gap, cw = (iw - gap * 2) / 3;
+    U.btn(ix, ty2, cw, cellH, '−', 'ghost', 'buyminus', buyQty <= 1);
+    CV.card(ix + cw + gap, ty2, cw, cellH, { fill: CV.C.panel2 });
+    CV.text(String(buyQty), ix + cw + gap + cw / 2, ty2 + cellH / 2,
+      { size: CV.FS.f2, bold: true, align: 'center', color: CV.C.gold });
+    CV.hit('buynum', ix + cw + gap, ty2, cw, cellH);              // 点数字 → 手动输入
+    U.btn(ix + (cw + gap) * 2, ty2, cw, cellH, '＋', 'ghost', 'buyplus', buyQty >= max);
+    /* 取消 / 买 N 个 */
+    const ty3 = ty2 + cellH + gap, half = (iw - gap) / 2;
+    U.btn(ix, ty3, half, btnH, '取消', 'ghost', 'buycancel');
+    U.btn(ix + half + gap, ty3, half, btnH, '购买', 'primary', 'buyok');
+  }
+  CV.on('buyminus', function () { buyQty = Math.max(1, buyQty - 1); CV.render(); });
+  CV.on('buyplus', function () { buyQty = Math.min(Core.shopMaxQty(shopTab, buyIdx), buyQty + 1); CV.render(); });
+  CV.on('buycancel', function () { buyDialog = null; CV.render(); });
+  CV.on('buynum', function () {
+    const W = G.wx;
+    if (!W || !W.showKeyboard) { CV.toast('这台设备不支持输入，用 − / + 调吧'); return; }
+    try {
+      if (W.offKeyboardConfirm) W.offKeyboardConfirm();
+      W.onKeyboardConfirm(function (res) {
+        const raw = String((res && (res.value !== undefined ? res.value : res.data)) || '');
+        let v = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+        if (!isFinite(v) || v < 1) v = 1;
+        const max = Core.shopMaxQty(shopTab, buyIdx);
+        buyQty = Math.min(v, max);                      // ← 超上限自动压到上限（父亲大人的例子：99 → 50）
+        if (v > max) CV.toast('超过能买的上限，已改成 ' + max + ' 个');
+        CV.render();
+      });
+      W.showKeyboard({ type: 'number', defaultValue: String(buyQty), maxLength: 4, success: function () {}, fail: function () { CV.toast('这台设备不支持输入，用 − / + 调吧'); } });
+    } catch (e) { CV.toast('这台设备不支持输入，用 − / + 调吧'); }
+  });
+  CV.on('buyok', function () {
+    const r = Core.buyShopItem(shopTab, buyIdx, buyQty);
+    CV.toast(r.msg || (r.ok ? '购买成功' : '买不了'), 2600);
+    buyDialog = null;
+    CV.render();
   });
 })();

@@ -37,11 +37,21 @@
      不要各写一遍 —— 两处排序一旦分家，就会出现"这边和那边不一样"。 */
   G.charSortDefault = function (ids) {
     const S = Core.S;
+    /* V1.1.15（2026-09-27 · 父亲大人："现在伙伴的默认排序少了一个战力啊"）：
+       同一稀有度内按 **等级 → 战力 → 星级** 排。
+       ⚠️ 战力先整表算一遍再排：排序里同一个 id 会被比较多次，`Core.power()` 不轻
+       （它要把装备 / 血统 / 铭刻全都折进去），逐个比较现算会把一次排序拉成几百次重算。 */
+    const pow = {};
+    [].concat(ids).forEach(function (id) {
+      try { pow[id] = (Core.power && S.chars[id]) ? Core.power(id) : 0; } catch (e) { pow[id] = 0; }
+    });
     return [].concat(ids).sort((a, b) => {
       const pa = S.party.includes(a) ? 1 : 0, pb = S.party.includes(b) ? 1 : 0;
       if (pa !== pb) return pb - pa;
       if (rarIdx(a) !== rarIdx(b)) return rarIdx(b) - rarIdx(a);
       if (S.chars[a].lv !== S.chars[b].lv) return S.chars[b].lv - S.chars[a].lv;
+      /* 同等级 → 比战力（高的在前） */
+      if ((pow[a] || 0) !== (pow[b] || 0)) return (pow[b] || 0) - (pow[a] || 0);
       /* V1.0.1：四档全平时要有个**唯一兜底键** —— 否则顺序取决于 `Object.keys` 的
          插入顺序，读档后会变，玩家看到的就是"排序又乱了"。详见网页版 ui.js 同一处。 */
       return (S.chars[b].star - S.chars[a].star) || String(a).localeCompare(String(b));
@@ -81,11 +91,16 @@
        "上阵"角标也按网页版 .inparty：右上角 3/3、左右 5px、11 号字。 */
     const cols = 3, g2 = 10 * CV.SCALE;
     const cw = (U.cw() - g2 * (cols - 1)) / cols;
-    /* V1.1（视觉语言基准 §4.2）：卡片底部让出 18px 画**档色铭牌 ＋ 档码字**（品质框 v2）。 */
-    const BAND = 18 * CV.SCALE;
-    const ch = 140 * CV.SCALE + BAND;
     const PAD = 10 * CV.SCALE, AV = 46 * CV.SCALE, AV_GAP = 6 * CV.SCALE;
     const NAME_H = 18.5 * CV.SCALE, SMALL_H = 15 * CV.SCALE;
+    /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 5 条）：档色铭牌带高度照网页版
+       `[class*="rarity-"]::after` 的 **1.375rem＝22px**（这里原来 18px，两端并排就看得出厚薄不同）。
+       「改高度不许只改高度」：卡片要同时给铭牌让够位置 —— 网页版是
+       `.char-card { padding-bottom: 1.75rem }`（28px）− 铭牌 22px = **末行小字离铭牌 6px**。
+       所以高度不再写死 140，而是"内容实高 + 6 + 铭牌高"，内容改了高度自己跟着走。 */
+    const BAND = 22 * CV.SCALE;
+    const CONTENT_H = PAD + AV + AV_GAP + NAME_H + SMALL_H + 2 * CV.SCALE + SMALL_H + 2 * CV.SCALE + SMALL_H;
+    const ch = CONTENT_H + 6 * CV.SCALE + BAND;
     const y0 = U.y;
     list.forEach((id, i) => {
       const cx = U.pad() + (i % cols) * (cw + g2), cy = y0 + Math.floor(i / cols) * (ch + g2);
@@ -93,9 +108,10 @@
       const ch0 = D.charById[id], c0 = Core.S.chars[id];
       CV.qframe(cx, cy, cw, ch, ch0.rarity, 12 * CV.SCALE, BAND);
       if (isP) {
-        const tw = CV.measure('上阵', CV.FS.xs) + 10 * CV.SCALE;   // .inparty：padding 1px 5px
+        /* 「上阵」角标：网页版 .char-card .inparty 是**五级 11px**（小游戏原来画成 12px） */
+        const tw = CV.measure('上阵', CV.FS.tag) + 10 * CV.SCALE;   // .inparty：padding 1px 5px
         CV.round(cx + cw - tw - 3 * CV.SCALE, cy + 3 * CV.SCALE, tw, 17 * CV.SCALE, CV.RADIUS_CHIP,  CV.C.accent);
-        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.xs, align: 'center', color: CV.C.white });
+        CV.text('上阵', cx + cw - tw / 2 - 3 * CV.SCALE, cy + 11.5 * CV.SCALE, { size: CV.FS.tag, align: 'center', color: CV.C.white });
       }
       /* 头像 → 名字 → 星级 → 两行小字：每一行的中心都按"上一行结束处"往下推（网页版顺序） */
       const acx = cx + cw / 2;
@@ -109,7 +125,7 @@
       CV.text(CV.fit(nm(id), cw - PAD * 2, CV.FS.lg, true), acx, ly + NAME_H / 2, { size: CV.FS.lg, bold: true, align: 'center' });
       ly += NAME_H;
       CV.text('★'.repeat(c0.star) + '☆'.repeat(Math.max(0, D.RARITY_MAXSTAR[ch0.rarity] - c0.star)), acx, ly + SMALL_H / 2,
-        { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });   // 网页版 .char-card .stars：letter-spacing -1
+        { size: CV.FS.tag, color: CV.C.gold, align: 'center', ls: -1 });   // 网页版 .char-card .stars：五级 11px、letter-spacing -1
       ly += SMALL_H + 2 * CV.SCALE;
       CV.text('Lv.' + c0.lv + ' · 战力 ' + fmt(Core.power(id)), acx, ly + SMALL_H / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
       ly += SMALL_H + 2 * CV.SCALE;
@@ -166,7 +182,9 @@
       CV.text(blLine, tx, top + 50 * CV.SCALE, { size: CV.FS.sm, color: blLamp });
       U.draw(function () { CV.blGlyph(ch.bloodline, tx + CV.measure(blLine, CV.FS.sm) + 7 * CV.SCALE, top + 50 * CV.SCALE, 11 * CV.SCALE, blLamp); });
       /* V9.6.129：显示**该稀有度的通用碎片**（不再是他一个人攒的） */
-      CV.text('Lv.' + c.lv + ' · ' + ch.rarity + ' 碎片 ' + Core.shardPoolOf(ch.rarity) + ' · 命格 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+      /* V1.1.14（0927-F）：碎片**从这一版起按人记账**（满星之后才转通用池）——
+         列表这一行必须写清"**他自己**有几颗"，否则玩家在列表上看不出谁能升星。 */
+      CV.text('Lv.' + c.lv + ' · 碎片 ' + Core.shardsOf(id) + '（' + ch.rarity + '池 ' + Core.shardPoolOf(ch.rarity) + '） · 命格 Lv.' + c.bloodlineLv, tx, top + 66 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
       CV.text(fmt(Core.power(id)), U.ix() + U.iw(), top + 18 * CV.SCALE, { size: CV.FS.f2, bold: true, color: CV.C.gold, align: 'right' });
       CV.text('战力', U.ix() + U.iw(), top + 38 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
       U.y = top + h;
@@ -209,18 +227,51 @@
          现在把三件事分行写清：当前星级 / 升下一星要多少碎片 / 池子里有多少。 */
       U.h3('⭐ 星级', Core.charName(id) + ' · ' + ch.rarity + ' 档');
       U.kv('当前星级', c.star + ' / ' + maxStar + ' ★');
-      U.kv('升下一星需要', c.star >= maxStar ? '已满星' : (D.STAR_COST[c.star] + ' 碎片'), CV.C.gold);
-      U.kv(ch.rarity + ' 通用碎片池', String(Core.shardPoolOf(ch.rarity)));
-      U.btnRow([{ label: c.star >= maxStar ? '已满星' : '升星', style: 'ghost', id: c.star >= maxStar ? 'noop' : 'starup' }]);
+      /* V1.1.14（0927-F · 父亲大人）：碎片**按人各算各的** —— 抽到谁就是谁的碎片，
+         该伙伴满星之后再抽到才转成"同稀有度通用池"。升星**先吃他自己的，不够再用通用池补**。
+         所以这一卡要**两行分开写**（他自己的 / 通用池），并说清这一星会从哪边扣。
+         口径全走 `Core.starInfo(id)` 一处（成本走 `D.starCostOf`，UR 那条独立曲线也在这生效）。 */
+      const si = Core.starInfo ? Core.starInfo(id) : null;
+      const need = si ? si.need : (c.star >= maxStar ? 0 : D.STAR_COST[c.star]);
+      U.kv('升下一星需要', si && si.full ? '已满星' : (need + ' 碎片'), CV.C.gold);
+      U.kv('他自己的碎片', String(si ? si.own : 0), si && si.own > 0 ? CV.C.green : CV.C.dim);
+      U.kv(ch.rarity + ' 通用碎片池', String(si ? si.pool : Core.shardPoolOf(ch.rarity)));
+      if (si && !si.full) {
+        /* V1.1.15（2026-09-27 · 父亲大人："那个转换的注释小字不要"）：
+           讲"碎片怎么转通用"的那半句解释删掉 —— 规则本身在做法里（满星自动转、升星先吃自己的），
+           卡上只留**操作性**的一句：够不够、这一星从哪扣。 */
+        U.hint(si.can
+          ? ('这一星会扣：他自己的 ' + si.fromOwn + ' 颗' + (si.fromPool > 0 ? ('，再从 ' + ch.rarity + ' 通用池补 ' + si.fromPool + ' 颗') : ''))
+          : ('还差 ' + (need - si.total) + ' 颗'),
+          3 * CV.SCALE);
+      } else if (si && si.full) {
+        U.hint('已满星', 3 * CV.SCALE);
+      }
+      /* V1.1.14：加了两行说明之后，按钮离上方小字只剩 1.2pt（inset_audit 当场报红）——
+         补一个 SP[1] 的净距（别处按钮行前都是这个量级）。 */
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: (si && si.full) ? '已满星' : '升星', style: 'ghost', id: (si && si.full) ? 'noop' : 'starup' }]);
     });
 
     /* ④ 血统（等级 + 升级） */
-    const blCost = c.bloodlineLv < D.BLOODLINE_MAX ? D.bloodlineCost(c.bloodlineLv) : null;
+    /* V1.1.4（A12-F · 命格接「血髓晶」）：
+       ① 报价改走 `Core.bloodlineQuote(id)` —— 它才是**实际会扣的那一份**（含命格实验室最高 -40%）。
+          这一页原来读的是 `D.bloodlineCost` 毛价，按钮写着 ◆120、真扣 ◆72，正是 core.js V9.5.89
+          那条注释点名的"虚高价"问题在这一页的残留（主角页早就走 quote 了）。
+       ② 材料（血髓晶）也挂在 quote 里（`mat`/`matN`），所以直接分行显示，不用另开一条数据通道。 */
+    const blCost = c.bloodlineLv < D.BLOODLINE_MAX ? Core.bloodlineQuote(id) : null;
+    const blMat = blCost ? (D.ITEMS[blCost.mat] || {}) : {};
+    const blMatHave = blCost ? (S.items[blCost.mat] || 0) : 0;
+    const blMatOk = !blCost || !blCost.matN || blMatHave >= blCost.matN;
     U.card(function () {
       U.h3('🧬 ' + ch.bloodline + '命格', 'Lv.' + c.bloodlineLv + ' / ' + D.BLOODLINE_MAX);
+      if (blCost && blCost.matN) {
+        U.kv(blMat.name || blCost.mat, blMatHave + ' / ' + blCost.matN, blMatOk ? CV.C.green : CV.C.dim);
+        U.space(CV.SP[1]);
+      }
       U.btnRow([{
         label: blCost ? '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
-        style: 'ghost', id: blCost ? 'blup' : 'noop',
+        style: 'ghost', id: (blCost && blMatOk) ? 'blup' : 'noop', dis: !!(blCost && !blMatOk),
       }]);
     });
 
@@ -236,7 +287,23 @@
         U.skillRow({
           name: ['技能', '技能', '必杀'][i] + '·' + sk.name,
           tag: 'Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i],
-          desc: sk.desc || '',
+          /* V1.0.6（父亲大人 09-24 反馈图 11「伙伴技能升级消耗没写」）：
+             网页版这一行的 .sdesc 末尾带着「（每级 +X% 效果 · 下级需 ◆ N）」，画布这边只传了
+             sk.desc —— 玩家看不到升下一级要多少异界结晶，只有一颗说不出价钱的按钮。
+             ⚠️ 两个取值都**按游戏里的真数**取，没照抄网页版那句文案（那句子本身有两处旧的）：
+               · 每级百分比 → D.SKILL_PCT_PER_LV（=2%）。网页版写死「+7%」是旧公式
+                 （battle.js:434 的注释：`1+(lv-1)*0.07` 已改成 0 基 +2%）；
+               · 下级价钱 → Core.SKILL_CHIP_COST[lv]（core.js:1096 升级时扣的就是这一格）。
+                 网页版写的是 `[lv-1]`，在 Lv.0 上直接落到 undefined 显示成「—」、
+                 其余等级显示的是**上一级**的价钱，都比真实扣费低一档。
+             这两处属于"网页版也要跟着改"（单列在回单里），本单只动小游戏端。 */
+          /* V1.1.15（2026-09-27 · `page_text_audit` 抓到的"话没说完"）：
+             原来这句尾巴用的是「效果 · 下级需 ◆ N」—— **折行点正好落在 `·` 上**，
+             于是那一行画出来以 `·` 结尾（尺子按"行尾挂着 · → + / ："判成半句话，父亲大人看着也像）。
+             `U.skillRow` 本身是折行的（`CV.wrap`），所以只要**别让分隔符落在行尾**就行：
+             句内改成顿号式连接、并把「下级需」收成「升下级」，整句短一截、断点不再挂在连接符上。 */
+          desc: (sk.desc || '') + '（每级 +' + Math.round((D.SKILL_PCT_PER_LV || 0.02) * 100) + '%；升下级 ◆ '
+            + (Core.SKILL_CHIP_COST[lv] || '—') + '）',
           btnId: lv < 10 ? 'sk' + i : '',
           btnDis: !(lv < 10),      // 满级 → 禁用态（原来绑的是 'noop'：看着能点、点了什么都不发生）
           last: false,
@@ -269,6 +336,12 @@
         }
       });
       U.y = y0 + Math.ceil(slots.length / cols) * (th + gap) - gap;
+      /* V1.1.6（A4 · 父亲大人原话见《定调与口径》§2 第 1 条）：「伙伴详情一键装备」。
+         ① **调现成的 `Core.autoEquipBest(id)`**，不新写排序（网页版那颗「⚡ 一键最优装备」用的就是它，
+            规则：只从"没穿在任何别人身上"的装备里挑、锁着的不动、绝不抢别人的装备）；
+         ② 主角详情早就有这颗（`autoeq_player`），**伙伴详情一直缺** —— 这一轮补上，两端文案一字不差。 */
+      U.space(CV.SP[1]);
+      U.btnRow([{ label: '⚡ 一键最优装备', style: 'ghost', id: 'autoeq:' + id }]);
     });
 
     /* ⑦ 属性面板（照网页版：装备/血统/星级都算进来） */
@@ -312,6 +385,13 @@
     });
   });
   CV.on('starup', () => { const r = Core.starUp(cur); CV.toast(r.msg); CV.render(); });
+  /* V1.1.6（A4）：伙伴详情「一键最优装备」—— 与主角页那颗同一份实现与文案
+     （`Core.autoEquipBest(id)` 只给这一个人配，绝不碰别人的装备）。 */
+  CV.on('autoeq:*', function (id) {
+    const r = Core.autoEquipBest(id);
+    CV.toast(r.changed ? '已换上 ' + r.changed + ' 件（只从背包里没穿的装备挑）' : '背包里没有更好的了', 2400);
+    CV.render();
+  });
   CV.on('blup', () => { const r = Core.bloodlineUpgrade(cur); CV.toast(r.msg); CV.render(); });
   [0, 1, 2].forEach((i) => CV.on('sk' + i, () => { const r = Core.skillUp(cur, i); CV.toast(r.msg); CV.render(); }));
 })();

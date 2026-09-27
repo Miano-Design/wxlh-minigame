@@ -23,10 +23,22 @@
   let pickSlot = null;        // 正在给哪一格挑人
   let detailFrom = null;      // 从队伍点进详情的格子号
 
-  /* 伙伴头像（V1.1.2 · 基准 §4.4）：改成组合剪影，画法统一在 CV.avatar（与网页版同一个形） */
+  /* 队伍头像（V1.0.6 · 父亲大人 09-24 拍板：「**统一都用文字头像**」）：
+     原来这里走 CV.avatar 的**组合剪影**，而战斗页画的是"名字首字"——同一支队伍在两屏里
+     长相不一样（反馈图 03 就是这条）。
+     现在统一成**文字头像**，并且直接沿用本室**已经有的那一套取法**
+     （执灯者列表 / 伙伴详情头卡就是这么画的：圆盘 → 稀有度色环 → 名字首字，字号 = 直径×0.44；
+      圈色规则也不新造：主角金圈、伙伴按稀有度）。
+     一处收口，队伍页三处调用（上阵格 / 选伙伴上阵 / 无损换将）一起统一。 */
   function avatar(id, size, cx, cy) {
     const ch = D.charById[id] || {};
-    CV.avatar(id, cx, cy, size, id === '@player' ? CV.C.gold : rarColor(ch.rarity));
+    const ring = id === '@player' ? CV.C.gold : rarColor(ch.rarity);
+    const c = CV.ctx;
+    c.beginPath(); c.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    c.fillStyle = CV.C.panel3; c.fill();
+    c.lineWidth = 2; c.strokeStyle = ring; c.stroke();
+    CV.text(String(Core.charName(id) || '?').slice(0, 1), cx, cy,
+      { size: size * 0.44, bold: true, align: 'center', color: ring });
   }
 
   CV.register('party', function () {
@@ -160,9 +172,10 @@
             CV.text('放这里', x + cw / 2, y - 10 * CV.SCALE, { size: CV.FS.xs, color: CV.C.sel, align: 'center', bold: true });
           }
           if (id === '@player') {
-            const tw = CV.measure('主角', CV.FS.xs) + 10 * CV.SCALE;
+            /* 队伍格左上角的「主角」标：网页版 .pslot .pos-tag 是**五级 11px**（原来画成 12px） */
+            const tw = CV.measure('主角', CV.FS.tag) + 10 * CV.SCALE;
             CV.round(x + 4 * CV.SCALE, y + 4 * CV.SCALE, tw, 16 * CV.SCALE, CV.RADIUS_CHIP,  null, CV.a(CV.C.gold, .4));
-            CV.text('主角', x + 4 * CV.SCALE + tw / 2, y + 12 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center' });
+            CV.text('主角', x + 4 * CV.SCALE + tw / 2, y + 12 * CV.SCALE, { size: CV.FS.tag, color: CV.C.gold, align: 'center' });
           }
           /* 头像 40（上留 8）、名字 13/行高 17.5、小字 11/行高 15.4 —— 全按网页版实测 */
           const avTop = y + PAD + 8 * CV.SCALE;
@@ -254,7 +267,15 @@
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'party_back');
     CV.text('选伙伴上阵', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
-    const own = Object.keys(S.chars).filter((id) => S.party.indexOf(id) < 0);
+    /* V1.0.6（父亲大人 09-24 反馈图 10「顺序问题」）：
+       这一页原来直接吃 `Object.keys(S.chars)` —— **没排序**，顺序就是存档里的键序
+       （抽卡先后决定的插入序，读档后还会变），所以他看到的是"乱排序"。
+       网页版同一屏（js/ui.js:2170 `const owned = charListSorted();`）走的是
+       「上阵 → 稀有度 → 等级 → 星级 ＋ id 兜底」，**小游戏端本来就有一份同规则实现**
+       （G.charSortDefault，执灯者列表与「无损换将」都在用）—— 只有这一页漏了调用。
+       所以照 pickswap 的规矩补上（不留静默兜底：实现真丢了就当场抛错）。 */
+    if (typeof G.charSortDefault !== 'function') throw new Error('排序实现缺失：G.charSortDefault');
+    const own = G.charSortDefault(Object.keys(S.chars)).filter((id) => S.party.indexOf(id) < 0);
     if (!own.length) { U.hint('没有可上阵的伙伴（去招募）', 4 * CV.SCALE); return; }
     U.card(function () {
       U.h3('可选伙伴', own.length + ' 名');

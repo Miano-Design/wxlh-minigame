@@ -1,0 +1,9 @@
+{
+  "name": "savecode",
+  "version": "1.0.0",
+  "description": "存档码：upload 换 8 位短码 / claim 取回（24 小时 · 用一次即失效）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -11,8 +11,14 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
+  /* 游戏圈入口（js/sc-gameclub.js）。它在 game.js 里先于本文件加载 ——
+     万一哪天顺序变了，也别让整页炸掉，退回"没有原生按钮"这条兜底路。 */
+  const GC = G.GameClub || { placeContent: () => false, fallback: () => {} };
   const fmt = G.fmt || ((n) => String(n));
   const dur = (sec) => (G.formatDuration ? G.formatDuration(sec) : (sec + '秒'));
+  /* V1.1.x（2026-09-27 · 音频系统）：这一片（炼化台 / 悬赏 / 任务 / 成就 / 设置）的音效出口。
+     G.AUD 不存在时静默跳过（尺子的假环境不加载音频模块，别让尺子红在"没有音效"上）。 */
+  function snd(name) { if (G.AUD && G.AUD.play) G.AUD.play(name); }
   function head(title) {
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
     CV.text(title, U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
@@ -25,6 +31,39 @@
     const S = Core.S;
     U.begin(); head('⚗️ 炼化台');
     U.hint('精华是永久强化剂：喂给某名伙伴后永久加属性，每人每种有上限。命格精华只有对应命格能用——先觉醒命格，再决定喂给谁。', 0);
+    U.space(CV.SP[1]);
+    /* ================= V1.1.13（0927-E · 总监 §5.3 来源②）：重铸石配方 =================
+       版式与下面那张血清卡**同一套**（名字 / 说明 / 配方 / 已有 ＋ 右侧 炼×1 · 炼×10）。
+       炼化台吃的是合成材料 → **天然与强化抢料**，所以这条配方**不限次**（不用另设限购）。 */
+    {
+      const R = D.REFORGE_CRAFT || { mat: 'mat_t3', matN: 2, points: 4000, out: 1 };
+      const matName = (D.ITEMS[R.mat] || {}).name || R.mat;
+      const haveMat = S.items[R.mat] || 0;
+      const own = S.items[D.REFORGE_ITEM || 'reforge_stone'] || 0;
+      const can = Math.min(Math.floor(haveMat / R.matN), Math.floor((S.cur.points || 0) / R.points));
+      U.card(function () {
+        const bw = Math.max(58 * CV.SCALE, CV.measure('炼 ×10', CV.FS.md) + 26 * CV.SCALE);
+        const colGap = 8 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bGap = 6 * CV.SCALE;
+        const lw = U.iw() - bw - colGap;
+        const top = U.y;
+        const nameSize = CV.FS.lg, nameLh = nameSize * 1.35;
+        U.draw(function () { CV.text('🔨 重铸石', U.ix(), top + nameLh / 2, { size: nameSize }); });
+        U.y = top + nameLh + 4 * CV.SCALE;
+        U.hint('装备详情页「重铸」用它：档 A 重摇数值 · 档 C 重抽词条（每锁 1 条多花 1 颗）。', 0, CV.C.dim, lw);
+        U.hint('配方：' + matName + ' ×' + R.matN + ' + ◉ ' + fmt(R.points)
+          + '　（现有 ' + matName + ' ' + haveMat + ' · ◉ ' + fmt(S.cur.points || 0) + '）', 4 * CV.SCALE, CV.C.dim, lw);
+        const ownTop = U.y + 4 * CV.SCALE;
+        U.draw(function () {
+          CV.text('已有 ×' + own, U.ix(), ownTop + CV.FS.xs * 0.8, { size: CV.FS.xs, color: own ? CV.C.green : CV.C.dim });
+        });
+        U.y = ownTop + CV.FS.xs * 1.6;
+        const bx = U.ix() + U.iw() - bw;
+        U.btn(bx, top, bw, bh, '炼 ×1', 'ghost', 'craftStone:1', can < 1);
+        U.btn(bx, top + bh + bGap, bw, bh, '炼 ×10', 'ghost', 'craftStone:10', can < 10);
+        const rightH = bh * 2 + bGap;
+        if (rightH > U.y - top) U.y = top + rightH;
+      });
+    }
     U.space(CV.SP[1]);
     D.SERUMS.forEach(function (s) {
       const itemId = D.SERUM_ITEM(s.id);
@@ -49,12 +88,18 @@
         const lw = U.iw() - bw - colGap;
         const top = U.y;
         const nameSize = CV.FS.lg, nameLh = nameSize * 1.35;
+        /* V1.1.9（续13 · 乙组）：精华（血清）也有稀有度 —— 名字按**品质色**画，
+           右边那颗小标签从"只有血统专属"扩成"专属 ＋ 品质"（报告 §10.2：一档通用 SR / 一档专属 SSR /
+           二档通用 SSR / 二档专属 UR）。取值一律回查 `D.ITEMS[serum_x].rarity`，不在这儿再抄一份表。 */
+        const serumRar = (D.ITEMS[itemId] || {}).rarity;
+        const serumTag = (s.bloodline ? s.bloodline + '专属 · ' : '') + ((D.RARITY_NAME || {})[serumRar] || '');
         U.draw(function () {
           const cy = top + nameLh / 2;
-          CV.text('💊 ' + s.name, U.ix(), cy, { size: nameSize });
-          if (s.bloodline) {
+          CV.text('💊 ' + s.name, U.ix(), cy, { size: nameSize,
+            color: serumRar ? ((D.RARITY_COLOR || {})[serumRar] || CV.C.text) : CV.C.text });
+          if (serumTag) {
             const w0 = CV.measure('💊 ' + s.name, nameSize);
-            CV.text(s.bloodline + '专属', U.ix() + w0 + 4 * CV.SCALE, cy,
+            CV.text(serumTag, U.ix() + w0 + 4 * CV.SCALE, cy,
               { size: CV.FS.xs, color: CV.C.gold });
           }
         });
@@ -88,6 +133,13 @@
       });
     });
   });
+  [1, 10].forEach(function (n) {
+    CV.on('craftStone:' + n, function () {
+      const r = Core.craftReforgeStone(n);
+      CV.toast(r.msg || (r.ok ? '已炼制' : '材料不够'));
+      CV.render();
+    });
+  });
 
   /* ---------- 限时悬赏 ---------- */
   CV.register('bounty', function () {
@@ -107,10 +159,14 @@
         CV.text(CV.fit(b.name, textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         CV.text(CV.fit(b.desc || '', textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         /* V9.6.142：这一行原来单行 fit → 「剩余时间 12小时00分　奖励 ◉ 9500 …」尾巴被砍，
-           玩家看不到奖励是什么。改成**折到最多两行**，卡片高度跟着算。 */
-        const bLines = CV.wrap('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000)))
-          + '　奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm, 2);
-        const cardH = (bLines.length > 1 ? 46 + bLines.length * 17 : h);
+           玩家看不到奖励是什么。改成折行、卡片高度跟着算。
+           V1.0.6（父亲大人 09-24 反馈图 09「4300 被断成 43 / 0」）：折行原来是**逐字**断的，
+           专挑数字中间下刀。现在两件一起改：
+             · 「剩余时间」与「奖励」**各起一行**（网页版就是两条 kv 行，不是一句合起来的）；
+             · 折行走 CV.wrapTokens（只在 · / → / 空格处断），数字永远不会被劈成两半。 */
+        const bLines = CV.wrapTokens('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000))), textW, CV.FS.sm)
+          .concat(CV.wrapTokens('奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm));
+        const cardH = Math.max(h, (56 + (bLines.length - 1) * 17 + 17 + 8) * CV.SCALE);
         bLines.forEach(function (ln, k) {
           CV.text(ln, U.ix(), top + (56 + k * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
         });
@@ -127,6 +183,7 @@
   });
   CV.on('bounty_claim:*', function (id) {
     const r = Core.claimBounty(id);
+    snd(r && r.ok === false ? 'error' : 'claim');
     CV.toast(r.msg || '已领取');
     CV.render();
   });
@@ -136,8 +193,20 @@
     CV.render();
   });
 
-  /* ---------- 任务 / 成就（四个标签） ---------- */
-  let taskTab = 'main';
+  /* ---------- 任务（悬赏 → 每日 → 周常，一页到底）＋ 成就（独立页） ----------
+     V1.1.5（A1）· 父亲大人 09-26 原话：
+       「任务那里可以加个**一键领取**的功能，就不用一个个点了」
+       「**每日任务和悬赏任务可以合并到一起**，把**主线任务和成就从日常任务的二级界面去掉**，
+         不然主线任务都可以提前完成了，**主线任务就直接放在主页按顺序完成**就行了，
+         全都完成后就可以**直接把主线任务的卡片去掉**了，不要放在那占位」
+       「养成和日常你整理一下顺序，从常用到不常用重新排下序」（→ A2，表在 data.js）
+       「进去二级界面和退出二级界面的位置感觉还是不太对，像任务那里，**每次领取完他就会回到最上面**，
+         得再次下滑…就整体的交互感觉还可以再优化优化」
+     落地口径＝《定调与口径》§3.3 / §3.4：
+       · 一页到底：**限时悬赏（按最早到期排最上）→ 每日（8 条 ＋ 全清奖）→ 周常（＋全清奖）**，没有页签；
+       · 页头一颗「一键领取」＝悬赏＋每日＋周常（含两档全清）—— 走 `Core.claimEverything('task')`，不新写第二套；
+       · **主线与成就都搬出本页**：主线只剩主页那张卡（一步一领）、成就独立成页；
+       · 「领完停在原地」＝ uiw.js 的引导滚动改成"每条引导只滚一次"（见那个文件里的同名注释）。 */
   /* 「前往 ›」的落点（逐条照网页版 gotoQuest / gotoDaily 的映射） */
   function goQuest(qid) {
     /* 点「去完成」= 换一件事讲：先把当前这条和排队的都清掉，
@@ -240,117 +309,151 @@
     const b = o.btn;
     if (b) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, b[0], b[1], b[2], b[3]);
   }
-  /* 顶部四枚 .pill 标签（网页版 .pill-tabs > .pill） */
-  function tabPills(tabs) {
-    const gap = 6 * CV.SCALE, h = U.BTN_H * CV.SCALE, top = U.y;
-    let x = U.ix();
-    tabs.forEach(function (t) {
-      const on = taskTab === t[0];
-      const w = Math.max(72 * CV.SCALE, CV.measure(t[1], CV.FS.md) + 28 * CV.SCALE);
-      CV.round(x, top, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: on ? CV.C.white : CV.C.dim });
-      CV.hit('tasktab:' + t[0], x, top, w, h);
-      x += w + gap;
-    });
-    U.y = top + h + CV.SP[2];
-  }
+  /* ---------- 任务（一页到底：悬赏 → 每日 → 周常） ---------- */
   CV.register('tasks', function () {
     U.begin(); head('任务');
-    const tabs = [['main', '📜 主线'], ['daily', '📋 日常'], ['weekly', '🗓 周常'], ['ach', '🏅 成就']];
-    tabPills(tabs);
-    if (taskTab === 'main') {
-      const list = Core.mainQuestState();
-      const curIdx = list.findIndex(function (x) { return !x.claimed; });
-      U.card(function () {
-        U.h3('主线进度', list.filter((x) => x.claimed).length + ' / ' + list.length + ' 步');
-        list.forEach(function (x, i) {
-          const isCur = i === curIdx && !x.claimed;
-          coreRow({
-            /* 网页版当前这一步带一枚金色「当前」小标 —— canvas 里用金色实心块 + 白字复刻 */
-            t1: '第 ' + (i + 1) + '/' + list.length + ' 步 · ' + x.q.name,
-            t2: x.q.desc + ' · 奖励 ' + Core.rewardTextOf(x.q.reward),
-            dim: x.claimed,
-            tag: isCur ? '当前' : null,
-            btn: x.claimed ? ['已完成', 'ghost', '', true] : (x.done ? ['领取', 'primary', 'quest_claim:' + x.q.id] : ['前往 ›', 'ghost', 'quest_go:' + x.q.id]),
-          });
+    /* 页头那颗「一键领取」：范围＝悬赏＋每日＋周常（含两档全清），**不含主线**。
+       没得领时也照旧显示（灰着）—— 页头那颗按钮本身就是"这里能一键收"的说明。 */
+    const bst = Core.bountyState();
+    const ts = Core.todayState();
+    const allDailyDone = D.DAILY_TASKS.every((t) => ((Core.S.tasks.daily || {})[t.id] || 0) >= t.target);
+    const ws = Core.weeklyState() || [];
+    const allWeeklyDone = ws.every((x) => x.done);
+    const anyable = bst.claimable > 0 || ts.dailyClaimable > 0 || ts.weeklyClaimable > 0;
+    U.btnRow([{ label: anyable ? ('⚡ 一键领取（' + (bst.claimable + ts.dailyClaimable + ts.weeklyClaimable) + ' 项可领）') : '⚡ 一键领取',
+      style: 'gold', id: anyable ? 'claim_all_tasks' : 'noop', dis: !anyable }]);
+    U.space(CV.SP[1]);
+
+    /* ① 限时悬赏（最早到期的那条排最上 —— 《定调与口径》§3.3 的"按到期压力"） */
+    U.sectionTitle('限时悬赏');
+    U.card(function () {
+      const sorted = bst.list.slice().sort(function (a, b) {
+        /* 还能领的排最前（这是玩家唯一要做的事）；其余按"离到期还剩多久"升序 */
+        const ka = (a.done && !a.claimed && !a.expired) ? 0 : (a.expired ? 2 : 1);
+        const kb = (b.done && !b.claimed && !b.expired) ? 0 : (b.expired ? 2 : 1);
+        return ka - kb || a.leftMs - b.leftMs;
+      });
+      sorted.forEach(function (x) {
+        const b = x.b;
+        const top = U.y, h = 74 * CV.SCALE;
+        const bw = 84 * CV.SCALE;
+        const textW = U.iw() - bw - 12 * CV.SCALE;
+        CV.text(CV.fit(b.name, textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
+        CV.text(CV.fit(b.desc || '', textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        const bLines = CV.wrapTokens('剩余时间 ' + (x.expired ? '已结束' : dur(Math.ceil(x.leftMs / 1000))), textW, CV.FS.sm)
+          .concat(CV.wrapTokens('奖励 ' + Core.rewardTextOf(b.reward), textW, CV.FS.sm));
+        const cardH = Math.max(h, (56 + (bLines.length - 1) * 17 + 17 + 8) * CV.SCALE);
+        bLines.forEach(function (ln, k) {
+          CV.text(ln, U.ix(), top + (56 + k * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        });
+        const claimable = x.done && !x.claimed && !x.expired;
+        U.btn(U.ix() + U.iw() - bw, top + (cardH - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
+          claimable ? '领取奖励' : (x.claimed ? '已领取' : '去完成'), claimable ? 'primary' : 'ghost',
+          claimable ? 'bounty_claim:' + b.id : '');
+        U.y = top + cardH;
+      });
+      U.space(CV.SP[1]);
+      if (bst.allOver) U.btnRow([{ label: '开新一期悬赏', style: 'primary', id: 'bounty_renew' }]);
+      else U.hint('到点作废、达成才有奖励；全部结束后可以开新一期。', 2 * CV.SCALE);
+    });
+
+    /* ② 每日（8 条 ＋ 全部完成奖励） */
+    U.sectionTitle('每日');
+    U.card(function () {
+      U.h3('每日任务', '每天 0 点重置');
+      D.DAILY_TASKS.forEach(function (t) {
+        const cur = Math.min((Core.S.tasks.daily || {})[t.id] || 0, t.target);
+        const done = cur >= t.target;
+        const claimed = !!(Core.S.tasks.claimed || {})[t.id];
+        coreRow({
+          t1: t.name,
+          t2: cur + '/' + t.target + ' · 奖励 ' + Core.rewardTextOf(t.reward)
+            + ((done || claimed) ? '' : (' · ' + (DAILY_MAIN_GO[t.id] || ''))),
+          dim: claimed,
+          btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'task_claim:' + t.id] : ['前往 ›', 'ghost', 'godaily:' + t.id]),
         });
       });
-    } else if (taskTab === 'daily') {
-      const allDone = D.DAILY_TASKS.every((t) => ((Core.S.tasks.daily || {})[t.id] || 0) >= t.target);
-      U.card(function () {
-        U.h3('每日任务', '每天 0 点重置');
-        D.DAILY_TASKS.forEach(function (t) {
-          const cur = Math.min((Core.S.tasks.daily || {})[t.id] || 0, t.target);
-          const done = cur >= t.target;
-          const claimed = !!(Core.S.tasks.claimed || {})[t.id];
-          coreRow({
-            t1: t.name,
-            t2: cur + '/' + t.target + ' · 奖励 ' + Core.rewardTextOf(t.reward)
-              + ((done || claimed) ? '' : (' · ' + (DAILY_MAIN_GO[t.id] || ''))),
-            dim: claimed,
-            btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'task_claim:' + t.id] : ['前往 ›', 'ghost', 'godaily:' + t.id]),
-          });
+    });
+    U.card(function () {
+      U.h3('全部完成奖励');
+      U.note(Core.rewardTextOf(D.DAILY_ALL_REWARD), 2 * CV.SCALE);
+      U.space(CV.SP[1]);
+      const got = !!Core.S.tasks.allClaimed;
+      U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allDailyDone) ? 'all_daily' : 'noop', dis: got || !allDailyDone }]);
+    });
+
+    /* ③ 周常（5 条 ＋ 本周全清奖励） */
+    U.sectionTitle('周常');
+    U.card(function () {
+      U.h3('周常任务', '周一 0 点重置');
+      U.hint('本周 ' + Core.weekKey() + ' 起算 · 进度与每日任务通用，周一自动重置。', 2 * CV.SCALE);
+      ws.forEach(function (x) {
+        const t = x.t || {}, done = !!x.done, claimed = !!x.claimed;
+        coreRow({
+          t1: t.name || '', t2: Math.min(x.prog || 0, t.target || 0) + '/' + (t.target || 0) + ' · 奖励 ' + Core.rewardTextOf(t.reward),
+          dim: claimed,
+          btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'week_claim:' + t.id] : ['进行中', 'ghost', '', true]),
         });
       });
-      U.card(function () {
-        U.h3('全部完成奖励');
-        U.note(Core.rewardTextOf(D.DAILY_ALL_REWARD), 2 * CV.SCALE);
-        U.space(CV.SP[1]);
-        const got = !!Core.S.tasks.allClaimed;
-        U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allDone) ? 'all_daily' : '', dis: got || !allDone }]);
-      });
-    } else if (taskTab === 'weekly') {
-      /* Core.weeklyState() 返回的是**数组**（[{t, prog, done, claimed}]），不是 {list}。 */
-      const ws = Core.weeklyState() || [];
-      const allDone = ws.every((x) => x.done);
-      U.card(function () {
-        U.h3('周常任务', '周一 0 点重置');
-        U.hint('本周 ' + Core.weekKey() + ' 起算 · 进度与每日任务通用，周一自动重置。', 2 * CV.SCALE);
-        ws.forEach(function (x) {
-          const t = x.t || {}, done = !!x.done, claimed = !!x.claimed;
-          coreRow({
-            t1: t.name || '', t2: Math.min(x.prog || 0, t.target || 0) + '/' + (t.target || 0) + ' · 奖励 ' + Core.rewardTextOf(t.reward),
-            dim: claimed,
-            btn: claimed ? ['已领', 'ghost', '', true] : (done ? ['领取', 'primary', 'week_claim:' + t.id] : ['进行中', 'ghost', '', true]),
-          });
-        });
-      });
-      U.card(function () {
-        U.h3('本周全清奖励');
-        U.note(Core.rewardTextOf(D.WEEKLY_ALL_REWARD), 2 * CV.SCALE);
-        U.space(CV.SP[1]);
-        const got = !!Core.S.tasks.weeklyAllClaimed;
-        U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allDone) ? 'all_weekly' : '', dis: got || !allDone }]);
-      });
-    } else {
-      const sum = Core.achievementSummary();
-      U.card(function () {
-        U.kv('成就进度', '已达成 ' + sum.claimed + '/' + sum.total + ' · 可领取 ' + sum.list.filter((x) => x.done && !x.claimed).length);
-      });
-      ['战斗', '养成', '收集', '挑战'].forEach(function (cat) {
-        const list = sum.list.filter(function (x) { return x.a.cat === cat; });
-        if (!list.length) return;
-        U.sectionTitle(cat);
-        U.card(function () {
-          list.forEach(function (x) {
-            coreRow({
-              t1: (x.claimed ? '🏅 ' : x.done ? '✨ ' : '') + x.a.name,
-              t2: x.a.desc + ' · 奖励 ' + Core.rewardTextOf(x.a.reward),
-              t1Color: x.done ? null : CV.C.dim, dim: x.claimed,
-              btn: x.claimed ? ['已领', 'ghost', '', true] : (x.done ? ['领取', 'primary', 'ach_claim:' + x.a.id] : ['未达成', 'ghost', '', true]),
-            });
-          });
-        });
-      });
-    }
+    });
+    U.card(function () {
+      U.h3('本周全清奖励');
+      U.note(Core.rewardTextOf(D.WEEKLY_ALL_REWARD), 2 * CV.SCALE);
+      U.space(CV.SP[1]);
+      const got = !!Core.S.tasks.weeklyAllClaimed;
+      U.btnRow([{ label: got ? '已领取' : '领取', style: 'gold', id: (!got && allWeeklyDone) ? 'all_weekly' : 'noop', dis: got || !allWeeklyDone }]);
+    });
   });
-  ['main', 'daily', 'weekly', 'ach'].forEach(function (k) {
-    CV.on('tasktab:' + k, function () { taskTab = k; CV.render(); });
+
+  /* ---------- 成就（独立页，V1.1.5 · A1）----------
+     父亲大人：「把主线任务和成就从日常任务的二级界面去掉」—— 成就从任务页搬出来**单独一页**，
+     主页「成就」那一格直接进这里；四类与判定**一个字没动**（《定调与口径》§3.3）。 */
+  CV.register('ach', function () {
+    U.begin(); head('成就');
+    const sum = Core.achievementSummary();
+    U.card(function () {
+      U.kv('成就进度', '已达成 ' + sum.claimed + '/' + sum.total + ' · 可领取 ' + sum.list.filter((x) => x.done && !x.claimed).length);
+    });
+    ['战斗', '养成', '收集', '挑战'].forEach(function (cat) {
+      const list = sum.list.filter(function (x) { return x.a.cat === cat; });
+      if (!list.length) return;
+      U.sectionTitle(cat);
+      U.card(function () {
+        list.forEach(function (x) {
+          coreRow({
+            t1: (x.claimed ? '🏅 ' : x.done ? '✨ ' : '') + x.a.name,
+            t2: x.a.desc + ' · 奖励 ' + Core.rewardTextOf(x.a.reward),
+            t1Color: x.done ? null : CV.C.dim, dim: x.claimed,
+            btn: x.claimed ? ['已领', 'ghost', '', true] : (x.done ? ['领取', 'primary', 'ach_claim:' + x.a.id] : ['未达成', 'ghost', '', true]),
+          });
+        });
+      });
+    });
   });
-  /* 首页「成就」那颗格子直接落到成就标签 */
-  CV.on('open_ach', function () { taskTab = 'ach'; CV.push('tasks'); });
+  /* 主页「成就」那颗格子 → 直接进成就页 */
+  CV.on('open_ach', function () { CV.push('ach'); });
+  /* 页头「一键领取」：底层是同一个 `Core.claimEverything`，只换 scope（不新写第二套）。 */
+  CV.on('claim_all_tasks', function () {
+    const r = Core.claimEverything('task');
+    snd((r && r.total) ? 'claim' : 'error');
+    CV.toast((r && r.total) ? taskClaimSummary(r) : '暂时没有可领的');
+    CV.render();
+  });
+  /* 领完把"收了几项、收在哪"说清（《定调与口径》§2 第 7 条点名的那个代价：
+     一键把悬赏也收掉，玩家看不到单条明细）—— 一句话报四段，没动的段不报。 */
+  function taskClaimSummary(r) {
+    const d = r.detail || {};
+    const seg = [];
+    if (d.bounty) seg.push('悬赏 ' + d.bounty);
+    if (d.tasks) seg.push('每日 ' + d.tasks);
+    if (d.allDaily) seg.push('每日全清');
+    if (d.weekly) seg.push('周常 ' + d.weekly);
+    if (d.allWeekly) seg.push('周常全清');
+    return '一键领取：' + seg.join(' · ');
+  }
   CV.on('quest_claim:*', function (id) {
     const r = Core.claimQuest(id);
+    snd(r && r.ok === false ? 'error' : 'claim');
     CV.toast(r.msg || '已领取');
     CV.render();
   });
@@ -358,16 +461,19 @@
      否则"前往 ›"点了只弹一句话，玩家还是得自己找路。 */
   CV.on('task_claim:*', function (id) {
     const r = Core.claimTask(id);
+    snd(r && r.ok === false ? 'error' : 'claim');
     CV.toast(r.msg || '已领取');
     CV.render();
   });
   CV.on('week_claim:*', function (id) {
     const r = Core.claimWeekly(id);
+    snd(r && r.ok === false ? 'error' : 'claim');
     CV.toast(r.msg || '已领取');
     CV.render();
   });
   CV.on('ach_claim:*', function (id) {
     const r = Core.claimAchievement(id);
+    snd(r && r.ok === false ? 'error' : 'claim');
     CV.toast(r.msg || '已领取');
     CV.render();
   });
@@ -396,27 +502,72 @@
   function settingsPage() {
     const S = Core.S, set = S.settings;
     U.begin(); head('设置与存档');
+    /* ================= V1.1.x（0927-P · 父亲大人 2026-09-27 原话）=================
+       「最后设置界面的内容和顺序应该是：**主角列表、声音、自动分解、游戏圈、然后找回存档、
+         新手指引、玩法指南**做成三个按钮在一排就行了，最下面就一个**红色边框**按钮写
+         **删除当前进度重新开始**」。
+       这一屏就照他念的那串排（下面每一块的位置都能对上）。同一条原话里**撤掉**的：
+         · 「玩法说明」那张卡 —— 玩法指南挪进"三个按钮那一排"；
+         · 「战斗」那张卡（＝自动进入下一关）—— 整卡撤掉，**只撤界面**（`S.settings.autoNext`
+           字段与战斗页那条自动推进的读取处**一个字没动**，见下面那张卡的注释）；
+         · 「存档与备份」整张卡 —— 只留一颗「找回存档」（导出/导入/存档码/说明小字/诊断小字全撤，
+           **逻辑层一行没删**：`Core.exportSave/importSave`、云函数 `savecode` 都还在）；
+         · 「云同步」整张卡（开关一并撤）—— 现在**默认开启、关不了**（在 js/sc-cloud.js 里钉死）；
+         · 「新手引导」那张卡 —— 内容挪进「新手指引」那颗按钮（`reset_coach` 处理器照旧）；
+         · 「危险区」那张卡 —— 换成最下面那颗**红色边框**按钮。 */
+    /* ① 主角列表（原样：列表 ＋ 切换 ＋ ➕ 新建主角）—— 父亲大人点名排在最上面 */
     U.card(function () {
-      U.h3('玩法说明');
-      U.btnRow([{ label: '❓ 玩法指南', style: 'ghost', id: 'open_guide' }], undefined, U.BTN_SM);
+      U.h3('主角列表');
+      Core.protagonistList().forEach(function (p, i) {
+        const bw = 62 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+        const rowTop = U.y;
+        const h = U.listRow({
+          /* V1.0.5（两端对表第 6 条）：「当前」照网页版画成一枚**金色描边 tag**
+             （`<span class="tag" style="color:var(--gold);border-color:var(--gold)">当前</span>`），
+             不再拼成"（当前）"跟在名字后面 —— 那是纯文本，跟网页版那枚描边小标不是一个东西。
+             U.listRow 的 o.tag 就是为这个口子准备的（金色描边胶囊、画在标题右侧）。 */
+          t1: p.name,
+          tag: p.current ? '当前' : '',
+          t2: 'Lv.' + p.level + ' · ' + (p.bloodline ? (p.bloodline + '命格 Lv.' + p.bloodlineLv) : '未觉醒命格'),
+          rightW: p.current ? 0 : (bw + 10 * CV.SCALE),
+        });
+        /* 「切换」网页版是 .btn.small **默认底**（不是 ghost） */
+        if (!p.current) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, '切换', null, 'switch_alt:' + p.altIndex);
+      });
+      U.hint('新建主角从 Lv.0 开始，可体验不同命格路线；世界进度、货币、队伍不受影响', CV.SP[1]);
+      U.space(CV.SP[1]);
+      /* 「新建主角」网页版是 `btn small block` —— **默认底 + 整宽**（小游戏原来是 ghost 一行、
+         宽度只够文字，看着像个次要按钮，而它其实是这一块唯一的主动作）。 */
+      U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '➕ 新建主角', null, 'new_protag');
+      U.y += U.BTN_SM * CV.SCALE;
     });
+    /* V1.1.6（乙组 B-3 · 父亲大人 09-26 原话）：「把设置里的**战斗速度**…去掉」。
+       整张卡撤掉（含 `speed_set:*` 三颗按钮）。
+        ⚠️ **只撤界面**：`S.settings.speed` 这个字段**保留**（战斗页自己那颗 `battle_speed`
+           仍然读写它；B9 的"免费 1×/2× ＋ 看广告 30 分钟 ×5"还要用它）。
+          所以下一棒做 B9 时**别去 core 里找"speed 怎么没了"——它一直都在**。 */
+    /* ================= V1.1.x（2026-09-27 · 音频系统）=================
+       两个开关＝音乐 / 音效。**默认都开**（core 的 settings 默认值）。
+       ⚠️ 2026-09-27（父亲大人发来截图："这个小字不要"）：原来每行下面各挂一句说明小字
+       （"灯阁里的环境音乐，首尾交叠过…" / "点击、战斗命中、抽卡…这些打击声"）——**整段撤掉**，
+       只留「背景音乐 / 音效」两个标题 ＋ 右侧开关。开关本身就是自解释的，小字是多余的一行。
+       真正开关音频的逻辑在 `js/audio.js`（本页只翻标志位 + 调 `AUD.apply()` 让它立刻生效 ——
+       **关掉音乐是真的 stop 掉 source**，不是只置标志位）。 */
     U.card(function () {
-      U.h3('战斗速度');
-      U.btnRow([1, 2, 3].map(function (v) {
-        return { label: v + '×', style: (set.speed || 1) === v ? 'primary' : 'ghost', id: 'speed_set:' + v };
-      }), undefined, U.BTN_SM);
-    });
-    U.card(function () {
-      U.h3('战斗');
-      /* V9.6.115（父亲大人）：**自动战斗整条下线**（"把自动战斗的功能去掉吧"）——
-         这里的开关、战斗页里对应的跳过逻辑都删了；老存档里残留的 autoBattle 不再被任何人读。
-         （上一版撤掉的「音效」开关同理：小游戏没有音效实现，留着就是假开关。） */
-      [['autoNext', '通关结算自动进下一关', '胜利结算 5 秒内没做选择，就自动接着打下一关；关掉之后结算页会一直等你点'],
-      ].forEach(function (r) {
+      U.h3('声音');
+      [['bgm', '背景音乐'], ['sfx', '音效']].forEach(function (r) {
         const on = set[r[0]] !== false;
-        setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
+        setRow(r[1], '', on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
       });
     });
+    /* ================= V1.1.x（0927-P · 父亲大人 09-27 原话）=================
+       「**然后吧战斗自动进入下一关的设置卡片去点吧，没必要**」——
+       「战斗」那张卡（就是 `autoNext` 那颗「通关结算自动进下一关」）**整张撤掉**。
+       ⚠️ 与前面几轮同一条纪律：**只撤界面** ——
+         `S.settings.autoNext` 这个字段与它的读取处（战斗页那条"胜利结算 5 秒内没做选择就自动接着打"）
+         **照旧留着、一个字没动**；等他哪天说"连逻辑一起去掉"再动。
+         （撤掉之后这一页没有任何 `toggle:*` 的 `autoNext` 入口，`CV.on('toggle:*')` 里
+          那个名字表照旧保留，不碍事。） */
     U.card(function () {
       U.h3('自动分解');
       [['autoSellN', '自动分解 N 装备', '掉到 N 品质直接换成 ◆ 异界结晶'],
@@ -425,82 +576,71 @@
         setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
       });
     });
+    /* ================= ④ 游戏圈（原样那一块 —— 见 P3）=================
+       2026-09-26（流量主「条件二」）：游戏圈入口。微信只给**原生按钮**这一条路 ——
+       位置在这里登记，由 js/sc-gameclub.js 逐帧摆上去（那份注释写了为什么不能画个 canvas 按钮了事）。
+       放这一屏是父亲大人的口径（设置页那一屏）。
+       ⚠️ 2026-09-27（父亲大人）：「**进入游戏圈的按钮滑动的时候还是会频闪**」——
+         这一块本身没变，修的是 `js/sc-gameclub.js` 的 `GC.tick`（拖动中一次都不许重建原生按钮，
+         见那里与 `js/cv.js` 的 `CV.dragging`）；上下两个位置（页内区块顺序）也不用管它。 */
     U.card(function () {
-      U.h3('存档与备份');
-      U.hint('进度只存在这台设备里', 0);
+      U.h3('游戏圈');
+      U.hint('和别的执灯者聊玩法、发攻略、领礼包。在微信「发现 → 游戏」里也能看到这个圈子。', CV.SP[1]);
       U.space(CV.SP[1]);
-      U.btnRow([
-        { label: '📤 导出存档', style: 'ghost', id: 'save_export' },
-        { label: '📥 导入存档', style: 'ghost', id: 'save_import' },
-      ], undefined, U.BTN_SM);
-      U.hint('手动存档槽（三格）：', CV.SP[3]);
-      U.space(CV.SP[1]);
-      const info = Core.slotInfo();
-      info.forEach(function (s) {
-        /* slotInfo() 的字段是 { slot, exists, meta:{ level, floor, time } } —— 等级在 meta 里，
-           原来读 s.level 恒为 undefined，三个槽全显示"Lv.0"。 */
-        const m = s.meta || {};
-        const bw = 62 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, gap = 8 * CV.SCALE;
-        const rowTop = U.y;
-        const h = U.listRow({
-          t1: '存档槽 ' + s.slot,
-          t2: (s.exists && s.meta) ? ('Lv.' + (m.level || 0) + ' · 深井 ' + (m.floor || 0) + ' 层') : '空',
-          rightW: bw * 2 + gap + 10 * CV.SCALE,
-        });
-        const by = rowTop + (h - bh) / 2;
-        U.btn(U.ix() + U.iw() - bw * 2 - gap, by, bw, bh, '存入', 'ghost', 'slot_save:' + s.slot);
-        U.btn(U.ix() + U.iw() - bw, by, bw, bh, '读取', 'ghost', s.exists ? 'slot_load:' + s.slot : '', !s.exists);
-      });
+      const bw = U.iw(), bh = U.BTN_SM * CV.SCALE, bx = U.ix(), by = U.y;
+      /* 原生按钮能摆上去时这里**什么都不画** —— 画了就是两层叠在一起、字会重影。
+         画布兜底那颗与原生那颗**同底色 / 同描边 / 同圆角 / 同字号**（`U.btn` 的小按钮那一档，
+         与 `build()` 里给原生按钮的 style 逐项对齐）——`scripts/gameclub_audit.js` ⑥ 段钉着。 */
+      if (!GC.placeContent(bx, by, bw, bh, '进入游戏圈')) {
+        U.btn(bx, by, bw, bh, '进入游戏圈', null, 'open_gameclub');
+      }
+      U.y = by + bh;
     });
+    /* ================= V1.1.x（0927-P · 父亲大人 09-27 原话的两条）=================
+       ① 「**存档只用留一个找回存档**，以防丢档的时候可以回溯就行了，感觉也不用导出导入了，
+          反正存档都在云」—— 原来那张「存档与备份」整张卡（导出 / 导入 / 生成存档码 /
+          用存档码取回 / 三行说明小字 / 诊断小字 / 恢复上一份存档）**全部撤掉**，只留一颗
+          「找回存档」（就是下面第 5 排三颗里最左边那颗，处理器 `save_recover`）。
+          ⚠️ **逻辑层一行没删**：`Core.exportSave / importSave`、存档码的云函数入口
+          （`js/sc-cloud.js` 的 `makeCode/claimCode`）与 `save_export / save_import /
+          code_make / code_claim` 四个**处理器**都原样留着 —— 以后要把入口挂回来，贴一颗按钮就行。
+       ② 「**默认开启云同步，关不了**」—— 原来那张「云同步」卡（开关 / 立即同步 /
+          从云端下载存档 / 取回云端旧备份 / 上次同步那两行）**整张撤掉**；
+          开关在 `js/sc-cloud.js` 里被钉成**常开**（`prefs().on` 恒 true、`info().on` 恒 true），
+          界面上**没有任何入口**能把它关掉。静默同步那套口径（谁新听谁的、不弹窗、覆盖前两头留档、
+          每天 20 次上限）**一个字没改**；云同步那四颗按钮的**界面胶水**（`cloud_toggle /
+          cloud_push / cloud_pull / cloud_prev`）跟着卡一起删了 —— 手动取回云端那份的能力
+          收口到了「找回存档」里（它自己调 `CS.pullCloud()` / `CS.takeCloudPrev()`）。 */
+    /* ================= ⑤ 一排三颗：找回存档 · 新手指引 · 玩法指南 =================
+       父亲大人 09-27：「然后**找回存档、新手指引、玩法指南**做成三个按钮在一排就行了」。
+       走 `U.tiles`（网页版 .text-menu 那套**三列文字宫格**，本页与首页同一件通用件）：
+       它的格宽是按可用宽度三等分算的，320 短屏上也是**实打实的一排三颗**
+       （换成 U.btnRow 会撞上 .btn 的 86px 最小宽，窄屏被迫折成两行 —— 那不是他要的）。
+       · 找回存档 → `save_recover`（下面那段处理器：列出来源、只给一颗「恢复」）；
+       · 新手指引 → `reset_coach`（原「新手引导」那张卡的那颗处理器，一个字没改）；
+       · 玩法指南 → `open_guide`（原「玩法说明」那张卡的那颗按钮，挪到这里）。 */
     U.card(function () {
-      U.h3('主角列表');
-      Core.protagonistList().forEach(function (p, i) {
-        const bw = 62 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
-        const rowTop = U.y;
-        const h = U.listRow({
-          t1: p.name + (p.current ? '（当前）' : ''),
-          t2: 'Lv.' + p.level + ' · ' + (p.bloodline ? (p.bloodline + '命格 Lv.' + p.bloodlineLv) : '未觉醒命格'),
-          rightW: p.current ? 0 : (bw + 10 * CV.SCALE),
-        });
-        if (!p.current) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, '切换', 'ghost', 'switch_alt:' + p.altIndex);
-      });
-      U.hint('新建主角从 Lv.0 开始，可体验不同命格路线；世界进度、货币、队伍不受影响', CV.SP[1]);
-      U.space(CV.SP[1]);
-      U.btnRow([{ label: '➕ 新建主角', style: 'ghost', id: 'new_protag' }], undefined, U.BTN_SM);
+      U.tiles([['save_recover', '找回存档'], ['reset_coach', '新手指引'], ['open_guide', '玩法指南']]);
     });
-    U.card(function () {
-      /* V9.6.36：重跑新手引导 —— 清掉"这一课看过"的记录，下次进对应页面会重新逐项讲一遍。
-         父亲大人 8 问里第 8 条：只在设置里放这一个入口。 */
-      U.h3('新手引导');
-      U.hint('已经把引导跳过的部分，可以在这里重新跑一遍 —— 进入对应页面时会重新逐项讲解。', 2 * CV.SCALE);
-      U.space(CV.SP[1]);
-      U.btnRow([{ label: '重跑新手引导', style: 'ghost', id: 'reset_coach' }]);
-    });
-    /* 2026-09-23（文案策划 · 合规岗体检报告 R4）：适龄提示 —— 微信小游戏特别规范 6.1（未成年人保护）。
-       首屏（sc-splash.js）那一条是短标识，这里放全文；文案与网页版 ui.js 的设置弹窗逐字一致。 */
-    U.card(function () {
-      U.h3('适龄提示');
-      U.hint(D.COMPLIANCE.ageFull, CV.SP[1]);
-    });
-    /* V1.0.3（提审硬要求 · 特别规范 2.6.2 / 2.6.1）：
-       忠告全文与著作权人信息在**开机流程里**已经各过一遍（js/sc-start.js 的 notice / copyright 两页），
-       这里再各留一份 —— 玩家（和审核员）进游戏之后也查得到，不用重开一次游戏。
-       文案一律取 D.COMPLIANCE（data.js 一处定义，与网页版 ui.js 的设置弹窗同源，不许手抄）。 */
-    U.card(function () {
-      U.h3(D.COMPLIANCE.healthTitle);
-      D.COMPLIANCE.healthAdvice.forEach(function (line) { U.hint(line, 3 * CV.SCALE, CV.C.text2); });
-    });
-    U.card(function () {
-      U.h3(D.COMPLIANCE.ownerTitle);
-      U.hint(D.COMPLIANCE.ownerNote, CV.SP[1]);
-      D.COMPLIANCE.ownerFields.forEach(function (f) {
-        U.kv(f.k, f.v || D.COMPLIANCE.ownerBlank, f.v ? CV.C.text2 : CV.C.dim);
-      });
-    });
-    U.card(function () {
-      U.h3('危险区');
-      U.btnRow([{ label: '删除当前进度，重新开始', style: 'ghost', id: 'wipe_save' }], undefined, U.BTN_SM);
-    });
+    /* V1.1.6（乙组 B-5 / B-6 · 父亲大人 09-26 原话）：「把设置里的…**适龄、健康游戏**去掉」。
+       两张卡整段撤掉（适龄提示全文 / 《健康游戏忠告》全文）。**合规现状（照实记，别只写"删了"）**：
+         · 忠告**没有从游戏里消失**：冷启动那个独立弹窗（`uiw.js` 的 `U.healthNotice`，
+           由 game.js 开机调）**照旧**全文登载 —— 提审要的"游戏开始前显著位置全文"仍然成立；
+           设置页这张只是"进游戏之后还能再查一遍"的那份副本。
+         · 适龄提示**游戏内一处都不剩了**：平台启动页会自己打，MP 后台那一栏仍要自己设好。
+         · `D.COMPLIANCE.ageFull / healthTitle / healthAdvice` 这些**数据字段保留**（别顺手删）：
+           冷启动弹窗正在读 `healthTitle/healthAdvice`。
+       （这是父亲大人的决定，照做；风险已在此写清。） */
+    /* ================= ⑥ 最下面那一颗：红边框的删档按钮 =================
+       父亲大人 09-27：「最下面就一个**红色边框**按钮写**删除当前进度重新开始**」。
+       原来包在「危险区」那张卡里（ghost 小按钮）—— 现在卡撤掉、换成**整宽的红边框按钮**：
+       `style: 'danger'` 是这一轮往通用件上新增的一档（U.btn，见 js/uiw.js）——
+       只描边不填底，描边取色板 `danger`（#d43a4f），字取 `dangerText`（#e8626f）。
+       **不用纯 #FF0000**：那在深色底上又刺眼又不过对比度（12px 红字要 4.5:1，
+       `danger` 直接当字色只有 3.5 上下，项目里一直是"面用 danger、字用 dangerText"）。
+       点它 → `wipe_save`（下面那段：随机 4 位数字的二次确认，敲对了才真删）。 */
+    U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, '删除当前进度，重新开始', 'danger', 'wipe_save');
+    U.y += U.BTN_H * CV.SCALE;
     U.space(CV.SP[2]);
     U.draw(function () {
       /* 2026-09-23（文案策划 · 提审合规）：外显名必须与备案名一致 ——
@@ -509,8 +649,15 @@
       CV.text('残域灯阁 V' + (G.GAME_VER || ''), CV.W / 2, U.y + 8 * CV.SCALE,
         { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     });
-    /* 版本号连点 7 下进调试面板（和网页版同一个暗门，父亲大人要的"GM 后门"） */
-    CV.hit('gm_tap', CV.W / 2 - 70 * CV.SCALE, U.y, 140 * CV.SCALE, 18 * CV.SCALE);
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："把 GM 后门关了"）=================
+       这个连点入口是开发期刷数据用的（版本号连点 7 下 → 调试面板：能跳任意页面、一键发资源）。
+       游戏已经面向真实用户，**后门关掉**：
+         · 热区不再登记（玩家连点不会有任何反应，也不会弹"再点 N 下"的提示）；
+         · `CV.on('gm_tap')` 与 `CV.register('gm')` **都留着**（前者满足 `tap_audit` 那条
+           "登记了热区就必须有处理器"，后者防"别处跳转过来找不到页面"直接崩）——
+           只是从今往后**没有任何入口**通向它。
+       以后还要调试：把下面 `GM_OPEN` 改成 true，仅此一处。 */
+    if (GM_OPEN) CV.hit('gm_tap', CV.W / 2 - 70 * CV.SCALE, U.y, 140 * CV.SCALE, 18 * CV.SCALE);
     U.space(18 * CV.SCALE);
   }
   CV.register('settings', settingsPage);
@@ -518,27 +665,106 @@
     const set = Core.S.settings;
     set[k] = !(set[k] !== false);
     Core.save();
+    /* 音频两个开关（bgm / sfx）：翻完标志位立刻落到音频上 —— 关音乐＝真 stop（见 js/audio.js）。
+       G.AUD 不存在时（尺子的假环境没加载音频模块）什么也不做，不影响本页其它开关。 */
+    if (G.AUD && G.AUD.apply) G.AUD.apply();
     /* V9.6.115：名字表里也去掉已下线的 autoBattle / sfx（开关本身已经不渲染了）。
        原来的三元表达式两个分支一模一样，等于白写 —— 顺手简化成一句。 */
-    CV.toast(({ autoNext: '结算自动进下一关', autoSellN: '自动分解 N', autoSellR: '自动分解 R' }[k] || k) + '：' + (set[k] ? '已开启' : '已关闭'));
+    CV.toast(({ autoNext: '结算自动进下一关', autoSellN: '自动分解 N', autoSellR: '自动分解 R',
+      bgm: '背景音乐', sfx: '音效' }[k] || k) + '：' + (set[k] ? '已开启' : '已关闭'));
     CV.render();
   });
-  CV.on('speed_set:*', function (v) {
-    Core.S.settings.speed = +v; Core.save();
-    CV.toast('战斗速度 ' + v + '×');
-    CV.render();
-  });
+  /* V1.1.6（B-3 的连带）：`speed_set:*` 的处理器删掉 —— 设置页那张卡已经撤了，
+     留着一个没有入口的处理器就是"死代码"（`tap_audit` 的静态检查也在盯这一类）。
+     ⚠️ `S.settings.speed` 字段与战斗页那颗 `battle_speed` **都不动**（B9 还要用）。 */
   /* ---------- 存档导出 / 导入 ----------
      网页版是弹一个文本框让你全选复制 / 粘贴；画布里没有输入框也没有"全选"，
      小游戏就用**剪贴板**当那个文本框 —— 语义一样（一段可搬走的存档文本），
      而且是这台设备上唯一能跨设备搬档的路子。 */
+  /* ================= V1.1.x（0927-P · 「找回存档」＝存档那一块唯一的入口）=================
+     父亲大人 09-27：「**存档只用留一个找回存档，以防丢档的时候可以回溯就行了**，
+     感觉也不用导出导入了，反正存档都在云」。
+     原来那三块（「恢复上一份存档」一颗、导出/导入、云同步那张卡）现在**收口成这一颗按钮**：
+     点开＝一份**只读清单**（本机备份 / 云端上一份 / 云端当前那份，各带时间与大小）＋**一颗「恢复」**。
+     · 「恢复」**自动取较新的那一份**（他 09-27 的既有口径：真冲突默认选最新，不要让玩家选）；
+     · 恢复前**先把现在这份留档** —— 三条路各自都会留，**不另写一套**：
+         本机备份 → `Core.restoreFromBackup()`（它把当前主档写进 `_pre_restore`）；
+         云端当前 → `CS.applyCloudSave()`（它在覆盖前把当前主档写进 `_bak`）；
+         云端上一份 → `CS.takeCloudPrev()`（同一条 `applyCloudSave` 路）。
+     · 一个来源都没有 → 如实写「暂无可回溯的存档」，**不给一颗点了没反应的死键**（只留「知道了」）。
+     ⚠️ 比时间用的三把尺子：本机备份 `at`（写备份那一刻）/ 云端当前 `ts`（那份档自己的时间戳，
+       `CS.pullCloud()` 回来的那个）/ 云端上一份 `prevTs`（被换掉那份自己的时间戳）。
+       都是"这一份是什么时候落的"，同一量纲；不比大小到字节级（差异只在秒级边角）。 */
+  CV.on('save_recover', function () {
+    const CS = G.CloudSync;
+    const bak = (Core.backupInfo ? Core.backupInfo() : null) || { exists: false };
+
+    /* 画清单：cloud ＝ { ok:false } / null（还没读到）或 { ok:true, doc:{ts,bytes,payload} } */
+    const paint = function (cloud) {
+      const ci = CS ? CS.info() : null;
+      const rows = [];
+      if (bak.exists) rows.push({ key: 'bak', name: '本机备份', at: Number(bak.at) || 0, bytes: bak.len || 0, bad: !bak.readable });
+      if (cloud && cloud.ok && cloud.doc) rows.push({ key: 'cloud', name: '云端当前', at: Number(cloud.doc.ts) || 0, bytes: Number(cloud.doc.bytes) || 0 });
+      if (ci && (ci.prevAt || ci.prevTs)) rows.push({ key: 'prev', name: '云端上一份', at: Number(ci.prevTs || ci.prevAt) || 0, bytes: Number(ci.prevBytes) || 0 });
+
+      if (!rows.length) {
+        U.confirm('找回存档', '暂无可回溯的存档。' + (CS && CS.info().available ? '' : '（这台设备没有云开发能力，云端那份读不到）'),
+          function () { CV.render(); }, { cancel: false, okLabel: '知道了' });
+        return;
+      }
+      const when = function (t) { return t ? new Date(t).toLocaleString() : '不知道什么时候'; };
+      const list = rows.map(function (r) {
+        return r.name + '　' + when(r.at) + '　' + cloudKB(r.bytes) + (r.bad ? '（可能读不出）' : '');
+      }).join('\n');
+      rows.sort(function (a, b) { return b.at - a.at; });
+      const pick = rows[0];
+      U.confirm('找回存档', '能回溯的就这几份：\n' + list
+        + '\n点「恢复」会自动取**最新**的那一份（' + pick.name + '），现在这份会先留一手。',
+      function () {
+        const done = function (ok, msg) {
+          CV.toast(ok ? msg : (msg || '没恢复成，你的进度没动'), 3600);
+          if (ok) CV.reset('home'); else CV.render();
+        };
+        if (pick.key === 'bak') {
+          const r = Core.restoreFromBackup();
+          done(!!(r && r.ok), (r && r.msg) || '恢复失败');
+          return;
+        }
+        if (pick.key === 'cloud') {
+          const r = CS.applyCloudSave(cloud.doc.payload, cloud.doc.ts, 'recover');
+          done(!!(r && r.ok),
+            (r && !r.ok) ? (r.msg || '没恢复成') : (r && r.same ? '本机就是最新的这份，没有改动' : '已恢复到云端那份'));
+          return;
+        }
+        CS.takeCloudPrev().then(function (r) {
+          done(!!(r && r.ok), (r && r.msg) || (r && r.ok ? '已恢复到云端上一份' : '没恢复成'));
+        });
+      }, { okLabel: '恢复' });
+    };
+
+    /* 先把云端那份读回来（只读一次，不写任何东西）；读的过程给一句实话，
+       读不到就照实只列本机那份（绝不假装"云端没有"）。 */
+    if (!CS || !CS.info().available) { paint({ ok: false }); return; }
+    CV.toast('正在读云端…', 1200);
+    CS.pullCloud().then(paint, function () { paint({ ok: false }); });
+  });
   CV.on('save_export', function () {
-    const json = Core.exportSave();
+    /* V1.1.x（0927-L · 云同步）：导出档外面**套一层信封**，信封上写微信账号指纹
+       （openid 的哈希，不是 openid 本身）—— 导入时凭它拒收"别的账号导出的档"。
+       ⚠️ 存档本体一个字没变，还是 `Core.exportSave()` 那串密文；
+          老玩家手里那些**没有信封**的旧导出串也照样能导进来（见下面的导入那一段）。 */
+    const CS = G.CloudSync;
+    const raw = Core.exportSave();
+    const json = CS ? CS.wrapExport(raw) : raw;
+    const bound = CS ? CS.info().bound : false;
     if (!(G.wx && G.wx.setClipboardData)) { CV.toast('这台设备不支持剪贴板'); return; }
     try {
       G.wx.setClipboardData({
         data: json,
-        success: function () { CV.toast('存档已复制到剪贴板（' + json.length + ' 字符），发给别的设备粘贴导入即可', 3200); },
+        success: function () {
+          CV.toast('存档已复制到剪贴板（' + json.length + ' 字符），发给别的设备粘贴导入即可'
+            + (bound ? '' : '；这次还没绑上微信账号，导入时不做账号校验'), 3600);
+        },
         fail: function () { CV.toast('复制失败，请重试'); },
       });
     } catch (e) { CV.toast('复制失败，请重试'); }
@@ -550,9 +776,17 @@
         success: function (res) {
           const txt = String((res && res.data) || '').trim();
           if (!txt) { CV.toast('剪贴板是空的：先把存档内容复制下来'); return; }
-          if (txt.charAt(0) !== '{') { CV.toast('剪贴板里不是存档内容（要以 { 开头）'); return; }
-          U.confirm('导入存档', '剪贴板里这段存档会**覆盖当前进度**（共 ' + txt.length + ' 字符），确定吗？', function () {
-            const r = Core.importSave(txt);
+          /* ① 账号指纹这一关（云同步模块在：信封带指纹就比对，不带就放行但标注）；
+             ② 存档本体的形状这一关 —— 明文/信封都是 `{` 开头，**密文是 `MPG1:` 开头**
+                （存档从 V1.1.12 起默认是密文，所以"必须以 { 开头"这句老话会把自家导出的档挡在门外）。 */
+          const CS = G.CloudSync;
+          const chk = CS ? CS.checkImport(txt) : { ok: true, data: txt, note: '' };
+          if (!chk.ok) { CV.toast(chk.msg || '这份存档不能导入', 4000); return; }
+          const body = chk.data;
+          if (body.charAt(0) !== '{' && !/^MPG\d+:/.test(body)) { CV.toast('剪贴板里不是存档内容'); return; }
+          U.confirm('导入存档', '剪贴板里这段存档会**覆盖当前进度**（共 ' + body.length + ' 字符）'
+            + (chk.note ? '。' + chk.note : '') + '，确定吗？', function () {
+            const r = Core.importSave(body);
             CV.toast(r.ok ? '存档已导入' : (r.msg || '导入失败'));
             if (r.ok) CV.reset('home'); else CV.render();
           });
@@ -561,22 +795,63 @@
       });
     } catch (e) { CV.toast('读取剪贴板失败'); }
   });
-  [1, 2, 3].forEach(function (n) {
-    CV.on('slot_save:' + n, function () {
-      /* V9.6.90：网页版这里会看返回值 ——「存不进去」必须说出来（配额满 / 隐私模式），
-         原来无条件报"已存入"，玩家以为存上了，其实一个字都没落盘。 */
-      const ok = Core.saveSlot(n);
-      CV.toast(ok ? '已存入存档槽 ' + n : '保存失败（存储空间不足？）');
-      CV.render();
-    });
-    CV.on('slot_load:' + n, function () {
-      U.confirm('读取存档', '读取存档槽 ' + n + ' 会覆盖当前进度，确定吗？', function () {
-        const ok = Core.loadSlot(n);
-        CV.toast(ok ? '已读取存档槽 ' + n : '这个槽是空的');
-        if (ok) CV.reset('home'); else CV.render();
-      });
+  /* ---------- 云同步：界面上**一颗按钮都不留**（判断与联网全在 js/sc-cloud.js） ----------
+     父亲大人 09-27：「**默认开启云同步，关不了**」——原来那四颗（开关 / 立即同步 /
+     从云端下载存档 / 取回云端旧备份）连同「云同步」那张卡一起撤掉。
+     ⚠️ 这里删掉的只是**界面胶水**：`CS.toggle / manualPush / pullCloud / takeCloudPrev`
+       与静默同步那套口径（谁新听谁的、不弹窗、覆盖前两头留档、每天 20 次上限）**一个字没改**；
+       "从云端恢复"这条能力收口到了上面那颗「找回存档」里（它自己调 `CS.pullCloud()` /
+      `CS.takeCloudPrev()` / `CS.applyCloudSave()`）。**开关本身在 sc-cloud.js 里被钉成常开。** */
+  function cloudKB(n) { return (Number(n) / 1024).toFixed(1) + ' KB'; }
+  /* ---------- 存档码（生成 / 取回）：8 位 · 24 小时 · 用一次即失效 ---------- */
+  CV.on('code_make', function () {
+    const CS = G.CloudSync;
+    if (!CS) { CV.toast('这台设备没有云开发能力：可以用【导出存档】'); return; }
+    CV.toast('正在生成存档码…', 1400);
+    CS.makeCode().then(function (r) {
+      if (!r.ok) { CV.toast(r.msg || '这次没生成出来，等会儿再试', 4000); CV.render(); return; }
+      /* 生成完直接替他复制到剪贴板（这一步就是在"搬那份 17KB"，只是不用他看见）。 */
+      let copied = false;
+      try {
+        if (G.wx && G.wx.setClipboardData) { G.wx.setClipboardData({ data: r.code }); copied = true; }
+      } catch (e) {}
+      const until = r.expireAt ? new Date(r.expireAt).toLocaleString() : '24 小时内';
+      U.confirm('存档码' + (copied ? '（已复制）' : ''), r.code
+        + '\n把这串码发到另一台设备，在那台设备点【用存档码取回】。'
+        + '\n有效期到 ' + until + '，**用一次就失效**。',
+      null, { cancel: false, okLabel: '知道了' });
     });
   });
+  CV.on('code_claim', function () {
+    const CS = G.CloudSync;
+    if (!CS) { CV.toast('这台设备没有云开发能力：可以用【导入存档】'); return; }
+    if (!(G.wx && G.wx.getClipboardData)) { CV.toast('这台设备不支持剪贴板'); return; }
+    try {
+      G.wx.getClipboardData({
+        success: function (res) {
+          const code = CS.normCode((res && res.data) || '');
+          if (!code) { CV.toast('剪贴板里没有 8 位存档码：先在另一台设备上【生成存档码】，把码复制过来', 4200); return; }
+          CV.toast('正在取回…', 1400);
+          CS.claimCode(code).then(function (r) {
+            if (!r.ok) { CV.toast(r.msg || '没取回来（这个码可能已经用过或过期）', 4200); CV.render(); return; }
+            U.confirm('用存档码取回',
+              '存档码 **' + r.code + '** 里那份存档会**覆盖本机现在的进度**'
+              + (r.createdAt ? '（生成于 ' + new Date(r.createdAt).toLocaleString() + '）' : '')
+              + '。本机这份会先留一手，能在设置里恢复。确定吗？',
+              function () {
+                const a = CS.applyExternal(r.data, 'code');
+                CV.toast(a.ok ? '存档已取回' : (a.msg || '没取回来'), 3600);
+                if (a.ok) CV.reset('home'); else CV.render();
+              }, { okLabel: '取回' });
+          });
+        },
+        fail: function () { CV.toast('读取剪贴板失败'); },
+      });
+    } catch (e) { CV.toast('读取剪贴板失败'); }
+  });
+  /* V1.1.6（B-4 的连带）：三格存档槽的 `slot_save:* / slot_load:*` 处理器删掉（界面已撤）。
+     `Core.saveSlot / loadSlot / slotInfo` 三个**逻辑层函数原样保留**（老档里存过的槽、
+     以及以后要把这个入口放回来时都用得上）—— 这一轮只撤界面。 */
   /* 主角列表三个动作（照网页版 settingsModal 的 data-switchprotag / data-newprotag / data-reset） */
   CV.on('switch_alt:*', function (i) {
     const r = Core.switchProtagonist(+i);
@@ -604,7 +879,10 @@
   });
   CV.on('gm_mats', function () {
     ['mat_t1', 'mat_t2', 'mat_t3', 'mat_t4', 'mat_t5'].forEach(function (k) { Core.addItem(k, 200); });
-    CV.toast('各档强化材料 +200');
+    /* V1.1.4（A12）：GM 也要能一次补出**新料**，否则父亲大人验"铭刻 / 命格 / 权限 / 秘术 / 药园"
+       这五条线还得先去刷副本（这不是"我加的东西"应当留下的门槛）。 */
+    ['minghun_sha', 'xuesui_jing', 'dengyou', 'mijuan_canzhang', 'lingzhi_zhong'].forEach(function (k) { Core.addItem(k, 200); });
+    CV.toast('各档强化材料 +200 · 五种新料 +200');
     CV.render();
   });
   CV.on('gm_exps', function () {
@@ -627,23 +905,88 @@
     CV.reset('home');
     CV.toast('新手引导已重置 —— 从首页重新开始讲');
   });
+  /* ================= V1.1.x（0927-P · 删档的二次确认：随机 4 位数字）=================
+     父亲大人 09-27：「然后**点击删档跳出来一个确认弹窗随机生成 4 个数字，让玩家输入这四个数字
+     一致后才能删档，避免误触**」。
+     做法（**不新造一套**）：
+       · 弹窗走通用件 `U.confirm` 的**输入格**（`opt.inputBox` / `opt.inputId`，见 js/uiw.js）——
+         那块与"购买数量"那颗数字格同口径；
+       · 收字照抄**项目里已有的那一套**（`js/sc-grow.js` 的购买数量：
+         `wx.offKeyboardConfirm()` → `wx.onKeyboardConfirm()` → `wx.showKeyboard({type:'number'})`），
+         **不新写一套输入**（起名那一步踩过的坑：小游戏的键盘事件是**全局**的，必须先注销上一个）；
+       · 弹窗里**不给「确认删档」那颗按钮**（避免又点一次误触）——一致性只在键盘那一下判：
+         对不上就**不删**、给一句人话、弹窗留着；对上了才真删。取消 / 关掉随时可以。
+       · 删档是**最重的操作**：删之前先把当前档留一份（写进 `_bak`，与 core 的 `backupSave` 同一格式，
+         也就是「找回存档」里那份"本机备份"）—— 父亲大人说的"不留备份"指的是别堆古董文件，
+         **存档的救援副本要留**（`restoreFromBackup` 那套口径）。留不成就不许删（下面第 ③ 句）。 */
+  let wipeDigits = '', wipeTyped = '';
+  const wipeKeyOk = function () {
+    const W = G.wx;
+    return !!(W && W.showKeyboard && W.onKeyboardConfirm);
+  };
+  function wipeDialog() {
+    /* 那 4 个数字放在**标题**上：弹窗里字最大、最亮的那一行就是它（正文是 --dim 灰的、
+       胶囊小字是 11px，都压不住"必须看清并照着敲"这件事）。
+       正文三句话各管一件事：会清掉什么 / 怎么才算数 / 删之前留了一手。 */
+    U.confirm('删除当前进度　' + wipeDigits.split('').join(' '),
+      '会清掉这台设备上的全部进度，重新从开局契约开始。\n照着上面这四个数字输入一遍才会删档。',
+      null,
+      {
+        inputBox: { value: wipeTyped, placeholder: '点这里输入这四个数字' },
+        inputId: 'wipe_input',
+        cancel: false, okLabel: '取消', okStyle: 'ghost',   // ← 只有"取消"这一颗，没有"确认删档"
+        note: '删档前会先把现在这份进度留一手，真删错了能在【找回存档】里拿回来一份。',
+      });
+  }
   CV.on('wipe_save', function () {
-    U.confirm('删除当前进度', '会清掉这台设备上的全部进度，重新从开局契约开始。确定吗？', function () {
-      Core.wipeSave();
-      /* V9.6.100：删档 = 内存也回到全新档，所以这里必须补一次 newGame() ——
-         defaultState() 是"零资源"的空壳（点数 0），newGame() 才会发开局资源、
-         并**恢复存盘开关**（wipeSave 会把它关上，防旧档被写回）。 */
-      Core.newGame();
-      Core.ensureDaily && Core.ensureDaily();
-      CV.reset('welcome');
-    });
+    if (!wipeKeyOk()) { CV.toast('这台设备不支持数字键盘，删档没开（免得误触）'); return; }
+    /* 每次打开**重新摇** 4 个数字（1 位数 ×4，0 也可以是其中一位）。 */
+    wipeDigits = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    wipeTyped = '';
+    wipeDialog();
+  });
+  CV.on('wipe_input', function () {
+    const W = G.wx;
+    if (!wipeKeyOk()) { CV.toast('这台设备不支持输入'); return; }
+    try {
+      /* 与 `js/sc-grow.js` 的 `buynum` **逐句同源**：先注销上一个全局处理器，再挂这一个。 */
+      if (W.offKeyboardConfirm) W.offKeyboardConfirm();
+      W.onKeyboardConfirm(function (res) {
+        if (!U.overlay) return;                        // 弹窗已经关掉了（关掉之后敲键盘不算数）
+        const raw = String((res && (res.value !== undefined ? res.value : res.data)) || '');
+        const typed = raw.replace(/[^0-9]/g, '').slice(0, 4);
+        if (typed !== wipeDigits) {
+          /* 对不上 = **不删** ＋ 一句人话；弹窗留着（重新画一遍，把刚敲的显示出来）。 */
+          wipeTyped = typed;
+          wipeDialog();
+          CV.toast('数字对不上，没有删', 2600);
+          return;
+        }
+        /* 对上了 —— 删之前先留一手。留不成（这个版本没有留档口）就**不删**。 */
+        const CS = G.CloudSync;
+        if (!CS || !CS.keepBackup) { CV.toast('这个版本没法先把存档留一手，删档已取消'); return; }
+        if (!CS.keepBackup(Core.exportSave(), 'wipe')) { CV.toast('存档没能先留一手，删档已取消'); return; }
+        U.overlay = null;
+        Core.wipeSave();
+        /* V9.6.100：删档 = 内存也回到全新档，所以这里必须补一次 newGame() ——
+           defaultState() 是"零资源"的空壳（点数 0），newGame() 才会发开局资源、
+           并**恢复存盘开关**（wipeSave 会把它关上，防旧档被写回）。 */
+        Core.newGame();
+        Core.ensureDaily && Core.ensureDaily();
+        CV.reset('welcome');
+        CV.toast('已删除进度，重新开始（刚才那份在【找回存档】里还留着）', 3200);
+      });
+      W.showKeyboard({ type: 'number', defaultValue: wipeTyped, maxLength: 4, success: function () {}, fail: function () { CV.toast('这台设备不支持输入'); } });
+    } catch (e) { CV.toast('这台设备不支持输入'); }
   });
 
   /* ---------- GM 调试页（V9.6.12，父亲大人："小程序的 GM 后门先给我开开"）----------
      小游戏原来**没有** GM 面板，导致很多界面（没解锁的 / 需要资源的）根本进不去。
      这里补一个：设置与存档 → 连点版本号 7 次进入。能 ① 直接跳任意页面 ② 一键发资源。 */
+  const GM_OPEN = false;     // ← 调试后门总开关（父亲大人 2026-09-27：关）
   let gmTaps = 0, gmTimer = null;
   CV.on('gm_tap', function () {
+    if (!GM_OPEN) return;
     gmTaps++;
     clearTimeout(gmTimer);
     gmTimer = setTimeout(function () { gmTaps = 0; }, 2000);
@@ -903,6 +1246,11 @@
       U.space(CV.SP[1]);
       // V9.6.134：货币 8 → 4（故事点并入点数、深井徽记与血统结晶并入异界结晶）
       U.kv('通关奖励', '◉ ' + fmt(rw.points) + ' · ◆ ' + rw.otherworld, CV.C.gold);
+      /* V1.1.4（A12-F · 深井每 10 层里程碑 2 颗新料）：这一层给不给料，**上一屏就要看得见**——
+         不然玩家打完才发现背包里多了个不认识的图标（《收口2》§3.1 的"深井每 10 层 2 颗"）。 */
+      if (rw.mat && rw.mat.length) {
+        U.kv('里程碑额外', rw.mat.map(m => ((D.ITEMS[m.id] || {}).name || m.id) + '×' + m.n).join(' · '), CV.C.gain);
+      }
       U.space(CV.SP[1]);
       U.btnRow([{ label: '⚔️ 挑战本层', style: 'primary', id: 'corridor_fight' }]);
     });
@@ -937,11 +1285,20 @@
         }
         const rw = D.corridorReward(floor);
         Core.addCur('points', rw.points); Core.addCur('otherworld', rw.otherworld || 0);
+        /* V1.1.4（A12-F）：深井每 10 层里程碑 2 颗（《收口2》§3.1）——
+           清单由 D.corridorReward(floor).mat 一处给出（含 2:1 分料与每 20 层的中品材料包），
+           这里只负责入库 + 把它写进结算页（"什么时候给了什么"要当场说清）。 */
+        const matGot = [];
+        (rw.mat || []).forEach(function (m) {
+          const nm = ((D.ITEMS[m.id] || {}).name || m.id) + '×' + m.n;
+          if (Core.addItem(m.id, m.n)) matGot.push(nm);
+          else { Core.stashItem(m.id, m.n); matGot.push(nm + '（背包满，已存待领箱）'); }
+        });
         const gotMark = floor % D.CORRIDOR_MARK_STEP === 0;
         S.corridor.best = Math.max(S.corridor.best, floor);
         S.corridor.floor = floor + 1;
         Core.save();
-        const rewards = ['◉+' + fmt(rw.points), '◆+' + rw.otherworld]
+        const rewards = ['◉+' + fmt(rw.points), '◆+' + rw.otherworld].concat(matGot)
           .concat(gotMark ? ['♜ 获得深井印记（' + Core.corridorMarks() + ' 枚 · 深井内 +' + Math.round(Core.corridorMarkBonus() * 100) + '%）'] : []);
         return {
           title: '第 ' + floor + ' 层通过', sub: '', rewards: rewards,

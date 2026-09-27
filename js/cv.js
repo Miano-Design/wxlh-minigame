@@ -79,11 +79,20 @@
     ICO: 19,                                    // 行首图标（网页版 .list-row 的 1.1875rem）
     DISP: { d1: 20, d2: 24, d3: 30, d4: 40 },   // 展示数字：战力 20 / 关卡图标 24 / 胜负大字 30 / 深井层数 40
     FONT: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    /* V1.0.6（父亲大人 2026-09-24：「现在底部导航栏不对吧」）：
+       底栏**只有文字**，与网页版一致 —— 这里原来给四格各挂一个 emoji（🏮 ⚔ 👥 🎒），
+       放大就是三条毛病：①四个字形不成一套（灯笼 / 交叉剑 / 两个人 / 书包）；
+       ②压灰之后**半灰半彩**（emoji 是字体字形，颜色不由我们管）；③「执灯者」用"两个人"语义不对。
+       而网页版 navbarHtml() 自 V8.1「界面改纯文字（照参考图）」起**就只有 t.name**、没有图标
+       （`css/style.css` 里那条 `.nav-item .ico` 是那时候留下的死规则）。
+       按本室铁律「界面以网页版为准、canvas 逐条对齐」，这里把图标去掉、标签在格子里居中 ——
+       不动页签数量 / 顺序 / 名字（父亲大人：不许大改导航结构）。
+       ②的方案（两端同上一套矢量图标）与代价写在回单里，等一句话再动。 */
     NAV_TABS: [
-      { id: 'home', name: '灯阁', ico: '🏮' },
-      { id: 'dungeon', name: '残域', ico: '⚔' },
-      { id: 'roster', name: '执灯者', ico: '👥' },
-      { id: 'bag', name: '背包', ico: '🎒' },
+      { id: 'home', name: '灯阁' },
+      { id: 'dungeon', name: '残域' },
+      { id: 'roster', name: '执灯者' },
+      { id: 'bag', name: '背包' },
     ],
   };
   CV.cur = 'home';
@@ -171,6 +180,80 @@
      又容易跟别的界面联系不上"）。这里给这些符号配**矢量画法**，并挂在 CV.GLYPHS 上；
      CV.text / CV.measure 会自动识别：遇到这些字符就按图标宽（= 字号）走，其余照常排版。
      代价为零，调用点一行都不用改（页面里照旧写 '♜ 深井印记'）。 */
+  /* ---------- 图标 op 渲染器（V1.0.6 · 父亲大人拍板「B，收口」） ----------
+     **形状数据只有一处**：data.js 的 NAV_ICONS / CUR_ICONS / ICON_STROKE（与 FACTION_GLYPH
+     同一个做法——数据层放几何，界面层只负责画）。两端各渲染一次：这里是画布端那一次，
+     网页版那次在 ui.js 的 iconSvg()。同一份 op、同一线宽、同一圆角。
+     坐标系 24×24、中心对齐 (cx,cy)；描边型统一线宽 ICON_STROKE（op 尾巴上可覆盖）。
+     ⚠️ 本函数里**不许出现任何具体形状**（写了就等于又开一套），只认 data.js 那几个 op。 */
+  CV.drawIcon = function (ops, c, cx, cy, size, color) {
+    if (!ops || !ops.length) return;
+    const k = size / 24;
+    const sw = ((G.DATA && G.DATA.ICON_STROKE) || 1.9) * k;
+    const P = (x, y) => [cx + (x - 12) * k, cy + (y - 12) * k];
+    const lwAt = (op, n) => (op.length > n && typeof op[n] === 'number' ? op[n] * k : sw);
+    c.save();
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    ops.forEach(function (op) {
+      const t = op[0];
+      c.strokeStyle = color; c.fillStyle = color; c.lineWidth = sw;
+      if (t === 'line') {
+        const a = P(op[1], op[2]), b = P(op[3], op[4]);
+        c.lineWidth = lwAt(op, 5);
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+      } else if (t === 'rect') {
+        const a = P(op[1], op[2]), w = op[3] * k, h = op[4] * k, r = op[5] * k;
+        c.lineWidth = lwAt(op, 6);
+        c.beginPath();
+        c.moveTo(a[0] + r, a[1]);
+        c.arcTo(a[0] + w, a[1], a[0] + w, a[1] + h, r);
+        c.arcTo(a[0] + w, a[1] + h, a[0], a[1] + h, r);
+        c.arcTo(a[0], a[1] + h, a[0], a[1], r);
+        c.arcTo(a[0], a[1], a[0] + w, a[1], r);
+        c.closePath(); c.stroke();
+      } else if (t === 'arc') {
+        const a = P(op[1], op[2]);
+        c.lineWidth = lwAt(op, 6);
+        c.beginPath(); c.arc(a[0], a[1], op[3] * k, op[4] * Math.PI / 180, op[5] * Math.PI / 180); c.stroke();
+      } else if (t === 'circle') {
+        const a = P(op[1], op[2]);
+        c.lineWidth = lwAt(op, 4);
+        c.beginPath(); c.arc(a[0], a[1], op[3] * k, 0, Math.PI * 2); c.stroke();
+      } else if (t === 'poly' || t === 'fpoly') {
+        const pts = op[1] || [];
+        c.lineWidth = lwAt(op, 2);
+        c.beginPath();
+        pts.forEach(function (p, i) { const q = P(p[0], p[1]); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); });
+        c.closePath();
+        if (t === 'poly') c.stroke(); else c.fill();
+      } else if (t === 'frect') {
+        const a = P(op[1], op[2]);
+        c.fillRect(a[0], a[1], op[3] * k, op[4] * k);
+      } else if (t === 'ring') {
+        const a = P(op[1], op[2]);
+        c.beginPath();
+        c.arc(a[0], a[1], op[3] * k, 0, Math.PI * 2);
+        c.arc(a[0], a[1], op[4] * k, 0, Math.PI * 2);
+        c.fill('evenodd');
+      } else if (t === 'mark') {
+        const a = P(op[1], op[2]), b = P(op[3], op[4]);
+        c.globalAlpha = (op[6] === undefined ? 1 : op[6]);
+        c.strokeStyle = op[5] || color;
+        c.lineWidth = Math.max(1, sw * 0.5);
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+        c.globalAlpha = 1;
+      }
+    });
+    c.restore();
+  };
+  /* 按 id 取形状（NAV_ICONS / CUR_ICONS 都在 data.js）：找不到就**什么都不画**——
+     "找不到就退回 emoji" 正是上一版那类漂移的入口，这里不给它留口子。 */
+  CV.iconOps = function (kind, id) {
+    const D = G.DATA || {};
+    /* 表结构由 data.js 的 iconOpsOf 自己解释（nav 是 {name,ops}、货币直接是 ops）——
+       这里不许再猜一遍：猜错过一次，代价是顶栏四颗货币图标全没了。 */
+    return (D.iconOpsOf ? D.iconOpsOf(kind, id) : null);
+  };
   /* 五角星顶点（归一化 0~1，10 点内外半径交替）—— ★ 与 ☆ 共用一张表。
      放在 GLYPHS 外面是因为它只是**几何数据**，不是某个字的画法。 */
   const STAR5 = (function () {
@@ -188,42 +271,13 @@
        "货币稀有度看反"那次误判就是它们直接造成的）。
        按他的 ROI 建议：**只先做最高频的一批**（货币 4 个），不动其余 188 个。
        四个形状刻意做成**互不相似**：圆中方孔 / 菱形切面 / 四角星 / 双环轮回。 */
-    '◉': function (c, x, y, s, color) {           // 点数 = 铜钱（外圆 + 方孔）
-      const r = s * 0.45;
-      c.save(); c.fillStyle = color;
-      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
-      c.globalCompositeOperation = 'destination-out';
-      c.beginPath(); c.arc(x, y, r * 0.62, 0, Math.PI * 2); c.fill();
-      c.globalCompositeOperation = 'source-over';
-      const h = r * 0.42;
-      c.fillRect(x - h / 2, y - h / 2, h, h);
-      c.restore();
-    },
-    '◆': function (c, x, y, s, color) {           // 异界结晶 = 竖菱形 + 内切面
-      const w = s * 0.34, h = s * 0.46;
-      c.save(); c.fillStyle = color;
-      c.beginPath(); c.moveTo(x, y - h); c.lineTo(x + w, y); c.lineTo(x, y + h); c.lineTo(x - w, y); c.closePath(); c.fill();
-      c.strokeStyle = CV.a(CV.C.white, .55); c.lineWidth = Math.max(1, s * 0.05);
-      c.beginPath(); c.moveTo(x - w * 0.46, y - h * 0.46); c.lineTo(x + w * 0.46, y + h * 0.46); c.stroke();
-      c.restore();
-    },
-    '✦': function (c, x, y, s, color) {           // 圣洁晶石 = 四角星（细长十字）
-      const R = s * 0.48, r = s * 0.16;
-      c.save(); c.fillStyle = color; c.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = -Math.PI / 2 + i * Math.PI / 4, d = i % 2 ? r : R;
-        const px = x + Math.cos(a) * d, py = y + Math.sin(a) * d;
-        i ? c.lineTo(px, py) : c.moveTo(px, py);
-      }
-      c.closePath(); c.fill(); c.restore();
-    },
-    '♾': function (c, x, y, s, color) {           // 转生点 = 双环（轮回）
-      const r = s * 0.22;
-      c.save(); c.strokeStyle = color; c.lineWidth = Math.max(1.4, s * 0.12); c.lineCap = 'round';
-      c.beginPath(); c.arc(x - r, y, r, 0, Math.PI * 2); c.stroke();
-      c.beginPath(); c.arc(x + r, y, r, 0, Math.PI * 2); c.stroke();
-      c.restore();
-    },
+    /* 四种货币：几何**只有一处** —— data.js 的 CUR_ICONS（V1.0.6 · 父亲大人「B，收口」）。
+       这里只是画布端的**渲染**：同一份 op 交给 CV.drawIcon()。形状一个字都不许写在本文件里。
+       （原来这四段是各写各的：网页版那头还在打 ◉◆✦♾ 文字字符 —— 两端同形就是这么漂开的。） */
+    '◉': function (c, x, y, s, color) { CV.drawIcon(CV.iconOps('cur', 'points'), c, x, y, s, color); },
+    '◆': function (c, x, y, s, color) { CV.drawIcon(CV.iconOps('cur', 'otherworld'), c, x, y, s, color); },
+    '✦': function (c, x, y, s, color) { CV.drawIcon(CV.iconOps('cur', 'holy'), c, x, y, s, color); },
+    '♾': function (c, x, y, s, color) { CV.drawIcon(CV.iconOps('cur', 'rp'), c, x, y, s, color); },
     '♜': function (c, x, y, s, color) {           // x = 图标中心，y = 垂直中线
       const w = s * 0.86, h = s, L = x - w / 2, R = x + w / 2;
       const top = y - h * 0.42, bot = y + h * 0.42;
@@ -613,7 +667,16 @@
       segs.forEach(function (t) { total += CV.GLYPHS[t] ? size : CV.measure(t, size, opt.bold); });
       let px = opt.align === 'center' ? x - total / 2 : (opt.align === 'right' ? x - total : x);
       segs.forEach(function (t) {
-        if (CV.GLYPHS[t]) { CV.GLYPHS[t](c, px + size / 2, y, size, opt.color || CV.C.text); px += size; }
+        if (CV.GLYPHS[t]) {
+          /* ⚠️ V1.0.6（父亲大人 09-24 反馈的原话：「消费的货币还是没有用现在的货币图标，
+             **还是用的白色图标**」）——**根因就在这一行**：
+             四个货币符号 V1.0.1 起走的是"自绘"这条支路，可这支的取色写死是**文字色**（--text 白），
+             而"按货币专属色上色"那段逻辑只写在**下面 else 那一支**（fillText 那条路）——
+             于是同一个符号：顶栏是彩色、**文案里永远是白的**（成长页 / 图鉴 / 商店 / 强化 / 结算…）。
+             现在自绘这一支也先查货币色：是那四个货币就用自己的颜色，其余 GLYPHS 字（★ ♜ ⚔…）照旧用文字色。 */
+          const gcol = (curHits && CV.CUR_COLOR[t]) ? CV.CUR_COLOR[t] : (opt.color || CV.C.text);
+          CV.GLYPHS[t](c, px + size / 2, y, size, gcol); px += size;
+        }
         else {
           const ta = c.textAlign; c.textAlign = 'left';
           if (curHits && CV.CUR_COLOR[t]) c.fillStyle = CV.CUR_COLOR[t];   // 货币符号：用自己的颜色
@@ -747,6 +810,9 @@
     const lines = [];
     let line = '', w = 0;
     chars.forEach((ch) => {
+      /* V1.0.6（忠告独立弹窗）：支持**硬换行** —— '\n' 处强制断行、不吃宽度。
+         别的调用点传进来的串里没有 '\n'，行为与以前逐字一致。 */
+      if (ch === '\n') { if (line) lines.push(line); line = ''; w = 0; return; }
       const cw = CV.measure(ch, size);
       if (w + cw > maxW && line) { lines.push(line); line = ch; w = cw; }
       else { line += ch; w += cw; }
@@ -760,6 +826,57 @@
     return lines;
   };
 
+  /* V1.0.6（父亲大人 09-24 反馈图 09）：**词级折行** —— CV.wrap 是逐字断的，
+     「剩余时间 11小时51分　奖励 ◉ 9500 · ✦ 4300 · 异界征召令×1」这种串会在**数字中间**
+     断开（截图里就是「✦ 43」/「0」），玩家读到的是两个错数。
+     这里先在分隔符处切成词、按词贪心排；只有"整个词比一行还宽"才退回逐字断。
+     断点字符（· / → / 空格 / 全角空格）**跟着前一个词走**，行尾不会只剩一个孤零零的「·」。 */
+  CV.wrapTokens = function (str, maxW, size, maxLines) {
+    const s = String(str == null ? '' : str);
+    const tokens = [];
+    let tk = '', sepNext = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '\n') { if (tk) tokens.push(tk); tokens.push('\n'); tk = ''; sepNext = false; continue; }
+      /* 「→」「·」是**下一段的起头**：断点落在它们前面，并且**紧跟的那个空格跟着它们走** ——
+         这样"分隔符 + 后面那一项"永远在同一个 token 里，行尾就不会挂着一个孤零零的
+         「·」或「→」（page_text_audit 的"话没说完"那把尺子就是盯这个的）。 */
+      if (ch === '→' || ch === '·') { if (tk) tokens.push(tk); tk = ch; sepNext = true; continue; }
+      tk += ch;
+      if (sepNext) { sepNext = false; continue; }      // 分隔符后面那个空格不再当断点
+      if (ch === '\u3000' || ch === ' ') { tokens.push(tk); tk = ''; }
+    }
+    if (tk) tokens.push(tk);
+    const lines = [];
+    let line = '';
+    tokens.forEach(function (t) {
+      if (t === '\n') { if (line) lines.push(line); line = ''; return; }
+      if (!line) { line = t; return; }
+      if (CV.measure(line + t, size) <= maxW) line += t;
+      else { lines.push(line); line = t; }
+    });
+    if (line) lines.push(line);
+    /* 收尾：行尾不许挂着一个孤零零的「→」（"话没说完"那把尺子会报）——
+       真有这种情况就把箭头挪到下一行去。 */
+    for (let i = 0; i < lines.length - 1; i++) {
+      const m = /→\s*$/.exec(lines[i]);
+      if (m) { lines[i] = lines[i].slice(0, m.index); lines[i + 1] = '→ ' + lines[i + 1]; }
+    }
+    /* 兜底：某一行还是超宽（整段就是一个长词）→ 退回逐字折行，绝不画到框外 */
+    const out = [];
+    lines.forEach(function (ln) {
+      if (!ln) return;
+      if (CV.measure(ln, size) <= maxW) out.push(ln);
+      else CV.wrap(ln, maxW, size).forEach(function (x) { out.push(x); });
+    });
+    if (maxLines && out.length > maxLines) {
+      const keep = out.slice(0, maxLines);
+      keep[maxLines - 1] = CV.fit(keep[maxLines - 1] + (out[maxLines] || ''), maxW, size);
+      return keep;
+    }
+    return out;
+  };
+
   /* ---------- 触摸命中区 ----------
      V9.5.93（父亲大人："小游戏功能点了没反应"）：命中区**分两套坐标系**，
      以前混在一起比，导致内容区的按钮判定整体偏移了一整条顶栏（点 A 触发 A 下面那个）。
@@ -771,12 +888,44 @@
      屏幕坐标的热区分两种 —— 顶栏 / 底栏 / 吸顶条是"平时就在那儿"的，
      而弹窗自己那两颗按钮是"模态"的。以前只有一个 screen 标记，于是弹窗打开时
      底栏照样能点（模态等于没挡住）。现在多一个 modal 标记，触摸层按它放行。 */
+  /* ================= V1.1.12（0927-B · 交互复审）：**热区最小尺寸 ≥88rpx** =================
+     父亲大人：「各个岗位整体再审查一遍，从数值到交互到UI都查一遍」——
+     交互这一档《专业基准》写的硬指标就是 **热区 ≥88rpx（≈44pt）**。
+     实测（三机型 × 全部 56 页）：**309 处热区一维不够、51 处两维都不够**
+     （最典型：**每个页面的返回键 40×40**、选命格卡片 44×34、招募页「出率」40×40）——
+     而在此之前**没有任何一把尺子量过热区尺寸**（尺子只看"有没有处理器"）。
+
+     ⚠️ **不改画面**：那些按钮的视觉尺寸是排版定过的，动它会连带整页重排（320 短屏尤其危险）。
+     做法＝**只把热区长到够**（视觉一个像素不动），并且加两道保护：
+       ① 长完**夹进画布**（横向不越界；纵向屏幕坐标系不越底，内容坐标系允许在折线下方＝本来就要滚动才能点到）；
+       ② **与已登记的热区撞上（两维都重叠 >2pt）就缩回原样** ——
+          宁可这颗还是小的，也**绝不许造出"点 A 触发 B"**（那是历史上最难查的一类 bug，tap_audit 的
+          "锚点覆盖"一节就是专门盯它的）。
+     ⇒ 这条把**所有热区**都管住了：它们只有 `CV.hit` 这一个出口，以后新加的小按钮自动享受同一条。 */
+  /* 88rpx ≙ 44pt（《专业基准》那条括注给的就是这个物理口径）。
+     ⚠️ **不按屏宽重新换算**：画布端的按钮高度是**绝对 pt**（不随屏宽伸缩），
+        而 88rpx 若按屏宽算，在 430 的屏上会变成 50.4pt —— 比物理基准更严，
+        于是"同一颗按钮在大屏上反而不合格"这种荒唐结论会出现（实测：430 上多出 6 条假红）。 */
+  function minHitPx() { return 44; }
+  CV.minHitPx = minHitPx;
   CV.hit = function (id, x, y, w, h) {
-    CV.hits.push({
-      id: id, x: x, y: y, w: w, h: h,
-      screen: CV.hitMode === 'screen' || CV.hitMode === 'overlay',
-      modal: CV.hitMode === 'overlay',
-    });
+    const screen = CV.hitMode === 'screen' || CV.hitMode === 'overlay';
+    const modal = CV.hitMode === 'overlay';
+    const min = minHitPx();
+    if (w < min - 0.5 || h < min - 0.5) {
+      const dw = Math.max(0, min - w), dh = Math.max(0, min - h);
+      const nw = w + dw, nh = h + dh;
+      let nx = Math.max(0, Math.min(x - dw / 2, CV.W - nw));
+      let ny = Math.max(0, y - dh / 2);
+      if (screen) ny = Math.max(0, Math.min(ny, CV.H - nh));
+      const clash = CV.hits.some((o) => o.screen === screen
+        && Math.min(nx + nw, o.x + o.w) - Math.max(nx, o.x) > 2
+        && Math.min(ny + nh, o.y + o.h) - Math.max(ny, o.y) > 2);
+      if (clash) { nx = x; ny = y; }
+      CV.hits.push({ id: id, x: nx, y: ny, w: clash ? w : nw, h: clash ? h : nh, screen: screen, modal: modal });
+      return;
+    }
+    CV.hits.push({ id: id, x: x, y: y, w: w, h: h, screen: screen, modal: modal });
   };
   /* V9.6.108：这颗热区有没有处理器（精确 id 或前缀处理器）。
      "给引导当锚点"的整块区域（party_board / attr_card / stage_grid…）没有处理器 ——
@@ -808,15 +957,30 @@
   CV.scroll = 0;
   CV.register = function (name, drawFn) { CV.panels[name] = drawFn; };
   /* 换页时把"页面级覆盖层"清掉 —— 否则结算层会跟着下一页一起被画出来（V9.6.1 修） */
-  /* ---------- 滚动位置记忆（V9.6.130 父亲大人："滑到中间点开一个伙伴，一退出来就回滚，
-     还得再翻半天去找他"）----------
-     规矩：**进入子页（push）时记住当前页的滚动位置；返回（pop）时恢复上一层的位置**；
-     而**换标签/重进（reset）仍然从头看**（这是父亲大人认可的行为）。
-     一处修，所有列表页一起受益（执灯者 / 背包 / 任务 / 世界列表 / 各商店…）。 */
+  /* ================= V1.1.7（A7 · 滚动三态）=================
+     父亲大人报过的两处现场（都在这一条上）：
+       · 「进去二级界面和退出二级界面的位置感觉还是不太对，像**任务那里，每次领取完他就会回到最上面**，
+          得再次下滑」→ **原地重画必须保位**（上一轮先把它治住了，这一轮收成规则）；
+       · 「**从执灯者进去伙伴详情页是直接在最底下的**，得往上滑」→ **进新页必须归零**
+          （真因：`char` 是**一个页名**、底下是 120 个伙伴，上一回从 A 的底部离开时记下 scroll=1200，
+          再开 B 时那句"搬回这一页的记忆"把 1200 夹到 B 的 maxScroll → **一进去就在最底下**）。
+
+     **三条规则（一处定义，所有列表页共享）**：
+       ① **进新页 → 归零**：`reset`（换标签 / 重进）与 `push`（进二级页）一律 `scroll = 0`；
+       ② **原地重画 → 保位**：`render()` **不碰** `CV.scroll`（只有"内容变短"时会夹回 `maxScroll`）；
+       ③ **返回上一页 → 恢复**：`pop` 把当前页的位置记进 `scrollMemo`，再恢复上一层记下的位置。
+     ⚠️ 与"引导把目标滚进视野"（V9.6.34 父亲大人要的）的接缝：**两者打架时以这三条为准** ——
+        引导那只允许在"它自己第一次出现"时滚一次（见 uiw.js 的 `coachState.scrolled`），
+        **不许在"进页那一帧"把刚归零的页面又拽走**。判据写在尺子里（`scroll_fit_audit` 的⑥⑦⑧）。 */
+  /* ⚠️ 键是**栈深**（`CV.stack` 的下标），**不是页名** ——
+     页名当键会漏一种真场景：**同一个页名连着压两层**（比如"背包 → 又进一次背包"、
+     "伙伴详情 A → 伙伴详情 B"）。那时后压的那层"离开时位置 0"会把前一层的 121 覆盖掉，
+     返回之后位置就丢了（`scroll_fit_audit` 的⑧就是拿这个 case 抓到的：bag>bag → pop 回来变 0）。
+     键换成栈深之后，每一层各记各的，"返回恢复"才真的对得上"离开时那一层"。 */
   CV.scrollMemo = {};
   CV.reset = function (name, opts) {
     CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.grabCfg = null; CV.dropGrab();
-    CV.scrollMemo[name] = 0;                 // 换标签＝从头看，把这一页的记忆清掉
+    CV.scrollMemo = {};                      // 换标签＝从头看：整条栈的记忆一起清掉（键是栈深，清空才算干净）
     CV.render();
   };
   /* ---------- 长按抓起 · 拖动换位（V9.6.111） ----------
@@ -834,15 +998,18 @@
   CV.dropGrab = function () { CV.grab = null; };
 
   CV.push = function (name, opts) {
-    CV.scrollMemo[(CV.top() || {}).name] = CV.scroll || 0;    // 记住"从哪来、看到哪了"
+    CV.scrollMemo[CV.stack.length - 1] = CV.scroll || 0;      // 记住"当前这一层看到哪了"（键＝栈深）
     CV.stack.push({ name, opts: opts || {} });
-    CV.scroll = CV.scrollMemo[name] || 0;                    // 这一页自己也有记忆（比如从详情再进详情）
+    /* A7 ①（进新页归零）：这里原来读的是 `CV.scrollMemo[name] || 0` —— 那是"同一页名的上一次位置"，
+       被不同内容复用时会跳到很远的地方（伙伴详情那一类：一进去就在最底下）。
+       现在 push 一律归零；"恢复"只发生在 pop（退回上一页）那一条路。 */
+    CV.scroll = 0;
     CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
   };
   CV.pop = function () {
-    CV.scrollMemo[(CV.top() || {}).name] = CV.scroll || 0;   // 离开这一页：记住它看到哪
+    CV.scrollMemo[CV.stack.length - 1] = CV.scroll || 0;     // 离开这一层：记住它看到哪（键＝栈深）
     if (CV.stack.length > 1) CV.stack.pop();
-    CV.scroll = CV.scrollMemo[(CV.top() || {}).name] || 0;   // 回到上一层：**恢复它原来看到的位置**
+    CV.scroll = CV.scrollMemo[CV.stack.length - 1] || 0;     // 回到上一层：**恢复它原来看到的位置**
     CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
   };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
@@ -852,6 +1019,7 @@
      玩家看到的就是首页那句话，而不是这一步该讲的话（实测 27 步里 23 步串台）。 */
   CV.jump = function (name, opts) {
     CV.stack = [{ name: 'home', opts: {} }, { name: name, opts: opts || {} }];
+    CV.scrollMemo = {};                      // 直接跳页＝新的一条路：按 A7① 归零，别带旧记忆
     CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null;
     CV.render();
   };
@@ -861,16 +1029,28 @@
   CV.render = function () {
     const c = CV.ctx;
     if (!c) return;
+    /* ⚠️ V1.0.6（P0 · 提审驳回：真机"卡在此界面无法进一步游戏"）——渲染入口的最后一道闸。
+       真机 console 的三条栈（`CV.splash` / `onShow → relayoutNow` / 又一次重排）**全部**落在这里：
+       `CV.render → realmState → S.player`，而那时 `S` 还是 null
+       （真机 `wx.onShow` 一注册就回调，跑在 game.js 的读档/建档之前；模拟器不会，所以本地不复现）。
+       根因修法是把建档提到最前（game.js 顶部）；这一道是**兜底**：
+       发现 null 就先读档/建档再画 —— 画面照常出来，**不是留一片空白**，
+       并且 `ensureState()` 会 console.warn 出声（能自证：真机上看到那条 warn 就说明撞上了这条缝）。 */
+    if (G.Core && G.Core.ensureState && !G.Core.S) G.Core.ensureState();
     CV.hits = [];
     CV.y = 0;
     /* 开局三步（欢迎 / 起名 / 选血统）时**不画顶栏和底栏**——
        网页版这时整块界面是隐藏的（没签契约看不到游戏界面，V9.5.23 定的），这里照做。 */
     /* 战斗页也是整屏接管：网页版战斗遮罩盖住了顶栏和底栏，这里同样不画标准顶栏/底栏，
        由战斗页自己画"标题 / 速度 / 撤离"那一条（V9.5.93）。 */
-    /* V1.0.3：开机合规闸那两页（notice / copyright）也在名单里 ——
+    /* V1.0.3：开机那几页（主画面 gate）都在名单里 ——
        它们排在**游戏开始前**，与开局三步同一档：不画顶栏/底栏
-       （那两样本身就是"游戏界面"，游戏还没开始就不该出现）。 */
-    const chromeless = ['notice', 'copyright', 'welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
+       （那两样本身就是"游戏界面"，游戏还没开始就不该出现）。
+       V1.0.5：notice 那页已并进主画面 gate（父亲大人："两个弹窗可以不要，主画面…上面有个
+       按钮写进入残域"）。
+       V1.0.6：copyright（2.6.1 的著作权人专门页）整页删掉 —— 父亲大人 2026-09-23
+       「著作权不要啊，个人的没有这个……等审核通过再说吧」；名单里一并去掉，不留空页名。 */
+    const chromeless = ['gate', 'welcome', 'create', 'bloodline', 'battle'].indexOf(CV.top().name) >= 0;
     /* V1.1.4（2026-09-23 父亲大人："改完选血统那里滑动不了了" · P0）：
        `chromeless` 这一张名单只管一件事 —— **要不要画顶栏/底栏**（纯视觉）。
        可在下面算 `CV.maxScroll` 时，它被当成了第二件事用："一屏定版、不参与滚动"。
@@ -962,6 +1142,9 @@
        V1.1.4 更正：这里以前判的是 `chromeless`，而那张名单里还带着"选命格"（见上面 SCROLL_LOCKED
        那段）—— 于是**该滚的那一页被一起锁死了**。现在只锁真正的一屏定版页。 */
     CV.maxScroll = scrollLocked ? 0 : (bottom <= viewH ? 0 : (bottom - viewH + CV.SP[1]));
+    /* A7 ②（原地重画保位）：**这是 `render()` 里唯一允许碰 `CV.scroll` 的地方，而且只"夹"不"重置"** ——
+       内容变短了就把超出的部分夹回来，其余情况一律保持玩家当前看到的位置。
+       任何"重画一次就跳回去"的毛病，根因都在别处（引导自动滚动见 uiw.js；换页见上面的三态）。 */
     if (CV.scroll > CV.maxScroll) { CV.scroll = CV.maxScroll; }
     /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
        页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
@@ -977,6 +1160,9 @@
        V9.6.1（父亲大人："结算内容也得在画面中间"）：以前结算画在内容层里，被顶栏下移、还跟着滚动，
        既不在正中、命中区也整体偏下（"收下奖励并返回"因此点不动）。 */
     if (CV.pageOverlay) CV.pageOverlay();
+    /* 游戏圈入口（V1.0.4）：微信的原生游戏圈按钮不在 canvas 上，位置只能靠这里逐帧摆
+       （谁登记的见 js/sc-gameclub.js）。放在内容画完之后 —— 它读的是这一帧刚登记好的位置。 */
+    if (G.GameClub) { try { G.GameClub.tick(); } catch (e) {} }
     CV.drawToasts();
     /* 最顶层覆盖（V1.1.3）：开机首屏走这里 —— 它要盖住**一切**（包括 toast），
        因为它代表的是"游戏还没开机完成"。见 js/sc-splash.js。 */
@@ -1036,19 +1222,29 @@
     const main = (D ? D.CURRENCIES : []).slice();
     let x = PAD;
     const cy = top + ROW_H + BAR_TOP;
+    /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 2 条 "顶栏货币条"）：
+       **四等分等宽**，与网页版 #curbar 同一套（grid-auto-columns: 1fr，gap 0.375rem）。
+       原来是"按内容宽、只给一个上限"—— 四颗宽度各不相同、右端参差不齐，
+       数值一长还会各自顶到上限，跟网页版那条整整齐齐的格子对不上。
+       现在每颗先占死 1/4，内容（图标 + 数值）在格内**居中**（.cur-chip 是 justify-content:center），
+       数值放不下就缩到四级、再放不下才省略号（点开货币图鉴看准确值，与网页版同口径）。 */
+    const CHIP_GAP = 6 * CV.SCALE;                        // .curbar gap 0.375rem
+    const CHIP_W = (CV.W - PAD * 2 - CHIP_GAP * 3) / 4;   // 四等分（PAD = .curbar 左右 0.75rem）
     const chip = function (label, icon, color, dim, dashed) {
-      const w = 11 * CV.SCALE + CV.measure(icon, CV.FS.md) + 5 * CV.SCALE + CV.measure(label, CV.FS.md) + 11 * CV.SCALE;
-      /* 四颗要挤在一行里：给一个上限（每颗不超过四分之一宽），
-         数值太长（比如 1000.0万）就缩字号，别让第四颗掉出画面。 */
-      const ww = Math.min(Math.max(40 * CV.SCALE, w), (CV.W - PAD * 2 - 18 * CV.SCALE) / 4);
+      const ww = CHIP_W;
       CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.C.panel, dashed ? CV.C.line2 : CV.C.line);
-      let tx = x + 11 * CV.SCALE;
-      /* V9.6.134：图标也用货币表里的**专属色**（以前统一是白字，四种币看着一模一样） */
-      if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: color || CV.C.text }); tx += CV.measure(icon, CV.FS.md) + 5 * CV.SCALE; }
-      const room = ww - (tx - x) - 8 * CV.SCALE;
+      const pad = 8 * CV.SCALE;                           // .cur-chip padding 左右 0.5rem
+      const iw = icon ? CV.measure(icon, CV.FS.md) : 0;
+      const iGap = icon ? 5 * CV.SCALE : 0;               // .cur-chip gap 0.3125rem
+      const room = ww - pad * 2 - iw - iGap;
       const numSize = CV.measure(label, CV.FS.md) <= room ? CV.FS.md : CV.FS.sm;
-      CV.text(CV.fit(label, room, numSize, true), tx, cy + CHIP_H / 2, { size: numSize, color: dim ? CV.C.dim : CV.C.text, bold: true });
-      x += ww + 6 * CV.SCALE;
+      const txt = CV.fit(label, room, numSize, true);
+      /* 内容整块居中；格子再窄也至少留出左内边距，不会贴边 */
+      let tx = x + Math.max(pad, (ww - (iw + iGap + CV.measure(txt, numSize, true))) / 2);
+      /* V9.6.134：图标也用货币表里的**专属色**（以前统一是白字，四种币看着一模一样） */
+      if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: color || CV.C.text }); tx += iw + iGap; }
+      CV.text(txt, tx, cy + CHIP_H / 2, { size: numSize, color: dim ? CV.C.dim : CV.C.text, bold: true });
+      x += ww + CHIP_GAP;
       return ww;
     };
     /* 每一颗胶囊都登记热区 → 点它打开货币图鉴（V9.6.7 补的那条规矩，
@@ -1062,6 +1258,15 @@
     CV.hitMode = 'content';
   };
 
+  /* ---------- 底栏（V1.0.6：**纯文字**，与网页版一致） ----------
+     这里原来有一套 navIconGray()：把四个页签 emoji 画到离屏画布上逐像素降饱和，
+     好对齐网页版 .nav-item .ico 的 filter: grayscale(.55) opacity(.8)。
+     V1.0.6（父亲大人 2026-09-24：「现在底部导航栏不对吧」）底栏改成纯文字之后，
+     它连同缓存一起删掉：网页版 navbarHtml() 自 V8.1「界面改纯文字（照参考图）」起就没有图标，
+     .nav-item .ico 那条 CSS 是那时候留下的死规则 —— 画布端照着做才叫两端一致。
+     将来若真要两端同一套矢量图标，新图标是自绘的、颜色由我们给（选中金 / 未选 dim），
+     也用不上这种降饱和补丁。 */
+
   /* ---------- 底栏（照网页版 #navbar：四格，选中金色） ---------- */
   CV.navbar = function () {
     const c = CV.ctx;
@@ -1073,8 +1278,12 @@
     CV.NAV_TABS.forEach((t, i) => {
       const cx = tabW * i + tabW / 2;
       const active = CV.top().name === t.id || (CV.top().name === 'home' && t.id === 'home');
-      CV.text(t.ico, cx, y + 22, { size: CV.ICO, align: 'center' });
-      CV.text(t.name, cx, y + 42, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
+      /* V1.0.6（父亲大人 2026-09-24 拍板「B，收口」）：图标回来了，但**形状来自 data.js 一处**
+         （NAV_ICONS）—— 自绘矢量、颜色由我们给，所以不需要 emoji 那套降饱和补丁：
+         选中金 / 未选 dim，与网页版 `.nav-item{color:--dim} .active{color:--gold}` 同一条规则。
+         版式照旧（图标在上、标签在下），热区/台阶/红点一行没动。 */
+      CV.drawIcon(CV.iconOps('nav', t.id), c, cx, y + 22 * CV.SCALE, CV.ICO, active ? CV.C.gold : CV.C.dim);
+      CV.text(t.name, cx, y + 42 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       /* V9.6.145（"再审一遍"抓到的两边不一致）：网页版底栏有**红点**（主页=挂机有待领、
          背包=待领箱里有东西），小游戏这边**一个点都没画** —— 玩家在小游戏里看不出
          "有东西等你处理"。这里照网页版 navbarHtml 的同一套规则补上（一处判定都不另写）：
@@ -1117,6 +1326,9 @@
   };
 
   /* ---------- 触摸 ---------- */
+  /* 手指是不是"正在拖动"（见 bindTouch 里的说明）—— 默认 false，
+     没绑触摸时（尺子的假环境）读它也不会是 undefined。 */
+  CV.dragging = false;
   CV.bindTouch = function () {
     const toW = (e) => {
       const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
@@ -1124,6 +1336,17 @@
     };
     const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
     let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
+    /* V1.1.15（2026-09-27 · 父亲大人："现在我界面滑动有点卡卡的，是我手机卡还是游戏卡"）：
+       touchmove 在高刷屏上 60~120Hz 派发，而原来**每个事件都整页重画一次**——
+       重页面（科技阁 816 次 fillText / 灯录 700 次 / 玩法指南 842 次）一拖就是每秒上百帧重画，
+       一半的帧预算白烧在"同一帧里画两遍"上。改成**每帧最多画一次**：
+       `CV.scroll` 位置照旧实时更新（手指跟手感不变），只是画面用 RAF 合帧。
+       松手那一帧仍是同步 render，惯性与落位衔接不受影响。 */
+    let drawRaf = 0;
+    const drawSoon = () => {
+      if (drawRaf) return;
+      drawRaf = RAF(() => { drawRaf = 0; CV.render(); });
+    };
     /* V9.6.111：长按抓起用的计时器（和网页版同一个时长） */
     const GRAB_MS = 420;
     let grabTimer = null;
@@ -1180,10 +1403,21 @@
     };
     wx.onTouchStart((e) => {
       const p = toW(e);
+      /* V1.1.x（2026-09-27 · 音频系统）：微信不许自动播放 —— BGM 只能等**玩家的第一次触摸**。
+         这里就是"第一次触摸"的唯一收口（含首屏那一下：首屏也是玩家点的）。
+         AUD.unlock() 内部有"只解锁一次"的闸，每次都调不会重启音乐。 */
+      if (G.AUD && G.AUD.unlock) G.AUD.unlock();
       /* 开机首屏（V1.1.3）：它盖在页面上，这一下**不往下传** ——
          不然玩家点一下首屏，底下那颗「签订灯阁契约」就被顺手点掉了。抬手时才结束首屏。 */
-      if (CV.splashActive && CV.splashActive()) { CV.pressed = null; downY = p.y; lastY = p.y; moved = false; return; }
+      if (CV.splashActive && CV.splashActive()) { CV.pressed = null; downY = p.y; lastY = p.y; moved = false; CV.dragging = false; return; }
       downY = p.y; lastY = p.y; lastT = Date.now(); vel = 0; moved = false;
+      /* V1.1.x（0927-P · 父亲大人：「进入游戏圈的按钮滑动的时候还是会频闪」）：
+         `CV.dragging` ＝ **这一次手势是不是真的在拖**（手指还在屏幕上、位移过了 8px 的阈值）。
+         只读标志，给"原生组件不能在拖动中重建"这类地方用（见 js/sc-gameclub.js 的 GC.tick）——
+         原来那边只能看"滚动位置有没有变"，于是"手指滑得慢 / 中途顿一下"时
+         会被误判成"已经停稳了"而提前重建，手指再一动又收起来 = 频闪。
+         手指抬起（onTouchEnd）或被打断（onTouchCancel）一律归位。 */
+      CV.dragging = false;
       startScroll = CV.scroll || 0;
       stopMomentum();
       coachLock = coachOn();
@@ -1229,12 +1463,13 @@
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
+      if (moved) CV.dragging = true;
       /* 抓起中：不滚页面，只跟手 + 更新落点高亮 */
       if (CV.grab && gestureGrab) {
         CV.grab.x = p.x; CV.grab.y = p.y;
         if (CV.grabCfg && CV.grabCfg.targetAt) CV.grab.over = CV.grabCfg.targetAt(p);
         stopMomentum();
-        CV.render();
+        drawSoon();
         return;
       }
       if (moved) clearGrabTimer();        // 手指滑走＝在滚页面，不算长按
@@ -1245,11 +1480,12 @@
       vel = (p.y - lastY) / dt;                    // px/ms，向下拖为正
       lastY = p.y; lastT = now;
       const next = Math.max(0, Math.min(CV.maxScroll || 0, startScroll - dy));
-      if (next !== CV.scroll) { CV.scroll = next; CV.render(); }
+      if (next !== CV.scroll) { CV.scroll = next; drawSoon(); }
     });
     wx.onTouchEnd((e) => {
       const p = toW(e);
       clearGrabTimer();
+      CV.dragging = false;                    // 抬手＝这一次手势结束（原生组件这才允许重建）
       if (CV.splashActive && CV.splashActive()) { if (CV.splashSkip) CV.splashSkip(); return; }
       /* 松手时"手里拿着东西"，且这一下就是抓着的手势：
          落点在哪一格 —— 换到那一格；落回自己或空白 —— 手里继续拿着（等下一下拖动或点选，
@@ -1320,6 +1556,7 @@
            继续拿着，但**不能再算"刚抓起的那一次手势"**（否则下一次点按钮会被当成继续拖）。 */
         if (CV.grab) CV.grab.fresh = false;
         gestureGrab = false;
+        CV.dragging = false;                    // 被打断也当成"手势结束"（否则原生按钮会一直不重建）
         CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
       });
     }

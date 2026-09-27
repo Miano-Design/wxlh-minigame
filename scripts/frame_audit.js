@@ -83,7 +83,9 @@ CV.setup(global.wx.getWindowInfo());
 (CV.NAV_TABS || []).forEach((t) => { CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); }); });
 
 /* ---------- 包一层 render：每次渲染的前后都要"零净变化" ---------- */
-const CHROMELESS = ['welcome', 'create', 'bloodline', 'battle'];
+/* V1.0.6：'gate'（主画面）是**没有底栏**的整屏页 —— 冷启动先落在它上面（忠告弹窗盖在其上），
+   所以它本来就不该有 4 个页签热区。漏了它会让这一条在所有别的问题之前先报红。 */
+const CHROMELESS = ['welcome', 'create', 'bloodline', 'battle', 'gate'];
 let leaks = 0, unders = 0, geom = 0;
 const rawRender = CV.render;
 CV.render = function () {

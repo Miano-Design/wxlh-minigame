@@ -13,8 +13,14 @@
 (function () {
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
+  /* V1.1.x（2026-09-27 · 音频系统）：背包这一片的音效出口（强化 / 重铸 / 开箱 / 被拒）。
+     一处定义，不散着写；G.AUD 不存在时静默跳过（尺子的假环境不加载音频模块）。 */
+  function snd(name) { if (G.AUD && G.AUD.play) G.AUD.play(name); }
   const fmt = G.fmt || ((n) => String(n));
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
+  /* V1.1.9（续13 · 乙组）：稀有度排序权重（数字越小越靠前）。没有 rarity 的一律 9（垫底）。 */
+  const RARITY_RANK = { MYTH: 0, UR: 1, SSR: 2, SR: 3, R: 4, N: 5 };
+  const rarRank = (r) => (RARITY_RANK[r] === undefined ? 9 : RARITY_RANK[r]);
 
   /* ---------- 批量分解（网页版 equipBatchBar / equipFilterBar 的那颗按钮）----------
      父亲大人 2026-09-17：装备栏那颗「🧹 批量分解」原来点了只弹一句"下一步复刻"。
@@ -28,20 +34,47 @@
   const EQ_CATS = [['all', '全部'], ['world', '世界套装'], ['blood', '命格套装'], ['god', '命格神装'], ['sig', '专属']];
   const EQ_SLOTS = [['all', '全部'], ['weapon', '武器'], ['armor', '胸甲'], ['head', '头部'], ['hands', '手部'], ['legs', '腿部'], ['accessory', '饰品']];
   let eqCat = 'all', eqSlot = 'all';
-  /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字） */
+  /* 一行小胶囊（.pill.sm：40 高、圆角兜住、选中红框红字）
+     ================= V1.1.15（2026-09-27 · 派单 I 第 3 条 · 视觉复审 P0-1）=================
+     这一排原来是**平铺一行**：`x += w + gap`，没有换行、没有溢出保护、也不裁。
+     窄屏上量出来（320×568 · iPhone 5/SE 档，`U.iw()` 只有 296）：
+
+       分类行（全部/世界套装/命格套装/命格神装/专属）  需要 306  → 超 10px
+       部位行（全部/武器/胸甲/头部/手部/腿部/饰品）     需要 330  → 超 34px（「饰品」只剩一个"饰"字）
+
+     证据：岗位回单/验收截图-0927视觉复审/关键取证/320-背包-装备-筛选胶囊出画.png。
+     这正是康康今天给 `U.btnRow` 补的那种洞（uiw.js V1.1.11 那段注释），**胶囊行是最后一份**。
+     现在同款修法：**先试一行，放不下就按"一行能塞几颗"分行**，高度按行数往上加
+     （胶囊按自然宽排，不做整行拉伸 —— 筛选标签拉满行宽反而看不出"哪几颗是同一组"）。 */
   function pillRow(list, cur, prefix) {
     /* V9.6.12（父亲大人）：这一排原来 40 高，在手机上显得很笨重 → 收到 28 */
     const h = 28 * CV.SCALE, gap = 6 * CV.SCALE, top = U.y;
-    let x = U.pad();
-    list.forEach(function (t) {
-      const on = cur === t[0];
-      const w = CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE;
-      CV.round(x, top, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.C.panel, on ? CV.C.accent : CV.C.line);
-      CV.text(t[1], x + w / 2, top + h / 2, { size: CV.FS.xs, align: 'center', color: on ? CV.C.white : CV.C.dim });
-      CV.hit(prefix + t[0], x, top, w, h);
-      x += w + gap;
+    const avail = U.iw();
+    const nat = list.map(function (t) { return CV.measure(t[1], CV.FS.xs) + 18 * CV.SCALE; });
+    const rows = [];
+    {
+      let row = [], w = 0;
+      nat.forEach(function (nw) {
+        const add = row.length ? gap + nw : nw;
+        if (row.length && w + add > avail + 0.5) { rows.push(row); row = [nw]; w = nw; }
+        else { row.push(nw); w += add; }
+      });
+      if (row.length) rows.push(row);
+    }
+    let y = top, idx = 0;
+    rows.forEach(function (ws) {
+      let x = U.pad();
+      ws.forEach(function (w) {
+        const t = list[idx++];
+        const on = cur === t[0];
+        CV.round(x, y, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.C.panel, on ? CV.C.accent : CV.C.line);
+        CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.xs, align: 'center', color: on ? CV.C.white : CV.C.dim });
+        CV.hit(prefix + t[0], x, y, w, h);
+        x += w + gap;
+      });
+      y += h + gap;
     });
-    U.y = top + h + 6 * CV.SCALE;
+    U.y = top + rows.length * h + (rows.length - 1) * gap + 6 * CV.SCALE;
   }
   /* .eq-bar：左边「未穿戴 x / y 格」，右边「🧹 批量分解」（开了批量就换成一行状态文字） */
   function eqBarRow() {
@@ -68,7 +101,9 @@
   function listBtn(o) {
     const bw = 84 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
     const rowTop = U.y;
-    const h = U.listRow({ t1: o.t1, t2: o.t2, rightW: o.btn ? (bw + 10 * CV.SCALE) : 0, dim: o.dim, tag: o.tag });
+    /* V1.1.6（A6）：把 `t1Color` / `tag` 都透传给 U.listRow —— 装备候选列表要用
+       "品质色标题 ＋ 稀有度小标"（见 equip_pick 那一段）。 */
+    const h = U.listRow({ t1: o.t1, t2: o.t2, rightW: o.btn ? (bw + 10 * CV.SCALE) : 0, dim: o.dim, tag: o.tag, t1Color: o.t1Color });
     if (o.btn) U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, o.btn[0], o.btn[1], o.btn[2], o.btn[3]);
     return h;
   }
@@ -113,13 +148,22 @@
     CV.hitMode = 'content';
   }
 
-  const TABS = [['item', '道具'], ['mat', '材料'], ['equip', '装备']];
+  /* V1.1.2（A11 并池）：**三个标签 → 两个** —— 道具与材料并成一个池（父亲大人拍板
+     「并池容量还是 50，单格上限 100」），所以"材料"不再是独立标签；装备保持独立（不占池、每件 1 格）。
+     老的 `view === 'mat'` 一律归到 'item'（玩家从旧版本进来时那个状态还留在内存里）。 */
+  const TABS = [['item', '道具'], ['equip', '装备']];
+  /* V1.1.7（丙组 1 · "一个按钮的 id 只在一处拼"）：那颗「＋（扩容）」的热区 id 原来是**现场拼**的
+     （`'bag_expand:' + view` 在渲染处、`CV.on('bag_expand:eq')` 在注册处）—— 两套拼法不一样，
+     装备那一格登记的是 `bag_expand:equip`、处理器只注册了 `:eq` → **真死键**（康康 09-26 抓到的那只）。
+     现在把 id 写进池子表里：渲染与注册**都读 `POOLS[view].expandId`**，两处不可能再分叉。
+     （做成字段而不是"再拼一次"：以后加第三个池，只要在这张表里补一行，两边自动跟上。） */
   const POOLS = {
-    item: { label: '道具格', capKey: 'itemCap', expKey: 'itemExpands' },
-    mat: { label: '材料格', capKey: 'matCap', expKey: 'matExpands' },
-    equip: { label: '装备格', capKey: 'eqCap', expKey: 'eqExpands' },
+    item: { label: '背包', capKey: 'itemCap', expKey: 'itemExpands', expandId: 'bag_expand:item' },
+    mat: { label: '背包', capKey: 'itemCap', expKey: 'itemExpands', expandId: 'bag_expand:mat' },   // 并池：与 item 同一个池
+    equip: { label: '装备格', capKey: 'eqCap', expKey: 'eqExpands', expandId: 'bag_expand:equip' },
   };
   let view = 'item';
+  if (view === 'mat') view = 'item';
   let curItem = null;          // 道具详情页当前看的道具
 
   /* ---------- 分类卡（网页版 .tab-cards / .tab-card） ---------- */
@@ -170,23 +214,65 @@
 
   /* ---------- 待领箱（网页版 stashBar） ---------- */
   function stashBar() {
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："那我要是副本掉落的装备呢"）=================
+       装备页显示的是**装备待领箱**（`S.stashEq`）：装备格满时掉的/开出来的装备先存这儿，
+       扩容后一键领回 —— 以前是直接折现成 ◆，刷本出的 UR 就这么没了。 */
+    if (view === 'equip') {
+      const eqN = Core.stashEqCount ? Core.stashEqCount() : 0;
+      if (!eqN) return;
+      const ue = Core.bagUsage();
+      const eqList = Core.stashEqList();
+      U.card(function () {
+        U.h3('📮 待领箱', eqN + ' 件装备');
+        U.hint('装备格满时掉的、开出来的装备先存这里', 2 * CV.SCALE);
+        U.hint(eqList.slice(0, 3).map((e) => e.name).join(' · ')
+          + (eqList.length > 3 ? (' … 还有 ' + (eqList.length - 3) + ' 件') : ''), 2 * CV.SCALE);
+        U.hint('装备格 ' + ue.eqUsed + ' / ' + ue.eqCap, 2 * CV.SCALE);
+        U.space(CV.SP[1]);
+        U.btnRow([
+          { label: '全部领回', style: 'primary', id: 'stash_eq_claim' },
+          { label: '扩容 +' + D.BAG_EXPAND_SIZE + ' 格（◉ ' + fmt(D.bagExpandCost(Core.S.bag.eqExpands || 0)) + '）',
+            style: 'ghost', id: 'bag_expand:equip' },
+        ]);
+      });
+      return;
+    }
     const n = Core.stashCount();
     if (!n) return;
     const list = Core.stashList();
+    /* V1.1.15（2026-09-27 · 父亲大人："待领箱的卡片显示和扩容后还是没东西"）：
+       领回**要占格子**，背包满就一件都进不来 —— 可原来卡片只写"全部领回"，
+       玩家（尤其用 GM 把背包塞满测的档）根本不知道为什么点了没反应。
+       现在把占用写出来、把"还差几格"算出来，并且**扩容按钮直接放这张卡上**
+       （不用再跑去装备页点那颗＋，那颗加的是装备格、救不了道具）。 */
+    const u = Core.bagUsage();
+    const need = Core.stashNeedCells ? Core.stashNeedCells() : 0;
     U.card(function () {
       U.h3('📮 待领箱', n + ' 件');
       U.hint('背包满时收到的道具先存这里', 2 * CV.SCALE);
       const txt = list.slice(0, 4).map((x) => ((D.ITEMS[x.id] || {}).name || x.id) + '×' + x.n).join(' · ');
       U.hint(txt + (list.length > 4 ? ' … 还有 ' + (list.length - 4) + ' 种' : ''), 2 * CV.SCALE);
+      U.hint('背包 ' + u.used + ' / ' + u.cap + (need ? (' · 还差 ' + need + ' 格才能全领回') : ' · 空间够，可以全领回'),
+        2 * CV.SCALE);
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '全部领回', style: 'primary', id: 'stash_claim' }]);
+      U.btnRow([
+        { label: '全部领回', style: 'primary', id: 'stash_claim' },
+        { label: '扩容 +' + D.BAG_EXPAND_SIZE + ' 格（◉ ' + fmt(D.bagExpandCost(Core.S.bag.itemExpands || 0)) + '）',
+          style: 'ghost', id: 'bag_expand:item' },
+      ]);
     });
   }
 
   /* ---------- 网格（网页版 .bg-grid：5 列、缝 6、格子正方形、圆角 10） ---------- */
   function grid(cells, used, cap, expandId, cost, filtering) {
     const gap = 6 * CV.SCALE, cols = 5;
-    const cw = Math.max(62 * CV.SCALE, (U.iw() - gap * (cols - 1)) / cols);
+    /* V1.1.11（父亲大人 09-27：「现在小屏幕的背包显示就有问题，一直没改」）：
+       旧算式是 `Math.max(62 * SCALE, 可用宽/5)` —— 那个 **62 的下限**在窄屏上会赢，
+       于是 5 列的总宽 = 5×62 ＋ 4×gap ＞ 屏宽，**第 5 列被切在屏幕外**（320×568 实测：4.5 列）。
+       ⇒ 去掉下限，改成**按可用宽等分**；同时给一个"再窄也读得出来"的兜底：
+         只有连 40pt 都不到时才夹到 40（那已经是 200pt 宽的极端屏了，本项目不会遇到）。 */
+    const fit = (U.iw() - gap * (cols - 1)) / cols;
+    const cw = Math.max(40 * CV.SCALE, fit);
     const top = U.y;
     cells.forEach(function (c, i) {
       const r = Math.floor(i / cols), col = i % cols;
@@ -216,14 +302,20 @@
       } else {
         CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
       }
-      /* 名字：13px 粗体，最多两行，居中在"数量以上"那块区域（网页版 .bg-name） */
-      const lines = CV.wrap(c.name, cw - 14 * CV.SCALE, CV.FS.lg, 2);
+      /* 名字：13px 粗体，最多两行，居中在"数量以上"那块区域（网页版 .bg-name）。
+         V1.1.11（窄屏）：320 宽的屏上 5 列只有 ~55pt 宽，按 13px ＋ 左右各 7pt 内边距
+         会**截成省略号**（"异界征…"）。窄格子里降到四级字（CV.FS.md）并把内边距收到 8pt
+         —— 字号仍取既有台阶，不新造字号；390 以上一切照旧。 */
+      const tight = cw < 58 * CV.SCALE;
+      const nameSize = tight ? CV.FS.md : CV.FS.lg;
+      const namePad = (tight ? 8 : 14) * CV.SCALE;
+      const lines = CV.wrap(c.name, cw - namePad, nameSize, 2);
       const areaH = cw - 22 * CV.SCALE;                 // 数量占底部 ~22
       const cy0 = y + areaH / 2;
-      const lh = CV.FS.lg * 1.3;
+      const lh = nameSize * 1.3;
       lines.forEach(function (ln, k) {
         CV.text(ln, x + cw / 2, cy0 + (k - (lines.length - 1) / 2) * lh,
-          { size: CV.FS.lg, bold: true, align: 'center', color: c.color || CV.C.text });
+          { size: nameSize, bold: true, align: 'center', color: c.color || CV.C.text });
       });
       /* 数量 / 强化等级：贴底 8px（.bg-count 金色粗体 12 / .bg-sub 灰 11） */
       if (c.count) CV.text(c.count, x + cw / 2, y + cw - 8 * CV.SCALE - 6 * CV.SCALE, { size: CV.FS.md, bold: true, color: CV.C.gold, align: 'center' });
@@ -256,7 +348,11 @@
     };
     stashBar();
     const pool = POOLS[view];
-    const cap = S.bag[pool.capKey];
+    /* V1.1.1（父亲大人 0926 拍板）：容量口径 = **max(基数 50, 已扩容值, 实际理论占用)**，
+       占用格数自带"单格上限 100、超了就占下一格"——两件事都只在 core.bagUsage() 里算一次，
+       这一页只读结果（不许自己再算一遍，否则界面与逻辑迟早对不上）。 */
+    const usage0 = Core.bagUsage();
+    const cap = pool.capKey === 'matCap' ? usage0.matCap : pool.capKey === 'eqCap' ? usage0.eqCap : usage0.cap;
     /* 装备页：两行分类（套装 / 部位）+ 一行「未穿戴 x / y 格 · 批量分解」
        —— V9.6.8（父亲大人）：小游戏的装备页原来**没有这些分类标签**（网页版有），
        而且「🧹 批量分解」原来挤在格子卡的标题行里、贴着卡片上沿。现在照网页版
@@ -291,27 +387,80 @@
           : { id: 'eqd:' + e.uid, name: (e.lock ? '🔒' : '') + e.name, color: rarColor(e.rarity), sub: '+' + e.enhance + ' · ' + Core.equipScore(e) });
       });
     } else {
-      const isMat = (k) => (D.ITEMS[k] || {}).type === 'material';
-      const stacks = Object.entries(S.items).filter(([k, n]) => n > 0 && (view === 'mat' ? isMat(k) : !isMat(k)));
-      used = stacks.length;
-      stacks.slice(0, cap).forEach(([k, n]) => {
-        /* V1.0.1（P2 第三步）：把道具的品质带进格子，下面按品质描边 */
-        cells.push({ id: 'item:' + k, name: (D.ITEMS[k] || {}).name || k, count: '×' + n,
-          rarity: (D.ITEMS[k] || {}).rarity || null });
+      /* V1.1.2（并池）：这一页只剩**一个池** —— 道具与材料一起列（材料不再单独一个标签）。
+         排序表（V9.6.12 之前是"按拥有顺序"）：券 → 箱 → 经验 → 血清 → 材料 → 其它，
+         同组内按名字——玩家"想找券/想找材料"一眼能定位（材料 2 §A11 的"排序表"）。 */
+      const RANK = { ticket: 0, box: 1, exp: 2, serum: 3, material: 4 };
+      const stacks = Object.entries(S.items).filter(([, n]) => n > 0)
+        .sort((a, b) => {
+          const ia = D.ITEMS[a[0]] || {}, ib = D.ITEMS[b[0]] || {};
+          const ra = RANK[ia.type] === undefined ? 5 : RANK[ia.type];
+          const rb = RANK[ib.type] === undefined ? 5 : RANK[ib.type];
+          if (ra !== rb) return ra - rb;
+          /* V1.1.9（续13 · 乙组 稀有度）：**组内**再加一级"稀有度降序"（报告 §10.3）——
+             上面那张组顺序表（券→箱→经验→血清→材料→兜底）一个字没动，
+             只是同一组里"更稀有"的排前面（玩家扫一眼先看到 UR/SSR 那些）。 */
+          const qa = rarRank(ia.rarity), qb = rarRank(ib.rarity);
+          if (qa !== qb) return qa - qb;
+          return String(ia.name || a[0]).localeCompare(String(ib.name || b[0]));
+        });
+      used = usage0.used;
+      /* V1.1.1（单格上限 100 · 父亲大人："超过 100 就会占两格，这样扩容也用的上了"）：
+         同一件东西按 100/格 拆开画 —— **每格写 100，最后一格写余数**；
+         点任意一格进的都是**同一个详情页**（id 一样）。这样"一件东西占两格"一眼看得出来，
+         不会像"两格长得一样"那样让人以为重复了。 */
+      const MAX = D.BAG_STACK_MAX || 100;
+      stacks.forEach(([k, n]) => {
+        const it = D.ITEMS[k] || {};
+        const parts = Math.max(1, Math.ceil(n / MAX));
+        for (let s = 0; s < parts; s++) {
+          const inThis = s === parts - 1 ? n - MAX * (parts - 1) : MAX;
+          cells.push({ id: 'item:' + k, name: it.name || k, count: '×' + inThis,
+            /* V1.1.9（续13 · 乙组）：**名字也按稀有度上色**。
+               以前这里只给箱子传 rarity（描边），名字留默认白 —— 那一版的原因是"材料没有品质"，
+               而本轮正是**给每件材料/道具定品质**（报告 §十），所以口径跟着改：
+               材料/道具与装备同一套"描边 ＋ 名字色"，这样他才看得出"这是普通货还是稀有货"。 */
+            rarity: it.rarity || null, color: it.rarity ? rarColor(it.rarity) : null,
+            sameStack: parts > 1 });
+        }
       });
     }
     /* 筛选状态下**不补空格子**（网页版同款）：筛出 3 件武器后面还跟着 47 个空格，
        玩家会以为筛选没生效。 */
     const filtering = view === 'equip' && (eqCat !== 'all' || eqSlot !== 'all');
+    /* V1.1.7（父亲大人 09-26 现场反馈：「背包扩容没有看到相应的空格子增加，感觉扩了没到位」）：
+       V1.1.2 那次把"补到容量"改成了"按内容铺一整行"（`ceil((内容+1)/5)*5`），代价是
+       **扩容变成了看不见的** —— 板子长度只跟**内容**有关，买 +10 格之后一格没变；
+       而能说明"容量变了"的那行数字早在 V9.6.12 就按他的要求撤掉了 → 屏幕上零反馈。
+       现在**改回网页版的基准**（ui.js 的 bagPool 注释：「空的补到 cap 个，再加上第 cap+1 格：＋扩容」）：
+       空格补到 **cap**，扩容格就永远落在**第 cap+1 格** —— 扩容一次，十颗空格立刻出现、位置也对得上。 */
     if (!filtering) while (cells.length < cap) cells.push({ empty: true });
     /* V9.6.4（父亲大人："背包的扩容格也没了"）：格子补满 cap 个之后，**必须再补最后一格**
        —— 网页版是"第 cap+1 格：灰色虚线框 + ＋"，点了问"是否支付 ◉x 扩容"。
        上一版排格子的循环只补了空格，把这一格漏掉了（grid() 里画 add 格的分支一直没被触发）。 */
     cells.push({ add: true });
+    /* ================= V1.1.15（2026-09-27 · 父亲大人："待领箱有时是完整的功能卡片、
+       有时只显示几排红色小字"）=================
+       那句"几排红色小字"就是这里原来画的（`U.hint(..., CV.C.accent)`）——
+       同一页里"东西进箱了"是卡片、"背包满了"是红字，两种形态看着像两套东西。
+       现在**统一成卡片**：有东西进箱 → 上面那张带「全部领回」的卡片负责说；
+       只有"满了、但还没东西进箱"这一种情况才在这里补一张**同款式**的提示卡
+       （带一键扩容，玩家不用滚到底去找那颗「＋」）。 */
+    /* ⚠️ 只在**道具池**这一版显示：装备格满了跟待领箱没关系（待领箱收的是道具） */
+    if (used >= cap && pool.capKey !== 'eqCap' && !Core.stashCount()) {
+      U.card(function () {
+        U.h3('📮 背包已满', '暂时还没东西溢出');
+        U.hint('新到手的东西会先存进待领箱，一件都不会丢。', 2 * CV.SCALE);
+        U.hint('背包 ' + used + ' / ' + cap, 2 * CV.SCALE);
+        U.space(CV.SP[1]);
+        U.btnRow([{ label: '扩容 +' + D.BAG_EXPAND_SIZE + ' 格（◉ ' + fmt(cost) + '）', style: 'ghost', id: pool.expandId }]);
+      });
+    }
     U.card(function () {
       /* V9.6.12（父亲大人："这些文字都去掉"）：格子上面那行「XX格 N / 50」撤掉 ——
          格子本身已经把内容说清楚了，多一行标题只是白占一条高度。 */
-      grid(cells, used, cap, 'bag_expand:' + view, cost, false);
+      /* 热区 id **只从池子表里读**（丙组 1）：两处拼法分叉就是那只真死键的成因，这里不再现场拼。 */
+      grid(cells, used, cap, (pool.expandId || ('bag_expand:' + view)), cost, false);
     });
     if (view === 'equip' && batchMode) CV.pageOverlay = batchBar;
   });
@@ -321,16 +470,70 @@
     const S = Core.S;
     const it = D.ITEMS[curItem] || {};
     const n = S.items[curItem] || 0;
+    /* ================= V1.1.15（2026-09-27 · 派单 I 第 1 条「320 挤压」）=================
+       320×568 上"用 1 个 / 用 10 个 / 全部用（20）"三颗按钮**掉在折叠线以下**：
+       上面四张信息卡（名称 / 说明 / 在哪用 / 去哪弄）把首屏吃满了，主操作要滚一下才按得到
+       （证据：…/三机型对照/15-物品详情.png 第一列）。
+       复审给的路子是"把在哪用/去哪弄压成一行摘要"，我这里换了个**更小、且不丢内容**的改法：
+       首屏放不下时，把**动作行提到名称卡之后**（动作优先），四张信息卡原样跟在后面。
+       判据按**可用内容高**而不是屏宽 —— 375×667 这种"屏不窄、但内容区也不到 520"的档同样要吃这一条
+       （它和 320 一样按 491px 的内容区算）。 */
+    const firstScreen = CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8;
+    const actFirst = firstScreen < 520 * CV.SCALE;
+    /* 动作行（各类型一套，照网页版）——窄屏要提前画，所以提成一个函数 */
+    const actionRow = function () {
+      if (it.type === 'box') {
+        U.btnRow([
+          { label: '开 1 个', style: 'ghost', id: n >= 1 ? 'box:1' : '' },
+          { label: '开 10 个', style: 'ghost', id: n >= 2 ? 'box:10' : '' },
+          { label: '全部开（' + n + '）', style: 'gold', id: n >= 1 ? 'box:0' : '' },
+        ]);
+        return true;
+      } else if (it.type === 'exp') {
+        U.btnRow([
+          { label: '用 1 个', style: 'ghost', id: n >= 1 ? 'exp:1' : '' },
+          { label: '用 10 个', style: 'ghost', id: n >= 10 ? 'exp:10' : '' },
+          { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'exp:0' : '' },
+        ]);
+        return true;
+      } else if (it.type === 'serum') {
+        /* V9.6.7 自审抓到：血清以前**只有"炼"没有"喂"** —— 炼化台能做出来，
+           道具卡上却一个动作按钮都没有（说明里还写着"点这张卡选伙伴喂下"）。
+           补齐网页版那三个按钮 → 「使用血清」选人页。 */
+        U.btnRow([
+          { label: '用 1 支', style: 'ghost', id: n >= 1 ? 'serum:1' : '' },
+          { label: '用 10 支', style: 'ghost', id: n >= 10 ? 'serum:10' : '' },
+          { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'serum:0' : '' },
+        ]);
+        return true;
+      } else if (it.type === 'ticket') {
+        const pool = D.RECRUIT_POOLS[it.pool] || {};
+        const tk = Core.ticketOf(it.pool);
+        U.btnRow([{ label: '去「' + (pool.name || '招募') + '」使用（现有 ' + (tk ? tk.n : n) + ' 张）', style: 'gold', id: 'go_recruit' }]);
+        return true;
+      }
+      return false;                        // 材料没有动作（强化时自动消耗），不进"动作优先"这一条
+    };
     U.begin();
     U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'back_bag');
     CV.text('道具详情', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
     U.card(function () {
       const top = U.y;
-      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true });
+      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true,
+        color: it.rarity ? rarColor(it.rarity) : CV.C.text });
       CV.text('×' + n, U.ix() + U.iw(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
       U.y = top + 26 * CV.SCALE;
+      /* V1.1.9（续13 · 乙组）：道具 / 材料也要**看得出稀有**（父亲大人："像装备那样分稀有度展示"）。
+         写法与色阶跟装备详情（本文件 eqdetail 里的 `U.kv('品质', …)`）**同一套**：
+         中文名 ＋ 代码 ＋ 品质色。报告 §十 给的那张 52 件分级表就是这里的取值来源。 */
+      if (it.rarity) {
+        U.kv('品质', (((D.RARITY_NAME || {})[it.rarity]) || it.rarity) + ' · ' + it.rarity, rarColor(it.rarity));
+      }
     });
+    /* 首屏放不下的档位：动作先上（画完留一格间距再排信息卡） */
+    const hoisted = actFirst && actionRow();
+    if (hoisted) U.space(CV.SP[1]);
     U.card(function () { U.h3('说明'); U.note(it.desc || '', 2 * CV.SCALE); });
     U.card(function () {
       U.h3('在哪用');
@@ -338,34 +541,9 @@
       if (it.use) U.note(it.use, 4 * CV.SCALE);
     });
     U.card(function () { U.h3('去哪弄'); U.note(it.src || '副本掉落 / 商店兑换', 2 * CV.SCALE); });
-    /* 动作：盒/经验/血清/材料/券，各按网页版同一套按钮 */
-    if (it.type === 'box') {
-      U.btnRow([
-        { label: '开 1 个', style: 'ghost', id: n >= 1 ? 'box:1' : '' },
-        { label: '开 10 个', style: 'ghost', id: n >= 2 ? 'box:10' : '' },
-        { label: '全部开（' + n + '）', style: 'gold', id: n >= 1 ? 'box:0' : '' },
-      ]);
-    } else if (it.type === 'exp') {
-      U.btnRow([
-        { label: '用 1 个', style: 'ghost', id: n >= 1 ? 'exp:1' : '' },
-        { label: '用 10 个', style: 'ghost', id: n >= 10 ? 'exp:10' : '' },
-        { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'exp:0' : '' },
-      ]);
-    } else if (it.type === 'serum') {
-      /* V9.6.7 自审抓到：血清以前**只有"炼"没有"喂"** —— 炼化台能做出来，
-         道具卡上却一个动作按钮都没有（说明里还写着"点这张卡选伙伴喂下"）。
-         补齐网页版那三个按钮 → 「使用血清」选人页。 */
-      U.btnRow([
-        { label: '用 1 支', style: 'ghost', id: n >= 1 ? 'serum:1' : '' },
-        { label: '用 10 支', style: 'ghost', id: n >= 10 ? 'serum:10' : '' },
-        { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'serum:0' : '' },
-      ]);
-    } else if (it.type === 'material') {
-      U.card(function () { U.note('强化装备时自动优先消耗', 2 * CV.SCALE); });
-    } else if (it.type === 'ticket') {
-      const pool = D.RECRUIT_POOLS[it.pool] || {};
-      const tk = Core.ticketOf(it.pool);
-      U.btnRow([{ label: '去「' + (pool.name || '招募') + '」使用（现有 ' + (tk ? tk.n : n) + ' 张）', style: 'gold', id: 'go_recruit' }]);
+    /* 动作：盒/经验/血清/材料/券，各按网页版同一套按钮（首屏放得下就仍在信息卡之后，V9.6.x 原口径） */
+    if (!hoisted) {
+      if (!actionRow()) U.card(function () { U.note('强化装备时自动优先消耗', 2 * CV.SCALE); });
     }
     U.space(CV.SP[2]);
     U.btnRow([{ label: '‹ 返回', style: 'ghost', id: 'back_bag' }]);
@@ -397,21 +575,110 @@
       U.kv('评分', String(Core.equipScore(eq)), CV.C.gold);
       U.kv('强化', '+' + eq.enhance + ' / 20');
       if (eq.charId) U.kv('专属', '仅限 ' + Core.charName(eq.charId) + ' 装备');
+      /* 2026-09-27（父亲大人：「每人一套本命」）：本命标 —— 六件（武器/头/胸甲/手/腿/饰品）同一行，
+         走本命格的灯色（与上面两条命格行同一套色）。**不新增弹窗**，就是多一行。 */
+      if (eq.charId) {
+        const sigCh = ((D.charById || {})[eq.charId]) || {};
+        U.kv('本命', Core.charName(eq.charId) + '（' + (sigCh.bloodline || '') + '·' + (sigCh.role || '') + '）',
+          CV.blLamp(sigCh.bloodline, Core.realmState().realm));
+      }
       /* 命格主题（V1.1）：命格套装与神装**不染色框**（框是稀有度的），名字走本命格的灯色 —— 与网页版同口径 */
       if (gs) U.kv('命格神装', '仅限' + eq.godSet + '命格装备（穿戴者命格要对得上）', CV.blLamp(eq.godSet, Core.realmState().realm));
       if (cs) U.kv('命格套装', '仅限' + eq.bloodSet + '命格 · 同一张图（' + (eq.bloodWorld || '?') + '）的件才算一套', CV.blLamp(eq.bloodSet, Core.realmState().realm));
       U.kv('分解可得', '◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3));
     });
+    /* 重铸报价（**要先算** —— V1.1.12 起重铸按钮就长在属性卡里，见下面） */
+    const rq = Core.reforgeQuote ? Core.reforgeQuote(eqUid) : null;
+    /* ================= V1.1.12（父亲大人 09-27）=================
+       他原话：「**重铸的按钮离属性太远了，我每次重铸都得滑回去看哪里变了**，要不你直接把重铸
+       并到属性卡片里；然后**重铸所有词条**吧（也不用两条了）；然后你可以在**属性的数值加一个区间**，
+       就让人知道这条属性最少多少、最多多少，他才有一个**重铸的方向**」。
+       三处一起改：
+         · 重铸那一段**搬进属性卡**（原来它单独一张卡、在强化卡下面，跟属性隔着屏幕）；
+         · 每条副词条的数值后面**挂上它在这个档位能摇出的区间**（`D.affixRange`，与生成/重铸同源）；
+         · 重铸本来就是**全部重摇**（`core.reforgeEquip` 是 forEach 全量），
+           所以标题不再写容易读成"只摇 2 条"的「N 条」——改说人话「重摇全部 N 条数值 · 种类不变」。 */
     U.card(function () {
-      const rows = [];
-      if (est.flat.atk) rows.push(['攻击', '+' + Math.round(est.flat.atk)]);
-      if (est.flat.def) rows.push(['防御', '+' + Math.round(est.flat.def)]);
-      if (est.flat.hp) rows.push(['生命', '+' + Math.round(est.flat.hp)]);
-      if (est.flat.spd) rows.push(['速度', '+' + Math.round(est.flat.spd)]);
-      Object.keys(est.affix || {}).forEach((k) => rows.push([(D.AFFIX_POOL[k] || {}).name || k, '+' + (est.affix[k] * 100).toFixed(1) + '%']));
-      U.h3('📊 属性', '共 ' + rows.length + ' 条');
-      if (!rows.length) U.hint('这件装备没有附加属性', 4 * CV.SCALE);
-      rows.forEach((r) => U.kv(r[0], r[1]));
+      /* ================= V1.1.14（父亲大人 09-27：「那**基础属性就不要重铸**吧，**分开显示**，
+         用**一条横线分割开就好**，不用做的太复杂」）=================
+         为什么必须分开：**基础属性是算死的**（世界 × 部位 × 档位，两件同世界同档位的武器底子一模一样），
+         **副词条才是能重摇的**。以前两张搅在一张卡里、又没有分界，
+         他点完重铸看到"第一个数没变"，第一反应就是"漏了一条"。
+         ⇒ 结构改成两段：**基础属性 →（实线）→ 副词条**。其余 kv 行本来就是**虚线**行分隔，
+           所以这条用**实线**，一眼分得出"这是分组线、不是行分隔"。 */
+      const flatRows = [];
+      if (est.flat.atk) flatRows.push(['攻击', '+' + Math.round(est.flat.atk)]);
+      if (est.flat.def) flatRows.push(['防御', '+' + Math.round(est.flat.def)]);
+      if (est.flat.hp) flatRows.push(['生命', '+' + Math.round(est.flat.hp)]);
+      if (est.flat.spd) flatRows.push(['速度', '+' + Math.round(est.flat.spd)]);
+      const affixRows = [];
+      /* V1.1.13（0927-E · 总监 §4.4）：属性卡标题挂**词条总评**（这批词条的 q 均值）。
+         ⚠️ 只在**这件装备自己的词条**上算（`rq.perAffix`）——
+            `est.affix` 是**聚合后**的（含套装/神装加成），拿聚合值去比"本件可达区间"是错的。
+         V1.1.14（父亲大人 09-27：「**也没必要写级还是粗，反正有数字看，或者你用颜色去区分也行**」）：
+         ⇒ 每条词条右边那枚 **[ 粗/良/优/极 ] 文字标**撤掉，**改成用颜色区分**
+           （灰 → 白 → 绿 → 金，从差到好；都是既有色令牌，不新造色），标题也不再写档位词。 */
+      const ownByKey = {};
+      ((rq && rq.perAffix) || []).forEach((a) => { ownByKey[a.k] = a; });
+      const TIER_COLOR = { '粗': CV.C.dim, '良': CV.C.text, '优': CV.C.gain, '极': CV.C.gold };
+      Object.keys(est.affix || {}).forEach((k) => {
+        const band = D.affixRange ? D.affixRange(k, eq.rarity) : null;
+        const v = '+' + (est.affix[k] * 100).toFixed(1) + '%';
+        const own = ownByKey[k];
+        affixRows.push([(D.AFFIX_POOL[k] || {}).name || k,
+          (band ? (v + '（' + (band.lo * 100).toFixed(1) + '~' + (band.hi * 100).toFixed(1) + '%）') : v),
+          own ? TIER_COLOR[own.tier] : null]);
+      });
+      const allRows = flatRows.concat(affixRows);
+      U.h3('📊 属性', (rq && rq.perAffix && rq.perAffix.length)
+        ? ('共 ' + allRows.length + ' 条 · 词条总评 ' + Math.round(rq.meanQ * 100) + '%')
+        : ('共 ' + allRows.length + ' 条'));
+      if (!allRows.length) U.hint('这件装备没有附加属性', 4 * CV.SCALE);
+      flatRows.forEach((r) => U.kv(r[0], r[1]));
+      /* 分组实线：`U.kv` 每行底是虚线（行分隔），这里用**实线**画分组线，两者一眼分得开。 */
+      if (flatRows.length && affixRows.length) {
+        U.draw(function () {
+          CV.ctx.save();
+          CV.ctx.strokeStyle = CV.C.line; CV.ctx.lineWidth = 1;
+          CV.ctx.beginPath();
+          CV.ctx.moveTo(U.ix(), U.y + 3 * CV.SCALE - .5);
+          CV.ctx.lineTo(U.ix() + U.iw(), U.y + 3 * CV.SCALE - .5);
+          CV.ctx.stroke();
+          CV.ctx.restore();
+        });
+        U.space(6 * CV.SCALE);
+      }
+      affixRows.forEach((r) => U.kv(r[0], r[1], r[2] || undefined));
+      const nAff = (eq.affixes || []).length;
+      U.space(CV.SP[1]);
+      if (!nAff) { U.hint('这件装备没有副词条，重铸不了。', 3 * CV.SCALE); return; }
+      if (!rq) return;
+      U.space(CV.SP[1]);
+      /* ================= V1.1.13（0927-E · 总监 §4.2/§4.4 S16）：重铸这一段 =================
+         两档按钮（**价格写在按钮上**）＋ 每条词条一个**锁定开关**＋ 🔥 炉火进度 ＋
+         `石头 0 颗`时直接写"去哪拿"（§4.4 第 4 条：买不到石头的兜底文案）。 */
+      U.kv('现有', (D.ITEMS[rq.stone] || {}).name + ' ' + rq.stoneHave + ' · ' + ((D.ITEMS[rq.item] || {}).name || rq.item) + ' ' + rq.matHave
+        + (rq.short > 0 ? ('（材料不够，差 ' + rq.short + ' 块 → 用 ◉' + fmt(rq.substitute) + ' 代用）') : ''));
+      /* V1.1.14（父亲大人 09-27）：「**下面那个锁也不要了，就不让人锁定**，反正**留两条词条**，
+         没必要锁了」→ **逐条锁定整段撤掉**（按钮、📌 标、每锁 +1 石的算法都从界面上消失，
+         玩家再也锁不了）。同时撤掉两处**纯解释性注释**：炉火那行的"满 N 次后下一次必不倒退"
+         与"一颗石头都没有去哪拿"那段 —— 他的口径是"有数字看就行"。
+         ⚠️ **整件锁定保护（操作卡那颗 🔒）不动** —— 他说的是"下面那个锁"（词条锁），
+            整件锁是另一件事（保护一件装备不被误分解/误重铸），继续有效；
+            所以下面两颗按钮遇到 `rq.locked`（整件锁）时仍然禁用并提示"先解锁"。 */
+      U.kv('🔥 炉火', rq.forgeN + '/' + rq.pityAt, rq.pityReady ? CV.C.gold : CV.C.dim);
+      U.space(CV.SP[1]);
+      if (rq.locked) U.hint('这件装备已锁定：先解锁才能重铸（锁＝别动它）。', 3 * CV.SCALE, CV.C.accent);
+      U.space(CV.SP[1]);
+      const nameOf = (id) => (D.ITEMS[id] || {}).name || id;
+      const cA = Core.reforgeCost(eq, { mode: 'value' }), cC = Core.reforgeCost(eq, { mode: 'kind' });
+      const canKind = rq.kindable && !rq.locked;
+      U.btnRow([
+        { label: rq.locked ? '🔒 先解锁再重铸' : ('🔨 重摇数值（石×' + cA.stoneN + '）'),
+          style: 'ghost', id: rq.locked ? 'noop' : 'eq_reforge', dis: rq.locked },
+        { label: (canKind ? '🎲 重抽词条（石×' + cC.stoneN + '）' : (rq.kindable ? '🎲 重抽词条（先解锁）' : '🎲 专属不可重抽')),
+          style: 'gold', id: canKind ? 'eq_reforge_kind' : 'noop', dis: !canKind },
+      ]);
     });
     /* V9.6.15（父亲大人："装备的套装属性好像都没写，就算没激活也得用灰字写出来几件能激活什么"）：
        原来这里读的是 `set.bonus` —— **数据里没有这个字段**（数据是 `text`："2件:…　4件:…" + b2/b4/b6），
@@ -447,6 +714,19 @@
         /* V9.6.16（父亲大人）：这行解释多余 —— 件数是 0/3、效果一条条都列着，不用再解释一遍。 */
       });
     };
+    /* V1.1.15（2026-09-27 · 父亲大人："现在专属装备没有套装效果吗"）：
+       **本命套装**（第 4 类）也要在这张卡里露面 —— 只算"这位伙伴自己穿上的专属件数"，
+       与世界套/血统套/神装同款式（2/4/6 三档）。专属没穿上（放在背包里）就显示 0/6，
+       玩家能一眼看出"再穿两件就触发下一档"。 */
+    if (eq.sigSet) {
+      const ss = D.SIGNATURE_SET;
+      let sc = 0;
+      Object.values((Core.S.equipped || {})[eq.charId] || {}).forEach(function (uid) {
+        const e2 = uid && Core.S.equips[uid];
+        if (e2 && e2.sigSet === eq.sigSet) sc++;
+      });
+      if (ss) mkSetCard('本命套装', ss.name, ss.text, sc, 6);
+    }
     if (gs) mkSetCard('命格神装', gs.name, gs.text, wornOf(eq.godSet, 'godSet'), 6);
     else if (cs) {
       // 血统套装按「同一张图 + 同一支血统」计件（V9.6.83），不能再只比血统名
@@ -463,6 +743,10 @@
       U.space(CV.SP[1]);
       U.btnRow([{ label: '强化（◉ ' + fmt(q.points) + ' + ◆ ' + q.otherworld + ' · ' + Math.round(q.rate * 100) + '%）', style: 'ghost', id: q.maxed ? '' : 'eq_enh' }]);
     });
+    /* V1.1.8 那张独立的「🔨 重铸副词条」卡**已并进属性卡**（V1.1.12 · 父亲大人：
+       "重铸的按钮离属性太远了，我每次重铸都得滑回去看哪里变了"）—— 逻辑不变：
+       只重摇数值、锁定过的不可重摇、消耗 ＝ 1 块当前档材料 ＋ ◉3,000（临时值）。
+       判据④依然成立：没副词条的装备在属性卡里明说"重铸不了"，锁定的按钮禁用并写清"先解锁"。 */
     U.card(function () {
       U.h3('操作');
       U.btnRow([
@@ -479,12 +763,41 @@
   });
   CV.on('eq_enh', function () {
     const r = Core.enhance(eqUid);
+    /* 强化成功 / 失败：两种完全不同的音色（"叮" vs "嗡嗡"）—— 不看字也听得出成没成 */
+    snd(r.ok ? 'enhanceOk' : 'enhanceFail');
     CV.toast(r.msg || (r.ok ? '强化成功' : '强化失败'));
     CV.render();
   });
   CV.on('eq_lock', function () {
     const r = Core.toggleEquipLock(eqUid);
     CV.toast(r.lock ? '🔒 已锁定这件装备' : '🔓 已解锁');
+    CV.render();
+  });
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："重铸数值/词条都不用有弹窗了，直接替换就行了"）
+     V1.1.13 那一版摇完会弹一张「旧 → 新」对比卡（U.confirm）——**撤掉**。
+     现在摇完就地把属性卡重画一遍（数值已经是新的，不用点"收下"），
+     只在顶部留一行 toast 报"总评变化"——想再摇一次不用先关弹窗。
+     判据不变：数字是主角（区间已经在每条词条上写着，见 affixRange）。 */
+  function afterReforge(r) {
+    if (!r || !r.ok) { snd('error'); CV.toast((r && r.msg) || '重铸不了'); CV.render(); return; }
+    snd('reforge');
+    const dQ = Math.round((r.meanAfter - r.meanBefore) * 100);
+    CV.toast((r.pityHit ? '🔥 炉火保底 · ' : (r.mode === 'kind' ? '🎲 重抽完成 · ' : '🔨 重铸完成 · '))
+      + '词条总评 ' + Math.round(r.meanBefore * 100) + '% → ' + Math.round(r.meanAfter * 100) + '%'
+      + (dQ ? '（' + (dQ > 0 ? '+' : '') + dQ + '）' : '（没变）')
+      + (r.newBest ? ' · 🏆 刷新最好' : ''));
+    CV.render();
+  }
+  CV.on('eq_reforge', function () { afterReforge(Core.reforgeEquip(eqUid, { mode: 'value' })); });
+  CV.on('eq_reforge_kind', function () { afterReforge(Core.reforgeEquip(eqUid, { mode: 'kind' })); });
+  /* 词条锁开关（档 B）：锁 = 这一条不参与重铸（每锁 1 条每档多花 1 颗石）。
+     走 `Core.setAffixLock` 这一个入口 —— 界面不许自己去改 `eq.affixLock`。 */
+  CV.on('eq_afflock:*', function (arg) {
+    const eq = Core.S.equips[eqUid];
+    const i = parseInt(arg, 10);
+    const on = !((Core.affixLocksOf(eq) || []).indexOf(i) >= 0);
+    const r = Core.setAffixLock(eqUid, i, on);
+    if (!r.ok) CV.toast(r.msg || '锁不了');
     CV.render();
   });
   CV.on('eq_decomp', function () {
@@ -508,22 +821,55 @@
   TABS.forEach(function (t) {
     CV.on('bagview:' + t[0], function () { view = t[0]; CV.render(); });
   });
-  CV.on('bag_expand:item', function () { expand('item'); });
-  CV.on('bag_expand:mat', function () { expand('mat'); });
-  CV.on('bag_expand:eq', function () { expand('eq'); });
+  /* V1.1.7（丙组 1 · 把"这只死键的成因"结构上消掉）：
+     格子的热区 id 以前是**渲染处现场拼** `'bag_expand:' + view`、**注册处手写** `bag_expand:eq` ——
+     两套拼法不一样，装备那一格登记的是 `bag_expand:equip`、处理器只有 `:eq`
+     → `hitHasHandler()` 判它"没有处理器"、被当**引导锚点**放行 → 「＋」画在屏上、点了没反应
+     （康康 09-26 抓到的真死键：连点两次、截图逐字节相同）。
+     现在**注册也从同一张表读**：`POOLS[k].expandId` —— 渲染与注册读的是同一个字段，
+     两处不可能再分叉；以后加池子只在这张表里补一行。
+     `bag_expand:eq` 作为**老拼法的别名**保留一条出口（老引导/老调用点里可能还写着它）。 */
+  Object.keys(POOLS).forEach(function (k) {
+    const id = POOLS[k].expandId;
+    if (!id) return;
+    CV.on(id, function () { expand(k); });
+  });
+  CV.on('bag_expand:eq', function () { expand('equip'); });
   function expand(kind) {
-    const key = POOLS[kind === 'eq' ? 'equip' : kind].expKey;
+    /* 归一：POOLS 的键是 item / mat / equip，而 `Core.buyBagCap()` 只认 item / mat / eq ——
+       两边各归一一次，避免又把两种拼法混在一起（这就是上面那只死键的成因）。 */
+    const k = kind === 'eq' ? 'equip' : kind;
+    const key = POOLS[k].expKey;
     const cost = D.bagExpandCost(Core.S.bag[key] || 0);
-    const label = { eq: '装备', mat: '材料', item: '道具' }[kind];
+    const label = { equip: '装备', mat: '背包', item: '背包' }[k];
     U.confirm('扩容', '是否支付 ◉ ' + fmt(cost) + '，把' + label + '格再加 ' + D.BAG_EXPAND_SIZE + ' 格？', function () {
-      const r = Core.buyBagCap(kind);
+      const r = Core.buyBagCap(k === 'equip' ? 'eq' : k);
       CV.toast(r.msg || '已扩容');
       CV.render();
     });
   }
+  /* V1.1.15：**装备**待领箱的"全部领回"（装备页那张卡） */
+  CV.on('stash_eq_claim', function () {
+    const r = Core.claimStashEq();
+    const ue = Core.bagUsage();
+    if (r.moved) {
+      CV.toast('领回 ' + r.moved + ' 件装备' + (r.left ? ('，还剩 ' + r.left + ' 件 · 装备格 ' + ue.eqUsed + '/' + ue.eqCap) : ''), 3200);
+    } else {
+      CV.toast('装备格还是满的（' + ue.eqUsed + '/' + ue.eqCap + '）—— 点上面「扩容」', 3600);
+    }
+    CV.render();
+  });
   CV.on('stash_claim', function () {
     const r = Core.claimStash();
-    CV.toast(r.moved ? '领回 ' + r.moved + ' 件' + (r.left ? '，还有 ' + r.left + ' 件装不下' : '') : '背包还是满的，先扩容或分解装备');
+    /* V1.1.15：把"领回多少 / 还差几格"说清 —— 以前只报一句"背包还是满的"，
+       玩家（用 GM 把背包塞满的档尤其明显）会以为是待领箱坏了。 */
+    if (r.moved) {
+      const u = Core.bagUsage();
+      CV.toast('领回 ' + r.moved + ' 件' + (r.left ? ('，还剩 ' + r.left + ' 件 · 背包 ' + u.used + '/' + u.cap + '，还差 ' + (r.need || 0) + ' 格') : ''), 3200);
+    } else {
+      const u = Core.bagUsage();
+      CV.toast('一件都装不下：背包 ' + u.used + '/' + u.cap + '，还差 ' + (r.need || 0) + ' 格 —— 点上面「扩容」', 3600);
+    }
     CV.render();
   });
   CV.on('back_bag', function () { CV.pop(); });
@@ -534,6 +880,8 @@
     CV.on('box:' + v, function () {
       const cnt = v === 0 ? (Core.S.items[curItem] || 0) : v;
       const r = Core.openBoxes(curItem, cnt);
+      /* 开箱：一声"咔"（开 10 个 / 全部开也只响一声 —— 这是"打开了"的反馈，不是每件一个音） */
+      snd(r && r.ok === false ? 'error' : 'open');
       CV.toast(r.msg || '已开启');
       if ((Core.S.items[curItem] || 0) <= 0) CV.pop(); else CV.render();
     });
@@ -644,7 +992,7 @@
   [1, 10, 0].forEach(function (v) {
     CV.on('serum:' + v, function () {
       const n = v === 0 ? (Core.S.items[curItem] || 0) : v;
-      if (n < 1) { CV.toast('道具不足'); return; }
+      if (n < 1) { snd('error'); CV.toast('道具不足'); return; }
       serumCount = n; CV.push('serum_pick');
     });
   });
@@ -702,9 +1050,18 @@
         list.forEach(function (e) {
           const who = Core.equipWearer(e.uid);
           const isCur = e.uid === cur;
+          /* V1.1.6（A6 · 《总落地清单》A6 行）：装备候选**带稀有度** ——
+             ① 名字按**品质色**画（`rarityColor`，与背包格子 / 详情页同一套色阶）；
+             ② 标题右侧挂一枚**稀有度文字**小标（普通 / 精良 / 稀有 / 史诗 / 传说 / 神话，
+                取 `D.EQUIP_RARITY_NAME` 一处定义）。
+             起因：这一屏原来只有"名字 + 强化 + 套装类别"，同名的两件（不同品质）看不出谁好，
+             玩家只能点进去看详情再退出来比 —— 网页版那行是 `class="t1 rtext-<rarity>"`，
+             小游戏这边**连颜色都没有**（`listBtn` 没透传 t1Color）。 */
           listBtn({
             t1: e.name + ' +' + e.enhance + '　' + eqTag(e),
             t2: eqBrief(e) + (isCur ? ' · 当前穿戴中' : (who ? (' · ' + Core.charName(who) + '装备中') : '')),
+            t1Color: rarColor(e.rarity),
+            tag: (D.EQUIP_RARITY_NAME || {})[e.rarity] || e.rarity,
             btn: isCur ? null : ['装备', 'primary', 'eqwear:' + e.uid],
           });
         });

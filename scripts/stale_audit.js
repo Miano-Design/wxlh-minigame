@@ -13,6 +13,14 @@ const fs = require('fs');
 const path = require('path');
 const MG = path.resolve(__dirname, '../js');
 const WEB = path.resolve(__dirname, '../../wxlh-game/js');
+/* ⛔ V1.1.11（2026-09-27）：**本尺子整体退役**。它自己的注释就写着"两边源码一起扫
+   （网页版是唯一标准，只用一边会误判）"—— 网页版已归档到 GitHub、本地删掉，
+   只剩一边扫必然把"只被网页版读过的字段/导出"全报成残留（假警报比真问题多）。
+   ⇒ 与 parity_audit 同批退役；网页版哪天复活再恢复。 */
+if (!fs.existsSync(WEB)) {
+  console.log('⏭ stale_audit 已退役：网页版归档到 GitHub、本地已删 —— "两边一起扫"的前提没了。');
+  process.exit(0);
+}
 
 function readAll(dir) {
   const out = {};

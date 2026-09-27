@@ -19,6 +19,17 @@
   let view = { worldId: null, diff: 'normal' };
   let run = null;              // 进行中的关卡（与网页版同结构，落盘用）
 
+  /* 世界图标：**能自绘的走矢量**（形状在 data.js 的 WORLD_ICONS 一处定义，本文件只负责画），
+     没进表的退回这个世界自己的 emoji（`w.ico`）。V1.1.15 · 派单 I 第 2 条。
+     颜色用默认字色（= #e9edf6）：格底是各族 tint，浅色描边在三档格底上都过对比度；
+     族形角标那枚另有"按格底现算亮度"的取色（D.worldGlyphColor），两者分工不同、不要合并。 */
+  function worldIco(ico, cx, cy, size) {
+    if (ico && typeof ico === 'object') { CV.drawIcon(ico, CV.ctx, cx, cy, size, CV.C.text); return; }
+    CV.text(ico, cx, cy, { size: size, align: 'center' });
+  }
+  /* 一个世界该画什么：先问 WORLD_ICONS，没有才用它的 emoji / 主题兜底 */
+  const icoOf = (w) => D.iconOpsOf('world', w.id) || w.ico || ICON[w.theme] || '⚔';
+
   /* ---------- 世界卡（网页版 .world-card：图标 52 / 标题 / 小字 / 右箭头） ---------- */
   /* bg：格底色。V1.0.1 起由数据层的 D.worldTint(世界id) 给（五族色相 × 族内明度阶梯），
      网页版同一串颜色内联到 .world-ico 上；不传就退回旧底色（转生门那张、以及 ♾ 深井格）。 */
@@ -30,7 +41,7 @@
     CV.card(x, top, w, h);
     const box = 52 * CV.SCALE;
     CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.C.panel3, CV.C.line);
-    CV.text(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, { size: CV.DISP.d2, align: 'center' });
+    worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.DISP.d2);
     /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
        顶点表与网页版同一份（D.FACTION_GLYPH），别在这儿另画一套形状。 */
     const gs = 12 * CV.SCALE;
@@ -100,7 +111,7 @@
       const unlocked = true;
       const cleared = st.stages.normal.every((s) => s > 0);
       const prog = st.stages.normal.filter((s) => s > 0).length;
-      worldCard(w.ico || ICON[w.theme] || '⚔', w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
+      worldCard(icoOf(w), w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
         cleared ? '已通关' : '', 'w:' + w.id, false, D.worldTint(w.id), w.theme);
     });
@@ -137,8 +148,7 @@
          几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
       const box = 40 * CV.SCALE, top = U.y, x = U.ix();
       CV.round(x, top, box, box, CV.RADIUS,  D.worldTint(w.id), CV.C.line);
-      CV.text(w.ico || ICON[w.theme] || '⚔', x + box / 2, top + box / 2,
-        { size: CV.DISP.d2, align: 'center' });
+      worldIco(icoOf(w), x + box / 2, top + box / 2, CV.DISP.d2);
       const gs = 11 * CV.SCALE;
       if (D.FACTION_GLYPH[w.theme]) {
         /* 角标亮度按**本格格底**现算（对本格底 ≥3:1 · V1.1.2）—— worldId 一定要传 */
@@ -154,9 +164,23 @@
       U.kv('守关Boss', w.boss);
     });
     // 难度页签
+    /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 4 条）：三态照网页版 .diff-tabs。
+       网页版那颗按钮是 `class="btn small [active]"`，所以：
+         · 未选中 = **.btn 默认底**（panel2 底 + line2 边），不是透明 ghost；
+         · 选中   = .diff-tabs .btn.active（**panel3 暗底 + 金边 + 金字**）——
+                    小游戏原来画成金底白字，那是"花资源/危险"那套按钮的样子（基准 §2.3）。
+         · 禁用   = .btn[disabled]（**保住底和边**，整块压到 0.34），不是"透明只描一条线"。
+       字号也一并对齐：.btn.small 是**四级 12px**，原来这里写的 lg(13px) 是编外的一档。 */
     const tabs = D.DIFFICULTY.map((d) => ({
-      label: d.name + (d.id !== 'normal' ? ' ×' + d.mult : ''),
-      style: diff === d.id ? 'primary' : 'ghost',
+      /* V1.1.6（A5 · 《总落地清单》A5 行）：**难度按钮去乘数** ——
+         原来这里拼的是 `困难 ×1.8 / 地狱 ×3.2`，那个数是**敌人强度倍率**（`D.DIFFICULTY[].mult`），
+         对玩家没有决策价值：他只需要知道"这一档更难、奖励更多"，不需要看引擎内部乘了几倍；
+         而且那个数还会让人误以为"战力乘 1.8 就能打困难"（其实敌人 HP/攻击/防御各乘各的）。
+         现在只留难度名（数值一个字没动，只改显示）。
+         ⚠️ 网页版 `.diff-tabs` 那三颗**还带着** `×N`（`ui.js` 里那句模板没改，本轮"网页版界面一个字不动"）
+            → 这一处成了**有意的两端差异**，与 A1/A2 那三处一起记进回单，下次动网页版时抹平。 */
+      label: d.name,
+      key: d.id,                                        // 选中判定用**难度键**；
       id: 'diff:' + d.id,
       disabled: d.id !== 'normal' && !Core.worldCleared(w.id, d.id === 'hard' ? 'normal' : 'hard'),
     }));
@@ -166,12 +190,23 @@
       const top = U.y;
       tabs.forEach((t, i) => {
         const x = U.pad() + i * (cw + gap);
-        if (!t.disabled) U.btn(x, top, cw, h, t.label, t.style, t.id);
-        else {
-          CV.round(x, top, cw, h, CV.RADIUS_SM, null, CV.C.line);
-          CV.ctx.globalAlpha = 0.35;
-          CV.text(CV.fit(t.label, cw - 8, CV.FS.lg), x + cw / 2, top + h / 2, { size: CV.FS.lg, align: 'center', color: CV.C.dim });
-          CV.ctx.globalAlpha = 1;
+        /* 选中判定必须比**难度键**：t.id 是热区号（'diff:normal'），拿它跟 diff（'normal'）比
+           永远不相等 —— 那一版会让"选中态"整条消失（三颗都画成默认底），
+           模拟器上已经照出来过（截图 08-残域-世界详情，普通那颗没有金边金字）。 */
+        const on = diff === t.key;
+        const label = CV.fit(t.label, cw - 16 * CV.SCALE, CV.FS.md);
+        if (t.disabled) {
+          CV.ctx.save();
+          CV.ctx.globalAlpha = 0.34;                      // .btn[disabled] opacity:.34
+          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.C.panel2, CV.C.line2);
+          CV.text(label, x + cw / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: CV.C.text });
+          CV.ctx.restore();
+        } else if (on) {
+          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.C.panel3, CV.C.gold);
+          CV.text(label, x + cw / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: CV.C.gold });
+          CV.hit(t.id, x, top, cw, h);
+        } else {
+          U.btn(x, top, cw, h, t.label, null, t.id);      // style=null → .btn 默认底（panel2 + line2）
         }
       });
       U.y = top + h + 12 * CV.SCALE;                // V9.6.122：网页版 .diff-tabs margin-bottom = 12（原来 4）
@@ -196,14 +231,25 @@
               （我上一版把守关格写成 20px 反而更偏了）。 */
         const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
         const done = stars > 0;
+        /* ================= V1.1.15（2026-09-27 · 派单 I 第 1 条「320 挤压/顶格」）=================
+           320 上格子是 68×68（(296−24)/4），而星标原来钉在 `y + cw − 14` ——
+           「数字＋星标」这一组下沿只剩 5.75px、上沿却有 16px：复审里那条
+           「★★★ 贴到格子下沿（顶格）」说的就是这个（格子矮、字号不变，只能从**站位**上还）。
+           窄格（≤72）改成"数字与星标**作为一个整体在格子里居中**"；宽格一格不动
+           —— 复审只点了 320，390/430 那两档的星级站位保持原样（父亲大人"别改没毛病的地方"）。
+           证据：验收截图 …/三机型对照/06-世界详情-困难.png（三档并排）。 */
+        const narrowCell = cw <= 72 * CV.SCALE;
+        const numCy = narrowCell ? y + cw / 2 - (stars ? 8.25 * CV.SCALE : 0)     // 窄格：两组整体居中
+          : y + cw / 2 - (stars ? 7 * CV.SCALE : 0);                              // 宽格：原口径
+        const starCy = narrowCell ? numCy + 18.5 * CV.SCALE : y + cw - 14 * CV.SCALE;
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
         CV.round(x, y, cw, cw, CV.RADIUS,  done ? CV.C.doneBg : CV.C.panel2,
           done ? CV.C.doneLine : (isBoss ? CV.C.accent : CV.C.line));
-        CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, y + cw / 2 - (stars ? 7 * CV.SCALE : 0),
+        CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, numCy,
           { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
         if (isElite) CV.text('⚔', x + cw - 5 * CV.SCALE, y + 10 * CV.SCALE,
-          { size: CV.FS.xs, align: 'right', color: CV.C.dim });   // .sc-mark：右上角、五级、85% 不透明度
-        if (stars) CV.text('★'.repeat(stars), x + cw / 2, y + cw - 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
+          { size: CV.FS.tag, align: 'right', color: CV.C.dim });   // .sc-mark：右上角、五级、85% 不透明度
+        if (stars) CV.text('★'.repeat(stars), x + cw / 2, starCy, { size: CV.FS.tag, color: CV.C.gold, align: 'center', ls: -1 });
         CV.ctx.globalAlpha = 1;
         if (unlocked) CV.hit('stage:' + i, x, y, cw, cw);
       }
@@ -221,11 +267,57 @@
         label: '⏩ 扫荡（可选关卡 · 今日剩余 ' + left + '/' + Core.sweepCap() + ' 次）',
         style: 'ghost', id: 'sweep_open', dis: left <= 0,
       }]);
+      /* ================= V1.1.8（乙组 B6 · 扫荡 +10）=================
+         父亲大人的口径：**3 次/天**，每次 **+10 次扫荡、全额结算**（点数/结晶/装备/神话/材料一个不少）；
+         【定】**只对已通关的关卡** —— 这一段本来就在 `if (canSweep)` 里（本世界本难度有通关记录才画），
+         所以"只对已通关"是**位置保证**的，不需要再判一次。
+         那 10 次记在 `S.sweep.adBonus`（**与日上限分开的一本账**，见 core.sweepLeft 的注释）：
+         它不挤占"今日基础 10 次"，跨天清零 —— 否则"买来的次数用不掉"等于没给。 */
+      const AD = G.AD;
+      if (AD && AD.show) {
+        const adLeft = AD.left ? AD.left('sweep_plus') : 0;
+        U.space(CV.SP[1]);
+        U.btnRow([{
+          label: '📺 看广告 · 扫荡 +10 次（今日还剩 ' + adLeft + ' 次）',
+          style: 'ghost', id: adLeft > 0 ? 'ad_sweep_plus' : 'noop', dis: adLeft <= 0,
+        }]);
+      }
     }
   });
 
   /* ================= ③ 扫荡（选关卡 + 选次数，照网页版 sweepModal） ================= */
   let sweepSel = 11;
+  /* ================= V1.1.9（丙组 · 结算胶囊的唯一一处）=================
+     把"结算拿到了什么"拼成胶囊文案 —— **战斗结算与扫荡结算共用这一个函数**（父亲大人：
+     「现在扫荡的结算不行，里面还有乱码，**可以像战斗结算那样展示**」）。
+     两条结构性保证（那串"乱码"就是从这里漏出去的）：
+       · 货币一律查 `D.CURRENCIES` 拿**图标**（`◉/◆/✦/…`），**不拿内部键**（`points`/`otherworld` 拼不上屏）；
+       · 道具一律查 `D.ITEMS` 拿**它自己的 icon 与名字**（V1.0.6 口径：不许一律画背包图标）。 */
+  function rewardChips(got) {
+    return (got || []).map(function (x) {
+      /* V1.1.15：装备格满时装备会进「📮 待领箱」（不折现、不丢）——标出来，
+         否则玩家看到"掉了这件"、回背包没有，又要当 bug 报。 */
+      if (x.k === 'equip') return '🗡 ' + ((x.v && x.v.name) || ('装备×' + (x.n || 1))) + (x.stashed ? ' 📮' : '');
+      if (x.k === 'exp') return 'EXP+' + x.v;
+      if (x.k === 'item') {
+        const it = D.ITEMS[x.v] || {};
+        const n = x.n || 1;
+        /* V1.1.15（2026-09-27 · 父亲大人："待领箱有 bug"）：
+           背包满时掉落**进待领箱而不是蒸发**（dungeon.js 的 `dropItem` 统一出口）。
+           结算页必须**说出来**——否则玩家看到"掉了 3 件"、回背包一件没多，还是会当成 bug 报。
+           标一个 `📮`（待领箱那个符号）：既没进包也没丢，去背包页一键领回。 */
+        return (it.icon || '🎒') + ' ' + (it.name || x.v) + (n > 1 ? '×' + n : '') + (x.stashed ? ' 📮' : '');
+      }
+      /* V1.1.15：装备格满导致的"强制折现"要说明原因（`bagFull` 由 dungeon 的掉落带过来）——
+         不然玩家只看到一串 ◆，以为装备没掉。 */
+      return curIcon(x.k) + '+' + x.v + (x.bagFull ? '（装备格满·已折现）' : '');
+    });
+  }
+  function curIcon(k) { const m = (D.CURRENCIES || []).find((c) => c.id === k); return (m && m.icon) || '◈'; }
+  /* V1.1.9（丙组）：把胶囊拼法**挂出去一份**（`G.rewardChips`）——
+     尺子（`page_text_audit`）要拿"真代码"验"结算页不许漏内部键名"，
+     不许自己再抄一份（抄一份就等于验的是抄件，不是交付物）。 */
+  G.rewardChips = rewardChips;
   CV.register('sweep', function () {
     const S = Core.S;
     /* V9.6.70：这一页是从世界页推上来的（view.worldId 一定有值），但**代码不能假设**——
@@ -253,7 +345,9 @@
         CV.ctx.globalAlpha = 1;
         CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? CV.C.doneBg : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
         CV.text(String(x.i + 1), bx + cw / 2, by + cw / 2 - 6 * CV.SCALE, { size: CV.FS.f1, bold: true, align: 'center', color: sel ? CV.C.gold : CV.C.text });
-        CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.xs, color: CV.C.gold, align: 'center', ls: -1 });
+        /* 扫荡页用的也是网页版的 .stage-cell（星级 .st 是**五级 11px**）——
+           和世界详情页同一处漂移，只是复审表格里没列到这一屏。 */
+        CV.text('★'.repeat(x.s), bx + cw / 2, by + cw - 13 * CV.SCALE, { size: CV.FS.tag, color: CV.C.gold, align: 'center', ls: -1 });
         CV.hit('ssel:' + x.i, bx, by, cw, cw);
       });
       const rows = Math.ceil(cleared.length / cols);
@@ -298,14 +392,10 @@
     const stars = 1 + (anyDead ? 0 : 1) + (res.rounds <= 20 ? 1 : 0);
     const comp = Core.stageComplete(wid, df, si, stars);
     Core.clearPendingRun();
-    /* 奖励胶囊文案照网页版 rewardChips()：货币带图标（◉/◆/❖/▣…）、装备带品质色前缀、道具带 🎒 */
-    const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
-    const rewards = (g.got || []).map((x) => {
-      if (x.k === 'equip') return '🗡 ' + x.v.name;
-      if (x.k === 'exp') return 'EXP+' + x.v;
-      if (x.k === 'item') return '🎒 ' + ((D.ITEMS[x.v] || {}).name || x.v) + (x.n > 1 ? '×' + x.n : '');
-      return curIcon(x.k) + '+' + x.v;
-    });
+    /* 奖励胶囊文案：**只有这一处**（V1.1.9 起战斗结算与扫荡结算共用）
+       —— 照网页版 rewardChips()：货币带图标（◉/◆…）、装备带名字、道具带**它自己的 icon**
+       （V1.0.6 · 父亲大人 2026-09-24：「结算掉落基础金属的时候配的就是背包图标」）。 */
+    const rewards = rewardChips(g.got);
     if (comp && comp.firstClearReward) Object.keys(comp.firstClearReward).forEach((k) => rewards.push('首通 ' + curIcon(k) + '+' + comp.firstClearReward[k]));
     if (comp && comp.newUnlocks && comp.newUnlocks.length) comp.newUnlocks.forEach((n) => rewards.push('🔓 解锁【' + n + '】'));
     /* 结算页直接给「再来一次 / 下一关」——不用回世界列表再点关，推图节奏不断。
@@ -325,6 +415,13 @@
       const nw = D.WORLDS.find((x) => x.id === nx.worldId);
       afterSettle = { worldId: nx.worldId, diff: nx.diff, stageIdx: nx.stageIdx };
       acts.push({ label: '› 下一关（' + (nw ? nw.name : nx.worldId) + ' ' + (nx.stageIdx + 1) + '/12）', style: 'primary', id: 'dun_next' });
+    }
+    /* V1.1.15（2026-09-27 · 父亲大人："待领箱有时是卡片、有时只剩几排字"）：
+       结算里"装不下"的那部分（胶囊上标了 📮）在这里给一颗**可点的入口** ——
+       不然玩家看到一行字、不知道去哪领，就又是"待领箱坏了"。
+       只在真有东西进箱时出现（`stashCount() > 0`），不占常态版面。 */
+    if (Core.stashCount && Core.stashCount() > 0) {
+      acts.push({ label: '📮 待领箱 ' + Core.stashCount() + ' 件 · 去领回', style: 'ghost', id: 'goto_stash' });
     }
     run = null;
     /* V9.6.69（资料 §4「让玩家觉得自己成功」）：首通给一次**看得见**的庆祝 ——
@@ -360,7 +457,17 @@
           run = null;
           Core.clearPendingRun();
           view.worldId = wid;
-          return { title: '战斗失败', sub: '再接再厉，先练练队伍', rewards: [], acts: [{ label: '返回世界', style: 'ghost', id: 'battle_close' }] };
+          /* ================= V1.1.8（丙组 B10 · 战斗复活）=================
+             父亲大人的口径：**每场 1 次**；复活续战（敌人带剩余血量、只回阵亡者 50% 血）。
+             这颗按钮挂在**失败结算页**上；点了走 `battle_revive`（战斗页实现续战，见 sc-battle）。
+             ⚠️ "复活**不得**进资源结算路径"（B12 的第③条尺子在盯）：这一条**只重开战斗**，
+                不经过 `settleRun` / `grantRewards` —— 复活本身**不给任何资源**，只是把这一场接着打完。 */
+          const AD0 = G.AD;
+          const acts = [{ label: '返回世界', style: 'ghost', id: 'battle_close' }];
+          if (AD0 && AD0.show) {
+            acts.unshift({ label: '📺 看广告 · 复活续战（本场 1 次）', style: 'primary', id: 'battle_revive' });
+          }
+          return { title: '战斗失败', sub: '再接再厉，先练练队伍', rewards: [], acts: acts };
         }
         const isLast = run && run.wave === run.waves.length - 1;
         if (!isLast) {
@@ -400,6 +507,9 @@
     });
   });
   CV.on('dun_back', function () { CV.pop(); });
+  /* V1.1.15（2026-09-27）：结算页那颗「📮 待领箱 · 去领回」→ 直接切到背包那格
+     （与底栏页签同一套动作：cur 归位 + reset），省得玩家自己找。 */
+  CV.on('goto_stash', function () { CV.cur = 'bag'; CV.reset('bag'); });
   ['normal', 'hard', 'hell'].forEach(function (df) {
     CV.on('diff:' + df, function () { view.diff = df; CV.render(); });
   });
@@ -416,6 +526,18 @@
     CV.push('sweep');
   });
   CV.on('sweep_back', function () { CV.pop(); });
+  /* B6 · 扫荡 +10：广告 → 那 10 次记进 `S.sweep.adBonus`（与日上限分开的账），再原地重画。
+     这里**不改** `S.sweep.count`（已用次数）—— 买的是"额度"，用不使用由玩家在扫荡页决定。 */
+  CV.on('ad_sweep_plus', function () {
+    const AD = G.AD;
+    if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); return; }
+    AD.show('sweep_plus').then(function (r) {
+      if (!r || !r.granted) { CV.toast(r && r.reason === 'total' ? '今天看广告的次数用完了' : '今天这个次数用完了'); CV.render(); return; }
+      Core.addAdSweepBonus(10);
+      CV.toast('📺 今日扫荡次数 +10（现在剩 ' + Core.sweepLeft() + ' 次）', 2400);
+      CV.render();
+    });
+  });
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function (i) {
     CV.on('ssel:' + i, function () { sweepSel = i; CV.render(); });
   });
@@ -424,23 +546,46 @@
     if (n <= 0) { CV.toast('今日扫荡次数已用完'); return; }
     const r = Dun.sweep(view.worldId, view.diff, sweepSel + 1, n);
     if (!r.ok) { CV.toast(r.msg || '扫荡失败'); return; }
-    const agg = {};
-    r.total.forEach(function (t) {
-      t.got.forEach(function (g) {
-        if (g.k === 'equip') agg._eq = (agg._eq || 0) + 1;
-        else if (g.k === 'item') agg._it = (agg._it || 0) + (g.n || 1);
-        else agg[g.k] = (agg[g.k] || 0) + g.v;
+    /* ================= V1.1.9（丙组 · 扫荡结算重做）=================
+       父亲大人：「**现在扫荡的结算不行，里面还有乱码，可以像战斗结算那样展示**」
+       （截图证据：`0 次:points+710 · otherworld+20 · 🗡装备×1 · EXP+480 ·` 一条 toast 横着溢出屏幕）。
+       旧版三个毛病一起改掉：
+         ① **不再用 toast** —— 改成**同一个结算面板**（`BattleUI.showResult` → 战斗页的 drawSettle/drawChips）；
+         ② **内部键名一个都不许漏**：聚合与拼字都走 `rewardChips`（货币查 `D.CURRENCIES` 拿图标）；
+         ③ **"扫荡 N 次"要出现在结算页上**（写在第二行），他截图里那条开头就是它。
+       聚合口径：货币按币种累加、道具按 id 累加、装备按件数计 —— 与旧版一致（只是不再漏键名）。 */
+    const byCur = {}, byItem = {};
+    let eqN = 0, expN = 0;
+    (r.total || []).forEach(function (t) {
+      (t.got || []).forEach(function (g) {
+        if (g.k === 'equip') { eqN++; return; }
+        if (g.k === 'item') { byItem[g.v] = (byItem[g.v] || 0) + (g.n || 1); return; }
+        /* ⚠️ `exp` **不是货币**（`D.CURRENCIES` 里没有它）—— 第一版把它混进 `byCur`，
+           结果胶囊上出现 `◈+144`（兜底图标＋一个裸数字），正是"半漏内部信息"那一类。
+           经验就是"聚合要按**已经分类过**的种类走"，别拿 `else` 兜底当真。 */
+        if (g.k === 'exp') { expN += (g.v || 0); return; }
+        byCur[g.k] = (byCur[g.k] || 0) + (g.v || 0);
       });
     });
-    const parts = [];
-    Object.keys(agg).forEach(function (k) {
-      if (k === '_eq') parts.push('🗡装备×' + agg[k]);
-      else if (k === '_it') parts.push('🎒道具×' + agg[k]);
-      else if (k === 'exp') parts.push('EXP+' + agg[k]);
-      else parts.push(k + '+' + agg[k]);
+    /* 拼胶囊**完全走 `rewardChips` 那一套**（不另起一份）：先把聚合结果还原成 `got` 的形状，
+       再交给同一个函数 —— 战斗结算与扫荡结算从此只有一处"怎么把掉落写成字"的实现。 */
+    const merged = [];
+    Object.keys(byCur).forEach(function (k) { if (byCur[k]) merged.push({ k: k, v: byCur[k] }); });
+    if (expN) merged.push({ k: 'exp', v: expN });
+    if (eqN) merged.push({ k: 'equip', n: eqN });
+    Object.keys(byItem).forEach(function (id) { merged.push({ k: 'item', v: id, n: byItem[id] }); });
+    const chips = rewardChips(merged);
+    if (!chips.length) chips.push('这次没有掉落');
+    const w = D.WORLDS.find(function (x) { return x.id === view.worldId; }) || {};
+    G.BattleUI.showResult({
+      title: '扫荡结算',
+      bigTitle: '扫荡完成',
+      bigTitleColor: CV.C.gold,
+      line2: '扫荡 ' + r.count + ' 次 · ' + (w.name || view.worldId || '') + ' 第 ' + (sweepSel + 1) + ' 关（' + (DIFF_NAME[view.diff] || '') + '）',
+      rewards: chips,
+      maxChips: 14,
+      closeLabel: '收下并返回',
     });
-    CV.toast('扫荡 ' + r.count + ' 次：' + (parts.join(' · ') || '无掉落'));
-    CV.render();
   }
   CV.on('sweep_1', function () { doSweep(1); });
   CV.on('sweep_5', function () { doSweep(5); });

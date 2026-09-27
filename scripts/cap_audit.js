@@ -39,7 +39,31 @@ const r = Core.idleRates();
 const sweep = Core.sweepLeft();
 const boss = window.Dungeon.battleRewards(WORLD, 'normal', 12, 'boss');
 const arena = D.arenaReward(Math.max(1, Math.round(LV / 2)));
-const day = {
+/* ================= V1.1.15（2026-09-27 · 父亲大人："哦行，全都改了吧"）=================
+   **一处真相**：下面那张表的三种货币（点数 / 异界结晶 / 圣洁晶石）**直接读 `longrun_sim`
+   的实测记账**，不再各算一套公式。起因：总监会诊查出"两套日收入口径差 3.4 倍"，
+   公式那条只算"挂机 + 扫荡 + 斗法台"，漏了副本掉落 / 悬赏 / 深井 / 日常 ——
+   于是同一份代码里"点满要几天"能差出一倍多，谁都不知道该信哪个。
+   现在：`dayF` 是公式（留着当兜底与对照），`day` 是要用的那张 —— 有实测就用实测。
+   exp / charExp / sectExp 仍走公式（它们本来就是副本产出，公式那三条没漏）。 */
+const REAL = (function realDaily() {
+  try {
+    const { execFileSync } = require('child_process');
+    const out = execFileSync(process.execPath, ['scripts/longrun_sim.js', '30'],
+      { encoding: 'utf8', timeout: 120000, cwd: require('path').join(__dirname, '..') });
+    const lines = String(out).split('\n');
+    const at = lines.findIndex(l => l.indexOf('各货币的实测日收入') >= 0);
+    if (at < 0) return null;
+    const keys = ['points', 'otherworld', 'holy', 'rp'], got = {};
+    let n = 0;
+    for (let j = at + 1; j < lines.length && n < keys.length; j++) {
+      const m = lines[j].match(/日均\s*([\d,]+)/);
+      if (m) { got[keys[n]] = +m[1].replace(/,/g, ''); n++; }
+    }
+    return n === keys.length ? got : null;
+  } catch (e) { return null; }
+})();
+const dayF = {
   points: r.pointsPerMin * 1440 + boss.points * sweep * 0.5,
   /* V9.6.134：货币 8 → 4 —— 原「故事点」并入点数，原「技能芯片 / 血统结晶 / 深井徽记」
      并入异界结晶。`battleRewards` / `arenaReward` 返回的对象**已经**是合并后的口径，
@@ -54,6 +78,8 @@ const day = {
   charExp: boss.exp * sweep,                                   // 伙伴经验池：副本/扫荡那一份
   sectExp: D.SECT_EXP.perMin * 1440 + (D.SECT_EXP.normal + D.SECT_EXP.win) * sweep * 0.5,
 };
+const day = Object.assign({}, dayF);
+if (REAL) { day.points = REAL.points; day.otherworld = REAL.otherworld; day.holy = REAL.holy; }
 
 let warn = 0;
 const rows = [];
@@ -125,17 +151,23 @@ row('坐骑', `${D.MOUNTS.length} 匹`, { points: D.MOUNTS.reduce((a, m) => a + 
 }
 
 console.log(`=== 上限联动体检（样例存档：玩家 Lv.${LV} · 进度 W${String(TIER).padStart(2, '0')}）===`);
-console.log('  日收入（估）：' + ['points', 'otherworld', 'holy', 'exp', 'charExp', 'sectExp'].map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
-/* ═══ ⚠️ 口径警告（V1.0.1，游戏策划总监会诊查出）════════════════════════════
-   上面这行是**公式估算**（按当前进度的一条样例存档 × 各产线的理论日产量），
-   而 `longrun_sim` 报的是**实测**（真跑 30 / 90 天，靠 Core.tallyCur 记账）。
-   两者**不是一回事**，而且差得不小 —— 会诊那次实测：本文件 otherworld 约 1,759/天，
-   longrun_sim 90 天实测约 5,992/天，**差 3.4 倍**。
-   为什么差：公式只算了"挂机 + 扫荡 + 斗法台"三条，**漏了副本掉落、悬赏、深井、日常**。
-   **所以：下面那些"点满要几天"只能当数量级参考，不能当结论。**
-   要判断"这条线要多久"，用 `node scripts/longrun_sim.js 90` 的实测数。 */
-console.log('  ⚠ 以上为**公式估算**，与 longrun_sim 的实测口径不同（实测约高 3.4 倍）——'
-  + '判断"要几天"请以 longrun_sim 为准');
+console.log('  日收入（本表按它算）：' + ['points', 'otherworld', 'holy', 'exp', 'charExp', 'sectExp']
+  .map(k => `${k} ${Math.round(day[k]).toLocaleString()}`).join(' · '));
+if (REAL) {
+  console.log('    （三种货币 points / otherworld / holy 取 **longrun_sim 30 天实测记账**；exp / charExp / sectExp 走公式）');
+  const ratios = ['points', 'otherworld', 'holy'].map(k => ({ k, r: (REAL[k] || 0) / Math.max(1, dayF[k]) }));
+  console.log('  · 对照：只算"挂机+扫荡+斗法台"的老公式 = '
+    + ['points', 'otherworld', 'holy'].map(k => `${k} ${Math.round(dayF[k]).toLocaleString()}`).join(' · ')
+    + '（实测是它的 ' + ratios.map(x => x.r.toFixed(2) + '×').join(' / ') + '）');
+  const worst = ratios.reduce((m, x) => (x.r > m.r ? x : m), ratios[0]);
+  if (worst.r > 1.8) {
+    warn++;
+    console.log('  ⚠ 老公式比实测低 ' + worst.r.toFixed(1) + ' 倍（最偏的是 ' + worst.k + '）'
+      + ' —— 它已经跟不上游戏了（本表已改用实测，别再用那条公式做判断）');
+  }
+} else {
+  console.log('  ⚠ 跑不动 longrun_sim（没拿到实测口径），退回**只算三条产线的老公式** —— 它的数偏低，只当数量级参考');
+}
 console.log('');
 rows.forEach(x => console.log(x));
 
@@ -218,4 +250,4 @@ let curveBad = 0;
 }
 
 console.log(`\n结论：${warn === 0 && !curveBad ? '所有上限之间对得上、曲线也没断档 ✓'
-  : (warn ? '有 ' + warn + ' 处上限对不上' : '') + (curveBad ? (warn ? '、' : '') + '深井曲线有 ' + curveBad + ' 处断档' : '') + '，要调'}`);
+  : (warn ? '有 ' + warn + ' 处要留意（口径告警，见上面 ⚠）' : '') + (curveBad ? (warn ? '、' : '') + '深井曲线有 ' + curveBad + ' 处断档' : '') + '，要调'}`);

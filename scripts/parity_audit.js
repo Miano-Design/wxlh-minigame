@@ -20,6 +20,15 @@ const path = require('path');
 
 const MINI = path.resolve(__dirname, '..');
 const WEB = path.resolve(MINI, '../wxlh-game');
+/* ⛔ V1.1.11（2026-09-27）：**本尺子整体退役** —— 它存在的**唯一目的**就是"两仓对表"，
+   而网页版已按父亲大人的话归档到 GitHub、本地删掉（commit 589bebb）。
+   没有"另一仓"可对，这条机械比对无从执行；强行拿小游戏自己跟自己比只会全是假警报。
+   ⇒ 网页版哪天复活再把它恢复（`git show 589bebb:scripts/parity_audit.js` 在远端仓库里）。 */
+if (!fs.existsSync(WEB)) {
+  console.log('⏭ parity_audit 已退役：网页版归档到 GitHub、本地已删 —— 没有"另一仓"可对表。');
+  console.log('   （只查小游戏端的尺子照跑：page_smoke / layout_audit / visual_audit / journey_audit …）');
+  process.exit(0);
+}
 
 /* ---------- ① 剥注释 ---------- */
 function stripComments(src) {

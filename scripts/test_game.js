@@ -18,6 +18,21 @@ function t(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL:
 const realRandom = Math.random;
 // 需要"固定出率"的用例用这个：把整段随机钉成同一个值，跑完**还原成进来时的那个**（不是还原成裸 Math.random）
 function withRandom(v, fn) { const prev = Math.random; Math.random = () => v; try { return fn(); } finally { Math.random = prev; } }
+/* V1.1.4（A11 并池 + 单格上限 100 之后的**唯一正确造法**）：
+   并池口径是 `cap = max(50, 已扩容值, 实际占用)`，而基数 50 是**兜底不可下调**的
+   （父亲大人"老档不许缩水"那条 —— 靠这个取大天然兜住）。
+   所以老写法 `S.bag.itemCap = 1 / 2 / u0.itemStacks` **再也造不出"满背包"**了：
+   cap 永远 ≥50，那几条"满了会怎样"的用例会静默变成"没满"。
+   要造满只有一条正路：**让实际占用顶到 50**（给 50 种各 1 件），并把要试的那一件留在包外。
+   返回被留在包外的那个 id。 */
+function fillBagTightExcept(keepOut) {
+  Object.keys(Core.S.items).forEach((k) => delete Core.S.items[k]);
+  const kinds = Object.keys(D.ITEMS).filter((k) => k !== keepOut);
+  kinds.slice(0, 50).forEach((k) => Core.addItem(k, 1));
+  const u = Core.bagUsage();
+  if (u.used !== u.cap) throw new Error('fillBagTightExcept 没造出满背包：used=' + u.used + ' cap=' + u.cap);
+  return keepOut;
+}
 /* V9.6.90：整套用例默认跑在**一条固定随机数流**上 —— 同一份代码永远同一个结果。
    起因：`治疗者必杀次数`那条用例偶发红过一次（暴击/闪避的骰子影响了能量节奏），
    一把会自己抖的尺子比没有尺子更糟：红了不知道是代码坏了还是运气差。
@@ -25,6 +40,10 @@ function withRandom(v, fn) { const prev = Math.random; Math.random = () => v; tr
 {
   let seed = 0x2f6e2b1;
   Math.random = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  /* V1.1.4：把"重放同一条流"开出来 —— 有些用例要**两边跑在同一位置**才比得公平
+     （见 V9.5-7 治疗/输出必杀节奏）。不这么做的话，上游任何一处新增随机调用
+     都会悄悄把这个比较的结果挪走，红了也说不清是机制坏了还是流挪了。 */
+  global.reseedRandom = function (s) { seed = s >>> 0; };
 }
 
 // 1. 新游戏
@@ -266,7 +285,10 @@ t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
 
   /* 坐骑：驯服只是起点，喂养能一直投 */
   Core.addCur('points', 10000000);
-  Core.addItem('mat_t1', 5000);
+  /* V1.1.4（单格上限 100）：`addItem('mat_t1', 5000)` 现在要 **50 格**（＝整个基础容量），
+     会把这一块连带后面的"满了会怎样"用例一起带偏。这条用例只需要喂养 1 级（吃 1 块），
+     所以给 50 块（1 格）就够 —— 改的是**夹具用量**，不是判据。 */
+  Core.addItem('mat_t1', 50);
   const buy = Core.buyMount('mt01');
   t('坐骑能驯服', buy.ok, buy.msg || '');
   const p0 = Core.effectivePlayerStats().hp;
@@ -280,7 +302,7 @@ t('挂机1小时收益', gains.points > 0 && gains.exp > 0);
   /* 法宝：买到之后能祭炼，效果随等级放大 */
   Core.addCur('points', 100000);
   Core.addCur('otherworld', 100000);
-  Core.addItem('mat_t2', 5000);
+  Core.addItem('mat_t2', 50);        // 同上：祭炼 1 级只吃 1 块（原来 5000 ＝ 50 格）
   Core.buyFabao('fb01');
   Core.wearFabao('fb01');
   const e0 = Core.effectivePlayerStats().lifesteal || 0;
@@ -432,16 +454,36 @@ setParty(['C021']);
   const u0 = Core.bagUsage();
   t('道具格初始 50', u0.cap === 50 && u0.cap === D.BAG_BASE_ITEM_CAP);
   t('三池各 50 且互相独立', u0.eqCap === 50 && u0.matCap === 50 && u0.cap === 50);
-  Core.S.bag.itemCap = u0.itemStacks; // 只把道具格塞满
   Core.S.settings.autoSellN = false; Core.S.settings.autoSellR = false;
+  /* V1.1.4 修正：原来这里是 `Core.S.bag.itemCap = u0.itemStacks`（把道具池设成"刚好满"）。
+     并池之后 cap 是 `max(50, 已扩容, 实际占用)` —— 基数 50 兜底，这么写**造不出满背包**，
+     下面那条"满时新道具失败"就会变成"没满、当然成功"（静默失效的尺子）。
+     现在按新口径造满：占用顶到 50 格，留一个 exp_l 在包外当探针。 */
+  fillBagTightExcept('exp_l');
   t('道具格满时新道具失败', Core.addItem('exp_l') === false);
   t('已满的堆叠仍可叠加', Core.addItem('exp_s') === true);
   const eqFull = Core.grantEquip('W01', 'N');
   t('道具格满不影响装备入库', !!eqFull.equip && !eqFull.sold);
-  Core.S.bag.eqCap = u0.eqUsed;       // 再把装备格塞满
+  /* 装备池同理：`eqCap` 也有基数 50 兜底 → 真塞进 50+ 件才算满 */
+  for (let i = 0; i < 55; i++) Core.grantEquip('W01', 'N');
   const eqFull2 = Core.grantEquip('W01', 'N');
-  t('装备格满时自动分解', eqFull2.sold === true && eqFull2.bagFull === true);
-  Core.S.bag.itemCap = 50; Core.S.bag.eqCap = 50;
+  /* ================= V1.1.15（2026-09-27 · 父亲大人："不行啊，那我要是副本掉落的装备呢"）=================
+     口径改了：装备格满时**不再折现成 ◆**，而是进**装备待领箱**（`S.stashEq`），
+     扩容后一键领回。原来那一条写的是"自动分解"——那是旧口径，现在改成新口径 + 领回闭环。 */
+  t('装备格满时进「待领箱」而不是折现（一件不丢）',
+    eqFull2.stashed === true && eqFull2.bagFull === true && eqFull2.sold !== true);
+  (function () {
+    const n0 = Core.stashEqCount();
+    t('待领箱里确实收到那件装备', n0 >= 1, '待领箱 ' + n0 + ' 件');
+    const eqBefore = Core.bagUsage().eqUsed;
+    Core.addCur('points', 200000);
+    Core.buyBagCap('eq');                       // 扩容一次 → 空出 10 格
+    const cl = Core.claimStashEq();
+    t('扩容后点「全部领回」能拿回装备', cl.moved >= 1 && Core.bagUsage().eqUsed > eqBefore,
+      '领回 ' + cl.moved + ' 件 · 装备格 ' + Core.bagUsage().eqUsed + '/' + Core.bagUsage().eqCap);
+  })();
+  /* 扩容那几条要一个**干净窗口**：容量是"取大"，背包塞满时算不出 +10 的增量。 */
+  Core.newGame();
   Core.addCur('points', 100000);
   const cap0 = Core.bagUsage();
   const itemCap0 = cap0.cap, eqCap0 = cap0.eqCap;
@@ -454,17 +496,23 @@ setParty(['C021']);
   t('三条扩容曲线各自记账', Core.S.bag.itemExpands === 1 && Core.S.bag.eqExpands === 1 && Core.S.bag.matExpands === 0);
 }
 
-// 21b. 三池互相独立：道具池满了不影响材料池
+// 21b. V1.1.4（A11 并池之后）：道具与材料**不再分池** —— 池满就是全满
 {
   Core.newGame();
   Core.setPlayerName(D.PROTAG_NAMES[2]);
-  Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);   // 清掉新手道具，只看分池行为
-  Core.S.bag.itemCap = 1;
-  Core.S.bag.matCap = 3;
-  t('道具池先占满', Core.addItem('exp_s', 1) === true && Core.addItem('exp_m', 1) === false);
-  t('道具池满不影响材料池入库', Core.addItem('mat_t1', 1) === true && Core.addItem('mat_t2', 1) === true);
+  /* 原来这一块验的是"道具池满了不影响材料池"（V9.2 的三池时代）。V1.1.4 并池之后
+     **这句话按设计就不成立了** —— 道具与材料共用一个池，池满就是两头都进不来。
+     所以这块改判"并池之后**只有一套容量**"，验的是同一件事的新口径（不是把红的调绿）。 */
+  fillBagTightExcept('exp_s');            // 50 种各 1 件 → 占用顶到 50，exp_s 留在包外
   const u = Core.bagUsage();
-  t('三个池分别报数', u.itemStacks === 1 && u.matStacks === 2 && u.cap === 1 && u.matCap === 3);
+  t('并池后只有一套容量：道具与材料一起数格', u.used === 50 && u.cap === 50 && u.matStacks === 0);
+  t('池满时道具进不来', Core.addItem('exp_s', 1) === false);
+  Core.S.items.mat_t1 = 100;              // 材料正好占满它那一格（单格上限 100）
+  t('池满时材料也进不来（不再"各有一套容量"）', Core.addItem('mat_t1', 1) === false);
+  t('单格上限 100：100 件仍只占 1 格', Math.ceil(100 / D.BAG_STACK_MAX) === 1);
+  Core.addCur('points', 100000);
+  Core.buyBagCap('item');                 // 并池：扩容买的就是这唯一的池子
+  t('扩一次之后两头都进得来（同一个容量）', Core.addItem('exp_s', 1) === true && Core.addItem('mat_t1', 1) === true);
 }
 
 // 22. 删除进度不再被 beforeunload 回写
@@ -660,7 +708,7 @@ setParty(['C021']);
   t('免费招募计入统计', Core.S.stats.recruits === 1);
   t('免费招募计入日常', Core.S.tasks.daily.recruit1 === 1);
   Core.S.ssrTicket = 1;
-  Core.ssrTicketUse(D.characters.find(c => c.rarity === 'SSR' && !c.hidden).id);
+  Core.ssrTicketUse(D.characters.find(c => c.rarity === 'SSR').id);
   t('SSR 自选券也计入统计', Core.S.stats.recruits === 2);
 }
 
@@ -725,10 +773,10 @@ setParty(['C021']);
 {
   Core.newGame();
   Core.setPlayerName(D.PROTAG_NAMES[3]);
-  Object.keys(Core.S.items).forEach(k => delete Core.S.items[k]);
-  Core.S.bag.itemCap = 2;
-  // 道具池占满 2 格（用两件**不是**货架第 0 位的东西，这样"买不到"才说明是容量问题）
-  Core.S.items.exp_m = 1; Core.S.items.box_r = 1;
+  /* V1.1.4 修正（同 21）：`itemCap = 2` 在并池口径下造不出满背包（基数 50 兜底）。
+     按新口径造满，并把货架第 0 位（初级经验模块 exp_s）留在包外 ——
+     这样"买不到"仍然只可能是容量问题，不是别的原因。 */
+  fillBagTightExcept('exp_s');
   Core.S.cur.points = 100000;
   const r = Core.buyShopItem('god', 0);                // 初级经验模块
   t('背包满时购买被拒', r.ok === false);
@@ -1496,7 +1544,7 @@ setParty(['C021']);
   // 高级池：把"除一个人之外"的所有 SSR 都塞进背包，保底那一抽必须给还没有的那个
   Core.newGame(); Core.setPlayerName('招募2');
   Core.addCur('otherworld', 200 * 200);      // V1.0.1：高级池单抽 ◆200
-  const ssrs = D.characters.filter(c => c.rarity === 'SSR' && !c.hidden);
+  const ssrs = D.characters.filter(c => c.rarity === 'SSR');      // 2026-09-27：没有 hidden 概念了
   const wantId = ssrs[3].id;
   ssrs.forEach(c => {
     if (c.id === wantId) return;
@@ -1792,7 +1840,6 @@ setParty(['C021']);
 
   // 材料不足时失败
   t('高级货币不足时升不了', Core.upgradeAuthority().ok === false);
-
   /* V9.6.133：权限 20 级 → 每一级都跟着进度解锁（通关第 ceil(N×1.8) 张图）。
      先验证"没进度就点不动"，再补上进度验证整条线能走完。 */
   const c1pre = D.authorityCost(0);
@@ -1809,6 +1856,19 @@ setParty(['C021']);
     Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(2), hell: Array(12).fill(0) } };
   });
 
+  /* V1.1.4（A12-F · 灯阁权限接「灯油」每级 3 块）：进度通了之后，**先验"没料也升不了"**，
+     再给料 —— 两条缺一不可（只验"有料能升"的话，材料那一格写成 0 也照样绿）。
+     这一段必须排在"补进度"之后：否则拦下来的理由是"还没解锁"，验不到材料那一条。 */
+  {
+    const c = D.authorityCost(0);
+    Core.addCur('holy', c.holy); Core.addCur('otherworld', c.otherworld);
+    const holyKeep = Core.S.cur.holy, owKeep = Core.S.cur.otherworld;
+    const r = Core.upgradeAuthority();
+    t('没灯油：进度与货币都够也升不了', !r.ok && r.msg.indexOf('灯油') >= 0);
+    t('没灯油：货币一点没被扣走', Core.S.cur.holy === holyKeep && Core.S.cur.otherworld === owKeep && Core.S.auth === 0);
+    Core.addItem(D.AUTHORITY_MAT, 1000);          // 20 级共吃 60 块，给 1000 是余量
+  }
+
   // 给足材料升到 1 级
   const c1 = D.authorityCost(0);
   const holy0 = Core.S.cur.holy, ow0 = Core.S.cur.otherworld;
@@ -1816,6 +1876,8 @@ setParty(['C021']);
   const up1 = Core.upgradeAuthority();
   t('够材料就能升级', up1.ok && Core.S.auth === 1);
   t('升级扣掉两种高级货币', Core.S.cur.holy === holy0 && Core.S.cur.otherworld === ow0);
+  /* V1.1.4（A12-F）：材料真的被扣 3 块（不是"判了但没扣"）。 */
+  t('升级还扣掉 3 块灯油（每级 3 块）', Core.S.items[D.AUTHORITY_MAT] === 1000 - D.AUTHORITY_MAT_N);
   t('挂机产出真的变高', Core.idleBaseRates().pointsPerMin > base0);
   t('挂机经验也提高', Core.idleBaseRates().expPerMin > 0 && Core.authority().expPct === D.AUTHORITY_PER_LV.expPct);
 
@@ -1922,8 +1984,22 @@ setParty(['C021']);
   Core.newGame();
   const atk0 = Core.effectivePlayerStats().atk;
   Core.addCur('otherworld', 100000);
+  /* V1.1.4（A12-F · 秘术阁接「秘卷残章」每 5 级 1 张）：0→10 级会跨过 5 级与 10 级两道门 ＝ 吃 2 张。
+     先验"没有秘卷就点不动"，再给料。 */
+  /* 用**另一条线**（体修术）验"第 5 级那道门"，免得扰动下面 gongfa 的 0→10 断言。
+     注意连点的语义：0→5 会**升到 4 级为止**（第 5 级被材料拦住），返回 ok 但只升了 4 级；
+     再点 1 级才会明确报"秘卷残章不足"。 */
+  t('没秘卷残章：0→4 级能升，第 5 级被拦住', (function () {
+    Core.kejiUp('tixiu', 5);
+    const lv = Core.kejiLv('tixiu');
+    const r = Core.kejiUp('tixiu', 1);
+    return lv === 4 && !r.ok && r.msg.indexOf('秘卷残章') >= 0;
+  })());
+  Core.addItem(D.KEJI_MAT, 100);
+  const scroll0 = Core.S.items[D.KEJI_MAT];
   const r1 = Core.kejiUp('gongfa', 10);
   t('秘术能升级', r1.ok && Core.kejiLv('gongfa') === 10);
+  t('秘术每 5 级吃 1 张秘卷残章（0→10 级 ＝ 2 张）', scroll0 - (Core.S.items[D.KEJI_MAT] || 0) === 2);
   t('秘术消耗异界结晶', Core.S.cur.otherworld < 100000);
   t('秘术加成进攻击', Core.effectivePlayerStats().atk > atk0);
   t('秘术经济线进挂机产出', (() => {
@@ -1935,6 +2011,15 @@ setParty(['C021']);
     Core.S.cur.otherworld = 0;
     const lv = Core.kejiLv('tixiu');
     const r = Core.kejiUp('tixiu', 1);
+    return !r.ok && Core.kejiLv('tixiu') === lv;
+  })());
+  t('秘卷残章不够时也升不动', (() => {
+    Core.addCur('otherworld', 100000);
+    const lv = Core.kejiLv('tixiu');
+    const keep = Core.S.items[D.KEJI_MAT] || 0;
+    Core.S.items[D.KEJI_MAT] = 0;
+    const r = Core.kejiUp('tixiu', 5);            // 跨过 5 级那道门
+    Core.S.items[D.KEJI_MAT] = keep;
     return !r.ok && Core.kejiLv('tixiu') === lv;
   })());
   t('每条秘术都有名字/上限/消耗', D.KEJI.every(k => k.name && k.max > 0 && D.kejiCost(k, 0) > 0));
@@ -1999,10 +2084,19 @@ setParty(['C021']);
   t('没开的地种不下去', !Core.plantGarden(D.GARDEN_PLOTS, 'g1').ok);
   t('同一种灵田循环对应（第 5 块还是下品灵田）', gs0[D.GARDEN_PLOTS].kind.id === D.GARDEN[0].id);
   t('药园初始全空', gs0.every(s => !s.plot));
+  /* V1.1.4（A12-F · 药园接「灵植种」每块地 1 颗）：先验"没有种子种不下去"（不然这条判据等于没写），
+     再给种子走完整条播种→收成。 */
+  /* V1.1.5：开局 STARTER 已经给了 3 颗种子（那是"不许卡住第一次播种"的兜底）——
+     这条要验的是"手里真的没有种子时"的行为，所以先把种子清零，别依赖开局送了多少。 */
+  Object.keys(Core.S.items).forEach(function (k) { if (k === D.GARDEN_SEED) delete Core.S.items[k]; });
+  t('没灵植种：种不下去（材料也是播种条件）', !Core.plantGarden(0, 'g1').ok);
+  Core.addItem(D.GARDEN_SEED, 20);
+  const seed0 = Core.S.items[D.GARDEN_SEED];
   const pt0 = Core.S.cur.points;
   const p1 = Core.plantGarden(0, 'g1');
   t('药园能播种', p1.ok);
   t('播种扣点数', Core.S.cur.points === pt0 - D.GARDEN[0].points);
+  t('播种还扣 1 颗灵植种', seed0 - Core.S.items[D.GARDEN_SEED] === D.GARDEN_SEED_N);
   t('同一块地不能种两次', !Core.plantGarden(0, 'g1').ok);
   t('没熟不能收', !Core.harvestGarden(0).ok);
   Core.S.garden[0].at = Date.now() - 1000;         // 把成熟时间拨到过去
@@ -2010,6 +2104,20 @@ setParty(['C021']);
   t('熟了能收', h1.ok);
   t('收获给到材料', (Core.S.items.mat_t1 || 0) >= D.GARDEN[0].out.n);
   t('收完地变空', !Core.S.garden[0]);
+  /* V1.1.4（A12-F）：**收成回收 70%** —— 一块地只吃 1 颗，所以 0.7 在整数粒度上只能是
+     "按概率进位"（`floor(0.7) = 0` 会让药园变纯消耗，那正是"永远卡住药园"）。两种落点都钉一次。 */
+  Core.addItem(D.GARDEN_SEED, 5);
+  const seedA = Core.S.items[D.GARDEN_SEED];
+  Core.plantGarden(0, 'g1');
+  Core.S.garden[0].at = Date.now() - 1000;
+  const hA = withRandom(0.0, () => Core.harvestGarden(0));      // 0.0 < 0.7 → 回收
+  t('收成回收 70%：落在回收那一侧就把种子还回来', hA.ok && (Core.S.items[D.GARDEN_SEED] || 0) === seedA);
+  Core.addItem(D.GARDEN_SEED, 5);
+  const seedB = Core.S.items[D.GARDEN_SEED];
+  Core.plantGarden(0, 'g1');
+  Core.S.garden[0].at = Date.now() - 1000;
+  const hB = withRandom(0.9, () => Core.harvestGarden(0));      // 0.9 > 0.7 → 不回收
+  t('收成回收 70%：落在不回收那一侧就少 1 颗', hB.ok && (Core.S.items[D.GARDEN_SEED] || 0) === seedB - 1);
   // 种地不能是"亏本买卖"：收获材料的替代价必须 ≥ 投入点数（否则点数不如直接留着买材料）
   t('每块灵田都不亏（收获价值 ≥ 投入点数）', D.GARDEN.every(g => {
     const tier = +g.out.item.replace('mat_t', '');
@@ -2025,6 +2133,7 @@ setParty(['C021']);
   // 一键收：两块地都熟了才收得动
   Core.newGame();
   Core.S.cur.points = 100000;
+  Core.addItem(D.GARDEN_SEED, 20);        // V1.1.4：播种要种子（见上）
   Core.plantGarden(0, 'g1');
   Core.plantGarden(1, 'g2');
   t('没熟时一键收无所得', !Core.harvestAllGarden().ok);
@@ -2190,9 +2299,389 @@ setParty(['C021']);
     if (it.type === 'serum') return !!(it.serum && it.serum.key && it.serum.max > 0);
     if (it.type === 'material') return it.tier > 0;
     if (it.type === 'ticket') return !!(it.pool && D.RECRUIT_POOLS[it.pool]);
-    if (it.type === 'box') return !!it.rarity;
+    /* V1.1.4（A12 材料包）：箱子现在有两种 —— 装备箱（有 `rarity`）与
+       材料包（`matPack` 指向 `MAT_PACKS` 的开出表）。判据本身不变：**每一件都必须有去处**。 */
+    if (it.type === 'box') return !!(it.rarity || (it.matPack && D.MAT_PACKS && D.MAT_PACKS[it.matPack]));
+    /* V1.1.8（戊组 A13-F）：重铸石用**新 type `reforge`**（A11 排序表留的"兜底组"就是给它的）。
+       判据还是那条：**每一件道具都必须有真实去处** —— 它的去处是装备详情页的「重铸副词条」。 */
+    if (it.type === 'reforge') return !!D.REFORGE_ITEM && D.REFORGE_ITEM === k;
     return false;                              // 出现没见过的类型 = 有人加了道具却没接入系统
   }));
+}
+
+/* ================= V1.1.8（戊组 A13-F 重铸石）=================
+   《收口2》§1.4 的四条判据，逐条钉住：
+     ① 重铸 20 次后**词条种类集合不变**（只重摇数值、不换种类）；
+     ② **数值全在 `AFFIX_POOL` 区间内**（走 `D.rollAffixValue`，与生成装备同一个函数）；
+     ③ **强化等级与锁定状态不变**；
+     ④ 报价 ＝ **1 块当前档材料 ＋ ◉3,000**（临时值），且**锁定过的不可重摇**。 */
+{
+  Core.newGame(); Core.setPlayerName('重铸');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.addCur('points', 1e7); Core.addCur('otherworld', 1e7);
+  let uid = null;
+  for (let i = 0; i < 30 && !uid; i++) { const r = Core.grantEquip('W20', 'SR'); if (r.equip && r.equip.affixes.length) uid = r.equip.uid; }
+  const eq = Core.S.equips[uid];
+  t('重铸石在道具表里、type 是新加的 `reforge`（落在排序表兜底组）', !!D.ITEMS.reforge_stone && D.ITEMS.reforge_stone.type === 'reforge');
+  t('重铸石有真实来源（异界商店可买）', D.SHOPS.otherworld.items.some(x => x.item === 'reforge_stone'));
+  Core.addItem('reforge_stone', 40);
+  const tierItem = 'mat_t' + D.enhanceMatTier(eq.enhance);
+  Core.addItem(tierItem, 50);
+  const q0 = Core.reforgeQuote(uid);
+  t('报价 = 1 块当前档材料 ＋ ◉3,000（临时值）＋ 1 颗重铸石',
+    q0.points === 3000 && q0.item === tierItem && q0.itemN === 1 && q0.stone === 'reforge_stone' && q0.stoneN === 1);
+  const kinds0 = eq.affixes.map(a => a.k).join(','), enh0 = eq.enhance, lock0 = !!eq.lock;
+  let fails = 0, outRange = 0;
+  for (let i = 0; i < 20; i++) {
+    const r = Core.reforgeEquip(uid);
+    if (!r.ok) { fails++; break; }
+    if (eq.affixes.map(a => a.k).join(',') !== kinds0) fails++;
+    eq.affixes.forEach(a => { const p = D.AFFIX_POOL[a.k] || {}; if (!p.max || !(a.v >= p.min - 1e-9 && a.v <= p.max * 1.35 + 1e-9)) outRange++; });
+  }
+  t('重铸 20 次：词条**种类集合不变**、一次都没失败', fails === 0, fails ? (fails + ' 次异常') : '20 次全过');
+  t('重铸 20 次：数值**全在 `AFFIX_POOL` 区间内**（含神话可越上限那一档）', outRange === 0, outRange ? (outRange + ' 个越界') : '零越界');
+  t('重铸不改**强化等级**与**锁定状态**', eq.enhance === enh0 && !!eq.lock === lock0,
+    '强化 +' + eq.enhance + '（原 +' + enh0 + '）· 锁定 ' + eq.lock);
+  Core.toggleEquipLock(uid);
+  const rl = Core.reforgeEquip(uid);
+  t('锁定过的装备**不可重摇**（锁＝别动它）', !rl.ok && /锁定/.test(rl.msg), rl.msg);
+  t('没有副词条的装备重铸不了，而且**不白扣材料**', (function () {
+    const two = Core.grantEquip('W01', 'N');            // N 档：0 条副词条
+    const e2 = two.equip ? Core.S.equips[two.equip.uid] : null;
+    if (!e2) return false;
+    const before = Core.S.items.reforge_stone || 0;
+    const r = Core.reforgeEquip(e2.uid);
+    return !r.ok && (Core.S.items.reforge_stone || 0) === before;
+  })());
+}
+
+/* ================= V1.1.13（0927-E · 总监 0927-D §九 S19）两档重铸 / 锁定 / 炉火 / 部位加权 =================
+   这一轮把"重铸"从**一档**扩成**两档**（＋锁定＋炉火＋部位加权池），五条新行为各一条断言：
+     ① 实得条数 ＝ 标称（康康修的那个 bug，这里是**回归钉子**）
+     ② 部位加权池真的在起作用（武器爱出攻向、胸甲爱出生命）
+     ③ 锁定的那几条**一个字节都不动**（且锁了只会多花石头，不会"锁了还能摇"）
+     ④ 炉火第 6 次**必不倒退**（且计数归零）
+     ⑤ 老档（没有 `forge` / `affixLock`）读档能补默认值，且**不动老装备的词条**
+   加上两条结构保证：档 C 不会抽出重复词条 / 专属装备不许重抽；两档都**不碰** base·enhance·lock·套装字段。 */
+{
+  Core.newGame(); Core.setPlayerName('重铸E');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  Core.addCur('points', 1e8); Core.addCur('otherworld', 1e7);
+  /* ⚠️ **先扩容再发料** —— 顺序反了的话 addItem 会把超出容量的部分丢进待领箱，
+     于是"石头不足 0/N"（本单实测踩过：5000 颗全进了待领箱，五条断言一起红）。 */
+  Core.S.bag.eqCap = 100000; Core.S.bag.matCap = 100000; Core.S.bag.itemCap = 100000;
+  Core.addItem('reforge_stone', 5000);
+  for (let i = 1; i <= 5; i++) Core.addItem('mat_t' + i, 2000);
+
+  /* ① 条数 = 标称 */
+  const want = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4, MYTH: 5 };
+  let badN = [];
+  Object.keys(want).forEach((rar) => {
+    for (let i = 0; i < 40; i++) {
+      const r = Core.grantEquip('W20', rar);
+      const e = r.equip ? Core.S.equips[r.equip.uid] : null;
+      if (!e || (e.affixes || []).length !== want[rar]) { badN.push(rar + '=' + ((e && e.affixes || []).length) + '/' + want[rar]); break; }
+    }
+  });
+  t('① 每个稀有度的副词条**实得条数 = 标称条数**（N0/R1/SR2/SSR3/UR4/MYTH5）',
+    badN.length === 0, badN.length ? badN.join(' ') : '六档 × 40 件全对');
+
+  /* ② 部位加权池：武器 vs 胸甲 的词条分布要明显不同 */
+  const count = { weapon: {}, armor: {} };
+  ['weapon', 'armor'].forEach((slot) => {
+    for (let i = 0; i < 400; i++) {
+      const r = Core.grantEquip('W20', 'UR', slot);
+      const e = r.equip ? Core.S.equips[r.equip.uid] : null;
+      (e ? e.affixes : []).forEach(a => { count[slot][a.k] = (count[slot][a.k] || 0) + 1; });
+    }
+  });
+  const c = (slot, k) => count[slot][k] || 0;
+  t('② 部位加权池生效：武器出「攻击力」远多于出「生命」；胸甲反过来',
+    c('weapon', 'atkPct') > c('weapon', 'hpPct') * 2 && c('armor', 'hpPct') > c('armor', 'atkPct') * 2,
+    '武器 攻' + c('weapon', 'atkPct') + '/生' + c('weapon', 'hpPct')
+    + ' · 胸甲 生' + c('armor', 'hpPct') + '/攻' + c('armor', 'atkPct'));
+
+  /* 取一件 UR 武器当靶子（4 条词条，够测锁定与保底） */
+  let uid = null;
+  for (let i = 0; i < 60 && !uid; i++) {
+    const r = Core.grantEquip('W20', 'UR', 'weapon');
+    if (r.equip && r.equip.affixes.length === 4) uid = r.equip.uid;
+  }
+  const eq = Core.S.equips[uid];
+  const base0 = JSON.stringify(eq.base), enh0 = eq.enhance, lock0 = !!eq.lock, set0 = JSON.stringify([eq.set, eq.bloodSet, eq.godSet]);
+
+  /* ③ 锁定：锁第 0 条 → 摇 10 次，第 0 条的 k 与 v 一个字节不变；且报价多花 1 颗石/条 */
+  const r1 = Core.setAffixLock(uid, 0, true);
+  const qLock = Core.reforgeQuote(uid);
+  let frozenOk = true, moved = 0;
+  for (let i = 0; i < 10; i++) {
+    const v1 = eq.affixes[0].k + ':' + eq.affixes[0].v;
+    const others = eq.affixes.slice(1).map(a => a.k + ':' + a.v).join('|');
+    const r = Core.reforgeEquip(uid, { mode: 'value' });
+    if (!r.ok) { frozenOk = false; break; }
+    if (eq.affixes[0].k + ':' + eq.affixes[0].v !== v1) frozenOk = false;
+    if (eq.affixes.slice(1).map(a => a.k + ':' + a.v).join('|') !== others) moved++;
+  }
+  t('③ 锁定的词条摇 10 次**一个字节都不动**（`affixLock` 是独立字段，不是 `eq.lock`）',
+    r1.ok && frozenOk && eq.affixLock.length === 1 && eq.affixLock[0] === 0 && moved > 0,
+    '锁住的下标 ' + JSON.stringify(eq.affixLock) + ' · 未锁的那几条摇动 ' + moved + '/10 次');
+  t('③b 每锁 1 条 ＋1 颗石（报价随锁定条数走）', qLock.stoneN === 2, 'stoneN=' + qLock.stoneN);
+  t('③c 最多锁 n−1 条（至少留 1 条参与）', (function () {
+    Core.setAffixLock(uid, 1, true); Core.setAffixLock(uid, 2, true);
+    const over = Core.setAffixLock(uid, 3, true);        // 4 条全锁 → 必须被拒
+    const ok = !over.ok && Core.affixLocksOf(eq).length === 3;
+    Core.setAffixLock(uid, 1, false); Core.setAffixLock(uid, 2, false);
+    return ok;
+  })());
+
+  /* ④ 炉火：攒到 5 → 第 6 次必不倒退（逐条比较未锁定的那几条） */
+  Core.setAffixLock(uid, 0, false);
+  eq.forge = { n: 0, best: 0 };
+  for (let i = 0; i < 5; i++) Core.reforgeEquip(uid, { mode: 'value' });
+  const nBefore = eq.forge.n;
+  const valsBefore = eq.affixes.map(a => a.v);
+  const rPity = Core.reforgeEquip(uid, { mode: 'value' });
+  const noDrop = eq.affixes.every((a, i) => a.v >= valsBefore[i] - 1e-9);
+  t('④ 炉火：攒满 5 次后第 6 次**必不倒退**、且计数归零',
+    nBefore === 5 && rPity.ok && rPity.pityHit === true && noDrop && eq.forge.n === 0,
+    'n=' + nBefore + ' → ' + eq.forge.n + ' · 逐条不倒退 ' + noDrop);
+
+  /* ⑤ 档 C：种类会换、但**同一件装备上不会出现两条同名词条**；专属装备不许重抽 */
+  /* ⚠️ 第一版这里**只查了"没有重复＋在区间内"**，于是"档 C 其实什么都没换"这种改坏**照样绿** ——
+     本轮改坏试验当场发现（把 `rollAffixKey` 换成 `a.k` 竟全过）。
+     现在显式要求"**种类真的变了**"：连做 3 次档 C，至少有一次的词条集合与上一次不同。 */
+  const kindsBefore = eq.affixes.map(a => a.k).join(',');
+  let changed = 0, rC = null, kindsNow = [];
+  for (let i = 0; i < 3; i++) {
+    const prev = eq.affixes.map(a => a.k).join(',');
+    rC = Core.reforgeEquip(uid, { mode: 'kind' });
+    kindsNow = eq.affixes.map(a => a.k);
+    if (kindsNow.join(',') !== prev) changed++;
+  }
+  t('⑤ 档 C 重抽词条：种类**真的换了**，且没有重复词条、数值仍在区间内',
+    rC.ok && changed > 0 && new Set(kindsNow).size === kindsNow.length
+    && kindsNow.every(k => { const p = D.AFFIX_POOL[k] || {}; const a = eq.affixes.find(x => x.k === k); return p.max && a.v >= p.min - 1e-9 && a.v <= p.max * 1.35 + 1e-9; }),
+    '旧 ' + kindsBefore + ' → 新 ' + kindsNow.join(',') + '（3 次里换了 ' + changed + ' 次）');
+  t('⑤b 专属装备不许重抽词条（档 A 仍可用）', (function () {
+    const sig = Core.grantSignatureEquip ? Core.grantSignatureEquip(0) : null;
+    const se = sig && sig.equip ? Core.S.equips[sig.equip.uid] : null;
+    if (!se) return false;
+    const bad = Core.reforgeEquip(se.uid, { mode: 'kind' });
+    const okA = Core.reforgeEquip(se.uid, { mode: 'value' });
+    return !bad.ok && okA.ok;
+  })());
+
+  /* ⑥ 两档都**不碰** base / enhance / lock / 套装字段（结构保证，V1.1.13 继续钉） */
+  t('⑥ 两档重铸都不改 base / 强化 / 整件锁 / 套装三字段',
+    JSON.stringify(eq.base) === base0 && eq.enhance === enh0 && !!eq.lock === lock0
+    && JSON.stringify([eq.set, eq.bloodSet, eq.godSet]) === set0);
+
+  /* ⑦ 老档：抹掉新字段 → migrate 补默认值，且**不动老装备的词条** */
+  t('⑦ 老档（没有 forge / affixLock）读档能补默认值、且不动词条', (function () {
+    delete eq.forge; delete eq.affixLock;
+    const snap = eq.affixes.map(a => a.k + ':' + a.v).join(',');
+    Core.migrate();
+    return eq.forge && eq.forge.n === 0 && Array.isArray(eq.affixLock) && eq.affixLock.length === 0
+      && eq.affixes.map(a => a.k + ':' + a.v).join(',') === snap;
+  })());
+}
+
+/* ================= V1.1.14（0927-F · 父亲大人）伙伴碎片：**按伙伴各算各的** =================
+   他原话：「**还是得当前伙伴等级满星了，之后再抽出来才成通用的**，不然还是得**按照抽到谁就是谁的碎片**」。
+   四条新规矩各一条断言（每条都能单独红），外加"UR 满星 200、别的档不动"的成本曲线：
+     ① 重复抽到**没满星**的伙伴 → 进**他自己**那份（该档通用池一动不动）
+     ② 该伙伴**满星之后**再抽到 → 才转成该稀有度**通用池**
+     ③ 升星**先吃他自己的**（自己的够 → 通用池一动不动）
+     ④ 自己不够 → 才用**同稀有度通用池**补（先扣光自己的、再扣池子） */
+{
+  Core.newGame(); Core.setPlayerName('碎片F');
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });
+  const id = 'C021';
+  const base = D.charById[id];
+  const rar = base.rarity;
+  const maxStar = D.RARITY_MAXSTAR[rar];
+
+  /* ① 重复抽到（没满星）→ 进他自己那份 */
+  Core.addChar(id);
+  Core.S.chars[id].star = 1;
+  Core.S.chars[id].shards = 0;
+  Core.S.shardPool[rar] = 0;
+  const dup1 = Core.addChar(id);
+  t('① 重复抽到（没满星）→ 进**他自己**那份，通用池一动不动',
+    dup1.to === 'self' && Core.shardsOf(id) === D.DUP_SHARDS && Core.shardPoolOf(rar) === 0,
+    'to=' + dup1.to + ' · 自己的 ' + Core.shardsOf(id) + ' · ' + rar + ' 池 ' + Core.shardPoolOf(rar));
+
+  /* ② 满星之后再抽到 → 转通用池 */
+  Core.S.chars[id].star = maxStar;
+  const ownBefore = Core.shardsOf(id);
+  const dup2 = Core.addChar(id);
+  t('② 该伙伴**满星之后**再抽到 → 转成 ' + rar + ' 通用池（他自己那份不再涨）',
+    dup2.to === 'pool' && Core.shardPoolOf(rar) === D.DUP_SHARDS && Core.shardsOf(id) === ownBefore,
+    'to=' + dup2.to + ' · ' + rar + ' 池 ' + Core.shardPoolOf(rar) + ' · 他自己的仍是 ' + Core.shardsOf(id));
+
+  /* ③ 升星先吃自己的（自己的够 → 池子不动） */
+  Core.S.chars[id].star = 1;
+  const need12 = D.starCostOf(rar, 1);
+  Core.S.chars[id].shards = need12;
+  Core.S.shardPool[rar] = 500;
+  const poolBefore = Core.shardPoolOf(rar);
+  const up1 = Core.starUp(id);
+  t('③ 升星**先吃他自己的**（自己够时通用池一颗都不动）',
+    up1.ok && Core.S.chars[id].star === 2 && Core.shardsOf(id) === 0 && Core.shardPoolOf(rar) === poolBefore && up1.fromOwn === need12 && up1.fromPool === 0,
+    '扣自己 ' + up1.fromOwn + ' ＋ 池 ' + up1.fromPool + '（池 ' + poolBefore + '→' + Core.shardPoolOf(rar) + '）');
+
+  /* ④ 自己不够 → 用同稀有度通用池补（先扣光自己的） */
+  const need23 = D.starCostOf(rar, 2);
+  Core.S.chars[id].shards = 3;
+  Core.S.shardPool[rar] = need23 + 10;                       // 给足：3 ＋ 池 ≥ need23
+  const pool2 = Core.shardPoolOf(rar);
+  const up2 = Core.starUp(id);
+  t('④ 自己不够 → 用**同稀有度通用池**补（先扣光自己的那 3 颗）',
+    up2.ok && Core.S.chars[id].star === 3 && Core.shardsOf(id) === 0
+    && Core.shardPoolOf(rar) === pool2 - (need23 - 3) && up2.fromOwn === 3 && up2.fromPool === need23 - 3,
+    '这一星需要 ' + need23 + '：他自己的 3 ＋ ' + rar + ' 池 ' + (need23 - 3) + '（池 ' + pool2 + '→' + Core.shardPoolOf(rar) + '）');
+
+  /* ⑤ 成本曲线：UR 满星 200，其他档**一个字不动**（N60 / R130 / SR240 / SSR400） */
+  const sumTo = (rarity, n) => { let s = 0; for (let st = 1; st < n; st++) s += D.starCostOf(rarity, st); return s; };
+  t('⑤ UR 满星 **200**（原来的 400 砍半），而 N/R/SR/SSR 一档都没动',
+    sumTo('UR', 6) === 200 && sumTo('SSR', 6) === 400 && sumTo('SR', 5) === 240 && sumTo('R', 4) === 130 && sumTo('N', 3) === 60,
+    'UR ' + sumTo('UR', 6) + ' · SSR ' + sumTo('SSR', 6) + ' · SR ' + sumTo('SR', 5) + ' · R ' + sumTo('R', 4) + ' · N ' + sumTo('N', 3));
+}
+
+/* ================= V1.1.4（A12 材料）=================
+   《收口2》§3 / 《续2》§3 那一套的验收：**五种新料各有"真去处"与"真来源"**，
+   三种材料包能开，老档入门包只发一次。这里钉的是**结构与数**（平衡留给数值轮）：
+     · 去处：铭刻 293 块（20 阶）· 命格 145 块/人（50 级）· 灯阁权限 60 块（20 级）·
+             秘术阁 301 张 · 药园循环（播种 1 颗 / 收成回收 70%）
+     · 来源：守关/精英的**额外**掉落槽（不抢现有 6 种料的产量）· 深井每 10 层 2 颗 ·
+             扫荡每 5 次 1 张 · 游历奇遇 / 市集 / 副本材料档
+     · 结构：新料 id **不带 `mat_tN` 序号语义** → 现有 6 个消耗口结构上吃不到（§3.3 第 2/3 条） */
+{
+  Core.newGame(); Core.setPlayerName('材料');
+
+  /* ① 材料表：5 种新料 ＋ 3 种材料包 */
+  const NEW_MATS = ['minghun_sha', 'xuesui_jing', 'dengyou', 'mijuan_canzhang', 'lingzhi_zhong'];
+  t('五种新料都进了道具表、都是 material', NEW_MATS.every(id => D.ITEMS[id] && D.ITEMS[id].type === 'material'));
+  t('三种材料包都进了道具表、都是 box', ['matpack_low', 'matpack_mid', 'matpack_high']
+    .every(id => D.ITEMS[id] && D.ITEMS[id].type === 'box' && D.MAT_PACKS[D.ITEMS[id].matPack]));
+  t('新料 id 不带 mat_tN 序号语义（现有 6 个消耗口按 mat_t+档位取料 → 结构上吃不到）',
+    NEW_MATS.every(id => id.indexOf('mat_t') !== 0));
+  t('现有 6 个消耗口的取料写法没变（仍只认 mat_t1~t5 与兽魂石）',
+    D.SERUMS.every(s => /^mat_t[1-5]$/.test(s.mat))
+    && /^mat_t[1-5]$/.test(D.mountFeedCost(D.MOUNTS[0], 0).mat)
+    && /^mat_t[1-5]$/.test(D.fabaoRefineCost(D.FABAO[0], 0).mat));
+  /* V1.1.8 更新：A13-F 落地之后，**重铸石**（type `reforge`）补上了 ——
+     于是品种数从"材料 11 ＋ 道具 40 ＝ 51"变成 **材料 11 ＋ 道具 41 ＝ 52**，
+     正好等于 `收口4` §2.2 原本按"材料 11 ＋ 道具 41"算的那个数 ✓
+     （并池容量基数 50 < 52 → "收集满必扩一次"这条结论不变）。 */
+  t('材料 11 种 ＋ 道具 41 种 ＝ 52 种（A13-F 落地后与 `收口4` §2.2 的口径对齐）',
+    Object.values(D.ITEMS).filter(i => i.type === 'material').length === 11
+    && Object.values(D.ITEMS).filter(i => i.type !== 'material').length === 41);
+
+  /* ② 两个报价的数：写死进固定表，改表就必须过这两条 */
+  t('铭刻 20 阶：铭魂砂逐阶 2~13 块、合计 293 块（《续2》§3.1）',
+    D.GENE_LOCKS.length === 20 && D.GENE_LOCKS.every(g => g.mat === D.GENE_LOCK_MAT && g.matN > 0)
+    && D.GENE_LOCKS.reduce((a, g) => a + g.matN, 0) === 293);
+  t('铭刻 ◆ 侧按 25% 搬料后的现值（合计 438,900）',
+    D.GENE_LOCKS.reduce((a, g) => a + g.cost.otherworld, 0) === 438900);
+  t('命格 0→50 级：血髓晶合计 145 块/人，且前 5 级不吃料（《续2》§3.2）',
+    D.BLOODLINE_MAT_TABLE.length === 50 && D.BLOODLINE_MAT_TABLE.slice(0, 5).every(n => n === 0)
+    && D.BLOODLINE_MAT_TABLE.reduce((a, b) => a + b, 0) === 145);
+  t('灯阁权限 20 级：每级 3 块灯油、合计 60 块（《收口2》§3.1）',
+    D.AUTHORITY_MAT_N === 3 && D.authorityCost(0).mat === D.AUTHORITY_MAT
+    && Array.from({ length: 20 }, (_, i) => D.authorityCost(i).matN).reduce((a, b) => a + b, 0) === 60);
+  t('秘术阁 42 条线：每 5 级 1 张秘卷残章、合计 301 张（《收口2》§3.1）',
+    D.KEJI.reduce((a, k) => a + Array.from({ length: k.max }, (_, lv) => D.kejiMatNeed(lv)).reduce((x, y) => x + y, 0), 0) === 301);
+
+  /* ③ 四处"接料"的判定都要真的生效（判了不扣 / 扣了不判都不算落） */
+  Core.S.cur.otherworld = 1e7; Core.S.cur.holy = 1e6; Core.S.cur.points = 1e7;
+  Core.S.player.level = 100;
+  D.WORLDS.forEach(w => { Core.S.worlds[w.id] = { unlocked: true, stages: { normal: Array(12).fill(3), hard: Array(12).fill(2), hell: Array(12).fill(0) } }; });
+  D.UNLOCKS.forEach(u => { Core.S.unlocks[u.id] = true; });      // 别让"解锁门禁"替材料挡在前面
+  t('铭刻：没料时那一条写进"未满足"（且点不动）',
+    Core.geneLockInfo().reqs.join().indexOf('铭魂砂') >= 0 && Core.geneLockUnlock().ok === false);
+  Core.addItem('minghun_sha', 400);
+  t('铭刻：给料之后能解锁，并且真的扣掉 2 块（第 1 阶）',
+    Core.geneLockUnlock().ok && Core.S.items.minghun_sha === 398);
+  t('命格：0→5 级不吃料（前 5 级取 0，免得刚转生就被卡住）',
+    Core.addChar('C021') && (function () {
+      for (let i = 0; i < 5; i++) Core.bloodlineUpgrade('C021');
+      return Core.S.chars.C021.bloodlineLv === 5 && (Core.S.items.xuesui_jing || 0) === 0;
+    })());
+  t('命格：第 5 级起要吃 1 块血髓晶，没料就升不动',
+    !Core.bloodlineUpgrade('C021').ok && Core.S.chars.C021.bloodlineLv === 5);
+  Core.addItem('xuesui_jing', 10);
+  t('命格：给料之后能升，并且真的扣掉 1 块',
+    Core.bloodlineUpgrade('C021').ok && Core.S.items.xuesui_jing === 9);
+  t('灯阁权限：每级扣 3 块灯油', (function () {
+    Core.S.items.dengyou = 0;
+    const blocked = !Core.upgradeAuthority().ok && Core.S.auth === 0;
+    Core.addItem('dengyou', 10);
+    return blocked && Core.upgradeAuthority().ok && Core.S.items.dengyou === 7;
+  })());
+  t('秘术阁：第 5 级扣 1 张秘卷残章', (function () {
+    Core.S.items.mijuan_canzhang = 0;
+    Core.kejiUp('tixiu', 5);                       // 0→4 能升
+    const blocked = !Core.kejiUp('tixiu', 1).ok && Core.kejiLv('tixiu') === 4;
+    Core.addItem('mijuan_canzhang', 5);
+    return blocked && Core.kejiUp('tixiu', 1).ok && Core.S.items.mijuan_canzhang === 4;
+  })());
+  t('药园：每块地 1 颗灵植种（没种子种不下去，且市集有卖）',
+    (function () {
+      Core.S.items.lingzhi_zhong = 0;
+      const blocked = Core.plantGarden(0, 'g1').ok === false;
+      Core.addItem('lingzhi_zhong', 3);
+      const ok = Core.plantGarden(0, 'g1').ok && Core.S.items.lingzhi_zhong === 2;
+      Core.S.garden[0] = null;
+      return blocked && ok && D.SHOPS.god.items.some(x => x.item === 'lingzhi_zhong');
+    })());
+
+  /* ④ 产出口：额外掉落槽（**不动现有 6 种料的产量**）· 深井里程碑 · 扫荡给秘卷 */
+  t('守关 Boss 的额外槽会掉新料（0.30，钉住随机数）', (function () {
+    const before = (Core.S.items.minghun_sha || 0) + (Core.S.items.xuesui_jing || 0);
+    withRandom(0.0, () => Dungeon.grantRewards('W01', 'normal', 12, 'boss'));
+    return (Core.S.items.minghun_sha || 0) + (Core.S.items.xuesui_jing || 0) === before + 1;
+  })());
+  t('假随机（0.99）时额外槽不掉（说明它真是一个"额外槽"，不是必掉）', (function () {
+    const before = (Core.S.items.minghun_sha || 0) + (Core.S.items.xuesui_jing || 0);
+    withRandom(0.99, () => Dungeon.grantRewards('W01', 'normal', 12, 'boss'));
+    return (Core.S.items.minghun_sha || 0) + (Core.S.items.xuesui_jing || 0) === before;
+  })());
+  t('深井每 10 层里程碑给 2 颗，满 300 层合计 40 砂 + 20 晶（＝需求比 2:1，且不计入日产量）',
+    (function () {
+      let sh = 0, xj = 0;
+      for (let f = 10; f <= 300; f += 10) {
+        (D.corridorReward(f).mat || []).forEach(m => { if (m.id === 'minghun_sha') sh += m.n; if (m.id === 'xuesui_jing') xj += m.n; });
+      }
+      return sh === 40 && xj === 20;
+    })());
+  t('深井每 20 层再给一个材料包·中品', (D.corridorReward(20).mat || []).some(m => m.id === 'matpack_mid'));
+  t('扫荡每 5 次给 1 张秘卷残章（走扫荡、不占副本掉落）', (function () {
+    Core.S.items.mijuan_canzhang = 0;
+    Core.S.sweep = { date: '', count: 0, bonus: 0 };
+    Dungeon.sweep('W01', 'normal', 12, 5);
+    return Core.S.items.mijuan_canzhang === 1;
+  })());
+  t('游历奇遇里有一条专门给灯油（《收口2》§3.1 的来源之一）', D.TRAVELS.some(tv => tv.effect && tv.effect.item === 'dengyou'));
+  t('市集里有灯油与灵植种（"不设卡"那条兜底）',
+    D.SHOPS.god.items.some(x => x.item === 'dengyou') && D.SHOPS.god.items.some(x => x.item === 'lingzhi_zhong'));
+
+  /* ⑤ 材料包：开出量 = draws，且一件都不会凭空消失（装不下进待领箱） */
+  t('材料包开出的件数 = MAT_PACKS[].draws（3 / 4 / 5）',
+    ['low', 'mid', 'high'].every(k => D.MAT_PACKS[k].pool.length > 0
+      && D.MAT_PACKS[k].draws === { low: 3, mid: 4, high: 5 }[k]));
+  t('上品包能开出铭魂砂 / 血髓晶（"不看广告也能拿新料"那条通道）',
+    D.MAT_PACKS.high.pool.some(p => p[0] === 'minghun_sha') && D.MAT_PACKS.high.pool.some(p => p[0] === 'xuesui_jing'));
+  t('开一包：拿到 draws 件，且每一件都落在背包或待领箱（一件不丢）', (function () {
+    const r = Core.openMatPack('mid');
+    return r.ok && r.pack.length + r.stashed.length === D.MAT_PACKS.mid.draws;
+  })());
+  t('背包满时开箱也一件不丢（开箱消耗的是箱子，材料必须有去处）', (function () {
+    fillBagTightExcept('matpack_mid');
+    Core.S.items.matpack_mid = 1;
+    const r = Core.openMatPack('mid');
+    return r.pack.length + r.stashed.length === D.MAT_PACKS.mid.draws;
+  })());
 }
 
 // ---- V8.3 站位（主角也能选前后排）＋ 装备唯一性 ----
@@ -2486,16 +2975,16 @@ setParty(['C021']);
 // V9.5-4：背包满时奖励不丢——进待领箱，清出格子能领回
 {
   Core.newGame();
-  Core.S.items = {};
-  Core.S.bag.itemCap = 1;
-  Core.S.items.ticket_normal = 1;                    // 占满唯一的道具格
+  /* V1.1.4 修正：并池之后"满背包"＝占用顶到 50（见 fillBagTightExcept），
+     `itemCap = 1` 那种写法在有基数兜底之后是无效的。 */
+  fillBagTightExcept('exp_s');
   const p0 = Core.S.cur.points;
   const out = Core.applyRewardObj({ points: 100, item: 'exp_s' });
   t('背包满：奖励道具进待领箱，不再静默蒸发', (Core.S.items.exp_s || 0) === 0 && Core.stashCount() === 1);
   t('背包满：货币照常发放（只有道具会被寄存）', Core.S.cur.points - p0 === 100);
   t('applyRewardObj 会回报"哪件道具被寄存了"', out.stashed.length === 1 && out.stashed[0] === 'exp_s');
   t('待领箱里就是那件道具', Core.stashList()[0].id === 'exp_s' && Core.stashList()[0].n === 1);
-  Core.S.bag.itemCap = 10;                           // 扩容之后能领回
+  Core.S.bag.itemCap = 60;                           // 扩容之后能领回（并池：抬高唯一那个池）
   const cs = Core.claimStash();
   t('扩容后一键领回：进背包、待领箱清空', cs.ok && cs.moved === 1 && (Core.S.items.exp_s || 0) === 1 && Core.stashCount() === 0);
 }
@@ -2504,12 +2993,14 @@ setParty(['C021']);
 {
   Core.newGame();
   Core.addCur('points', 1e6);
-  Core.S.bag.matCap = 1;
   const g0 = D.GARDEN[0];
-  delete Core.S.items[g0.out.item];
-  Core.S.items.mat_t5 = 1;                           // 占满唯一的材料格
+  /* V1.1.4（A12-F）：播种要 1 颗灵植种，所以先把种子给上再种、再收。 */
+  Core.addItem(D.GARDEN_SEED, 5);
   Core.plantGarden(0, g0.id);
   Core.S.garden[0].at = Date.now() - 1000;
+  /* V1.1.4 修正：`matCap = 1` 在并池口径下无效（基数 50 兜底）→ 按新口径造满，
+     并把这块地的产物留在包外，收获时它才一定装不下。 */
+  fillBagTightExcept(g0.out.item);
   // 钉住随机数：别让"稀有额外掉落"混进这次断言
   const h = withRandom(0.9, () => Core.harvestGarden(0));
   t('药园：地块收回（收获动作成功）', h.ok && Core.S.garden[0] === null);
@@ -2519,8 +3010,9 @@ setParty(['C021']);
 // V9.5-6：挂机产线材料同样走待领箱
 {
   Core.newGame();
-  Core.S.bag.matCap = 1;
-  Core.S.items.mat_t5 = 1;
+  /* V1.1.4 修正：同上 —— 造满背包要顶到 50 格；挂机材料按等级取档，新号是 mat_t1，
+     所以把 mat_t1 留在包外（不然它叠在同一格上、永远装得下）。 */
+  fillBagTightExcept('mat_t1');
   const before = Core.stashCount();
   const m = Core.grantIdleMat(10);
   t('挂机材料背包满 → 进待领箱，且明确回报 full', !!m && m.full === true && m.stashed > 0 && Core.stashCount() > before);
@@ -2534,10 +3026,17 @@ setParty(['C021']);
     maxHp: 100000, hp: 100000, atk: 1000, def: 500, spd: 100, crit: 0.05, critDmg: 2, eva: 0, skillMult: 1,
     charId: c ? c.id : '@player',
   });
-  const healer = D.characters.find(c => c.kind === 'healer' && !c.hidden);
-  const warrior = D.characters.find(c => c.kind === 'warrior' && !c.hidden);
+  const healer = D.characters.find(c => c.kind === 'healer');
+  const warrior = D.characters.find(c => c.kind === 'warrior');
   const foe = [{ name: '木桩', hp: 1e8, atk: 1, def: 0, spd: 1, faction: null }];
+  /* V1.1.4：这条比的是"**同一场仗里**治疗位与输出位的必杀次数"（验的是能量发放机制，
+     不是运气），所以两边必须**从同一个随机流位置开跑**。原来第二次跑接着第一次的流往下走，
+     上游只要多掷一次骰子（A12 的额外掉落槽就是这种改动）结果就会漂 —— 那不是机制坏了，
+     是尺子自己在抖。现在显式复位到同一个种子。 */
+  const RUN_SEED = 0x51ce77;
+  reseedRandom(RUN_SEED);
   const run1 = Battle.run({ allies: [mkSpec(healer, 'healer')], enemies: foe.slice(), worldId: 'W99', maxRounds: 30 });
+  reseedRandom(RUN_SEED);
   const run2 = Battle.run({ allies: [mkSpec(warrior, 'warrior')], enemies: foe.slice(), worldId: 'W99', maxRounds: 30 });
   const ults = r => r.frames.filter(f => f.type === 'skill' && f.ult).length;
   // 修之前：治疗者 5 次 / 战士 9 次（能量只在伤害里发，治疗放技能等于白放）
@@ -2704,12 +3203,23 @@ setParty(['C021']);
       Core.newGame(); Core.setPlayerName('技能'); Core.choosePlayerBloodline('修真');
       Core.S.player.level = 40; Core.S.player.attrPoints = 120;
       D.ATTR_META.forEach(a => Core.allocateAttr(a.id, 4));
-      Core.addChar('C001'); Core.S.chars.C001.lv = 40;      // C001 的「裂空斩」带 sunder
-      Core.S.party = ['@player', 'C001', null, null, null];
+      /* V1.1.4：这条原来点名「C001 的裂空斩带 sunder」—— 但 A8「机制按伙伴」之后，
+         C001（林默）的 s1 已经换成机制池里的「碎星三连斩」（**无状态**），
+         而且全库**再没有任何伙伴**的 s1 带 sunder → 这条永远不可能变绿。
+         判据本身是对的（技能挂的状态必须有飘字帧），所以改成**现场找一个 s1 带状态的伙伴**：
+         机制池以后再改，这条尺子也不会失效。 */
+      const statChar = Object.keys(D.charById).find((id) => {
+        const s = D.charById[id] && D.charById[id].skills && D.charById[id].skills.s1;
+        return !!(s && s.status && s.status.id);
+      });
+      const statId = D.charById[statChar].skills.s1.status.id;
+      Core.addChar(statChar); Core.S.chars[statChar].lv = 40;
+      Core.S.party = ['@player', statChar, null, null, null];
       const allies = alliesFromParty();
       const foe = [{ name: '木桩', hp: 999999, atk: 1, def: 0, spd: 1, faction: null, eva: 0, resPct: 0 }];
       const r = Battle.run({ allies, enemies: foe, worldId: null, maxRounds: 12 });
-      t('技能挂的破防（C001 裂空斩）也有飘字帧', r.frames.some(f => f.type === 'status' && f.status === 'sunder'));
+      t('技能挂的状态（' + D.charById[statChar].name + '·' + D.charById[statChar].skills.s1.name + ' → ' + statId + '）也有飘字帧',
+        r.frames.some(f => f.type === 'status' && f.status === statId));
     }
     /* 已经倒下的单位不该再挂状态（帧里飘在尸体上是骗人） */
     {
@@ -2817,6 +3327,9 @@ setParty(['C021']);
   }
   {
     Core.addChar('C021'); Core.S.chars.C021.bloodlineLv = 10;
+    /* V1.1.4（A12-F）：命格 5 级起每级吃 1 块血髓晶（这里 10→11 级正是要料的那一段），
+       不给料就等于在验"报价 == 实扣"而实扣根本没发生。 */
+    Core.addItem(D.BLOODLINE_MAT, 10);
     const q = Core.bloodlineQuote('C021');
     const b0 = Core.S.cur.otherworld, p0 = Core.S.cur.points;
     Core.bloodlineUpgrade('C021');
@@ -3168,28 +3681,65 @@ setParty(['C021']);
     keys.join(' / ') || '(没命中任何命格套装)');
 }
 
-/* ---- 伙伴专属装备：六支血统各一件、不重复、基础值跟进度（V9.6.83） ---- */
+/* ---- 本命专属装备：6 支血统 × 6 部位 ＝ 36 件、每件 5 条（父亲大人 2026-09-27 四条拍板） ----
+   "绑定的人是不是本血统公开第一"这条由 `scripts/data_audit.js` ⑤ 现场重算 Core.power 来守
+   （那是"数"，不是结构；这里只守结构与词条口径 —— 一件事只写一处）。 */
 {
-  const byBlood = {};
+  const byBlood = {}, bySlot = {};
   D.SIGNATURE_EQUIPS.forEach(s => {
     const c = D.charById[s.charId] || {};
     byBlood[c.bloodline] = (byBlood[c.bloodline] || 0) + 1;
+    bySlot[s.slot] = (bySlot[s.slot] || 0) + 1;
   });
-  t('伙伴专属正好 6 件', D.SIGNATURE_EQUIPS.length === 6, D.SIGNATURE_EQUIPS.length + ' 件');
-  t('六支命格各一件、没有重复（念动力也有）',
-    Object.keys(byBlood).length === 6 && Object.values(byBlood).every(n => n === 1),
+  t('伙伴本命正好 36 件（6 支血统 × 6 个部位）', D.SIGNATURE_EQUIPS.length === 36, D.SIGNATURE_EQUIPS.length + ' 件');
+  t('每支血统 6 件、没有漏血统（念动力也有）',
+    Object.keys(byBlood).length === 6 && Object.values(byBlood).every(n => n === 6),
     JSON.stringify(byBlood));
-  /* 每一位都必须是**本血统最强**的那一位（六维和最大） */
-  const tot = c => Object.values(c.attrs).reduce((a, b) => a + b, 0);
-  const ORD = { UR: 0, SSR: 1, SR: 2, R: 3, N: 4 };
-  let best = true, worst = '';
+  t('六个部位一个不少、每部位 6 件（每人一套本命）',
+    D.SIGNATURE_SLOT_ORDER.every(sl => bySlot[sl] === 6),
+    JSON.stringify(bySlot));
+  t('每件都是 5 条词条（同档普通 UR 是 4 条）',
+    D.SIGNATURE_EQUIPS.every(s => s.affixes.length === 5),
+    D.SIGNATURE_EQUIPS.map(s => s.affixes.length).join(','));
+  t('36 个名字互不重复', new Set(D.SIGNATURE_EQUIPS.map(s => s.name)).size === 36);
+  /* 2026-09-27 04:30 父亲大人修正：「都说隐藏角色也能正常抽出来咯，就没有隐藏角色这种概念」
+     —— 所以这一条不再是"不许绑隐藏角色"，而是**这个概念必须整个消失**。 */
+  t('角色表里已经不存在 hidden 这个概念（120 人全部可抽）',
+    D.characters.every(c => c.hidden === undefined),
+    '还带标记的：' + (D.characters.filter(c => c.hidden).map(c => c.id).join(',') || '无'));
+  t('图鉴伙伴卷 ＝ 全体伙伴（原来被排除的 6 位 UR 已收进来）',
+    D.CODEX_VOLUMES[0].list().length === D.characters.length,
+    D.CODEX_VOLUMES[0].list().length + ' / ' + D.characters.length);
+  /* 那 6 位必须**真的抽得到**（不是只把标记删了）—— 高级池"优先未拥有"，抽满 20 种 UR 早停 */
+  Core.newGame(); Core.setPlayerName('UR池'); Core.addCur('otherworld', 1e9);
+  const seenUR = new Set();
+  let urDraws = 0;
+  while (seenUR.size < 20 && urDraws < 4000) {
+    const r = Core.recruitOnce('advanced');
+    urDraws++;
+    if (r && r.rarity === 'UR') seenUR.add(r.id);
+  }
+  t('UR 卡池 20 人全部抽得到（含原被排除的楚衍/郑遥/零式/无相/终焉/灯阁代行者）',
+    seenUR.size === 20, urDraws + ' 抽内见到 ' + seenUR.size + ' 种 UR');
+  /* 词条口径：每件至少 2 条落在**该血统的本命表**里（前 3 条每件都该有） */
+  let coreBad = '';
   D.SIGNATURE_EQUIPS.forEach(s => {
-    const me = D.charById[s.charId];
-    const sameBl = D.characters.filter(c => c.bloodline === me.bloodline);
-    const top = sameBl.slice().sort((a, b) => (ORD[a.rarity] ?? 9) - (ORD[b.rarity] ?? 9) || tot(b) - tot(a))[0];
-    if (top.id !== me.id) { best = false; worst = me.name + ' 不是' + me.bloodline + '最强（应给 ' + top.name + '）'; }
+    const bl = (D.charById[s.charId] || {}).bloodline;
+    const core = (D.SIGNATURE_CORE || {})[bl] || [];
+    const hit = s.affixes.filter(a => core.indexOf(a.k) >= 0).length;
+    if (hit < 2) coreBad = s.name + '（只命中 ' + hit + ' 条本命词）';
   });
-  t('专属都绑在本命格最强的伙伴身上', best, worst);
+  t('每件至少 2 条是该血统最想要的属性', !coreBad, coreBad || '(36 件全过)');
+  /* 取值口径：本命走"极品档" 0.85~1.00（区间内位置） */
+  let posBad = '';
+  D.SIGNATURE_EQUIPS.forEach(s => {
+    s.affixes.forEach(a => {
+      const p = D.AFFIX_POOL[a.k];
+      const q = (a.v - p.min) / (p.max - p.min);
+      if (!(q >= 0.849 && q <= 1.0001)) posBad = s.name + ' ' + a.k + ' q=' + q.toFixed(3);
+    });
+  });
+  t('词条取值都在区间的 0.85~1.00（本命极品档）', !posBad, posBad || '(180 条全过)');
 
   Core.newGame(); Core.setPlayerName('专属'); Core.choosePlayerBloodline('修真');
   Core.S.bag.eqCap = 999;
@@ -3200,6 +3750,54 @@ setParty(['C021']);
     '新号 ' + early.base.atk + ' → 20 张图 ' + late.base.atk);
   const normalUr = D.makeEquip('W20', 'weapon', 'UR', 'cmp', {}).base.atk;
   t('专属比同档普通 UR 武器更好', late.base.atk > normalUr, late.base.atk + ' vs ' + normalUr);
+  /* 六种部位都要能生成（旧版只生成武器，五个部位没走过这条路） */
+  const slotMade = D.SIGNATURE_SLOT_ORDER.map((sl, i) => {
+    const idx = D.SIGNATURE_EQUIPS.findIndex(s => s.slot === sl);
+    const e = D.makeSignatureEquip(idx, 'sl' + i, 'W20');
+    return e && Object.keys(e.base).length ? sl : ('!' + sl);
+  });
+  t('六个部位都能生成，且都带自己的基础属性',
+    slotMade.every((x, i) => x === D.SIGNATURE_SLOT_ORDER[i]), slotMade.join(','));
+
+  /* 掉落挑件（2026-09-27）：优先"还没拥有过"的那件；36 件全拿到 → -1（调用方转 ◆ 折现） */
+  const ownedNames = [];
+  const seenIds = new Set();
+  for (let i = 0; i < 36; i++) {
+    const id = D.pickSignatureEquip(ownedNames);
+    if (id < 0) break;
+    seenIds.add(id); ownedNames.push(D.SIGNATURE_EQUIPS[id].name);
+  }
+  t('挑件：36 次把 36 件各挑一次，第 37 次返回 -1（全拿到 → 折现）',
+    seenIds.size === 36 && D.pickSignatureEquip(ownedNames) === -1, seenIds.size + ' 件');
+  /* 发出去的那件必须立刻记进图鉴名单 —— 否则"优先未拥有"每局都发同一件 */
+  Core.newGame(); Core.S.bag.eqCap = 999;
+  const pickId = D.pickSignatureEquip(Core.S.codex.equipNames);
+  const gotSig = Core.grantSignatureEquip(pickId).equip;
+  t('发出去的专属立刻记进图鉴名单（下一次不会再挑它）',
+    !!gotSig && Core.S.codex.equipNames.indexOf(gotSig.name) >= 0, gotSig && gotSig.name);
+
+  /* 真实掉落路径（地狱守关 5%）：优先未拥有，36 件拿满之后转 ◆ 折现。
+     这一条**走 Dun.grantRewards**（不是直接调 grantSignatureEquip）—— 挑件逻辑写在调用方，
+     只测 grant 是测不到"优先未拥有"的。 */
+  Core.newGame(); Core.setPlayerName('本命掉落'); Core.choosePlayerBloodline('狼人');
+  Core.S.bag.eqCap = 99999; Core.S.bag.itemCap = 99999; Core.S.bag.matCap = 99999;
+  const keepRandom = Math.random;
+  Math.random = () => 0.01;                 // 钉死：5% 那一步必中（顺带把所有随机分支都钉住）
+  const sigGot = [], sigSold = [];
+  try {
+    for (let i = 0; i < 45; i++) {
+      const g = Dungeon.grantRewards('W36', 'hell', 12, 'boss', {});
+      (g.got || []).forEach(x => {
+        if (x.signature && x.v) sigGot.push(x.v.name);
+        if (x.allSignature) sigSold.push(x.v);
+      });
+    }
+  } finally { Math.random = keepRandom; }
+  t('地狱守关掉专属：36 件各来一次、一件不重（优先未拥有）',
+    sigGot.length === 36 && new Set(sigGot).size === 36, sigGot.length + ' 件 / ' + new Set(sigGot).size + ' 种');
+  t('36 件拿满之后转 ◆ 折现（不硬塞重复件）',
+    sigSold.length === 9 && sigSold.every(v => v === D.DECOMPOSE_GAIN.UR),
+    '折现 ' + sigSold.length + ' 次 × ◆' + D.DECOMPOSE_GAIN.UR);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

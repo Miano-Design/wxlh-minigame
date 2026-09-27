@@ -72,5 +72,87 @@ console.log('\n=== ③ 真跑一遍：阵型 / 克制 / 限定池 ===');
   t('限定池的本期 UP 是一名合法伙伴（阵营拿得到）', !!(up && up.id && D.FACTIONS.indexOf(up.faction) >= 0), up ? up.name + '（' + up.faction + '）' : '(取不到)');
 }
 
+/* ==================================================================================
+   ④ 机制按伙伴（V1.1.1 · 父亲大人 0926：「机制不是血统机制哦，是对应到不同的伙伴」）
+   ----------------------------------------------------------------------------------
+   这一节钉的是"同血统的人出手方式必须不一样"。判据来自材料《收口4》§1.3：
+     ① 每个人三元组齐全、原子存在、s1/s2/ult/passive 一个不缺
+     ② **同血统内两两不重复**（他那句"队伍组合才有可能性"的硬判据）
+     ③ 池子里没有"形状一样、只差倍率"的两条原子（那种不算"不同机制"）
+     ④ 技能/buff 字段全在战斗引擎白名单内（写了不生效＝静默 bug，这条一次堵死）
+     ⑤ 必杀的目标形状必须跟血统基准一致（换形状＝白送/砍掉一个强度档，材料《定调》§4.4 算过账）
+   改坏试验（跑过、都会红）：同血统两人改成同一三元组 → ②红；给原子塞一个 `critDmg`（引擎不认的键）→ ④红；
+   把某条原子删成"只留倍率"（hits/status 去掉）→ ③红；把某人的必杀换成另一种形状 → ⑤红。
+   ================================================================================== */
+console.log('\n=== ④ 机制按伙伴（同血统两两不重复 · 只用引擎白名单字段）===');
+{
+  const POOL = D.MECH_POOL || {};
+  const MECH = D.CHAR_MECH || {};
+  const SKILL_FIELDS = ['name', 'tag', 'desc', 'cd', 'type', 'target', 'mult', 'hits', 'pierce', 'status', 'buff', 'lifesteal', 'execute'];
+  const BUFF_KEYS = ['atkPct', 'defPct', 'spdPct', 'critPct', 'skillPct', 'evaPct', 'lifesteal', 'poisonOnHit', 'turns'];
+  const TYPES = ['dmg', 'heal', 'cleanseHeal', 'shield', 'teamshield', 'buff', 'debuff', 'energy'];
+  const TARGETS = ['enemy', 'allEnemies', 'self', 'team', 'lowest', 'topAlly', 'random'];
+
+  const missing = [], badAtom = [], badSkill = [], badField = [], badBuff = [];
+  D.characters.forEach(ch => {
+    const m = MECH[ch.id];
+    if (!m || m.length !== 3) { missing.push(ch.id); return; }
+    m.forEach(id => { if (!POOL[id]) badAtom.push(ch.id + ':' + id); });
+    const sk = ch.skills || {};
+    ['s1', 's2', 'ult'].forEach(slot => {
+      const s = sk[slot];
+      if (!s) { badSkill.push(ch.id + '.' + slot); return; }
+      if (TYPES.indexOf(s.type) < 0) badField.push(ch.id + '.' + slot + ' type=' + s.type);
+      if (TARGETS.indexOf(s.target) < 0) badField.push(ch.id + '.' + slot + ' target=' + s.target);
+      Object.keys(s).forEach(k => { if (SKILL_FIELDS.indexOf(k) < 0) badField.push(ch.id + '.' + slot + ' 多出字段 ' + k); });
+      if (s.type !== 'buff' && s.type !== 'debuff' && !(s.mult >= 0)) badField.push(ch.id + '.' + slot + ' mult');
+      if (s.buff) Object.keys(s.buff).forEach(k => { if (BUFF_KEYS.indexOf(k) < 0) badBuff.push(ch.id + '.' + slot + ' buff.' + k); });
+    });
+    if (!(sk.passive && sk.passive.name)) badSkill.push(ch.id + '.passive');
+  });
+  t('① 120 人都有三元组、原子都在池子里、s1/s2/ult/passive 都齐',
+    !missing.length && !badAtom.length && !badSkill.length,
+    ((missing.length ? '缺三元组 ' + missing.length + ' 人' : '') + (badAtom.length ? ' · 原子不存在 ' + badAtom.slice(0, 3).join(',') : '')
+      + (badSkill.length ? ' · 技能缺槽 ' + badSkill.slice(0, 3).join(',') : '')) || '全齐');
+  t('④-a 技能字段只用引擎认识的（type/target/mult/hits/pierce/status/buff/lifesteal/execute）',
+    !badField.length, badField.length ? badField.slice(0, 4).join(' · ') : '干净');
+  t('④-b buff 键全在引擎白名单内（写了不生效的一律报红）',
+    !badBuff.length, badBuff.length ? badBuff.slice(0, 4).join(' · ') : '干净');
+
+  const byBl = {};
+  D.characters.forEach(ch => { (byBl[ch.bloodline] = byBl[ch.bloodline] || []).push(ch); });
+  const dups = [];
+  Object.keys(byBl).forEach(bl => {
+    const seen = {};
+    byBl[bl].forEach(ch => {
+      const k = (MECH[ch.id] || []).join('|');
+      if (seen[k]) dups.push(bl + '：' + seen[k] + ' 与 ' + ch.id + ' 同三元组');
+      seen[k] = ch.id;
+    });
+  });
+  t('② 同血统内任意两人的机制三元组都不同', !dups.length,
+    dups.length ? dups.slice(0, 2).join(' · ') : Object.keys(byBl).map(bl => bl + byBl[bl].length + '人✓').join(' '));
+
+  const shapeOf = a => [a.type, a.target, a.hits || 1, a.pierce ? 'P' : '', a.status ? a.status.id + (a.status.chance ? 'c' : '') : '',
+    a.lifesteal ? 'L' : '', a.execute ? 'E' : '', a.buff ? Object.keys(a.buff).filter(k => k !== 'turns').sort().join('+') : ''].join('|');
+  const fam = { 打击: D.MECH_HIT_IDS, 治疗: D.MECH_HEAL_IDS, 功能: D.MECH_FN_IDS, 必杀全体: D.MECH_ULT_DPS_ALL_IDS, 必杀单体: D.MECH_ULT_DPS_ONE_IDS, 必杀辅助: D.MECH_ULT_SUP_IDS };
+  const sameShape = [];
+  Object.keys(fam).forEach(f => {
+    const ids = (fam[f] || []).filter(id => POOL[id]);
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      if (shapeOf(POOL[ids[i]]) === shapeOf(POOL[ids[j]])) sameShape.push(f + '：' + ids[i] + ' 与 ' + ids[j]);
+    }
+  });
+  t('③ 池子里没有"形状一样、只差倍率"的两条原子（那种不算"不同机制"）',
+    !sameShape.length, sameShape.length ? sameShape.slice(0, 3).join(' · ') : '干净');
+  const ultShapeBad = D.characters.filter(ch => {
+    const base = D.BLOODLINE_SKILLS[ch.bloodline];
+    if (!base) return false;
+    return ch.skills.ult.target !== base.ult.target;
+  });
+  t('⑤ 必杀的目标形状与血统基准一致（全体/单体不许互换）', !ultShapeBad.length,
+    ultShapeBad.length ? ultShapeBad.slice(0, 3).map(c => c.name + ' ' + c.skills.ult.target).join(' · ') : '一致');
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

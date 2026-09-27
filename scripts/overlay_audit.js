@@ -64,6 +64,8 @@ function blocks(o) {
   const b = [{ n: '标题', a: o.titleY - LH_T / 2, z: o.titleY + LH_T / 2 }];
   if (o.lineY.length) b.push({ n: '正文', a: o.lineY[0] - LH_L / 2, z: o.lineY[o.lineY.length - 1] + LH_L / 2 });
   if (o.chipY.length) b.push({ n: '胶囊', a: o.chipY[0] - CHIP_H / 2, z: o.chipY[o.chipY.length - 1] + CHIP_H / 2 });
+  /* 输入格（0927-P：挂机结算/删档确认那套）—— 也当一块参与"块与块不许贴住"的量算 */
+  if (o.input) b.push({ n: '输入', a: o.input.y, z: o.input.y + o.input.h });
   if (o.noteY.length) b.push({ n: '小字', a: o.noteY[0] - LH_N / 2, z: o.noteY[o.noteY.length - 1] + LH_N / 2 });
   b.push({ n: '按钮', a: o.btnY, z: o.btnY + 44 * CV.SCALE });
   return b;
@@ -100,6 +102,46 @@ check('普通确认（短句，双按钮）', {}, '撤离', '确定撤离？这�
 check('普通确认（长句折到 3~4 行）', {},
   '确定撤离？',
   '确定撤离？这场战斗不算数（不给奖励），本次探索进度会清空，已经拿到的奖励保留。撤离之后这一关要重新打，队伍血量按当前状态保留。');
+/* 0927-P 新增的那一档：**输入格**（删档二次确认那颗弹窗：标题带随机 4 位数字 ＋ 一个输入格）。 */
+check('删档二次确认（标题带 4 位数字 + 输入格 + 小字 + 单按钮）',
+  { inputBox: { value: '', placeholder: '点这里输入这四个数字' }, inputId: 'wipe_input',
+    cancel: false, okLabel: '取消', okStyle: 'ghost',
+    note: '删档前会先把现在这份进度留一手，真删错了能在【找回存档】里拿回来一份。' },
+  '删除当前进度　7 3 0 5',
+  '会清掉这台设备上的全部进度，重新从开局契约开始。\n照着上面这四个数字输入一遍才会删档。');
+
+/* ---------- N1（留存环第一格）：上面那些是手写样例，这一条量**真实的**七日登录那一屏 ----------
+   起因：七日登录是全游戏唯一"每天必定被看到"的留存件，可它原来只画当天那一格 ——
+   玩家不知道第 7 天有 🎫SSR自选券（见 `岗位回单/游戏策划总监-0927N留存环.md` 的 N1）。
+   做坏试验：把 `U.loginReward` 里的 `ladder()` 改回"只画当天那一格" → 下面第 1 条当场红。 */
+(function loginLadder() {
+  const D = global.DATA, LIST = D.LOGIN_REWARDS;
+  const day = LIST.length;                       // 第 7 天：钩子最厚、字最长的那一屏
+  U.loginReward({ day: day, reward: LIST[day - 1], round: 1, cycleDays: LIST.length });
+  const o = U.overlay;
+  const chips = ((o && o.rows) || []).reduce((a, r) => a.concat(r.map((c) => c.t)), []);
+  const b = blocks(o);
+  let worst = Infinity, who = '';
+  for (let i = 1; i < b.length; i++) { const gap = b[i].a - b[i - 1].z; if (gap < worst) { worst = gap; who = b[i - 1].n + '→' + b[i].n; } }
+  t('N1 七日登录：**真实**那一屏 7 格全在，且在 390×844 上排得下、按钮在框内',
+    !!o && chips.length === LIST.length && o.y >= 0 && o.y + o.h <= CV.H
+      && o.btnY + 44 * CV.SCALE <= o.h && worst >= 4,
+    chips.length + ' 格 · 高 ' + (o ? o.h.toFixed(0) : '—') + ' · 最小间距 ' + worst.toFixed(1) + '（' + who + '）');
+  t('N1 第 7 天的钩子看得见（🎫SSR自选券 写在「第7天」那一格上）',
+    !!chips[6] && /第7天/.test(chips[6]) && /SSR自选券/.test(chips[6]), chips[6] || '（没有第 7 格）');
+  t('N1 今天那一格带（今天）、没到的那些不冒充已领',
+    /（今天）/.test(chips[6] || '') && chips.slice(0, 6).every((c) => c.indexOf('今天') < 0),
+    JSON.stringify(chips).slice(0, 200));
+  /* 短屏（机型适配的老账）：320×568 上同一个弹窗也得整块在画布里 */
+  CV.setup({ windowWidth: 320, windowHeight: 568, pixelRatio: 2, safeArea: { top: 20, bottom: 548 } });
+  U.loginReward({ day: day, reward: LIST[day - 1], round: 1, cycleDays: LIST.length });
+  const o2 = U.overlay;
+  t('N1 短屏 320×568：同一个弹窗也在画布里（不出屏、按钮不出框）',
+    !!o2 && o2.y >= 0 && o2.y + o2.h <= CV.H && o2.btnY + 44 * CV.SCALE <= o2.h,
+    o2 ? ('高 ' + o2.h.toFixed(0) + ' @ y=' + o2.y.toFixed(0) + ' / 画布 ' + CV.H) : '（没有弹窗）');
+  CV.setup({ windowWidth: 390, windowHeight: 844, pixelRatio: 3, safeArea: { top: 44, bottom: 810 } });
+  U.overlay = null;
+})();
 
 /* ---------- 模态是不是"真挡住"：弹窗开着的时候，底栏不许被点到 ----------
    起因（V9.6.95 自审实测）：弹窗开着时点底栏居然真的换页了 ——
@@ -136,6 +178,50 @@ function tapAt(x, y) {
   if (b2) tapAt(b2.x + b2.w / 2, b2.y + b2.h / 2);
   t('弹窗关掉后底栏恢复可用', CV.top().name === 'bag',
     '当前页 ' + CV.top().name + ' · 页签热区' + (b2 ? '找到' : '**没找到**') + ' · 引导' + (U.coachActive && U.coachActive() ? '还在' : '已放'));
+})();
+
+/* ---------- N2（0927-P · 父亲大人：「支持点击空白处返回」）：热区登记顺序是死的 ----------
+   判据（`uiw.js` 的 drawOverlay 就是照这条写的）：
+     · `opt.blankClose` 的弹窗上有一颗**整屏**的模态热区（点它＝关弹窗、原地返回）；
+     · 它**必须先登记**，两颗按钮（以及输入格）登记在它**之后** —— `hitAt` 从数组末尾往前扫，
+       后登记的先命中；顺序反了，点按钮会先撞上那块整屏的（按钮就"点不动"了）；
+     · 真手指点空白 → 弹窗关掉（**不调 onOk / onCancel**，这是"返回"不是"确定"）。
+   做坏试验（必须能红）：把 `if (o.blankClose) CV.hit('_cf_blank', …)` 那行挪到两颗按钮**之后**
+   → 这条当场红（顺序断言）。 */
+(function blankCloseOrder() {
+  CV.reset('home');
+  if (U.coachDrop) U.coachDrop();
+  let okCalled = false, cancelCalled = false;
+  U.confirm('点空白返回（探针）', '正文一行。', function () { okCalled = true; },
+    { blankClose: true, inputBox: { value: '', placeholder: '点这里输入' }, inputId: 'probe_input',
+      cancelLabel: '取消', okLabel: '确定', onCancel: function () { cancelCalled = true; },
+      note: '这一条只在尺子里用。' });
+  const ids = (CV.hits || []).map((h) => String(h.id));
+  const iBlank = ids.indexOf('_cf_blank'), iInput = ids.indexOf('probe_input');
+  const iNo = ids.indexOf('_cf_no'), iYes = ids.indexOf('_cf_yes');
+  t('N2 空白那颗热区**登记在按钮与输入格之前**（后登记优先 ⇒ 点按钮先命中按钮）',
+    iBlank >= 0 && iInput > iBlank && iNo > iBlank && iYes > iBlank,
+    '登记顺序 ' + JSON.stringify(ids.filter((x) => /^(_cf_|probe_)/.test(x))));
+  const o = U.overlay;
+  const b = blocks(o);
+  const iy = o.y + o.input.y;
+  t('N2 输入格整块落在弹窗卡片里（不与按钮行重叠）',
+    iy > o.y && iy + o.input.h < o.y + o.btnY, '输入格 y=' + Math.round(iy) + '~' + Math.round(iy + o.input.h)
+    + ' · 按钮行 y=' + Math.round(o.y + o.btnY) + ' · 卡片 ' + Math.round(o.y) + '~' + Math.round(o.y + o.h));
+  const blanks = b.filter((x) => x.n === '输入')[0];
+  const btns = b.filter((x) => x.n === '按钮')[0];
+  t('N2 输入格与按钮之间留了量（块与块 ≥4px）', !!blanks && !!btns && (btns.a - blanks.z) >= 4,
+    '净距 ' + (blanks ? (btns.a - blanks.z).toFixed(1) : '—') + 'px');
+  /* 真手指点真正的空白（画布左上角）：应当"只是返回" —— 两个回调都不许被调 */
+  tapAt(4, 4);
+  t('N2 点空白：弹窗关掉，而且**没有**触发"确定 / 取消"任何一个回调（返回 ≠ 确认）',
+    !U.overlay && !okCalled && !cancelCalled,
+    '弹窗 ' + (U.overlay ? '还开着' : '已关') + ' · onOk ' + okCalled + ' · onCancel ' + cancelCalled);
+  /* 反面：不许给确认类弹窗开这一档（父亲大人：确认弹窗必须点按钮） */
+  U.confirm('确认类（探针）', '这种弹窗不该能点空白关掉。', function () {});
+  t('N2 普通确认弹窗**没有**那块空白热区（确认类必须点按钮）',
+    !U.overlay.blankClose && (CV.hits || []).every((h) => String(h.id) !== '_cf_blank'));
+  U.overlay = null;
 })();
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed\n');

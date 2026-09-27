@@ -9,6 +9,9 @@
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   let beastDetailId = null;      // 正在看哪一只伴生体（V9.6.132）
   const CV = G.CV, U = G.U, Core = G.Core, D = G.DATA;
+  /* V1.1.x（2026-09-27 · 音频系统）：升级 / 解锁类动作的音效出口（建筑升级、伴生体升阶…）。
+     G.AUD 不存在时静默跳过。 */
+  function snd(name) { if (G.AUD && G.AUD.play) G.AUD.play(name); }
   const fmt = G.fmt || ((n) => String(n));
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
@@ -31,7 +34,12 @@
     const rw = right ? CV.measure(right, CV.FS.sm) : 0;
     const t1Max = iw - rw - (right ? 8 * CV.SCALE : 0);
     const t1Shown = CV.fit(t1, t1Max, CV.FS.lg, true);
-    const lines = t2 ? CV.wrap(t2, iw, CV.FS.sm, 2) : [];
+    /* V1.0.6（新尺子 detail_audit ④ 抓到的**同类旧账**）：这一行走的是逐字折行，
+       境界线那条「初期 Lv.3 · 10%　中期 Lv.6 · 20%…」正好被劈成「…· 9」/「3%　中期…」——
+       跟父亲大人 09-24 报的悬赏「✦ 43 / 0」是**同一个病**（数字被折行劈开）。
+       换成词级折行（只在 · / → / 空格 / 全角空格处断），数字不再被切开；
+       一行里没有分隔符时它会自动退回逐字折行，行为与以前一致。 */
+    const lines = t2 ? CV.wrapTokens(t2, iw, CV.FS.sm, 2) : [];
     const nameH = CV.FS.lg * 1.35, dH = CV.FS.sm * 1.55;
     const h = (t2 ? (10 * CV.SCALE + nameH + 3 * CV.SCALE + lines.length * dH + 8 * CV.SCALE)
       : 34 * CV.SCALE);
@@ -59,7 +67,12 @@
     });
     U.card(function () {
       U.h3('评级经验从哪来', '首通全额 · 重复刷一半');
-      U.kv('通关 普通 / 困难 / 地狱', '+' + st.gain.normal + ' / +' + st.gain.hard + ' / +' + st.gain.hell);
+      /* V1.1.12（0927-B · 三机型复审）：原来左边写「通关 普通 / 困难 / 地狱」（13 个汉字 ≈195pt）、
+         右边一串「+3 / +5 / +8」—— 在 **320×568** 上两边加起来 309pt > 可用宽 296pt，
+         `U.kv` 的"保右边"分支就把**左边砍成「通关 普通 / 困难 / …」**（320 上实测）。
+         改法：把三个难度挪到**值**那一侧、左边只留 4 个字的类目 —— 两边加起来 238pt，320 也放得下，
+         而且读起来更像"一类加成照三个难度各给多少"。 */
+      U.kv('通关加成', '普通+' + st.gain.normal + '·困难+' + st.gain.hard + '·地狱+' + st.gain.hell);
       U.kv('每打赢一场战斗', '+' + st.gain.win);
       U.kv('挂机（在线 / 离线都算）', '每分钟 +' + st.gain.perMin);
     });
@@ -79,8 +92,13 @@
       const sw = D.SWEEP_DAILY_CAP + (au.now.sweep || 0);
       U.kv('每日扫荡次数', '+' + (au.now.sweep || 0) + ' 次（现在共 ' + sw + ' 次）');
     });
+    /* V1.1.4（A12-F · 灯阁权限接「灯油」）：材料进"能不能点"的判定，也必须**单独一行显示** ——
+       《收口2》§3.1 的三种新料都走这一套（材料与货币分开报，玩家才知道缺的是哪一样）。 */
+    const auMat = au.cost ? (D.ITEMS[au.cost.mat] || {}) : {};
+    const auMatHave = au.cost ? (Core.S.items[au.cost.mat] || 0) : 0;
     const can = !au.maxed && au.cost &&
-      (Core.S.cur.holy || 0) >= au.cost.holy && (Core.S.cur.otherworld || 0) >= au.cost.otherworld;
+      (Core.S.cur.holy || 0) >= au.cost.holy && (Core.S.cur.otherworld || 0) >= au.cost.otherworld
+      && auMatHave >= (au.cost.matN || 0);
     /* V9.6.133：权限 20 级 → 每一级跟着进度解锁，所以界面上必须写清"还差哪张图"，
        否则玩家只看到一个灰按钮，不知道缺什么。 */
     const nextLv = au.lv + 1;
@@ -92,6 +110,7 @@
         U.kv('解锁条件', reqMet ? '✓ ' + reqText : reqText, reqMet ? CV.C.green : CV.C.dim);
         U.kv('✦ 圣洁晶石', (Core.S.cur.holy || 0) + ' / ' + au.cost.holy, (Core.S.cur.holy || 0) >= au.cost.holy ? CV.C.green : CV.C.dim);
         U.kv('◆ 异界结晶', (Core.S.cur.otherworld || 0) + ' / ' + au.cost.otherworld, (Core.S.cur.otherworld || 0) >= au.cost.otherworld ? CV.C.green : CV.C.dim);
+        U.kv(auMat.name || '灯油', auMatHave + ' / ' + (au.cost.matN || 0), auMatHave >= (au.cost.matN || 0) ? CV.C.green : CV.C.dim);
         U.space(CV.SP[1]);
         /* V1.0.1（开发自审会诊）：`id: 条件 ? 'x' : ''` 会让按钮在条件不满足时
            **保持可点的样子、却没有热区**（点了没反应、也没提示）。网页版这一颗是 `disabled`。
@@ -129,8 +148,12 @@
         const textW = U.iw() - bw - 8 * CV.SCALE;
         /* V9.6.142：建筑说明原来单行 fit → 「每级：装备强化费用 -1%（最多-40…」被砍。
            这些说明本身就是两句话，改成折到最多两行（行高跟着算），一字不丢。 */
-        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 2);
-        const rowH = (dLines.length > 1 ? 62 : 56) * CV.SCALE;
+        /* V1.1.12（0927-B · 三机型复审）：**最多两行**这个上限在 320 上不够 ——
+           医疗室那句「每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时」在窄屏正好要三行，
+           而折行器第 2 行末尾会补「…」把它砍成「…离线上限 +0.2 …」（实测 320 上）。
+           放到三行；行高**只在真的用了第三行时才加**（两行仍是 62，不动既有密度）。 */
+        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 3);
+        const rowH = (dLines.length >= 3 ? 90 : dLines.length === 2 ? 62 : 56) * CV.SCALE;
         const h = rowH;
         CV.text(CV.fit(b.name + '  Lv.' + lv + '/50', textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         dLines.forEach(function (ln, k2) {
@@ -146,6 +169,7 @@
   D.BUILDINGS.forEach(function (b) {
     CV.on('bup:' + b.id, function () {
       const r = Core.upgradeBuilding(b.id);
+      snd(r.ok ? 'levelup' : 'error');
       CV.toast(r.msg || (r.ok ? '已升级' : '升级不了'));
       CV.render();
     });
@@ -159,9 +183,9 @@
       /* 命格主题（V1.1）：这一屏就是"灯"的落点之一 —— 标题 + 标题行右端的印记 + 境界条
          三处都走本命格的灯色（与网页版同一形、同一色、同一条进度）。 */
       const lamp = st.hasBloodline ? CV.blLamp(st.bloodline, st.realm) : null;
-      const ty = U.y;
-      U.h3(st.curName || '未定命格', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶', lamp ? { color: lamp } : null);
-      if (lamp) U.draw(function () { CV.blGlyph(st.bloodline, U.ix() + U.iw() - 8 * CV.SCALE, ty + CV.FS.f1 * 1.3 / 2, 14 * CV.SCALE, lamp); });
+      /* 印记站位同主角详情（V1.0.6）：挂在标题文字后面，不再甩到最右端压住等级数字 */
+      U.h3(st.curName || '未定命格', '已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶',
+        lamp ? { color: lamp, glyph: { bl: st.bloodline, color: lamp, size: CV.ICO * 0.75, after: true } } : null);
       if (lamp) {
         const bh = 4 * CV.SCALE, by = U.y;
         const pct = Math.max(0, Math.min(1, st.realm / D.REALM_STAGE_COUNT));
@@ -234,13 +258,17 @@
         row2(n.stage + '阶 · ' + n.name, n.desc, '');
         U.space(CV.SP[1]);
         U.kv('条件', n.req);
+        if (info.matN) U.kv((D.ITEMS[info.mat] || {}).name || info.mat, info.matHave + ' / ' + info.matN, info.matHave >= info.matN ? CV.C.green : CV.C.dim);
         if (!info.can && info.reqs && info.reqs.length) U.hint('未满足：' + info.reqs.join(' · '), 4 * CV.SCALE);
         U.space(CV.SP[1]);
         U.btnRow([{ label: '突破铭刻', style: 'primary', id: 'gl_unlock', dis: !info.can }]);
       }
     });
     U.card(function () {
-      U.h3('五阶一览');
+      /* V1.1.4：这一页的标题还是「五阶一览」—— 那是 V9.6.130 把铭刻从 5 阶扩到 20 阶之前的话，
+         下面的循环早就 20 行了（列表比标题多 15 行，玩家会以为显示错了）。
+         同一张卡里的「五阶」二字改成「铭刻一览」（1~20 阶都在下面）。 */
+      U.h3('铭刻一览');
       D.GENE_LOCKS.forEach(function (g, i) {
         const on = S.player.geneLock >= g.stage;
         row2(g.stage + '阶 · ' + g.name, g.desc, on ? '已解锁' : (i === S.player.geneLock ? '下一个' : ''), on ? CV.C.green : CV.C.dim);
@@ -261,7 +289,7 @@
       U.h3('伴生体', '已收集 ' + st.count + ' / ' + D.BEASTS.length);
       /* V1.0.1（文案策划会诊）：旧数字"Boss 必掉 1~3 颗"（承诺比实际好）；
          实际守关 Boss 10% / 精英 5%，另有药园、游历奇遇、灯阁市集三个来源。 */
-      U.note('伴生体是第二条养成线：上阵 1 只，给全队加属性 + 五行克制。孵化花兽魂石，重复获得转兽魂，兽魂用来升阶。兽魂石由守关 Boss、精英怪概率掉落，药园收成、游历奇遇、灯阁市集也能拿到。', 2 * CV.SCALE);
+      U.note('伴生体是第二条养成线：上阵 1 只，给全队加属性 + 五行克制。孵化花兽魂石，重复获得转兽魂，兽魂用来升阶。兽魂石由守关 Boss、精英怪概率掉落，药园收成、游历奇遇、市集也能拿到。', 2 * CV.SCALE);
       U.space(CV.SP[1]);
       U.kv('当前随行', st.activeBeast ? st.activeBeast.name : '还没有随行伴生体', CV.C.gold);
       U.kv('孵化', '兽魂石 ' + st.eggs + ' 颗 · 每 ' + st.eggCost + ' 颗孵 1 只');
@@ -393,6 +421,7 @@
   CV.on('beast_detail:*', function (id) { beastDetailId = id; CV.push('beast_detail'); });
   CV.on('beast_up', function () {
     const r = Core.beastLevelUp(beastDetailId);
+    snd(r.ok ? 'levelup' : 'error');
     CV.toast(r.msg || '升阶失败');
     CV.render();
   });
@@ -464,18 +493,48 @@
   });
 
   /* ---------- 灯录（图鉴） ---------- */
+  /* V1.1.3（A10 图鉴两卷）：**灯录页两个标签**（伙伴卷 / 装备卷）——
+     卷表在 data.js（`D.CODEX_VOLUMES`，现场枚举、以后加卷不用改这一页）；
+     装备卷的格子画的是**名字**（已收集的写名字、没收集的写「？」，颜色跟稀有度无关时用名字色）。 */
+  let codexVol = 'chars';
   CV.register('codex', function () {
     const cs = Core.codexState();
     U.begin(); head('灯录');
+    /* 两个标签（用与背包同一套按钮语汇，不新增组件） */
+    U.btnRow(Core.codexState().volumes.map(function (v) {
+      return { label: v.name + ' ' + v.owned + '/' + v.total, style: codexVol === v.id ? 'primary' : 'ghost', id: 'codexvol:' + v.id };
+    }));
+    U.space(CV.SP[1]);
+    const vol = cs.volumes.filter(function (v) { return v.id === codexVol; })[0] || cs.volumes[0];
     U.card(function () {
-      U.h3('灯录', '收集进度 ' + cs.owned + ' / ' + cs.total);
-      cs.rewards.forEach(function (r) {
-        row2('收集 ' + r.n + ' 名伙伴', Core.rewardTextOf(r.reward),
-          r.claimed ? '已领取' : (r.reached ? '点一下领取' : ('还差 ' + (r.n - cs.owned))),
+      U.h3(vol.name + '图鉴', '收集进度 ' + vol.owned + ' / ' + vol.total);
+      vol.rewards.forEach(function (r) {
+        row2('收集 ' + r.n + ' ' + vol.name, Core.rewardTextOf(r.reward),
+          r.claimed ? '已领取' : (r.reached ? '点一下领取' : ('还差 ' + (r.n - vol.owned))),
           r.claimed ? CV.C.dim : (r.reached ? CV.C.gold : CV.C.dim));
-        if (r.reached && !r.claimed) CV.hit('codex_claim:' + r.n, U.ix(), U.y - 52 * CV.SCALE, U.iw(), 52 * CV.SCALE);
+        if (r.reached && !r.claimed) CV.hit('codex_claim:' + vol.id + ':' + r.n, U.ix(), U.y - 52 * CV.SCALE, U.iw(), 52 * CV.SCALE);
       });
     });
+    if (vol.id === 'equips') {
+      /* 装备卷：按**名字表**的天然顺序（世界 → 部位）铺，收集到的写名字、没收集的画「？」 */
+      const all = D.codexEquipNameList();
+      const have = Core.S.codex.equipNames || [];
+      U.card(function () {
+        U.h3('装备名册', have.length + ' / ' + all.length);
+        const cols = 3, gap = 8 * CV.SCALE;
+        const cw = (U.iw() - gap * (cols - 1)) / cols, ch = 46 * CV.SCALE;
+        const y0 = U.y;
+        all.forEach(function (nm, i) {
+          const mine = have.indexOf(nm) >= 0;
+          const x = U.ix() + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+          CV.round(x, y, cw, ch, CV.RADIUS_CHIP,  mine ? CV.C.panel2 : CV.a(CV.C.shade, .13), mine ? CV.C.line2 : CV.C.line);
+          CV.text(CV.fit(mine ? nm : '？', cw - 12 * CV.SCALE, CV.FS.xs), x + cw / 2, y + ch / 2,
+            { size: CV.FS.xs, align: 'center', color: mine ? CV.C.text2 : CV.C.dim });
+        });
+        U.y = y0 + Math.ceil(all.length / cols) * (ch + gap) - gap;
+      });
+      return;      // 装备卷不画伙伴格子
+    }
     /* 按阵营分组、组内从低稀有度到高稀有度（父亲大人定的排序） */
     const order = { N: 0, R: 1, SR: 2, SSR: 3, UR: 4 };
     const byFaction = {};
@@ -508,9 +567,21 @@
       });
     });
   });
+  /* 标签切换 + 两卷各自那一串领取入口（卷表驱动，加卷不用改这里） */
+  D.CODEX_VOLUMES.forEach(function (v) {
+    CV.on('codexvol:' + v.id, function () { codexVol = v.id; CV.render(); });
+    v.rewards.forEach(function (r) {
+      CV.on('codex_claim:' + v.id + ':' + r.n, function () {
+        const res = Core.claimCodexReward(v.id, r.n);
+        CV.toast(res.msg || '已领取');
+        CV.render();
+      });
+    });
+  });
+  /* 老入口（`codex_claim:20` 这种裸数字）——玩家可能正停在旧版本的内存状态上，保留兼容 */
   D.CODEX_REWARDS.forEach(function (r) {
     CV.on('codex_claim:' + r.n, function () {
-      const res = Core.claimCodexReward(r.n);
+      const res = Core.claimCodexReward('chars', r.n);
       CV.toast(res.msg || '已领取');
       CV.render();
     });
