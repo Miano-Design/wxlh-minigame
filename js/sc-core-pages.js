@@ -15,12 +15,11 @@
   const fmt = G.fmt || ((n) => String(n));
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const rarColor = (r) => (D.RARITY_COLOR && D.RARITY_COLOR[r]) || CV.C.text2;
-  function head(title) {
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
-    CV.text(title, U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
-  }
-  CV.on('page_back', () => CV.pop());
+  /* 二级页顶栏（标题 + 返回）——**唯一实现是 U.pageHead**（吸顶，见 uiw.js）；
+     父亲大人 09-27 深夜：「每一屏的标题和返回键都固定在顶部吧，不然有时候要点返回又得滑回去」。 */
+  function head(title) { return U.pageHead(title); }
+  /* 二级页返回：实现**收口在 uiw.js 一处**（F2-7）—— 这里原来那份、sc-lines / sc-last 各一份，
+     四份一字不差；本单把可改范围内的三份删掉（sc-guide 那份不在本单范围，见回单）。 */
   /* 一行"左标题 / 右小字"（网页版 .list-row 的 t1 + t2 两行） */
   /* 两行式列表行（灯阁权限 / 铭刻 / 境界 / 图鉴收集…都用它）
      V9.6.142（父亲大人："伴生体的孵化那行字被省略了" → 顺着全站扫了一遍）：**
@@ -130,7 +129,8 @@
   });
   CV.on('auth_up', function () {
     const r = Core.upgradeAuthority();
-    CV.toast(r.msg || (r.ok ? '已提升' : '提升不了'));
+    /* F7 ②：成功＝权限等级当场变（看得见 → 删 toast）；失败要把理由说出来。 */
+    if (!r.ok) CV.toast(r.msg || '提升不了');
     CV.render();
   });
 
@@ -152,16 +152,22 @@
            医疗室那句「每级：离线效率 +1%；每 10 级：离线上限 +0.2 小时」在窄屏正好要三行，
            而折行器第 2 行末尾会补「…」把它砍成「…离线上限 +0.2 …」（实测 320 上）。
            放到三行；行高**只在真的用了第三行时才加**（两行仍是 62，不动既有密度）。 */
-        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 3);
-        const rowH = (dLines.length >= 3 ? 90 : dLines.length === 2 ? 62 : 56) * CV.SCALE;
+        /* F2-5（抢修单 0928R3）：这颗「升级」原来写的是 `id: can ? 'bup:'+id : ''` 且**没给 `dis`**
+           —— 点数不够时它照样画成能点的样子，点下去既没反应也没提示（真死键）。
+           现在 `dis` 变灰 + 把"差什么"当一行小字写进卡片（行高跟着一起算，别压住下一行）。 */
+        const can = (S.cur.points || 0) >= cost && lv < 50;
+        const lack = can ? [] : [lv >= 50 ? '已到 50 级封顶'
+          : ('点数不够：还差 ◉ ' + fmt(Math.max(0, cost - (S.cur.points || 0))) + '（当前 ◉ ' + fmt(S.cur.points || 0) + '）')];
+        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 3).concat(lack);
+        const rowH = (dLines.length >= 3 ? (56 + (dLines.length - 1) * 17) : dLines.length === 2 ? 62 : 56) * CV.SCALE;
         const h = rowH;
         CV.text(CV.fit(b.name + '  Lv.' + lv + '/50', textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         dLines.forEach(function (ln, k2) {
-          CV.text(ln, U.ix(), top + (36 + k2 * 17) * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+          CV.text(ln, U.ix(), top + (36 + k2 * 17) * CV.SCALE,
+            { size: CV.FS.sm, color: (k2 >= dLines.length - lack.length && lack.length) ? CV.C.accent : CV.C.dim });
         });
-        const can = (S.cur.points || 0) >= cost && lv < 50;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          lv >= 50 ? '已满级' : ('升级（◉ ' + fmt(cost) + '）'), 'ghost', can ? 'bup:' + b.id : '');
+          lv >= 50 ? '已满级' : ('升级（◉ ' + fmt(cost) + '）'), 'ghost', 'bup:' + b.id, !can);
         U.y = top + h;
       });
     });
@@ -170,7 +176,8 @@
     CV.on('bup:' + b.id, function () {
       const r = Core.upgradeBuilding(b.id);
       snd(r.ok ? 'levelup' : 'error');
-      CV.toast(r.msg || (r.ok ? '已升级' : '升级不了'));
+      /* F7 ②：建筑等级当场变（看得见 → 删）；失败留（材料 / 点数不够这类要读得到）。 */
+      if (!r.ok) CV.toast(r.msg || '升级不了');
       CV.render();
     });
   });
@@ -241,9 +248,21 @@
     }
   });
   CV.on('realm_try', function () {
-    const r = Core.attemptRealm();
-    CV.toast(r.msg || (r.success ? '渡劫成功' : '渡劫失败'));
-    CV.render();
+    /* F2-7（抢修单 0928R3 · 大额 / 不可逆补二次确认）：渡劫是"会失败、失败也照扣材料与点数"
+       的动作 —— 消耗由 `Core.realmState()` 现算（不手抄），先问一句再打。
+       口径与"转生 / 分解 / 删档"那几颗一致（它们本来就问）。 */
+    const st = Core.realmState();
+    const nx = st.next;
+    U.confirm('渡劫', nx
+      ? ('突破「' + (st.nextName || '下一阶') + '」：消耗 ' + ((D.ITEMS[st.matItem] || {}).name || st.matItem)
+        + ' ×' + st.matN + ' ＋ ◉ ' + fmt(st.points) + '，成功率 ' + Math.round(nx.rate * 100)
+        + '%。失败也扣（等级不掉）。确定吗？')
+      : '现在这一步渡不了（条件没满足）。', function () {
+      const r = Core.attemptRealm();
+      /* F7 ②：渡劫成功＝境界当场变（看得见 → 删）；失败**必须留**（失败也扣，得让人知道）。 */
+      if (!r.ok || !r.success) CV.toast(r.msg || '渡劫失败');
+      CV.render();
+    }, { okLabel: '渡劫' });
   });
 
   /* ---------- 铭刻 ---------- */
@@ -277,7 +296,8 @@
   });
   CV.on('gl_unlock', function () {
     const r = Core.geneLockUnlock();
-    CV.toast(r.msg || (r.ok ? '已突破' : '条件未满足'));
+    /* F7 ②：铭刻状态当场变（看得见 → 删）；"条件未满足"这类失败留。 */
+    if (!r.ok) CV.toast(r.msg || '条件未满足');
     CV.render();
   });
 
@@ -349,7 +369,7 @@
         const mine = st.activeBeast && st.activeBeast.elem;
         const bonus = mine ? (D.ELEMENT_COUNTER[mine] === we ? '克制 +' + Math.round(D.ELEMENT_BONUS * 100) + '% 伤害'
           : (D.ELEMENT_COUNTER[we] === mine ? '被克 −' + Math.round(D.ELEMENT_PENALTY * 100) + '% 伤害' : '无克制关系')) : '（先带一只随行才有效果）';
-        U.hint('随行伴生体的五行 × **这张图的属性** 才算克制：克制 +' + Math.round(D.ELEMENT_BONUS * 100) + '% 伤害，被克 −' + Math.round(D.ELEMENT_PENALTY * 100) + '% 伤害。', 4 * CV.SCALE);
+        U.hint('随行伴生体的五行 × 这张图的属性 才算克制：克制 +' + Math.round(D.ELEMENT_BONUS * 100) + '% 伤害，被克 −' + Math.round(D.ELEMENT_PENALTY * 100) + '% 伤害。', 4 * CV.SCALE);
         U.hint('当前进度「' + ((D.WORLDS.find((x) => x.id === wid) || {}).name || wid) + '」是' + (D.ELEMENT_ICON[we] || '') + we +
           ' · 你的随行是' + (mine ? (D.ELEMENT_ICON[mine] || '') + mine + ' → ' + bonus : '（无）'), 2 * CV.SCALE,
           mine ? (D.ELEMENT_COUNTER[mine] === we ? CV.C.green : CV.C.dim) : CV.C.dim);
@@ -378,7 +398,8 @@
   CV.on('beast_hatch10', function () { hatchThen(10); });
   CV.on('beast_on:*', function (id) {
     const r = Core.setActiveBeast(id);
-    CV.toast(r.msg || '已随行');
+    /* F7 ②：随行状态在那张卡上写着（"随行中" → 看得见，删）；失败留。 */
+    if (!r.ok) CV.toast(r.msg || '换不了随行');
     CV.render();
   });
 
@@ -389,9 +410,7 @@
     const bd = D.beastById(beastDetailId) || null;
     const owned = (Core.S.beast.owned || {})[beastDetailId] || null;
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
-    CV.text('伴生体详情', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('伴生体详情', { backId: 'page_back' });   // 吸顶（父亲大人 09-27 深夜 · 派单 Z-B）
     if (!bd || !owned) { U.card(function () { U.h3('伴生体详情'); U.hint('这只伴生体不在了（可能刚换过存档）', 4 * CV.SCALE); }); return; }
     const lv = owned.lv || 0, soul = owned.soul || 0;
     const need = D.BEAST_SOUL_PER_LV * (lv + 1);
@@ -428,7 +447,8 @@
   CV.on('beast_setactive', function () {
     const on = Core.S.beast.active === beastDetailId;
     const r = Core.setActiveBeast(on ? null : beastDetailId);
-    CV.toast(r.msg || (on ? '已收回' : '已随行'));
+    /* F7 ②：同上 —— 卡上"随行中"当场变。 */
+    if (!r.ok) CV.toast(r.msg || (on ? '收不回来' : '随行不了'));
     CV.render();
   });
 
@@ -446,8 +466,11 @@
     U.begin(); head('转生天赋');
     U.card(function () {
       U.h3('转生', '已转生 ' + (S.player.reincarnations || 0) + ' 次');
-      U.note('会重置：玩家等级（回到 Lv.0）、残域世界进度、深井层数。', 2 * CV.SCALE);
-      U.note('会保留：伙伴（含等级与技能）、装备、主角技能与属性、命格、铭刻、天赋、全部货币。', 2 * CV.SCALE);
+      /* 2026-09-27（父亲大人深夜拍板：**深井和世界进度都保留**）：这两行是**说明**，
+         必须与 reincarnate() 的行为逐字对得上（尺子 = test_game 里的"转生说明＝行为"那组）。
+         转生只动等级这一条线；六维已投的点数留着，只有"可用点"按等级重算。 */
+      U.note('会重置：玩家等级回到 Lv.0（升级给的属性点、技能点按新等级重新计算，已经点上的六维与技能不受影响）。', 2 * CV.SCALE);
+      U.note('会保留：残域世界进度与深井层数、伙伴（含等级与技能）、装备、主角技能与属性、命格、铭刻、天赋、全部货币。', 2 * CV.SCALE);
       /* V9.6.142：三个条件并排塞进 kv 的右半边 → 「… · 灯芯Lv.0/…」被砍掉，
          玩家看不到第三个门槛。改成**整行说明**（占满宽度），三项一条不漏。 */
       U.hint('第 ' + ((S.player.reincarnations || 0) + 1) + ' 次转生条件：玩家 Lv.' + S.player.level + '/' + need.lv
@@ -470,25 +493,49 @@
         const textW = U.iw() - bw - 8 * CV.SCALE;
         CV.text(t.name + '  Lv.' + lv + '/10', U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
         CV.text(CV.fit(t.desc, textW, CV.FS.sm), U.ix(), top + 36 * CV.SCALE, { size: CV.FS.sm, color: CV.C.dim });
+        /* F2-5：♾ 不够时那颗「升级 ♾N」原来是一颗画着能点、点了没反应的假按钮
+           —— 现在走 `dis` 变灰，并把"差多少"写在同一行的说明后面（满级就写满级）。 */
+        const canUp = cost !== undefined && (S.cur.rp || 0) >= cost;
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           cost === undefined ? '已满' : ('升级 ♾' + cost), 'ghost',
-          cost !== undefined && (S.cur.rp || 0) >= cost ? 'talent_up:' + br : '');
-        U.y = top + h;
+          'talent_up:' + br, !canUp);
+        if (!canUp) {
+          CV.text(CV.fit(cost === undefined ? '这支天赋已满级' : ('♾ 不够：还差 ' + fmt(Math.max(0, cost - (S.cur.rp || 0)))), textW, CV.FS.xs),
+            U.ix(), top + 50 * CV.SCALE, { size: CV.FS.xs, color: CV.C.accent });
+        }
+        /* 行高不够时补一点（那一行小字不能压到下一支天赋上） */
+        U.y = top + Math.max(h, ((!canUp ? 66 : 56)) * CV.SCALE);
       });
     });
   });
   CV.on('do_reincarn', function () {
-    U.confirm('转生', '确定转生？等级、残域进度、深井层数会重置，换来永久天赋点（伙伴 / 装备 / 命格 / 铭刻 / 货币都保留）。', function () {
+    U.confirm('转生', '确定转生？等级回到 Lv.0（升级给的属性点、技能点按新等级重算，已经点上的六维与技能不受影响），换来永久天赋点；残域进度、深井层数、伙伴 / 装备 / 命格 / 铭刻 / 货币全部保留。', function () {
       const r = Core.reincarnate();
-      CV.toast(r.msg || '已转生');
+      /* V1.0.4 · R9（父亲大人 09-27 点单）：`reincarn`（转生）—— 只报"这是第几次转生"，
+         不带名字、不带账号。转生是小游戏里最贵的一个动作，后台要能看出"谁走到这儿了"。 */
+      try {
+        if (G.LOG && (!r || r.ok !== false)) G.LOG.event('reincarn', { count: ((Core.S.player.reincarnations || 0)) });
+      } catch (e) {}
+      /* F7 ②：转生成功后落到主画面、等级当场变 Lv.0（看得见 → 删）；失败留。 */
+      if (r && r.ok === false) CV.toast(r.msg || '转不了');
       CV.reset('home');
     });
   });
   Object.keys(D.TALENTS || {}).forEach(function (br) {
     CV.on('talent_up:' + br, function () {
-      const r = Core.buyTalent(br);
-      CV.toast(r.msg || '已升级');
-      CV.render();
+      /* F2-7（大额补二次确认）：一支天赋一路点到头要 ♾6200，单点最贵的一档就是 ♾2500 ——
+         以前点一下直接扣，一句都不问。消耗按**当前这一级**现算（`D.TALENT_COSTS[lv]`）。 */
+      const t = (D.TALENTS || {})[br] || {};
+      const lv = (Core.S.player.talents && Core.S.player.talents[br]) || 0;
+      const cost = (D.TALENT_COSTS || [])[lv];
+      U.confirm('升级天赋', '把「' + (t.name || br) + '」从 Lv.' + lv + ' 升到 Lv.' + (lv + 1)
+        + '：消耗 ♾ ' + fmt(cost || 0) + '（现有 ♾ ' + fmt(Core.S.cur.rp || 0) + '）。'
+        + '永久天赋转生后保留，确定吗？', function () {
+        const r = Core.buyTalent(br);
+        /* F7 ②：天赋等级当场变（看得见 → 删）；失败留（♾ 不够这类）。 */
+        if (!r.ok) CV.toast(r.msg || '升不了');
+        CV.render();
+      }, { okLabel: '升级' });
     });
   });
 
@@ -507,7 +554,7 @@
     U.space(CV.SP[1]);
     const vol = cs.volumes.filter(function (v) { return v.id === codexVol; })[0] || cs.volumes[0];
     U.card(function () {
-      U.h3(vol.name + '图鉴', '收集进度 ' + vol.owned + ' / ' + vol.total);
+      U.h3(vol.name, '收集进度 ' + vol.owned + ' / ' + vol.total);
       vol.rewards.forEach(function (r) {
         row2('收集 ' + r.n + ' ' + vol.name, Core.rewardTextOf(r.reward),
           r.claimed ? '已领取' : (r.reached ? '点一下领取' : ('还差 ' + (r.n - vol.owned))),
@@ -573,7 +620,8 @@
     v.rewards.forEach(function (r) {
       CV.on('codex_claim:' + v.id + ':' + r.n, function () {
         const res = Core.claimCodexReward(v.id, r.n);
-        CV.toast(res.msg || '已领取');
+        /* F7 ②：领完那一档当场变灰 / 打勾（看得见 → 删成功）；失败留（"还差 N 个…"）。 */
+        if (!res.ok) CV.toast(res.msg || '领不了');
         CV.render();
       });
     });
@@ -582,7 +630,8 @@
   D.CODEX_REWARDS.forEach(function (r) {
     CV.on('codex_claim:' + r.n, function () {
       const res = Core.claimCodexReward('chars', r.n);
-      CV.toast(res.msg || '已领取');
+      /* F7 ②：同上（老入口）。 */
+      if (!res.ok) CV.toast(res.msg || '领不了');
       CV.render();
     });
   });

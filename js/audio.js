@@ -354,7 +354,9 @@
      父亲大人续单钉死"多段攻击每段一声（连击几段就响几下）" ——
      上限只该管"UI 音效被连点刷屏"，绝不能把战斗反馈吃掉。 */
   const live = [];
-  let bgmLoading = false, bgmFailed = '', failed = '';
+  /* `bgmDead` ＝"这个包里的 BGM 读不到 / 解不开"，**确凿失败、不再重试**（防每次触摸都重读一遍 mp3）；
+     `bgmTries` 只给"解码卡死超时"那种不确定的情况限个次数。 */
+  let bgmLoading = false, bgmFailed = '', failed = '', bgmDead = false, bgmTries = 0;
   const bufCache = {};
   const lastAt = {};
   const plays = {};
@@ -363,7 +365,11 @@
     const S = G.Core && G.Core.S;
     return (S && S.settings) || {};
   }
-  function bgmOn() { return settings().bgm !== false; }
+  /* V1.0.4 · T（父亲大人 09-27 第 14 条 · 省电模式）：开了省电就**停 BGM**，
+     音效一路照旧（他说"打击感不能丢"）。口径只写在**这一处** ——
+     `bgmStart()`（起播）、`apply()`（翻开关那一刻收口）、`onInterruptEnd()`（被打断后恢复）
+     三处都读它，于是"省电时不许自己响起来"和"翻开关真的 stop"自动一致，不会两处打架。 */
+  function bgmOn() { const st = settings(); return st.bgm !== false && st.savePower !== true; }
   function sfxOn() { return settings().sfx !== false; }
   function sr() { return (ctx && ctx.sampleRate) || SR_FALLBACK; }
 
@@ -419,7 +425,8 @@
 
   /* 读包内 mp3（ASCII 相对路径）→ decodeAudioData → 循环交叠 */
   function loadBgm() {
-    if (bgmLoading || loopBuf || !ctx) return;
+    if (bgmLoading || loopBuf || !ctx || bgmDead) return;
+    bgmTries++;
     bgmLoading = true;
     let ab = null;
     try {
@@ -429,25 +436,42 @@
     if (!ab || typeof ab.byteLength !== 'number') {
       bgmFailed = bgmFailed || 'read:not-arraybuffer';
       bgmLoading = false;
+      bgmDead = true;                        // 文件读不到＝确凿失败：不再每次触摸重读一遍
       if (G.console && console.warn) console.warn('[AUD] BGM 读不到：' + BGM_SRC + ' → ' + bgmFailed);
       return;
     }
     let done = false;
     const ok = function (b) {
       if (done) return; done = true; bgmLoading = false;
-      if (!b) { bgmFailed = 'decode:empty'; return; }
+      if (!b) { bgmFailed = 'decode:empty'; bgmDead = true; return; }
       try { loopBuf = loopPrep(b); } catch (e) { loopBuf = b; }
       if (unlocked) bgmStart();
     };
     const bad = function (e) {
       if (done) return; done = true; bgmLoading = false;
-      bgmFailed = 'decode:' + e;
+      bgmFailed = 'decode:' + e; bgmDead = true;   // 解不开＝确凿失败，不再重试
       if (G.console && console.warn) console.warn('[AUD] BGM 解码失败：' + e);
     };
     try {
       const r = ctx.decodeAudioData(ab, ok, bad);
       if (r && typeof r.then === 'function') r.then(ok, bad);      // 两种签名都认（Promise / 回调）
     } catch (e) { bad(e); }
+    /* ================= F6 #10（抢修单 0928）· `decodeAudioData` 卡死兜底 =================
+       老实现里有"既不回调、也不返回 Promise"的那一档（或 Promise 永远 pending）：
+       那样 `done` 永远是 false、`bgmLoading` 一直是 true ⇒ 这一局**全程没 BGM**，
+       而且因为 `loadBgm` 第一道闸就是 `bgmLoading`，**之后再也不会有第二次机会**：
+       玩家点多少次屏幕都不会重试，只有一条 warn 留在日志里。
+       现在给一次"超时未就绪就放开重试"的路：8 秒还没结果就把闸放掉（`bgmFailed` 写明原因），
+       下一次 `unlock/apply` 会重新读 + 重解。真解出来的那一次照旧能起播（`ok` 里 `done` 会拦住重复）。 */
+    try {
+      setTimeout(function () {
+        if (done) return;
+        bgmLoading = false;                    // 放开闸：下一次 unlock/apply 可以重试
+        if (!bgmFailed) bgmFailed = 'decode:timeout';
+        if (bgmTries >= 3) bgmDead = true;     // 只给几次机会，别在后台无限重解
+        if (G.console && console.warn) console.warn('[AUD] BGM 解码超时未回（8s）→ 放开重试');
+      }, 8000);
+    } catch (e5) {}
   }
 
   /* 等功率交叠：把首尾那段静音"填平"，回环点落在原素材内部连续的一对样本之间。
@@ -492,13 +516,34 @@
 
   /* ⚠️ 启播的唯一入口 —— 第一道闸就是 `unlocked`（首帧绝不可能出声） */
   function bgmStart() {
-    if (!unlocked || !ctx || !loopBuf || bgmSrc || !bgmOn()) return false;
+    if (!unlocked || !ctx || !bgmOn()) return false;
+    /* ================= F6 #8（抢修单 0928）· BGM"非空但已死"的重建口子 =================
+       原来只要 `bgmSrc` 非空，这里就永远拒绝新建；而没有任何监听、也没有看门狗：
+       平台悄悄停了那个 source、或 ctx 变成 `closed`，音乐就**一直静音** ——
+       `apply()` 与每次触摸的 `unlock()` 都救不回来，只能重启小游戏。
+       现在两条判别：
+         · `onended`（下面 start 之后挂）＝最精确的"这个源死了"（loop 源正常永不 ended）；
+         · `ctx.state === 'closed'` ＝上下文没了，源也出不了声。
+       ⚠️ **故意不用"state 不是 running 就重建"**：onHide 走的是 `suspend()`（state='suspended'），
+          回前台 `resume()` 是异步的 —— 那一刻 state 往往还是 suspended，
+          按那条口径会把还在放（只是被挂起）的源当死源重建，**每次切回前台音乐都从头开始**
+          （还多一次 fade-in 的短静音）。专业判断：挂起中的源是活的，别动它。 */
+    if (bgmSrc) {
+      if (ctx.state !== 'closed') return false;      // 正在放 / 正被挂起：源还有效，一个字节不动
+      bgmStop();                                    // ctx 已关闭：收干净，下面重建
+    }
+    /* 缓冲还没解出来（含解码卡死后超时放闸那一条路）：借这一次机会重试读 + 重解
+       （`bgmDead`＝文件读不到/解不开，确凿失败，别每次触摸都重读一遍 mp3）。 */
+    if (!loopBuf) { if (!bgmDead) loadBgm(); return false; }
     try {
       const s = ctx.createBufferSource();
       s.buffer = loopBuf;
       s.loop = true;                       // ← 无缝循环靠这一行（不是 innerAudioContext.loop）
       s.connect(bgmGain);
       s.start();
+      /* F6 #8：loop 源正常永远不 ended —— 真收到它就是"平台把这个源停了"，
+         清掉闸，下一次 bgmStart 才会重建（而不是永远静音）。 */
+      try { s.onended = function () { if (bgmSrc === s) bgmSrc = null; }; } catch (e0) {}
       bgmSrc = s; started++;
       fadeIn(bgmGain, BGM_GAIN, 0.35);
       return true;
@@ -515,12 +560,24 @@
 
   /* 玩家第一次触摸：resume + 启播（**只发生一次**，不会每次点击都重启） */
   function unlock() {
+    /* V1.0.4 · T（父亲大人 09-27 第 1 条）：**屏幕变暗的恢复挂在这扇门上**。
+       `js/cv.js` 的 onDown 每次触摸（PC 鼠标那一路也复用 onDown）都会调本函数 ——
+       只加这一行就覆盖了"任何触摸 → 立刻恢复玩家自己的亮度"，不必再注册第二个 `wx.onTouchStart`
+       （那会与既有假环境尺子打架：它们给 onTouchStart 只留一个槽）。
+       放在 `init()` 之前：没有 WebAudio 的环境也要照常恢复亮度；CAP 不在时什么也不做。 */
+    try { if (G.CAP && G.CAP.brightPing) G.CAP.brightPing(); } catch (e0) {}
     if (!init()) return false;
     if (!unlocked) {
       unlocked = true;
       if (G.console && console.log) console.log('[AUD] 首次交互，音频解锁：' + (bgmFailed || 'ok'));
     }
-    try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (e) {}
+    /* F6 #5：**不等于 running 就 resume** —— iOS 的 WebAudio 有第三个状态 `interrupted`
+       （被系统抢音频后就是它）。原来写死 `=== 'suspended'`，一旦平台把 state 置成它、
+       而 `onAudioInterruptionEnd` 又没被派发（老基础库），BGM 就**永远哑**：再点屏幕也不认，
+       只能重启小游戏。`ctx.resume()` 本身是幂等的（running 时调用无副作用），所以放开判据。
+       ⚠️ 诚实标注：`interrupted` 这个具体取值**没有真机验证过**（本机查不到微信 typings），
+          按"可能发生"处理 —— 放开判据的代价为零，收益是"多一种状态也能自愈"。 */
+    try { if (ctx.state !== 'running' && ctx.resume) ctx.resume(); } catch (e) {}
     /* 收口到 apply()：存档里的两个开关（老档补过默认值）在这里落一次 ——
        玩家上次把音效关了，这一下就把 SFX gain 压回 0，不会"刚一解锁先响一声再静音"。 */
     apply();
@@ -565,17 +622,23 @@
       s.buffer = b;
       s.connect(sfxGain);
       s.start();
-    } catch (e) { failed = 'sfx_play:' + e; return false; }
+    } catch (e) {
+      /* F6 #9：`start()` 抛错时，已经 connect 上的 source 会留在节点图上（不进 live 记账、
+         也没人 disconnect）—— 属于泄漏。这里收干净再走。 */
+      try { if (s && s.disconnect) s.disconnect(); } catch (e2) {}
+      failed = 'sfx_play:' + e; return false;
+    }
     lastAt[name] = now;
     plays[name] = (plays[name] || 0) + 1;
     /* 声部计数要**双保险**：`onended` 在部分实现上不一定回，只靠它会让计数只增不减、
        几场战斗之后上限就把声音全掐了。所以还有一条按缓冲时长的兜底释放 + `play()` 里的时间剪枝。 */
-    const entry = { end: now + Math.ceil(((b.duration || 0.5) + 0.15) * 1000), combat: !!spec.combat };
+    const entry = { end: now + Math.ceil(((b.duration || 0.5) + 0.15) * 1000), combat: !!spec.combat, src: s };
     live.push(entry);
     let released = false;
     const release = function () {
       if (released) return;
       released = true;
+      entry.src = null;
       const k = live.indexOf(entry);
       if (k >= 0) live.splice(k, 1);
       try { if (s.disconnect) s.disconnect(); } catch (e2) {}
@@ -589,6 +652,32 @@
   function pruneLive(now) {
     const t = now || Date.now();
     for (let i = live.length - 1; i >= 0; i--) if (live[i].end <= t) live.splice(i, 1);
+  }
+
+  /* ================= V1.0.4 · R6（父亲大人 09-27 点单：「音频打断处理」）=================
+     **一次性音效"立刻停"，不是"挂起后回来接着响"**。
+     为什么单独写这一条：`ctx.suspend()` 只是把时间轴冻住 —— 来电那一下没播完的打击声，
+     等挂了电话回到游戏会**接着响一半**，听着像穿帮；而 BGM 是循环，挂起后回来继续正合适。
+     所以：音效 sources 停掉（真停）、BGM 走 suspend/resume。 */
+  function stopVoices() {
+    for (let i = live.length - 1; i >= 0; i--) {
+      const e = live[i];
+      try { if (e && e.src && e.src.stop) e.src.stop(); } catch (e2) {}
+      /* F6 #9：停掉之后**断开节点**——原来只靠 `setTimeout(release,…)` 间接 disconnect，
+         那是隐式依赖（定时器没跑到就留在图上）。这里显式收干净。 */
+      try { if (e && e.src && e.src.disconnect) e.src.disconnect(); } catch (e3) {}
+      live.splice(i, 1);
+    }
+  }
+
+  /* 内存告警时可回收的音频缓存（R2）：合成音效的 PCM 缓冲**完全可再生**，
+     清了只是下一次现合成；BGM 的 loopBuf 是解码结果，重建要再解一次 mp3 —— 同样可再生，
+     但它正播着的时候不能丢，所以只丢"音效"。**玩家数据一个字都不碰。** */
+  function dropCaches() {
+    let n = 0;
+    Object.keys(bufCache).forEach(function (k) { delete bufCache[k]; n++; });
+    stopVoices();
+    return n;
   }
 
   /* 设置变了 / 首次解锁：一处收口把两个开关落到音频上（关＝真停） */
@@ -613,7 +702,26 @@
 
   /* ================= 五、前后台 / 来电打断 ================= */
   function suspend() { try { if (ctx && ctx.suspend) ctx.suspend(); } catch (e) {} }
-  function resume() { try { if (ctx && unlocked && ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (e) {} }
+  /* F6 #5：同 unlock 那条 —— `suspended` / `interrupted`（iOS 被系统抢音频）都要能唤醒；
+     判据改成"不等于 running"，`resume()` 幂等，重复调不会出事。 */
+  function resume() { try { if (ctx && unlocked && ctx.state !== 'running' && ctx.resume) ctx.resume(); } catch (e) {} }
+  /* 来电 / 微信音乐 / 别的 App 抢音频（R6）：三件事按顺序做，一样都不许少 ——
+       ① 正在响的音效**真停**（见 stopVoices 的说明）；
+       ② 音频上下文挂起（BGM 挂起后能接着放，正是想要的）；
+       ③ 结束回来：先 resume，再走 `apply()` 收口 —— **只在玩家没手动关音乐时**恢复
+          （`bgmOn()` 是 `apply()` 里的既有判据；玩家关了音乐，这一下就不许自作主张响起来）。 */
+  function onInterruptBegin() {
+    try { if (G.LOG) G.LOG.info('audio', 'interrupt_begin'); } catch (e) {}
+    stopVoices();
+    suspend();
+  }
+  function onInterruptEnd() {
+    let want = true;
+    try { want = bgmOn(); } catch (e) {}
+    try { if (G.LOG) G.LOG.info('audio', 'interrupt_end', { ok: want }); } catch (e2) {}
+    resume();
+    apply();
+  }
   /* V1.1.15（2026-09-27 · `boot_onshow_audit` 抓到的时序破坏）：
      这 4 个注册原来写在**模块顶层** —— 也就是"**读档/建档之前**就注册了事件"。
      处理器本身有守卫（不碰 S，所以不会当场崩），但它**破坏了
@@ -625,10 +733,16 @@
     if (!WX || lifeInstalled) return;
     lifeInstalled = true;
     try {
-      if (WX.onHide) WX.onHide(suspend);
+      /* F6 #6（与 R6 立的口径对齐）：**普通切后台也要"音效真停"** ——
+         原来只有 `onAudioInterruptionBegin` 那条路走了 `stopVoices()+suspend()`，
+         而切后台/回前台走的是裸 `suspend/resume`：正在响的那一声打击会被冻住、
+         回到游戏**接着响一半**（听着就是穿帮）。BGM 仍走挂起/恢复（循环音乐正合适）。 */
+      if (WX.onHide) WX.onHide(function () { stopVoices(); suspend(); });
       if (WX.onShow) WX.onShow(resume);
-      if (WX.onAudioInterruptionBegin) WX.onAudioInterruptionBegin(suspend);
-      if (WX.onAudioInterruptionEnd) WX.onAudioInterruptionEnd(resume);
+      /* R6（09-27 点单）：来电/微信音乐打扰 —— 这两条**不是** suspend/resume 的别名，
+         走的是上面 onInterruptBegin/End 那一套（音效真停 ＋ 结束时按开关决定要不要恢复）。 */
+      if (WX.onAudioInterruptionBegin) WX.onAudioInterruptionBegin(onInterruptBegin);
+      if (WX.onAudioInterruptionEnd) WX.onAudioInterruptionEnd(onInterruptEnd);
     } catch (e) {}
   }
   try { G.AUDInstallLifecycle = installLifecycle; } catch (e) {}
@@ -654,6 +768,7 @@
         api: !!(WX && WX.createWebAudioContext),
         ctx: !!ctx, state: ctx ? ctx.state : null,
         bgmLoaded: !!loopBuf, bgmPlaying: !!bgmSrc, bgmFailed: bgmFailed,
+        bgmDead: bgmDead, bgmTries: bgmTries,   // F6 #8/#10：确凿失败 / 重试次数（真机排查用）
         gain: { bgm: bgmGain ? bgmGain.gain.value : null, sfx: sfxGain ? sfxGain.gain.value : null },
         /* 空间尾（反馈延迟）有没有建起来 —— 建不起来是"干声"，不是"没声音" */
         space: { ok: !!(spDelay && spWet), delay: spDelay ? spDelay.delayTime.value : null,
@@ -667,6 +782,17 @@
     /* 测试口（只有尺子用；不参与游戏逻辑） */
     _spec: function (n) { return SFX[n]; },
     _synth: function (n) { return synthOf(n, SR_FALLBACK); },
+    /* V1.0.4 · R2/R6 的对外口子（`js/wx-cap.js` 用）：内存告警清缓存 / 打断时停音效 */
+    dropCaches: dropCaches,
+    stopVoices: stopVoices,
+    /* ================= 康康 2026-09-29 · 看广告期间静音 =================
+       激励视频是**盖在画面上的一层原生浮层**，它有自己的声音；游戏这边要是不停，
+       同一时间两套声音一起响（父亲大人：「看广告的时候游戏进程没有暂停」）。
+       这里走**与"切后台"完全相同的那条路**（`stopVoices()` ＋ `suspend()`，
+       回来 `resume()`）：正在响的那一声打击真停、BGM 挂起，广告结束原样恢复。
+       调用方只有一处：`js/wx-adapter.js` 的 `showRewarded`（真广告才调）。 */
+    pauseForAd: function () { try { stopVoices(); suspend(); } catch (e) {} },
+    resumeAfterAd: function () { try { resume(); } catch (e) {} },
     /* 渲染任意一组声部（**不归一**）—— 尺子用它把"噪声层"单独拉出来量占比：
        "打击音里到底有没有噪声成分"这件事，用混在一起的频谱是量不准的
        （窄带谐音的一个峰就能把频带能量比压没），拆开量 RMS 才作数。 */

@@ -17,10 +17,10 @@ window.Battle = (function () {
     return true;
   }
   const MECHANICS = {
-    W01: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 2); }, note: '感染' },
-    W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭/裂伤' },
-    W03: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '恐惧' },
-    W04: { onEnemyHit(t, fr) { if (Math.random() < 0.15) applyStatus(t, fr, 'stun', 1); }, bossRevive: true, note: '陷阱/复活' },
+    W01: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 2); }, note: '感染：敌人攻击附带中毒' },
+    W02: { enemySpd: 1.2, onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 2); }, note: '突袭：敌人速度+20%；裂伤' },
+    W03: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '恐惧：降低攻击；诅咒' },
+    W04: { onEnemyHit(t, fr) { if (Math.random() < 0.15) applyStatus(t, fr, 'stun', 1); }, bossRevive: true, note: '陷阱：随机眩晕；复活' },
     /* 效果是"打到只剩 1 点血"（濒死），不是真的秒杀 —— 飘字也跟着叫"濒死"（V9.2 对齐）。
        V1.0.1（游戏策划总监会诊揪出的真 bug）：原来**每次敌人命中都独立掷 3%**，
        而一场 12 关的战斗里敌人要命中几十上百次 —— 累积起来几乎必中，
@@ -33,45 +33,45 @@ window.Battle = (function () {
     W05: { onEnemyHit(t, frames) {
       if (t._ndUsed || t.hp <= 1) return;
       if (Math.random() < 0.03) { t._ndUsed = 1; t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); }
-    }, note: '濒死判定' },
-    W06: { enemyShield: 0.2, note: '护盾' },
-    W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠' },
-    W08: { allyHitMod: -0.15, note: '浓雾' },
-    W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂' },
-    W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '中毒' },
-    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤/汲取' },
-    W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '腐化' },
-    W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '冰冻' },
-    W14: { randomRule: true, note: '随机规则' },
+    }, note: '濒死判定：每场最多一次，把你打到剩 1 点血' },
+    W06: { enemyShield: 0.2, note: '护盾：开场获得护盾；远程炮击' },
+    W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠：概率无法行动；幻觉' },
+    W08: { allyHitMod: -0.15, note: '浓雾：命中-15%' },
+    W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂：裂伤；群体攻击' },
+    W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '中毒：持续掉血；缠绕' },
+    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤旧船员；汲取' },
+    W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '腐化：降低防御；群体增益' },
+    W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '冰冻：无法行动；王权强化' },
+    W14: { randomRule: true, note: '随机规则：每回合变化' },
     /* W15~W20 的机制以前只写在世界表里、战斗引擎里根本没有（`MECHANICS[worldId] || {}` 直接落空），
        等于最后 6 个世界（180 关）是纯数值怪，但世界详情页照常写着"吸血 / 水压 / 幻觉…"。
        这里按世界表上的文案逐条补齐（V9.5）。 */
-    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '绯月高悬：敌方攻击提升', note: '汲取/绯月强化' },
-    W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '水压/触手缠绕' },
-    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '无人机群/电磁干扰' },
-    W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉/死亡复活' },
-    W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '星骸护盾/轨道扫射' },
-    W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
+    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '绯月高悬：敌方攻击提升', note: '汲取：敌人攻击回复自身；绯月强化' },
+    W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '水压：每回合全队掉血；触手缠绕' },
+    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '无人机群：群体攻击；电磁干扰' },
+    W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉：概率攻击队友；死亡复活' },
+    W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '星骸护盾；轨道扫射' },
+    W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写：每 3 回合变换；全场压制' },
     /* W21~W36（V9.6.76 世界扩到 36 张时补的）。
        规矩照旧：**世界表上写什么，战斗引擎里就得真有什么** —— W15~W20 当年就是这个坑
        （文案写着吸血/水压，引擎里落空，180 关纯数值怪）。这里 16 条逐条对上，
        规则名也改成可配置的（镜界/灯阁说的不是同一句话）。 */
-    W21: { onEnemyHit(t, fr) { if (Math.random() < 0.28) applyStatus(t, fr, 'weak', 2); }, enemyShield: 0.15, note: '静默/护幕' },
-    W22: { enemyShield: 0.22, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '锈壳护盾/电磁干扰' },
-    W23: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, bossSummon: true, note: '感染/召唤幼体' },
-    W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '腐化/焚香灼烧' },
-    W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '规则轮转/镜面幻觉' },
-    W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '培养护盾/轨道扫射' },
-    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤夜影/汲取' },
-    W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '中毒/藤蔓缠绕' },
-    W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '诅咒/碑纹苏醒' },
-    W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '灼烧/炉温强化' },
-    W31: { confuseChance: 0.18, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '幻觉/诅咒' },
-    W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '规则改写/灯影压制' },
-    W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.20, note: '撕裂/吞噬护盾' },
-    W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '冰冻/时序加速' },
-    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '汲取/摆渡' },
-    W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写/全场压制' },
+    W21: { onEnemyHit(t, fr) { if (Math.random() < 0.28) applyStatus(t, fr, 'weak', 2); }, enemyShield: 0.15, note: '静默：攻击附带恐惧；护幕' },
+    W22: { enemyShield: 0.22, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '锈壳护盾；电磁干扰' },
+    W23: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, bossSummon: true, note: '感染：攻击附带中毒；召唤幼体' },
+    W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '腐化：降低防御；焚香灼烧' },
+    W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '规则轮转：每 4 回合换一条；镜面幻觉' },
+    W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '培养护盾；轨道扫射' },
+    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤夜影；汲取' },
+    W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '中毒：持续掉血；藤蔓缠绕' },
+    W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '诅咒：降低防御；碑纹苏醒' },
+    W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '灼烧：持续掉血；炉温强化' },
+    W31: { confuseChance: 0.18, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '幻觉：概率攻击队友；诅咒' },
+    W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '规则改写：每 3 回合变换；灯影压制' },
+    W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.20, note: '撕裂：裂伤；吞噬护盾' },
+    W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '冰冻：无法行动；时序加速' },
+    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '汲取：敌人攻击回复自身；摆渡' },
+    W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写：每 3 回合变换；全场压制' },
   };
 
   let uidSeq = 0;
@@ -79,6 +79,27 @@ window.Battle = (function () {
     // 异常抗性
     const isDebuff = ['poison', 'burn', 'bleed', 'stun', 'freeze', 'weak', 'sunder', 'fear'].includes(id);
     if (isDebuff && unit.resPct && Math.random() < unit.resPct) return false;
+    /* ================= 0928 抢修单 F5 #4：两个增益必须能共存 =================
+       旧写法：`const ex = unit.statuses.find(s => s.id === id); if (ex) ex.turns = max(...)`
+       —— 而**所有增益共用 id 'buff'**（减益共用 'debuff'），于是"命中已有条目"时
+       **只把回合续到最长、新效果整段丢弃**：探针实测先挂 `{atkPct:.25,critPct:.10}`
+       再挂 `{skillPct:.15}`，getBuffs 仍读到 `{atkPct:.25,critPct:.10,skillPct:0}`。
+       后果：「聚灵阵（全队技能伤害 +15%）」只要目标身上已有任何一条增益就完全无效，
+       只把那条续命；泰坦 / 念动力的全队 buff、世界机制的随机 buff 也都在抢同一个槽。
+       现在：**按效果键 merge 进同一条、且每个键各自计时**（`timers[k]`），
+       同一个键重复施加取"绝对值更大的那个"（强的覆盖弱的，不叠加、不会滚雪球）。 */
+    if (id === 'buff' || id === 'debuff') {
+      let ex = unit.statuses.find(s => s.id === id);
+      if (!ex) { ex = { id: id, turns: turns, timers: {} }; unit.statuses.push(ex); }
+      Object.keys(extra || {}).forEach(k => {
+        if (k === 'id' || k === 'turns' || k === 'timers') return;
+        const v = extra[k] || 0;
+        if (ex[k] === undefined || Math.abs(v) > Math.abs(ex[k])) ex[k] = v;
+        ex.timers[k] = Math.max(ex.timers[k] || 0, turns);
+      });
+      ex.turns = Math.max(ex.turns, turns);
+      return true;
+    }
     const ex = unit.statuses.find(s => s.id === id);
     if (ex) ex.turns = Math.max(ex.turns, turns);
     else unit.statuses.push(Object.assign({ id, turns }, extra || {}));
@@ -106,7 +127,10 @@ window.Battle = (function () {
     let def = Math.max(1, dst.def * (1 + db.defPct));
     if (opts.pierce) def *= (1 - opts.pierce);
     let dmg = (atk * atk) / (atk + def) * (mult || 1);
-    if (src.side === 'ally') dmg *= (src.skillMult || 1) * (1 + sb.skillPct);
+    /* 0928 抢修单 F5 #1：技能伤害倍率 **只吃技能那一发**（castSkill 传 opts.skill）。
+       `skillMult` 和 `skillPct` 的名字/文案都是"技能伤害"，普攻也乘就成了又一次"界面在骗人"
+       —— 角色页写着"技能伤害 +X%"，玩家会在普攻上看到它，那不是同源而是巧合。 */
+    if (src.side === 'ally' && opts.skill) dmg *= (src.skillMult || 1) * (1 + sb.skillPct);
     // 命中/闪避
     let hitChance = 0.95 + (opts.hitMod || 0) - Math.min(0.6, dst.eva + db.evaPct);
     hitChance = Math.max(0.3, Math.min(1, hitChance));
@@ -127,11 +151,10 @@ window.Battle = (function () {
       if (D.FACTION_COUNTER[src.faction] === dst.faction) dmg *= 1.15;
       else if (D.FACTION_COUNTER[dst.faction] === src.faction) dmg *= 0.90;
     }
-    // 五行克制：随行伴生体的属性克敌人属性 → +15%；被反克 → -8%（只有我方在算）
-    if (src.side === 'ally' && src.beastElem && dst.elem) {
-      if (D.ELEMENT_COUNTER[src.beastElem] === dst.elem) dmg *= 1 + D.ELEMENT_BONUS;
-      else if (D.ELEMENT_COUNTER[dst.elem] === src.beastElem) dmg *= 1 - D.ELEMENT_PENALTY;
-    }
+    /* 五行克制（0928 抢修单 F5 #2）：随行伴生体属性克**这张图的属性** → +15%；被反克 → -8%。
+       算式只留一份（`D.elementMult`，界面 Core.elementMultiplier 读的是同一份）——
+       以前战斗这段因为"敌人从来没带 elem"从没跑过，界面上那句承诺是空的。 */
+    if (src.side === 'ally' && src.beastElem && dst.elem) dmg *= D.elementMult(src.beastElem, dst.elem);
     dmg *= 0.9 + Math.random() * 0.2;
     if (hasStatus(dst, 'bleed')) dmg *= 1.15;
     if (dst.kind === 'tank') dmg *= 0.88;
@@ -155,7 +178,10 @@ window.Battle = (function () {
     }
     src.energy = Math.min(100, (src.energy || 0) + 30);
     dst.energy = Math.min(100, (dst.energy || 0) + 15);
-    frames.push({ type: 'damage', source: src.uid, target: dst.uid, dmg, crit, absorbed, healed, killed: dst.hp <= 0 });
+    /* F5 #8：伤害帧带上出手者**结算后的真能量** —— 界面原来自己另记一本账
+       （attack +30 / 被打 +15），技能每段伤、治疗/护盾/增益都不涨，于是"还没满就放大招 /
+       满了不放"。现在界面只负责显示引擎给的值。 */
+    frames.push({ type: 'damage', source: src.uid, target: dst.uid, dmg, crit, absorbed, healed, killed: dst.hp <= 0, energy: src.energy, targetEnergy: dst.energy });
     if (opts.execute && dst.hp / dst.maxHp < 0.5 && dmg > 0) {
       const extra = Math.round(dmg * 0.5);
       dst.hp = Math.max(0, dst.hp - extra);
@@ -165,7 +191,13 @@ window.Battle = (function () {
   }
 
   function healUnit(src, dst, mult, frames) {
-    let amount = src.side === 'ally' ? src.atk * mult * (src.skillMult || 1) : src.atk * mult;
+    /* 0928 抢修单 F5 #1 连带：这一行原来也乘 `src.skillMult` —— 而盟友的 skillMult 恒为 1，
+       所以从来没人发现它有害。三项接上之后它就是一颗雷：skillMult 的标签/词条都是**技能伤害**
+       （`PCT_LABEL.skillPct = '技能伤害'`），却会顺带把治疗量放到 8~16 倍
+       （法术型/治疗型靠精神堆 skillMult，满配白昼实测 16.24）→ 治疗者每次施法全队回满，
+       等于**暗改治疗**。这里回退成接线前的口径（治疗只吃技能倍率本身＋受治疗加成），
+       与"技能伤害只作用于伤害"同一条规矩。 */
+    let amount = src.atk * mult;
     if (src.kind === 'healer') amount *= 1.2;
     // 受治疗加成（天赋「受治疗+8%」）作用在被打的人身上
     if (dst.healUp) amount *= (1 + dst.healUp);
@@ -235,6 +267,15 @@ window.Battle = (function () {
       u.energy = Math.min(100, spec.initEnergy || 0);
       u.beastElem = spec.beastElem || null;   // 随行伴生体属性（五行克制用）
       u.charId = spec.charId;                 // 记住这是队伍里的谁：波间血量继承 / 战后写回都要靠它
+      /* 0928 抢修单 F5 #1：**暴击率 / 暴击伤害 / 技能伤害**三项进公式。
+         以前盟友复用 `makeEnemyUnit`，拿到的是敌人写死的 `crit:0.05 / critDmg:2.0 / skillMult:1`
+         ——而 `Core.effectiveStats` 早就把这三项算出来、角色页也在显示（`sc-roster` / `sc-protag`），
+         装备评分里 critPct 权重还是全场最高（1500）→ **角色页在骗人**：传 crit 0.99 实测暴击率 5.3%、
+         传 skillMult 2 伤害一字不变。现在按规格真读（缺省才用敌人的 5% / 2× / 1×）。
+         ⚠️ skillMult 只在技能上生效（见 dealDamage 的 opts.skill），不吃普攻。 */
+      u.crit = spec.crit != null ? spec.crit : 0.05;
+      u.critDmg = spec.critDmg != null ? spec.critDmg : 2.0;
+      u.skillMult = spec.skillMult != null ? spec.skillMult : 1;
       return u;
     });
     /* V1.0.1（父亲大人："为啥我现在打还是一排五个的布局"）：
@@ -245,6 +286,10 @@ window.Battle = (function () {
     const enemies = cfg.enemies.map(spec => {
       const u = makeEnemyUnit(spec);
       u.position = spec.position || 'front';
+      /* F5 #2：敌人**从来没带 elem**，而引擎判的正是"单个敌人的属性"（永远 null）——
+         五行克制因此从未生效。敌人没自带属性时，按 **cfg.worldId 这张图的属性**补上
+         （`Dungeon.makeEnemies` 现在也会自己带上；这里兜底，保证别的调用点也同源）。 */
+      if (!u.elem && cfg.worldId) u.elem = D.worldElement(cfg.worldId);
       return u;
     });
     if (mech.enemyShield) enemies.forEach(u => { u.shield = Math.round(u.maxHp * mech.enemyShield); });
@@ -322,7 +367,7 @@ window.Battle = (function () {
       if (mech.enemyAoeEvery && round > 1 && round % mech.enemyAoeEvery === 0) {
         const live = enemies.filter(u => u.hp > 0);
         if (live.length && alive(allies).length) {
-          frames.push({ type: 'skill', actor: live[0].uid, name: mech.enemyAoeName || '轨道扫射' });
+          frames.push({ type: 'skill', actor: live[0].uid, name: mech.enemyAoeName || '轨道扫射', energy: live[0].energy || 0 });
           live.forEach(src => {
             alive(allies).forEach(t => {
               dealDamage(src, t, mech.enemyAoeMult || 1.2, {}, frames);
@@ -385,6 +430,10 @@ window.Battle = (function () {
         if (mech.bossSummon && !boss.summoned && ratio <= 0.5) {
           boss.summoned = true;
           const add = makeEnemyUnit({ name: '被召唤的爪牙', hp: Math.round(boss.maxHp * 0.25), atk: boss.atk * 0.6, def: boss.def * 0.6, spd: 50 });
+          /* F5 #5：召唤物以前**没有 position** → 渲染时 `position !== 'front'` 恒成立，
+             它被画进"后排"那一行（甚至不上屏）；同时 `pickTarget` 的 front 过滤把它当后排，
+             前排没清光时单点技能**够不到它**（看不见又打不到）。统一当前排。 */
+          add.position = 'front';
           enemies.push(add); all.push(add);
           frames.push({ type: 'summon', enemy: publicUnit(add), text: `${boss.name} 召唤了爪牙！` });
         }
@@ -392,7 +441,19 @@ window.Battle = (function () {
       if (!checkEnd()) break;
       // 状态计时
       all.forEach(u => {
-        u.statuses.forEach(s => { s.turns--; });
+        u.statuses.forEach(s => {
+          s.turns--;
+          /* F5 #4：增益/减益的**每个效果键各自计时** —— 同一格里可以同时挂着
+             "攻击+15%（还剩 2 回合）"与"技能伤害+15%（还剩 1 回合）"，
+             一条到点只掉它自己那一项，不连坐另一条。 */
+          if (s.timers) {
+            Object.keys(s.timers).forEach(k => {
+              s.timers[k]--;
+              if (s.timers[k] <= 0) { delete s.timers[k]; delete s[k]; }
+            });
+            if (!Object.keys(s.timers).length) s.turns = 0;
+          }
+        });
         u.statuses = u.statuses.filter(s => s.turns > 0);
         Object.keys(u.cds || {}).forEach(k => { if (u.cds[k] > 0) u.cds[k]--; });
       });
@@ -428,9 +489,11 @@ window.Battle = (function () {
       const others = alive(friends).filter(x => x !== u);
       if (others.length) {
         const t = others[Math.floor(Math.random() * others.length)];
-        frames.push({ type: 'attack', actor: u.uid });
+        const cfFrame = { type: 'attack', actor: u.uid };
+        frames.push(cfFrame);
         frames.push({ type: 'rule', text: `${u.name} 被幻觉支配，攻向同伴！` });
         dealDamage(u, t, 1.0, {}, frames);
+        cfFrame.energy = u.energy || 0;
         return;
       }
     }
@@ -464,14 +527,14 @@ window.Battle = (function () {
       // Boss 特殊技（每 4 行动一次 AOE）
       u.actCount = (u.actCount || 0) + 1;
       if (u.isBoss && u.actCount % 4 === 0) {
-        frames.push({ type: 'skill', actor: u.uid, name: '毁灭冲击' });
+        frames.push({ type: 'skill', actor: u.uid, name: '毁灭冲击', energy: u.energy || 0 });
         alive(foes).forEach(t => dealDamage(u, t, 1.5, { hitMod: 0.1 }, frames));
         alive(foes).forEach(t => { if (mech.onEnemyHit) mech.onEnemyHit(t, frames); });
         return;
       }
       if (u.isElite && u.actCount % 3 === 0) {
         const t = pickTarget(u, foes);
-        frames.push({ type: 'skill', actor: u.uid, name: '猛击' });
+        frames.push({ type: 'skill', actor: u.uid, name: '猛击', energy: u.energy || 0 });
         if (t) dealDamage(u, t, 1.8, {}, frames);
         if (t && mech.onEnemyHit) mech.onEnemyHit(t, frames);
         return;
@@ -480,15 +543,19 @@ window.Battle = (function () {
     // ===== 普攻 =====
     const target = pickTarget(u, foes);
     if (!target) return;
-    frames.push({ type: 'attack', actor: u.uid });
+    /* F5 #8：出手帧带 actor 的能量；dealDamage 会先 +30，所以帧先入列、**结算后再回填**真值。 */
+    const atkFrame = { type: 'attack', actor: u.uid };
+    frames.push(atkFrame);
     const hitMod = u.side === 'ally' ? (cfg.allyHitMod || 0) : 0;
     dealDamage(u, target, 1.0, { hitMod }, frames);
+    atkFrame.energy = u.energy || 0;
     if (u.side === 'enemy' && mech.onEnemyHit) mech.onEnemyHit(target, frames);
     if (sb.poisonOnHit) applyStatus(target, frames, 'poison', sb.poisonOnHit, { srcAtk: u.atk });
   }
 
   function castSkill(u, sk, idx, foes, friends, frames, mech, cfg, lvMult, isUlt) {
-    frames.push({ type: 'skill', actor: u.uid, name: sk.name, ult: !!isUlt });
+    /* F5 #8：技能帧带 actor 能量（必杀前一帧能量已被清零，界面据此可以只显示、不自己记） */
+    frames.push({ type: 'skill', actor: u.uid, name: sk.name, ult: !!isUlt, energy: u.energy || 0 });
     // 天赋「超载：必杀伤害+25%」只加在必杀上
     const mult = sk.mult * (lvMult || 1) * (isUlt ? 1 + (u.ultPct || 0) : 1);
     const targetsOf = t => {
@@ -507,7 +574,8 @@ window.Battle = (function () {
           const ts = targetsOf(sk.target).filter(Boolean);
           let dealt = 0;
           ts.forEach(t => {
-            dealt += dealDamage(u, t, mult, { pierce: sk.pierce, sureCrit: sk.sureCrit, execute: sk.execute, hitMod: cfg.allyHitMod || 0 }, frames);
+            /* opts.skill：这一发是**技能**伤害 —— 技能伤害倍率 / 技能伤害加成只在这里生效（F5 #1）。 */
+            dealt += dealDamage(u, t, mult, { pierce: sk.pierce, sureCrit: sk.sureCrit, execute: sk.execute, hitMod: cfg.allyHitMod || 0, skill: true }, frames);
             if (sk.status && t.hp > 0) {
               const st = sk.status;
               if (!st.chance || Math.random() < st.chance) {
@@ -528,7 +596,12 @@ window.Battle = (function () {
       case 'heal': {
         targetsOf(sk.target).filter(Boolean).forEach(t => {
           healUnit(u, t, mult, frames);
-          if (sk.status) addStatus(t, sk.status.id, sk.status.turns);
+          /* V1.1.16（0927-Y 数值轮）：原来这里直接 `addStatus` —— **治疗型技能挂的状态没有飘字帧**
+             （`applyStatus` 才会 push `type:'status'`；`addStatus` 只改状态、不产生帧）。
+             同一个文件里"伤害型技能挂状态"早就走 `applyStatus`（见上面 dmg 分支），
+             所以"续命之环"这类治疗附带的状态在战斗里**看得见效果、看不到提示** —— 静默错。
+             这一轮治疗族补到 6 条（新增"群疗·持续""群净"）之后暴露得更明显，一并收口。 */
+          if (sk.status) applyStatus(t, frames, sk.status.id, sk.status.turns);
         });
         break;
       }

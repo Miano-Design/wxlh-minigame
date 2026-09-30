@@ -28,25 +28,31 @@
 
   /* 返回到上一步（从首页 tile 进来时 CV.pop 回首页；从结果页返回时回招募页） */
   CV.on('rec_back', function () { CV.pop(); });
-  CV.on('rec_close', function () { CV.pop(); });
+  /* F2-7（抢修单 0928R3 · 删没有入口的死处理器）：`rec_close` 全仓没有一处 `CV.hit` / 按钮引用
+     （招募页与招募结果页的返回都走 `rec_back`）—— 删掉，别让下一个人以为它是活的。 */
 
   /* ---------- 招募页 ---------- */
   CV.register('recruit', function () {
     const S = Core.S;
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'rec_back');
-    CV.text('招募伙伴', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
     /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 5 条）：页头那个 ⓘ 照网页版
        `.page-head .info-i`（占位 **2.5rem＝40px**，与左边返回键等宽）＋ `.info-i::after`
        （里面那颗圆只有 **1.25rem＝20px**、边框 line2、底 panel2、`--fs-md` 12px 斜体 Georgia、色 --dim）。
        小游戏原来是"40px 热区配 34px 圆圈 + 15px 粗白字"——圆圈比网页版大 70%、
        字比网页版大一档还改成白色，页头一眼就不一样。 */
+    /* ⚠️ 父亲大人 09-27 深夜（派单 Z-B）：标题 + 返回**吸顶**。
+       那颗「i」原来画在正文顶上（跟着一起滚），现在挂到吸顶顶栏的右端 ——
+       坐标由框架按**屏幕坐标**给（U.pageHead 的 right 回调），热区照旧登记 rec_rates。 */
     const ibox = 40 * CV.SCALE, icir = 20 * CV.SCALE;      // 2.5rem 占位 / 1.25rem 圆圈
-    const ibx = U.pad() + U.cw() - ibox, iby = U.y + (U.BTN_SM * CV.SCALE - ibox) / 2;
-    CV.round(ibx + (ibox - icir) / 2, iby + (ibox - icir) / 2, icir, icir, icir / 2, CV.C.panel2, CV.C.line2);
-    CV.text('i', ibx + ibox / 2, iby + ibox / 2, { size: CV.FS.md, align: 'center', color: CV.C.dim });
-    CV.hit('rec_rates', ibx, iby, ibox, ibox);
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('招募伙伴', { backId: 'rec_back', right: function (rx, y0, h) {
+      const ibx = rx, iby = y0 + (h - ibox) / 2;
+      const prevMode = CV.hitMode;                 // 框架整段就是 screen 模式：这里只许还回去
+      CV.hitMode = 'screen';
+      CV.round(ibx + (ibox - icir) / 2, iby + (ibox - icir) / 2, icir, icir, icir / 2, CV.C.panel2, CV.C.line2);
+      CV.text('i', ibx + ibox / 2, iby + ibox / 2, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+      CV.hit('rec_rates', ibx, iby, ibox, ibox);
+      CV.hitMode = prevMode;
+    } });
 
     Object.keys(D.RECRUIT_POOLS).forEach(function (pid) {
       const p = D.RECRUIT_POOLS[pid];
@@ -74,7 +80,7 @@
          （U.btnRow 只会把宽度**放大**到铺满，放大不会造成折行）。 */
       const near = CV.W < 360 * CV.SCALE;
       const oneLabel = fst.left > 0
-        ? (fst.ready ? (near ? ('免费抽1次（剩' + fst.left + '）') : ('免费抽 1 次（今日还剩 ' + fst.left + ' 次）'))
+        ? (fst.ready ? (near ? ('免费抽 1 次（剩 ' + fst.left + '）') : ('免费抽 1 次（今日还剩 ' + fst.left + ' 次）'))
           : (payLabel + ' · 免费还差 ' + mmss(fst.waitSec)))
         : payLabel;
       const tenLabel = (tk && tk.n >= 10) ? ('十连（' + tkIco + ' ' + tkName + '×10）') : ('十连（' + tenText + '）');
@@ -121,6 +127,15 @@
         {
           const one = { label: oneLabel, style: freeNow ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') };
           const ten = { label: tenLabel, style: 'gold', id: 'pull10:' + pid };
+          /* ================= V1.1.16（0927-Y 数值轮 · 报告 §6-8①）：普通池多一颗「连抽 ×10」 =================
+             点数到了中后期没有出口（建筑点满后 90 天剩 **727 万 ◉**，报告 §四/§6-8），
+             而普通池单抽 ◉500 就是现成出口 —— 缺的只是"一次点 100 下"。
+             口径（**不动任何既有排序/结构**）：只在**普通池**那张卡上，在「十连」**下面**加一颗
+             「连抽 ×10（◉45,000）」（＝10 次十连 ＝ 100 抽），点了先出一个确认弹窗报价。
+             别的池不加（限定池/高级池的货币本来就紧，给它们开口子等于改那条线的定价）。 */
+          const bulk = pid === 'normal'
+            ? { label: '连抽 ×10（' + Object.keys((p.ten || p.cost)).map((k) => curIcon(k) + fmt(((p.ten || p.cost)[k]) * 10)).join('') + ' · 共 100 抽）', style: 'ghost', id: 'pull100:' + pid }
+            : null;
           /* 「一行放不放得下」必须**在卡片里量**（`U.iw()` 在卡内是卡内宽 268，在卡外是页宽 296）——
              第一版把这段算在 `U.card` 外面，于是拿 296 去判、实际只有 268，
              320 上「免费抽 1 次（剩 3）」被挤到只剩 141 宽，0.9px 之差把末尾的「）」折到第二行。
@@ -136,6 +151,7 @@
           })();
           if (oneRowFits) U.btnRow([one, ten]);
           else { U.btnRow([one]); U.space(CV.SP[1]); U.btnRow([ten]); }   // 排不下 → 竖排（一颗一行、整宽）
+          if (bulk) { U.space(CV.SP[1]); U.btnRow([bulk]); }
         }
         /* ================= V1.1.8（乙组 B7 · 高级池看广告免费 1 抽）=================
            父亲大人的口径：**10 次/天**，每次免 1 抽（等价 ◆200）。
@@ -147,23 +163,23 @@
           const adLeft = G.AD.left ? G.AD.left('recruit_adv') : 0;
           U.space(CV.SP[1]);
           U.btnRow([{
-            label: '📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）',
-            style: 'ghost', id: adLeft > 0 ? ('ad_pull1:' + pid) : 'noop', dis: adLeft <= 0,
+            /* V1.0.4 · R3：弱网时这颗也变「网络不太好」（判定只在 G.ADWEAK 一处） */
+            label: (G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）')
+              : '📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）'),
+            style: 'ghost', id: adLeft > 0 ? ('ad_pull1:' + pid) : '', dis: adLeft <= 0,
           }]);
         }
       });
     });
     if (S.ssrTicket > 0) {
-      U.btnRow([{ label: '🎫 使用SSR自选券（剩 ' + S.ssrTicket + '）', style: 'gold', id: 'ssr_ticket' }]);
+      U.btnRow([{ label: '🎫 使用 SSR 自选券（剩 ' + S.ssrTicket + '）', style: 'gold', id: 'ssr_ticket' }]);
     }
   });
 
   /* ---------- 抽卡结果（网页版 showResults：伙伴卡网格 + 继续招募 / 返回） ---------- */
   CV.register('recruit_result', function () {
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'rec_back');
-    CV.text('招募结果', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('招募结果', { backId: 'rec_back' });    // 吸顶（父亲大人 09-27 深夜 · 派单 Z-B）
     const res = (last && last.results) || [];
     const cols = 3, gap = CV.SP[2];
     const cw = (U.cw() - gap * (cols - 1)) / cols;
@@ -278,9 +294,7 @@
   }
   CV.register('recruit_rates', function () {
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'rec_back');
-    CV.text('概率公示', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('概率公示', { backId: 'rec_back' });    // 吸顶（父亲大人 09-27 深夜 · 派单 Z-B）
     Object.keys(D.RECRUIT_POOLS).forEach(function (pid) {
       const p = D.RECRUIT_POOLS[pid];
       const pv = Core.pityView(pid);
@@ -320,12 +334,48 @@
     const pid = String(arg).split(':')[0];
     const r = Core.recruitTen(pid);
     if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
+    /* V1.0.4 · R9（父亲大人 09-27 点单）：十连 —— 只报"哪个池、出了几张"，
+       不报任何具体角色 / 账号（后台要的是漏斗，不是玩家抽到了谁）。 */
+    try { if (G.LOG) G.LOG.event('gacha_ten', { pool: String(pid), count: (r.results || []).length }); } catch (e) {}
     last = { results: r.results, pid: pid, n: 10, free: false };
     sndResults(last.results);
     CV.push('recruit_result');
   });
+  /* ================= V1.1.16（0927-Y 数值轮 · 报告 §6-8①）：普通池「连抽 ×10」＝一次 100 抽 =================
+     点数出口（报告 §四：建筑点满后 90 天剩 727 万 ◉）。
+     口径：**先报价再抽**（确认弹窗把"抽几组、花多少、有券先用券"写清），
+           抽卡本体走 `Core.recruitBulk`（内部就是 `recruitTen` 连环调用，出率/保底/记账同源）。
+     ⚠️ 钱不够时会**抽到一半停**：返回里带 `done` / `stops`，弹窗按实际组数报账 ——
+        不许把"以为 100 抽"写进结果页（那是骗玩家的账）。 */
+  CV.on('pull100:*', function (arg) {
+    const pid = String(arg).split(':')[0];
+    const p = D.RECRUIT_POOLS[pid];
+    if (!p) return;
+    const cost = p.ten || p.cost;
+    const price = Object.keys(cost).map(function (k) { return curIcon(k) + fmt(cost[k] * 10); }).join('');
+    const tk = Core.ticketOf(pid);
+    const byTicket = !!(tk && tk.n >= 100);
+    U.confirm('连抽 ×10（共 100 抽）',
+      byTicket
+        ? ('这一次会用掉 100 张' + (((D.ITEMS[tk.id] || {}).name) || tk.id) + '（现有 ' + tk.n + ' 张），不花货币。')
+        : ('费用 ' + price + '（＝10 次十连），有对应招募券时会先用券。'),
+      function () {
+        const r = Core.recruitBulk(pid, 10);
+        if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
+        try { if (G.LOG) G.LOG.event('gacha_ten', { pool: String(pid), count: (r.results || []).length }); } catch (e) {}
+        last = { results: r.results, pid: pid, n: (r.results || []).length, free: false, bulk: true };
+        sndResults(last.results);
+        CV.push('recruit_result');
+        if (r.stops) CV.toast('抽到第 ' + r.done + ' 组停了：' + r.stops);
+      },
+      { chips: [byTicket ? ('用券 ' + (((D.ITEMS[tk.id] || {}).name) || tk.id) + ' ×100') : ('花费 ' + price),
+        '共 100 抽（10 组十连）', byTicket ? '不动货币' : '有券先用券'],
+        note: '点下去就按 10 次十连依次抽完；中途不够会停在那一组，结果页只列真抽到的。' });
+  });
   /* B7 · 高级池：看广告免费 1 抽（配额在 wx-adapter 的 LIMITS.recruit_adv ＝ 10/天） */
   CV.on('ad_pull1:*', function (arg) {
+    /* 弱网：先给一句人话，别让玩家白等（R3） */
+    if (G.ADWEAK && G.ADWEAK.block()) return;
     const pid = String(arg).split(':')[0];
     const AD = G.AD;
     if (!AD || !AD.show) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast('这个版本没有广告模块'); return; }
@@ -343,6 +393,8 @@
     const pid = last.pid, n = last.n;
     const r = n >= 10 ? Core.recruitTen(pid) : Core.recruitOnce(pid);
     if (r.error) { if (G.AUD && G.AUD.play) G.AUD.play('error'); CV.toast(r.error); return; }
+    /* 「再来一次」也是十连的一条腿（结果页那颗）—— 同一口径记账，别只记第一次 */
+    if (n >= 10) { try { if (G.LOG) G.LOG.event('gacha_ten', { pool: String(pid), count: (r.results || []).length }); } catch (e) {} }
     last = { results: n >= 10 ? r.results : [r], pid: pid, n: n, free: false };
     sndResults(last.results);
     CV.render();
@@ -353,10 +405,7 @@
   CV.register('ssr_pick', function () {
     const S = Core.S;
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'ssr_back');
-    CV.text('SSR 自选（剩 ' + (S.ssrTicket || 0) + ' 张）', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2,
-      { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('SSR 自选券（剩 ' + (S.ssrTicket || 0) + ' 张）', { backId: 'ssr_back' });   // 吸顶（同上）
     if (ssrDone) {
       U.card(function () {
         U.h3('自选结果');
@@ -370,7 +419,7 @@
     }
     /* V1.1.14（0927-F）：碎片改成"抽到谁就是谁的" —— 已拥有的进**他自己**那份；
        他已经满星才会转成 SSR 通用碎片（可给同档别人用）。文案跟着说清。 */
-    U.note('选一名 SSR 伙伴入队；已拥有的伙伴会进**他自己的碎片**（他满星之后才转成 SSR 通用碎片，同档别人可以用）。', 0);
+    U.note('选一名 SSR 伙伴入队；已拥有的伙伴会进他自己的碎片（他满星之后才转成 SSR 通用碎片，同档别人可以用）。', 0);
     U.space(CV.SP[2]);
     /* 2026-09-27（父亲大人："就没有隐藏角色这种概念"）：自选池不再排除任何人 */
     const ssrs = D.characters.filter(function (c) { return c.rarity === 'SSR'; });
@@ -408,11 +457,18 @@
     ssrDone = null; CV.push('ssr_pick');
   });
   CV.on('ssrpick:*', function (id) {
-    const r = Core.ssrTicketUse(id);
-    if (!r.ok) { CV.toast(r.msg || '无法选择'); return; }
-    ssrDone = r.msg || '已获得';
-    CV.toast('🎫 ' + ssrDone);
-    CV.render();
+    /* F2-7（抢修单 0928R3 · 大额 / 不可逆补二次确认）：SSR 自选券是**一张券换一个人**，
+       点了就没了（券本来就稀）—— 以前这一下直接生效、一句都不问。
+       名字取的是玩家点的那张卡，不再靠 Core 回话里的文案。 */
+    const c = (D.characters || []).filter(function (x) { return x.id === id; })[0] || {};
+    U.confirm('使用自选券', '用掉 1 张 SSR 自选券，把「' + (c.name || id) + '」收到队里'
+      + '（现有券 ' + (Core.S.ssrTicket || 0) + ' 张）。这张券用掉就没了，确定吗？', function () {
+      const r = Core.ssrTicketUse(id);
+      if (!r.ok) { CV.toast(r.msg || '无法选择'); return; }
+      ssrDone = r.msg || '已获得';
+      CV.toast('🎫 ' + ssrDone);
+      CV.render();
+    }, { okLabel: '用券' });
   });
   CV.on('ssr_back', function () { CV.pop(); });
 })();

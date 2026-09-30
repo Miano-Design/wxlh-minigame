@@ -13,12 +13,17 @@ require('./js/core.js');
 require('./js/battle.js');
 require('./js/dungeon.js');
 require('./js/cv.js');           // canvas 界面框架（配色/字号/圆角全部取网页版 :root，并按 clamp 缩放）
+/* V1.0.4 · 官方能力接入层（R2~R8 · 父亲大人 09-27 点单）：内存告警 / 弱网 / 帧率 / 更新 /
+   收藏 / 鼠标滚轮。**只注册、不动作** —— 真正的注册由下面的 `G.CAP.install()` 在
+   读档/建档之后调（与音频那条同一条时序纪律）。放在 cv.js 之后：它要包 CV 的换页入口。 */
+require('./js/wx-cap.js');
 /* ⚠️ 音频必须排在这里：cv.js 之后（要包 CV.dispatch 的全局点击收口）、
    **uiw.js 之前**（引导/弹窗那层要包在音频外面）—— 顺序反了，"被引导吃掉的那一下"也会出声。 */
 require('./js/audio.js');        // BGM 无缝循环 + WebAudio 现场合成音效（2026-09-27 音频系统）
 require('./js/uiw.js');          // 通用件（卡片/标题行/键值行/宫格/按钮…每块对应网页版一个 CSS 类）
 require('./js/sc-gameclub.js');  // 游戏圈入口（原生按钮的摆放与兜底，与页面无关，先于各页面加载）
 require('./js/sc-cloud.js');     // 存档云同步（微信云开发 · 集合 saves；只登记两个联网口子，见 boot）
+require('./js/sc-namecheck.js'); // 自由命名 · 内容安全闸（V1.0.4 · V：本地筛 → 名单 → 云函数机审）
 require('./js/sc-splash.js');    // 开机首屏（主视觉）+ 选命格背影（V1.1.3）
 require('./js/sc-start.js');     // 开局三步：欢迎 → 起名 → 选血统
 require('./js/sc-guide.js');     // 玩法指南 / 货币图鉴 / 游历奇遇
@@ -68,7 +73,9 @@ if (hadSave) {
   /* 离线结算（和网页版一样：**入账在 core 里做，这里只决定要不要打扰玩家**） */
   bootGains = Core.settleOffline && Core.settleOffline();
 }
-if (!hadSave) { Core.newGame(); Core.ensureDaily && Core.ensureDaily(); }
+/* V1.1.20（F1-5）：这一句是**开机兜底**（不是玩家选择）—— 读不出来进救援态时，
+   `keepRescue: true` 让它"只建内存档、不覆盖主键"（主键那份读不出来的原文要留着）。 */
+if (!hadSave) { Core.newGame({ keepRescue: true }); Core.ensureDaily && Core.ensureDaily(); }
 /* ⚠️ 心跳计时器也必须在**事件注册之前**就位（V1.0.6 · P0 的第二颗雷）：
    `onShow` 处理器里除了 `relayoutNow` 还调 `catchUp()`，而 `catchUp` 读 `lastTick` ——
    `let/const` 有 TDZ：真机上 onShow 一注册就回调时，这两行还没执行到，
@@ -78,11 +85,41 @@ if (!hadSave) { Core.newGame(); Core.ensureDaily && Core.ensureDaily(); }
 let lastTick = Date.now();
 let saveCounter = 0;
 /* 小游戏版本号（设置页底部那行读它） */
-/* V1.0.3（2026-09-27 · 父亲大人拍板）：**上传版本号就用 1.0.3**。
-   上一批（游戏圈入口）曾按"当前 +1"写成 1.0.4，这次他明确给了号，改回 1.0.3 ——
-   **不是回退、不是笔误**：他的口径是"上传 / 提审 / 手上那份材料得是同一个号"。
-   网页版已归档（本地删除），所以"四处同步"现在只剩这一处。 */
-globalThis.GAME_VER = '1.0.3';
+/* V1.0.4（2026-09-27 · 父亲大人 09-27 点单：「官方能力接入」这一批**全部算 1.0.4**）。
+   · 1.0.3 已于 09-27 传成体验版 ⇒ **那个号冻住，这一批不许再改它**；
+   · 版本号**只此一处**（网页版已归档，`scripts/release.js` 直接读这一行）；
+   · 历史（别当笔误）：上一批（游戏圈入口）曾把号写成 1.0.4，父亲大人当时给了 1.0.3，
+     就改回 1.0.3 上传了 —— 现在是**新一轮**，号按他要的 1.0.4 走。 */
+/* V1.0.4 → **回到 1.0.3**（父亲大人 2026-09-27 深夜：「**版本还是 1.0.3 吧**」）——
+   他的口径一直是"上传 / 提审 / 手上材料用同一个号"，同号再传一次＝**覆盖体验版**（不是笔误、不是回退）。 */
+/* 2026-09-29：父亲大人拍板 ——「你把现在的问题都解决了**传 1.0.4** 的」。
+   这一版的内容见 `岗位回单/版本说明-1.0.4-20260928.md`（战斗数值修正 / 复活 / 云存档取回 / 起名与输入 /
+   小屏适配 / 提示精简 / 返回键与呼吸带 / GM 后门按环境开）。 */
+globalThis.GAME_VER = '1.0.4';
+/* ================= V1.0.4 · R1 / R9（父亲大人 09-27 点单：线上日志 ＋ 事件上报）=========
+   开机这两行是**真机白屏 / 丢档排查的第一现场**，也是最缺的两条信息：
+     · `boot/save` —— 这次到底读到档了没有、多大、存档版本几号（**只报字节数与版本号，
+       绝不上报存档内容**：`G.LOG` 的字段白名单会把别的键全丢掉，见 wx-adapter 的说明）；
+     · `boot/load_fail` —— 读不出来时**为什么**（json = 明文坏了 / enc = 密文解不开 /
+       shape = 不像存档 / migrate:xxx = 迁移抛错），与设置页那行诊断同一个来源（Core.loadIssue）。
+   `app_open` 是 R9 要的六个事件之一，口径是**每天一次**（用本地日期当闸）：
+   后台要的是"日活"，不是"每次冷启动"。没有 `wx.reportEvent` 时出口自己静默跳过。 */
+try {
+  if (G.LOG) {
+    const dg = (Core.saveDiag ? Core.saveDiag() : null) || {};
+    G.LOG.info('boot', 'save', { ok: !!hadSave, bytes: dg.len || 0, ver: (Core.S && Core.S.v) || 0 });
+    if (!hadSave) {
+      const li = Core.loadIssue ? Core.loadIssue() : null;
+      if (li) G.LOG.warn('boot', 'load_fail', { why: String(li.why || '') + (li.err ? '|' + li.err : '') });
+    }
+    const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+    const day = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+    if (localStorage.getItem('wxlh_open_day') !== day) {
+      localStorage.setItem('wxlh_open_day', day);
+      G.LOG.event('app_open', { day: day, ver: String(globalThis.GAME_VER || '') });
+    }
+  }
+} catch (e) {}
 /* V1.0.2（多账号调试自审时在 Console 里抓到的）：
    这一行原来是**裸调用** —— 冷启动时 jsbridge 还没就绪，wx.getWindowInfo() 会抛
    「[jsbridge] invoke getSystemInfo fail: jsbridge not ready」。
@@ -94,7 +131,10 @@ let info = {};
 try { info = (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()) || {}; } catch (e) {}
 /* 底栏四个页签 → 对应页面（网页版 #navbar） */
 CV.NAV_TABS.forEach(function (t) {
-  CV.on('tab:' + t.id, function () { CV.cur = t.id; CV.reset(t.id); });
+  /* 父亲大人 09-27 深夜（派单 Z-C）：「点下面的导航按钮又得重新进去界面重新找」——
+     页签不再直接 reset，改走 `CV.switchTab`：离开时把这一格现场（整条栈 + 滚动位置）存下来，
+     切回来时还原（含当时停在的那个二级页）；没有现场 / 那条栈已经没有了才落回该格首页。 */
+  CV.on('tab:' + t.id, function () { CV.switchTab(t.id); });
 });
 CV.setup(info);
 CV.bindTouch();
@@ -144,10 +184,59 @@ if (wx.onShow) {
   });
 }
 /* 切到后台立刻落盘 —— 微信随时可能把进程回收，等不到下一次自动存。 */
-if (wx.onHide) wx.onHide(function () { try { Core.save(); } catch (e) {} });
+/* V1.1.20（F1-1）：这一句是**自动**存盘（可能玩家根本没动手就被切走了）——
+   照常落盘、照常推 idle.lastTs，但不许把"谁新听谁的"判据（savedAt）推成"现在"。
+   玩家真玩过的那几下，各自的存盘已经把判据盖好了，不差这一句。 */
+if (wx.onHide) wx.onHide(function () { try { Core.save({ auto: true }); } catch (e) {} });
 /* 云同步（js/sc-cloud.js）：**只在这里登记两个联网口子** —— 第一次用户交互之后 / 切后台。
    首帧一次网络都不发（存档照旧只读本地，秒进、断网可玩）；开关关着时连口子都不挂。 */
 if (G.CloudSync && G.CloudSync.boot) G.CloudSync.boot();
+/* ================= V1.1.20（F1-5 · 严重）：读档失败 / 更高版本 → **救援态**，喊玩家拍板 =================
+   背景：原来"读不出来"＝当场建档，而 newGame() 里那句 save() 立刻把主键写成空新档 ——
+   玩家那一份（也许只是这一版读不懂、下个版本就能读）就这么被顶掉了（与 core.js 文件头
+   那句"绝不让一点进度被下一次存盘悄悄覆盖"自相矛盾）。现在 core 侧已经**禁写**（suppressSave），
+   这里只做一件事：**把选择权交给玩家**（不替他做主，也不静默）。
+     · 「继续新档」→ `Core.rescueConfirmNewGame()`：解闸 + 落一份新档（＝玩家显式的"重新开始"）；
+     · 「先不写盘」  → 保持禁写：这一局照常能玩，但**什么都不落盘**；
+                        想救回进度就去 设置 → 找回存档（那里有"本机备份"＝读档失败时原样留的那份），
+                        想彻底重来就走 设置 → 删档重开（同样是显式选择，它会解闸）。
+   ⚠️ 用 `wx.showModal`（原生弹窗）而不是画布里那套：这一刻游戏还没有任何页面/交互，
+      而且这件事必须**拦住人**（救援态是"禁写"，玩家要是不知情就等于白玩一局）。
+      真机/工具都有这个 API；没有它（老基础库）就退化成一条 toast，绝不因此崩开机。
+   位置：排在**忠告弹窗之后、进主画面之前**（见 afterHealthNotice）—— 那一刻屏幕上没有别的弹窗，
+   玩家也还没开始玩，正好把"要不要覆盖"这件事问掉（同 flushBootModals 那条"不叠弹窗"的规矩）。 */
+function askRescue(next) {
+  const ri = (Core.rescueInfo ? Core.rescueInfo() : null);
+  const why = String((ri && ri.why) || '');
+  const name = ({ json: '存档文件坏了', enc: '存档这一版解不开（密钥或格式不匹配）', shape: '内容不像存档' })[why]
+    || (/^future-v/.test(why) ? '这份档来自更新的版本（这一版游戏读不懂它）' : why);
+  const msg = '本机存档读不出来（' + name + '）。\n\n'
+    + '为了不覆盖它，自动保存已经暂停。\n'
+    + '· 点「继续新档」＝ 从现在开始重新玩（旧的那份会在【设置 → 找回存档】里留一手）；\n'
+    + '· 点「先不写盘」＝ 这一局不落盘，先去【设置 → 找回存档】把旧进度找回来再玩。';
+  const go = function () { try { next(); } catch (e) {} };
+  if (wx && typeof wx.showModal === 'function') {
+    try {
+      wx.showModal({
+        title: '存档没读出来', content: msg, confirmText: '继续新档', cancelText: '先不写盘',
+        success: function (res) {
+          if (res && res.confirm) {
+            Core.rescueConfirmNewGame();
+            go();
+            try { CV.toast('已开始新档（旧的那份在【设置 → 找回存档】里）', 3600); } catch (e) {}
+          } else {
+            go();
+            try { CV.toast('没有写盘：【设置 → 找回存档】可以把旧进度找回来', 4400); } catch (e) {}
+          }
+        },
+        fail: function () { go(); try { CV.toast('存档读不出来，自动保存已暂停（见【设置 → 找回存档】）', 4400); } catch (e) {} },
+      });
+      return;
+    } catch (e) { /* 掉到下面的 toast 兜底 */ }
+  }
+  go();
+  try { CV.toast('存档读不出来，自动保存已暂停：去【设置 → 找回存档】', 5200); } catch (e) {}
+}
 function relayoutNow(w, h, now) {
   if (!w || !h) return;
   /* 尺寸没变就只重画一帧（重画本身也会把 dpr 矩阵设回去 —— 微信随时可能洗掉它） */
@@ -166,9 +255,19 @@ function relayoutNow(w, h, now) {
    下面按网页版那一条一比一补上（dt 单帧封顶 10 秒，防卡顿跳变；切后台按离线规则补）。
 ================================================================================== */
 let pendingBoot = [];
+/* V1.0.4 · T（父亲大人 09-27 第 14 条 · 省电模式）：灯阁重绘的节拍计数。
+   ⚠️ 只影响"挂机区那一屏多久重画一次"—— 下面 `Core.onlineTick(dt)`（挂机入池 / 游历奇遇）
+   与"每 15 秒自动存盘"两条**照旧每秒 / 每 15 秒走**，省电模式一秒都不慢它们。 */
+let homePaintTick = 0;
 /* 引导要**给开机弹窗让路**（网页版 webTour 同一条规矩：弹窗栈没空就不抢戏）。
    这个标记必须在第一次渲染之前就位 —— 首页一渲染就会跑 coachFor。 */
 G.bootModalPending = function () { return pendingBoot.length > 0; };
+/* V1.0.4 · R5（父亲大人 09-27 点单：版本更新提示）：
+   `wx.getUpdateManager().onUpdateReady` 一到，就**排进这条开机弹窗队列** ——
+   不直接弹。理由跟离线收益/七日登录同一条：开机那一刻屏幕上有品牌首屏、忠告、
+   离线收益、七日登录，谁抢谁的戏都会让玩家看到两层压在一起。
+   队列的规矩是"灯阁 ＋ 没有弹窗/引导"才轮到它（见 flushBootModals）。 */
+G.queueUpdateNotice = function () { pendingBoot.push({ kind: 'update' }); };
 
 /* 开机：**读档/建档已经在文件最前面做完了**（V1.0.6 · P0，见那段长注释与 boot_audit 场景 6）。
    这里只剩"要不要打扰玩家"：有没有离线收益、七日登录要不要排队。 */
@@ -192,7 +291,8 @@ pendingBoot.push({ kind: 'login' });
 if (hadSave && Core.S.retiredRefundPending) {
   const gotRefund = Core.S.retiredRefund || 0;
   Core.S.retiredRefundPending = false;
-  try { Core.save(); } catch (e) {}
+  /* V1.1.20（F1-1）：开机这一句也是**自动**存盘（玩家还没动手），走 auto 那一档。 */
+  try { Core.save({ auto: true }); } catch (e) {}
   setTimeout(function () {
     CV.toast('治疗剂 / 强化剂已下架，背包里剩的按原价退回：◈ ' + gotRefund.toLocaleString(), 4200);
   }, 600);
@@ -222,9 +322,14 @@ if (CV.splash) CV.splash(1500);
        补完落到主画面（见 sc-start.js 的 name_ok / bl_pick 处理器）；· 新档 → 欢迎 → 起名 → 选命格。 */
 CV.reset('gate');                       // 弹窗背后就是主画面（与网页版 #boot 同一个样子）
 function afterHealthNotice() {
-  CV.reset(hadSave
-    ? (!Core.S.player.name ? 'create' : (!Core.S.player.bloodline ? 'bloodline' : 'gate'))
-    : 'welcome');
+  const into = function () {
+    CV.reset(hadSave
+      ? (!Core.S.player.name ? 'create' : (!Core.S.player.bloodline ? 'bloodline' : 'gate'))
+      : 'welcome');
+  };
+  /* V1.1.20（F1-5）：读档失败/更高版本 → 先把"要不要覆盖"问掉，再进主画面（见 askRescue）。 */
+  if (!hadSave && Core.rescueInfo && Core.rescueInfo()) { askRescue(into); return; }
+  into();
 }
 /* 品牌首屏（1.5 秒）走完再弹忠告 —— 不然弹窗会盖在"灯芯燃起中…"那条进度条上。 */
 setTimeout(function () {
@@ -250,6 +355,13 @@ function flushBootModals() {
   if (item.kind === 'offline') { G.U.offlineGains(item.g); return; }
   /* 回归礼（N5）：奖**开机那一刻就发过了**，这里只报账（读一份已经到手的账，不发第二次） */
   if (item.kind === 'comeback') { if (G.U.comebackGift) G.U.comebackGift(item.g); return; }
+  /* 版本更新（R5）：插在这里 —— 排在"给实惠的那几条"之后、与别的一样要等灯阁空出来。
+     只用单按钮弹窗（`U.updateReady`），点一下 = applyUpdate 立即重启进新代码。 */
+  if (item.kind === 'update') {
+    if (G.U && G.U.updateReady) G.U.updateReady();
+    else { try { CV.toast('新版本已就绪，重启后生效', 3000); } catch (e) {} }
+    return;
+  }
   /* 七日登录：**发放放在这里**（不是开机那一刻）—— 网页版也是等弹窗栈空了才发，
      免得奖励弹窗和开局三步/离线收益打架。同一天第二次调用会返回 null，所以不会重复发。 */
   if (item.kind === 'login') { const lr = Core.loginReward && Core.loginReward(); if (lr) G.U.loginReward(lr); }
@@ -260,17 +372,38 @@ setInterval(function () {
   const dt = Math.min(10, (now - lastTick) / 1000);   // 单帧最多计 10 秒，防卡顿跳变
   lastTick = now;
   try { Core.onlineTick(dt); } catch (e) {}
+  /* V1.0.4 · W：游戏圈活跃任务的"累计在线时长"按这一秒一次的心跳累加
+     （两次心跳之间只认 0 < dt ≤ 5 秒、一天封顶 8 小时；口径全在 js/core.js 的 actTick，
+     这里只负责叫一声 —— 它自己出错绝不许影响这一帧）。 */
+  try { if (Core.actTick) Core.actTick(now); } catch (e) {}
   saveCounter += dt;
-  if (saveCounter >= 15) { saveCounter = 0; try { Core.save(); } catch (e) {} }
-  /* 主界面（灯阁）的挂机区/游历奇遇要"活着"：每秒重画一帧。
-     有弹窗、有引导、正在战斗时不动（那几种情况各自有更合适的重画时机）。 */
+  /* V1.1.20（F1-1）：15 秒自动存盘走 **auto** 那一档 —— 它照常落盘（被杀进程不丢进度），
+     但"谁新听谁的"判据（savedAt）**只由玩家驱动的存盘刷新**。
+     不加这一档的话："开着游戏发呆两小时"会把本机判成"刚玩过"，于是另一台设备上更新的那份拉不下来
+     （甚至被这台发呆的顶掉）——那正是父亲大人报的那个症状的第二种形态。 */
+  if (saveCounter >= 15) { saveCounter = 0; try { Core.save({ auto: true }); } catch (e) {} }
+  /* 主界面（灯阁）的挂机区/游历奇遇要"活着"：默认每秒重画一帧；
+     有弹窗、有引导、正在战斗时不动（那几种情况各自有更合适的重画时机）。
+     省电模式（第 14 条）下改成**每 3 秒一次** —— 挂机数字还是活的，只是慢一点。
+     `% 1` 恒为真，所以没开省电时这一行的行为与以前**一字不差**。 */
+  homePaintTick++;
+  const homeEvery = (G.CAP && G.CAP.powerOn && G.CAP.powerOn()) ? 3 : 1;
   if (CV.top().name === 'home'
     && !(G.U && (G.U.overlay || (G.U.coachActive && G.U.coachActive())))
-    && !CV.toasts.length) CV.render();
+    && !CV.toasts.length
+    && (homePaintTick % homeEvery) === 0) CV.render();
   flushBootModals();
+  /* 能力层的一秒一次的小事（现在只有一件：收藏过的那句差别话，R8）—— 见 js/wx-cap.js */
+  try { if (G.CAP && G.CAP.tick) G.CAP.tick(); } catch (e) {}
 }, 1000);
 /* 开局走完（进到灯阁）再发一次 —— 上面那 1 秒的心跳也会周期性地来碰这件事 */
 setTimeout(flushBootModals, 900);
+/* ================= V1.0.4 · 官方能力接入（R2~R8 · 父亲大人 09-27 点单）=================
+   位置是刻意的：**读档/建档 ＋ 弹窗队列 ＋ 心跳都就位之后**才注册 ——
+   与音频那条 `AUDInstallLifecycle` 同一条时序纪律（真机冷启动卡死那次，就是事件注册排在了建档前面）。
+   里面每一条能力自带"没有这个 API 就静默跳过"，这一行外面再包一层 try：
+   **新接的能力绝不许把开机弄崩**。 */
+try { if (G.CAP && G.CAP.install) G.CAP.install(); } catch (e) {}
 
 /* 开发期截图（devtools 里画布是 HTMLCanvasElement → 自己导出 PNG，康康好对比） */
 try {

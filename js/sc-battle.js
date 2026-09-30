@@ -71,7 +71,8 @@
     on: false, cfg: null, res: null, idx: 0, units: {}, log: [], floaters: [],
     speed: 1, timer: null, done: false, panel: null, energy: {}, tip: null,
     autoT: null, autoLeft: 0,
-    tipAt: 0, tipT: null,        // 波次弹幕：起始时间 + 动画计时器（V9.6.123）
+    pausedByAd: false,      // 看广告期间挂起（见 pauseForAd / resumeAfterAd）
+    tipAt: 0,                    // 波次卡：起始时间（V9.6.123；V1.0.4 起动画帧由 tipLoop 驱动，句柄不再存这儿）
     /* V9.6.90：防重入闸门**单独一个字段**。以前是拿 `B.on && B.res` 凑的 ——
        看着能用，其实"波与波之间"正好也满足这两个条件，于是无缝交接那一瞬间
        下一波会被自己挡掉（副本第 5 关起多波，第 2 波直接打不开）。
@@ -82,7 +83,7 @@
   /* V9.6.115（父亲大人）：结算自动进下一关的倒计时 8 秒 → **5 秒**（与网页版同一个值） */
   const AUTO_NEXT_SEC = 5;
   let uidSeq = 0;
-  const STATUS_TEXT = { poison: '中毒', burn: '燃烧', bleed: '裂伤', stun: '眩晕', freeze: '冰冻', weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '回复' };
+  const STATUS_TEXT = { poison: '中毒', burn: '灼烧', bleed: '裂伤', stun: '眩晕', freeze: '冰冻', weak: '虚弱', sunder: '破防', fear: '恐惧', taunt: '嘲讽', regen: '再生' };
 
   function clearTimer() {
     if (B.timer) { clearTimeout(B.timer); B.timer = null; }
@@ -90,9 +91,11 @@
     /* V9.6.98（自审：定时器泄漏）：打击特效那个 55ms 的 interval（fxT）原来只有 finish()
        和"自己发现没有特效了"两条路会清 —— **撤离**那条路不清，于是离开战斗页之后
        它还会以 18fps 重画最多 0.9 秒（白耗电、还会重画一个新页面）。
-       撤离=离场，就该立刻全清。 */
-    if (fxT) { clearInterval(fxT); fxT = null; }
-    if (B.tipT) { clearInterval(B.tipT); B.tipT = null; }   // V9.6.123：波次弹幕的动画计时器，离场一起清
+       撤离=离场，就该立刻全清。
+       V1.0.4 · S1：这一条现在由 rAF（或退回的 setTimeout）驱动，停止走 `fxStop()` ——
+       两条路都要断（rAF 的句柄 / 兜底的 timer），**离场后一帧都不许再画**。 */
+    fxStop();
+    tipStop();                                              // V9.6.123：波次卡的动画帧，离场一起清
   }
   function pushLog(line) { B.log.push(line); if (B.log.length > 60) B.log.shift(); }
   function nameOf(uid) { const u = B.units[uid]; return u ? u.name : ''; }
@@ -105,14 +108,37 @@
        斗法台 / 深井没传 → 一律被送到残域。
        修法不是给每个入口补一句（那还会漏），而是**战斗页自己记住"从哪来"**：
        开打那一刻把页面栈与滚动位置存下来，配置没给回调时就还原回去。 */
-    B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
+    /* ================= 康康 2026-09-29 · 连打第二场会把"来路"记成战斗页自己 =================
+       父亲大人：「世界关卡和深井还是打了一关后返回键就失效了，没打就可以正常返回」。
+       真因：`B.back`（战斗页记的"从哪来"）是**每次开打那一刻**抓的当前页面栈；
+       而「下一关 / 再挑一层 / 继续第 N 层」是在**战斗页自己身上**再开一场 ——
+       那一帧栈里只有 `battle`（`start()` 里那句 `CV.reset('battle')` 把栈压成了一层），
+       于是 `B.back` 被记成 `['battle']`；等这一场收工、回调把页面 `reset('world'/'corridor')` 之后，
+       `backToSource` 那句"落点得在来路上"（`back.stack.some(l => l.name === landed)`）判不过
+       ⇒ **不还原** ⇒ 回来那一页成了**根**，它的吸顶 ‹ 没有地方可 pop
+       ⇒ 表现就是"打了一关返回键就废了"（只打第一场时 `B.back` 还是真的来路，所以"没打/打一关就回"看着正常）。
+       修法（一处收口，不逐页打补丁）：**只在"不是从战斗页自己再开一场"时才重记来路** ——
+       连打多场时始终沿用最初那次的页面栈与滚动位置（`B.back` 也只在从未记过时兜底）。
+       做坏试验：把这一句改回无条件 `B.back = {...}` → `_probe_return_after2.js` 的
+       ③ 深井那条会当场变回"栈 corridor（根）· 点了没动"。 */
+    const onBattlePage = CV.stack.length === 1 && CV.stack[0] && CV.stack[0].name === 'battle';
+    if (!onBattlePage || !B.back) B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
     B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     /* V1.1.8（丙组 B9）：开打时的档位读**唯一口径** `Core.effSpeed()` ——
        免费只有 1×/2×；广告窗口内才是 5。老档里存的 3× 会在那里被回落成 2×。 */
     B.speed = Core.effSpeed ? Core.effSpeed() : ((Core.S.settings && Core.S.settings.speed) || 1);
     CV.battleSpeed = B.speed;
     B.title = cfg.title || '战斗';
-    B.revived = false;                 // B10：复活"每场 1 次"，换一场就复位
+    /* ================= F2-2（抢修单 0928R3）=================
+     "每场 1 次"的旧写法是 `B.revived = false` —— 可**复活自己就是靠再调一次 `run()`**
+     重开的，于是那一次 `start()` 把闸门又清成 false ⇒ 一场里能无限复活
+     （按钮上明明写着"本场 1 次"，探针也复现了"连点两次都 granted"）。
+     现在账本**记在"这一场"上**（`cfg.reviveState`）：
+       · 副本：传的是它自己的 `run`（一趟副本＝一场，三波连着打完才算一场 ——
+         与 `Core.battleSettle('计一场')` 同一口径），换一关新建 run 才归零；
+       · 斗法台 / 深井：没给账本 → 就记在 cfg 自己身上（一次挑战＝一场）。
+     ⚠️ 账本只由 `battleRevive()` 写、只由这里读，**`start()` 不再复位它**。 */
+    B.revived = !!(cfg && (cfg.reviveState || cfg).revived);
     CV.reset('battle', { title: B.title });
   }
 
@@ -125,13 +151,86 @@
     B.log = B.log || []; B.floaters = B.floaters || []; B.energy = B.energy || {};
     B.hitAt = B.hitAt || {}; B.atkAt = B.atkAt || {};
     const startFrame = res.frames[0];
-    (startFrame.allies || []).concat(startFrame.enemies || []).forEach((u) => { B.units[u.uid] = Object.assign({}, u); });
-    if (startFrame.note) pushLog('⚠ 世界机制：' + startFrame.note);
+    /* ================= F6 #1（阻塞 · 来自 R6 #1）· 复活续战把单位规格丢光 =================
+       病根在这里：原来 `B.units` 只装 `res.frames[0]` 里那份**界面用**的单位 ——
+       而它来自 `battle.js` 的 `publicUnit()`，只有 9 个字段
+       （uid/name/side/maxHp/hp/isBoss/position/kind/charId），**没有 atk/def/spd/skills/skillLv/crit/skillMult**。
+       复活续战（`carryUnit`）从 `B.units` 搬"这一场的规格"时就只能搬出个空壳：
+       atk=undefined → 伤害 `Math.max(1,Math.round(NaN))=NaN` → hp 变 NaN → `alive()` 判全员阵亡
+       → **一回合瞬判胜负**（实测 `{"type":"damage","dmg":null}` ＋ `end win:true rounds:1`）。
+       从"最后一波失败点"点一次复活 ＝ 花一次广告直接通关＋发奖。
+       修法：**两份合起来用** —— 界面字段以开始帧为准（`hp`/`maxHp` 是这一场开局值，
+       后面由帧逐条更新），**规格字段从 `res.units`（引擎那份全字段，battle.js 的 `all`）补齐**。
+       ⚠️ 反过来（拿 `res.units` 当基准）不行：那是**打完那一刻**的状态，开场就会显示残血/阵亡。 */
+    const spec = {};
+    (res.units || []).forEach(function (u) { if (u && u.uid != null) spec[u.uid] = u; });
+    /* 开局那一份全字段规格的**只读快照**：复活续战的兜底基准（见 carryUnit 的非数保护）。 */
+    B.spec0 = spec;
+    (startFrame.allies || []).concat(startFrame.enemies || []).forEach((u) => {
+      B.units[u.uid] = Object.assign({}, spec[u.uid] || {}, u);
+    });
+    if (startFrame.note) pushLog('⚠ 世界机制 · ' + startFrame.note);
   }
 
   function fight(res) {
     loadRes(res);
     step();
+  }
+  /* 结算页那颗"自动下一关"的倒计时 —— **一处定义**（原来只有建它那一处，
+     广告暂停之后要能把它接着跑起来，所以抽成函数；行为与原来逐字相同）。 */
+  function startAutoNext() {
+    if (B.autoT) clearInterval(B.autoT);
+    B.autoT = null;
+    if (!(B.autoLeft > 0 && B.autoIdx >= 0)) return;
+    B.autoT = setInterval(function () {
+      B.autoLeft--;
+      if (B.autoLeft <= 0) {
+        clearInterval(B.autoT); B.autoT = null;
+        const a = B.panel && B.panel.acts[B.autoIdx];
+        if (a) CV.dispatch(a.id);
+        return;
+      }
+      CV.render();
+    }, 1000);
+  }
+  /* ================= 康康 2026-09-29 · 看广告时**暂停这一场** =================
+     父亲大人：「我发现看广告的时候游戏进程没有暂停，等广告结束后再结算是否观看完成然后再继续」。
+     微信的激励视频是**盖在整个画面上的一层原生浮层**，游戏自己的 JS 计时器照跑 ——
+     所以战斗会继续推帧、结算页的"自动下一关"倒计时会继续走、特效循环还在画。
+     这里给战斗页出口两个口子（`BattleUI.pauseForAd / resumeAfterAd`），由广告底座在
+     **真广告**开演前后调用（`js/wx-adapter.js` 的 `showRewarded` 一处收口）：
+       · 暂停＝清掉推帧计时器（`B.timer`，含特效循环 `fxStop`）与自动倒计时（`B.autoT`），
+         但**不动 `B.on` / `B.res`** —— 这是"暂停"，不是撤离，回来接着打；
+       · 继续＝`step()` 接着推（只有还在打时才推：打完那一刻 `B.on` 已经是 false），
+         自动倒计时按**剩下的秒数**接着走（`B.autoLeft` 原样保留）。
+     做坏试验：把 wx-adapter 里那两句 `adPause(true/false)` 去掉 →
+     `ad_audit` 的"看广告期间这一场真的停了 / 回来真的接着打"两条当场红。 */
+  /* 一帧要等多久 —— **一处定义**（`step()` 与"广告回来接着排"共用，别两处各算一份） */
+  function frameDelay(f) {
+    const delay = (f && f.type === 'round') ? 260
+      : (f && (f.type === 'skill' || f.type === 'phase' || f.type === 'revive' || f.type === 'summon')) ? 520 : 300;
+    const stop = (f && f.type === 'damage' && f.crit) ? 90 : 0;      // hitstop（暴击多停 ~90ms）
+    return Math.max(40, (delay + stop) / B.speed);
+  }
+  function pauseForAd() {
+    if (!B.on || B.pausedByAd) return;
+    B.pausedByAd = true;
+    /* 记下"下一帧本来还要等多久"，回来照这个节奏续上（别用固定值 —— 会跟 step() 分叉） */
+    B.adRearmMs = (B.res && B.res.frames[B.idx - 1]) ? frameDelay(B.res.frames[B.idx - 1]) : 300;
+    clearTimer();
+  }
+  /* ⚠️ 恢复**只把下一帧重新排上，不推进一帧**。
+     第一版写的是"直接 `step()` 推一帧"，结果把 ③ 那条"点复活不发任何资源"的尺子踩红了：
+     复活那条路的 Promise 结算之后会**重开一场**，而我这一帧是多推的 ——
+     它可能把旧那一场推到 `finish()` ⇒ 结算发奖 ⇒ 看着像"复活顺手发了资源"。
+     续排不推进，才是"暂停/继续"的语义（回来时那一帧本来也还没到）。 */
+  function resumeAfterAd() {
+    if (!B.on || !B.pausedByAd) return;
+    B.pausedByAd = false;
+    startAutoNext();
+    if (B.timer) clearTimeout(B.timer);
+    B.timer = setTimeout(step, B.adRearmMs || 300);
+    CV.render();
   }
 
   function step() {
@@ -142,29 +241,111 @@
     const f = B.res.frames[B.idx++];
     if (!f || f.type === 'end') { finish(); return; }
     applyFrame(f);
-    const delay = f.type === 'round' ? 260 : (f.type === 'skill' || f.type === 'phase' || f.type === 'revive' || f.type === 'summon') ? 520 : 300;
-    /* V9.6.68（资料 §8「hitstop」）：暴击多停 ~90ms —— 打击感主要来自这一下"顿"。 */
-    const stop = (f.type === 'damage' && f.crit) ? 90 : 0;
-    B.timer = setTimeout(step, Math.max(40, (delay + stop) / B.speed));
+    /* 等待时长 **一处定义**（`frameDelay`）—— 广告暂停回来也照它续排，两处不会分叉。
+       V9.6.68（资料 §8「hitstop」）：暴击多停 ~90ms —— 打击感主要来自这一下"顿"。 */
+    B.timer = setTimeout(step, frameDelay(f));
     CV.render();
   }
 
-  /* V9.6.28（父亲大人："战斗没有攻击、掉血的动效"）自审发现：飘字一直在往 B.floaters 里塞，
-     **却没有任何地方把它画出来** —— 所以打了半天没有伤害数字、也没有受击反馈。
-     这里是配套的动画帧：只要还有"活着的"动效（飘字 / 受击 / 出手），就按 ~18fps 重画，
-     放完自动停（不在空闲时白烧电）。 */
-  let fxT = null;
-  function ensureFx() {
-    if (fxT) return;
-    fxT = setInterval(function () {
-      const now = Date.now();
-      const alive = (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || D.BATTLE_GEOM.floatMs); })
-        || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
-        || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; });
-      if (!alive) { clearInterval(fxT); fxT = null; }
-      CV.render();
-    }, 55);
+  /* ================= V1.0.4 · S1/S2（父亲大人 09-27：「运行时间长手机会发烫，卡顿…主要还是战斗的时候」）===
+     V9.6.28 当初立这条动画帧时，全场只有一条 `setInterval(…, 55)`（≈18fps）**整页重画**。
+     它有两个结构性毛病（`scripts/soak_audit.js` 量出来的：战斗每秒 476 次文字绘制 ＝ 灯阁的 7 倍）：
+       ① **不是 rAF 驱动** ⇒ `wx.setPreferredFramesPerSecond`（战斗 60 / 挂机 30）**对它完全无效**，
+          而且切后台它照样烧；
+       ② 那一帧真正在动的只有**单位区 + 飘字**，可它每次都把日志折行 / 按钮 / 顶栏 / 整屏渐变重画一遍。
+     现在：
+       · 驱动换成 **rAF 递归**（没有 rAF 的环境——尺子 / 老基础库——退回 `setTimeout(…, 16)`），
+         并且**把档位当硬上限**：`档位`（CAP.fps.cur，战斗 60 / 灯阁 30）与"动效本身值多少帧"
+         取小。平台按档位节流 rAF 时，我们这一层跟着慢下来 —— 那条"60/30 真的落到功耗上"就是它。
+       · 动效只值 **12fps**：飘字是慢位移（18fps → 12fps 肉眼无差别，省 1/3）。
+       · 帧内只重画**战场那一片**（`CV.renderPatch` + `drawField`），日志 / 按钮 / 顶栏整段跳过。
+     ⚠️ "没有动效就彻底停"这条规矩一个字没改：飘字 / 受击 / 出手（含震屏）全没了就停，
+        停之前补一张整页（把最后一点残留擦干净）。
+     ⚠️ 数值与节奏一个字没动：每回合的 delay、暴击顿帧（hitstop）、音效挂点全在 `step()`/`applyFrame` 里。 */
+  const FX_FPS = 12;                       // 慢位移动效的目标帧率（原 55ms≈18fps）
+  const FX = { paints: 0, patch: 0, full: 0 };   // 尺子读这里（不对玩家生效）
+  /* 档位 = `wx.setPreferredFramesPerSecond` 那一路（唯一口径在 js/wx-cap.js 的 CAP.fps.cur）；
+     CAP 不在（老尺子的假环境）就按"战斗 60"兜底，绝不让它变成 0 帧。 */
+  function fxTier() {
+    const cur = (G.CAP && G.CAP.fps && G.CAP.fps.cur) || 0;
+    if (cur > 0) return cur;
+    return (G.CAP && G.CAP.fpsWant) ? G.CAP.fpsWant() : 60;
   }
+  /* 一个极小的"rAF 递归 + 档位当上限 + 没动效就自己停"的帧循环（动效帧与波次卡共用这一份，
+     免得两处各写一套、漏一条腿就变成"某个场景还在烧"）。
+       · 有 rAF 就用 rAF（平台按档位节流它，我们跟着慢 —— 这是"档位真落到功耗上"的那根线）；
+       · 没有（尺子 / 老基础库）退回 `setTimeout(…, 16)`，限频仍由下面那道 gap 把关；
+       · 每一格都问 `aliveFn()`：不活了就彻底停（`finalFn` 只给动效那条用：补一张整页收尾）；
+       · `stop()` 两条腿都断（rAF 的 cancel ＋ 兜底 timer 的 clear）。 */
+  function fpsLoop(targetFps, aliveFn, paintFn, finalFn) {
+    /* `dead` 的意思只是"这一条链别再往下走"（离场 / 停表），**不是**把这个循环报废 ——
+       下一场战斗调 `start()` 照样能重新点着（写成一次性的话，第一场之后就没动效了）。 */
+    let handle = null, last = 0, dead = true;
+    const loop = { driver: '', running: function () { return !!handle; } };
+    const stop = function () {
+      dead = true;
+      if (!handle) return;
+      try { if (handle.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle.raf); } catch (e) {}
+      if (handle.timer) clearTimeout(handle.timer);
+      handle = null;
+    };
+    const arm = function () {
+      if (handle || dead) return;
+      if (typeof requestAnimationFrame === 'function') { handle = { raf: requestAnimationFrame(step) }; loop.driver = 'raf'; }
+      else { handle = { timer: setTimeout(step, 16) }; loop.driver = 'timer'; }
+    };
+    function step() {
+      handle = null;
+      if (dead) return;                       // 已 stop（离场 / 换场景）→ 一帧都不再画
+      if (!aliveFn()) { if (finalFn) finalFn(); return; }
+      const now = Date.now();
+      const gap = 1000 / Math.max(1, Math.min(fxTier(), targetFps));
+      if (now - last >= gap - 1) { last = now; paintFn(); }   // 没到下一格：只重排，不画
+      arm();
+    }
+    loop.start = function () { dead = false; if (handle) return; last = 0; arm(); };
+    loop.stop = stop;
+    return loop;
+  }
+  /* "还有没有活着的动效"（原来那三条判据一字不动；震屏也算一条 —— 它在飞的时候也得有帧） */
+  function fxAlive() {
+    const now = Date.now();
+    return (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || D.BATTLE_GEOM.floatMs); })
+      || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
+      || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; })
+      || (B.shakeUntil || 0) > now;
+  }
+  /* 动效帧画哪儿：能局部就局部，不能就退回整页（**绝不半块半块地画**）：
+       · B.field 不在（波次卡那一段不画战场）→ 整页；
+       · 页面上有结算层 / 撤离确认框 / 已经不是战斗页 → 整页（那几层是模态，局部重画会把它擦掉）。
+       · 这一页要是登记了整屏底图（`CV.veilPage`，目前只有主画面/选命格）或吸顶条
+         （`CV.sticky`，背包那类页）→ 也整页 —— 那两样画在内容层之上/之下，局部重画会露馅。
+     局部重画那一趟只碰战场那一片的像素，命中区（CV.hits）由整页帧登记、这里一个字不改。 */
+  function fxPaint() {
+    FX.paints++;
+    const page = CV.top().name;
+    const canPatch = !!(B.field && !B.tip && page === 'battle'
+      && !CV.pageOverlay && !CV.sticky && !(CV.veils && CV.veils[page])
+      && !(G.U && G.U.overlay));
+    if (canPatch) {
+      FX.patch++;
+      if (CV.renderPatch(B.field.rect, function () { drawField(B.field); })) return;
+    }
+    FX.full++;
+    CV.render();
+  }
+  /* 收尾那一帧：整页（顺带把最后一点飘字 / 红闪擦干净）—— 只在"没动效了"的那一刻来一次 */
+  const fxLoop = fpsLoop(FX_FPS, fxAlive, fxPaint, function () { CV.render(); });
+  /* V9.6.28（父亲大人："战斗没有攻击、掉血的动效"）：飘字 / 受击 / 出手一出现就点着这条循环 */
+  function ensureFx() { fxLoop.start(); }
+  function fxStop() { fxLoop.stop(); }
+
+  /* 波次卡（「第 N 波」淡入停留淡出那 1.05 秒）的动画帧：同一个驱动器，30fps 上限。
+     它不算"动效残留"—— 只要 `B.tip` 还在就继续画；tip 一清（下一波开打 / 离场）就停，
+     停之前补一张整页，免得那张卡留在屏幕上。 */
+  const tipLoop = fpsLoop(30, function () { return !!B.tip; }, function () { CV.render(); },
+    function () { CV.render(); });
+  function tipStop() { tipLoop.stop(); }
   /* V1.0.1（UI 设计师会诊）：异常状态 / Boss 二阶段这类"要看清一句话"的提示 0.9 秒读不完，
      允许传 ttl（网页版 js/ui.js 的 floater(..., ms) 是同一套口径，两边一起改）。 */
   function floater(uid, text, color, ttl, size) {
@@ -181,13 +362,29 @@
   function hitFx(uid) { if (uid) { B.hitAt[uid] = Date.now(); ensureFx(); } }
   function atkFx(uid) { if (uid) { B.atkAt[uid] = Date.now(); ensureFx(); } }
 
+  /* F6（R6 #11）：把引擎帧里的能量读成 0~100 的显示值；帧里没有那一项时返回 null
+     （null ＝"这一帧没告诉我"，调用方退回界面自己的记账，见 applyFrame 里三处的用法）。 */
+  function eFrom(v) { return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(100, v)) : null; }
+
   function applyFrame(f) {
     switch (f.type) {
       case 'round': if (f.n <= 5 || f.n % 5 === 0) pushLog('—— 第 ' + f.n + ' 回合 ——'); break;
-      case 'attack': B.energy[f.actor] = Math.min(100, (B.energy[f.actor] || 0) + 30); break;
+      /* ================= F6（R6 #11）· 能量条改读引擎真值 =================
+         界面原来自己记一本能量账（普攻 +30 / 挨打 +15），引擎那边还有一本（每次伤害 +30/+15、
+         非伤害技能 +30、必杀清零）—— 两本必然对不上：技能涨的能量界面不记、
+         被闪避的普攻界面照加 ⇒ 画面上"还没满就放大招 / 满了不放"。
+         现在**引擎帧给什么就用什么**（`battle.js` 的普攻/技能帧带 `energy`、
+         伤害帧带 `energy`（出手者）与 `targetEnergy`（被打者））；
+         帧里没有这两个字段时（老帧 / 尺子手推的帧）才退回界面记账，尺子照旧跑得动。 */
+      case 'attack': {
+        const ea = eFrom(f.energy);
+        if (ea !== null) B.energy[f.actor] = ea;
+        else B.energy[f.actor] = Math.min(100, (B.energy[f.actor] || 0) + 30);
+        break;
+      }
       case 'skill':
         pushLog('✨ ' + nameOf(f.actor) + ' 使用【' + f.name + '】');
-        if (f.ult) B.energy[f.actor] = 0;
+        { const es = eFrom(f.energy); if (es !== null) B.energy[f.actor] = es; else if (f.ult) B.energy[f.actor] = 0; }
         /* 技能释放 / 大绝：大绝那一档更重更亮（一帧一音，别一个技能叠好几下） */
         snd(f.ult ? 'ult' : 'skill');
         break;
@@ -211,7 +408,10 @@
            判据写在尺子里（`scripts/audio_audit.js` ⑩：逐帧断言"有伤害飘字 ⇒ 同一次调用里有音效"，
            并且**多段＝多声**（几个伤害飘字就几声）；⑨ 静态断言 round/attack 里没有 snd）。 */
         snd(f.crit ? 'crit' : 'hit');
-        B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15);
+        /* 出手者那一格：伤害帧里引擎给的 `energy` 是**加完这一次伤害能量**之后的真值
+           （多段技能每一段都会 +30）—— 界面原来只在普攻帧上 +30 一次，多段的能量必然少算。 */
+        { const es = eFrom(f.energy); if (es !== null && f.source != null) B.energy[f.source] = es; }
+        { const et = eFrom(f.targetEnergy); if (et !== null) B.energy[f.target] = et; else B.energy[f.target] = Math.min(100, (B.energy[f.target] || 0) + 15); }
         if (f.healed) { const s = B.units[f.source]; if (s) { s.hp = Math.min(s.maxHp, s.hp + f.healed); floater(f.source, '+' + f.healed, CV.C.green); } }
         if (f.killed) pushLog('✗ ' + nameOf(f.target) + ' 倒下');
         break;
@@ -258,7 +458,7 @@
     if (B.done) return;
     B.done = true;
     B.hitAt = {}; B.atkAt = {};                 // 结算页不需要残留的受击/出手状态
-    if (fxT) { clearInterval(fxT); fxT = null; }
+    fxStop();                                   // V1.0.4 · S1：动效循环（rAF）离场即停
     const cfg = B.cfg, res = B.res;
     // 补算剩余帧，保证血量/日志正确
     for (; B.idx < res.frames.length; B.idx++) {
@@ -268,6 +468,11 @@
     const hpLeft = {};
     Object.keys(B.units).forEach((uid) => { const u = B.units[uid]; if (u.side === 'ally' && u.charId) hpLeft[u.charId] = Math.max(0, u.hp / u.maxHp); });
     B.panel = cfg.onEnd(res.win, res, hpLeft) || {};
+    /* V1.0.4 · R1（父亲大人 09-27 点单：「战斗结算（关卡、胜负）」要进线上日志）：
+       胜负这一条**每一场都记**（含深井 / 斗法台 —— 它们走同一段 finish）；
+       关卡号那一条在副本自己的 `settleRun` 里（那边才知道 world/diff/stage，
+       见 js/sc-dungeon.js 的 `battle/clear`）。两处合起来才是"关卡 ＋ 胜负"。 */
+    try { if (G.LOG) G.LOG.info('battle', 'end', { win: !!res.win, world: String((cfg && cfg.worldId) || '') }); } catch (e) {}
     B.panel.acts = B.panel.acts || [{ label: '返回', id: 'battle_close', style: 'ghost' }];
     /* 胜负结算音：**波与波之间不出声**（seamless 那一档不是"这一局结束了"，
        它只是"下一波马上来"，每波都来一声胜利音会吵成一锅粥）。 */
@@ -283,17 +488,7 @@
       const ai = B.panel.acts.findIndex(function (a) { return a.primary || a.style === 'primary'; });
       if (res.win && ai >= 0) {
         B.autoIdx = ai; B.autoLeft = AUTO_NEXT_SEC;
-        if (B.autoT) clearInterval(B.autoT);
-        B.autoT = setInterval(function () {
-          B.autoLeft--;
-          if (B.autoLeft <= 0) {
-            clearInterval(B.autoT); B.autoT = null;
-            const a = B.panel && B.panel.acts[B.autoIdx];
-            if (a) CV.dispatch(a.id);
-            return;
-          }
-          CV.render();
-        }, 1000);
+        startAutoNext();
       }
     }
     if (B.panel.seamless) {
@@ -305,11 +500,9 @@
          改成"波次卡"——这一段**不画战场**，整屏只留一行「第 N 波」，淡入停留淡出，然后下一波开打。 */
       B.tip = B.panel.sub || '本波通过…';
       B.tipAt = Date.now();
-      if (B.tipT) { clearInterval(B.tipT); B.tipT = null; }
-      B.tipT = setInterval(function () {
-        if (!B.tip) { clearInterval(B.tipT); B.tipT = null; return; }
-        CV.render();
-      }, 33);
+      /* V1.0.4 · S1：这一条原来是 30fps 的 `setInterval` 整页重画 —— 同样收进 rAF 驱动器
+         （档位当上限，`B.tip` 一没就自己停）。淡入停留淡出共 1.05s，30fps 富余。 */
+      tipLoop.start();
       const after = B.panel.after;
       B.panel = null;
       B.timer = setTimeout(function () {
@@ -390,6 +583,92 @@
       if (en > 0) CV.round(bx, by + bh + 13 * CV.SCALE, bw * (en / 100), D.BATTLE_GEOM.barEn * CV.SCALE, CV.RADIUS_CHIP,  CV.C.gold);
     }
     return av + 30 * CV.SCALE + 10 * CV.SCALE;
+  }
+
+  /* ================= V1.0.4 · S2（父亲大人 09-27：「运行时间长手机会发烫…主要还是战斗的时候」）===
+     **战场那一片的画法只有这一份**：整页那一趟（drawBattle）与动效帧（fxPaint 的局部重画）
+     都调它 —— 绝不复制第二份（"改了这处、那处忘了改"是这套代码过去最常见的病）。
+     `lay` ＝ 布局快照 `{ rows, av, compact }`，由 drawBattle 算好一次存进 `B.field`：
+     动效帧直接拿这份快照重画，既不重算几何，也保证两趟画出来的像素完全一致。
+     这一片之外的东西（战斗日志卡 / 撤离·加速 / 顶栏）**一律不在这里画**。 */
+  function drawField(lay) {
+    const rows = lay.rows;
+    /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
+       （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
+       画完立刻还原，热区不受影响。轻击 1.5px、暴击 3px，见 hitFx 里设的 B.shakePx。 */
+    const shaking = (B.shakeUntil || 0) > Date.now();
+    const shakePx = B.shakePx || 0;
+    const sx = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
+    const sy = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
+    CV.ctx.save();
+    CV.ctx.translate(sx, sy);
+    rows.forEach((row) => {
+      const list = row.list;
+      if (!list.length) return;
+      const n = Math.max(1, list.length);
+      const g = 8 * CV.SCALE;
+      /* V1.0.1（父亲大人："我方人员的大小也很敌方的不一样，统一做成敌方那样的大小标准"）：
+         原来我方按 24% 宽、敌方按 30% —— 同一张卡两种尺寸。统一走 30%。 */
+      const maxW = U.cw() * 0.3;
+      const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
+      const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
+      /* 标准档传 av: 0 → unitCard 走它原来的 50（390/430 一个像素不动）；
+         压缩档才把反算出来的 av 传下去（同时也把"名字与血量% 并一行"打开）。 */
+      list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally,
+        { av: lay.av, compact: lay.compact }));
+    });
+    /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
+       位置取自各卡刚才记下的 _cx/_top —— 所以先画完所有单位再画它。 */
+    (B.floaters || []).forEach(function (f) {
+      const u = B.units[f.uid];
+      if (!u || u._cx == null) return;
+      const p = Math.min(1, (Date.now() - f.t) / (f.ttl || D.BATTLE_GEOM.floatMs));
+      if (p >= 1) return;
+      const fy = u._top - 4 * CV.SCALE - D.BATTLE_GEOM.floatRise * CV.SCALE * p;
+      const alpha = 1 - p * p;
+      CV.ctx.save();
+      CV.ctx.globalAlpha = alpha;
+      const size = (f.size || D.BATTLE_GEOM.floatBase) * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）；现在按类型取（暴击走 floatCrit＝一级 17）
+      CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = CV.a(CV.C.shade, .75);
+      CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
+      CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
+      CV.ctx.strokeText(f.text, u._cx, fy);
+      CV.ctx.fillStyle = f.color || CV.C.gold;
+      CV.ctx.fillText(f.text, u._cx, fy);
+      CV.ctx.restore();
+    });
+    /* 受击红闪：在头像外再描一圈（画在飘字之前，所以不会被盖） */
+    Object.keys(B.hitAt || {}).forEach(function (uid) {
+      const u = B.units[uid];
+      if (!u || u._cx == null) return;
+      const p = Math.max(0, 1 - (Date.now() - B.hitAt[uid]) / 300);
+      if (p <= 0) return;
+      CV.ctx.save();
+      CV.ctx.globalAlpha = 0.75 * p;
+      CV.ctx.strokeStyle = CV.C.dangerText; CV.ctx.lineWidth = 2.5 * CV.SCALE;
+      if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
+      else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, CV.RADIUS,  null, CV.C.dangerText, 2.5 * CV.SCALE);
+      CV.ctx.restore();
+    });
+    /* V1.0.1（父亲大人："波次卡的高度和战斗阵容的高度不一样，所以切到波次卡日志就向上补位"）：
+       真凶 —— 这一句原来写在 `if (!B.tip)` **外面**，而与之配对的 ctx.save()
+       在 if **里面**。战斗中两者配对；**一到波次卡，save 不执行、restore 照样执行**，
+       每帧多弹出一层画布状态，把外层 `translate(0, 顶栏+8)` 的坐标系弹掉，
+       整块内容（日志卡 + 撤离/速度按钮）就被顶偏；下一波 tip 变回假又恢复 ——
+       正是"弹上去又回来"。这也解释了为什么"去掉波次卡就不弹"。
+       修法：把它挪进 if，与 save 严格配对（现在 save/restore 都在这一个函数里，永远成对）。 */
+    CV.ctx.restore();                       // 震屏结束：还原坐标系（必须与上面的 save 配对）
+  }
+
+  /* 战场那一片在**屏幕坐标**里的矩形（动效帧要在它上面"抹回底色 + 重画"）：
+     上边界额外让出 32px —— 飘字要升到卡片上方（最多 26px）再加震屏的 3px；
+     下边界正好到阵容区底 —— 再往下就是「撤离 / 速度」角标与日志卡，这一趟不碰它们。
+     再与内容可视区求交（顶栏下沿 … 底栏上沿），保证局部重画**绝不会**画到裁剪区外面。 */
+  function fieldRect(topContentY, bottomContentY) {
+    const base = CV.TOP + 8 - (CV.scroll || 0);
+    const top = Math.max(CV.TOP + 8, Math.round(base + topContentY - 32 * CV.SCALE));
+    const bottom = Math.min(CV.H - CV.NAV_H - CV.safeBottom - 8, Math.round(base + bottomContentY));
+    return { x: 0, y: top, w: CV.W, h: Math.max(0, bottom - top) };
   }
 
   /* 波次卡：空屏（底色已是战斗页底色）+ 居中一行「第 N 波」，淡入停留淡出 */
@@ -534,72 +813,12 @@
         { list: front, y: rowY(2), ally: true },                                            // 我方前排（靠中）
         { list: back, y: rowY(3), ally: true },                                             // 我方后排（最下）
       ];
-      /* V9.6.68（资料 §8：「震屏幅度要小、时间要短」）：命中时**只震战场这一片**
-         （单位卡 / 飘字 / 红闪一起震），顶栏与日志不动 —— 用 canvas translate 做，
-         画完立刻还原，热区不受影响。轻击 1.5px、暴击 3px，见 hitFx 里设的 B.shakePx。 */
-      const shaking = (B.shakeUntil || 0) > Date.now();
-      const shakePx = B.shakePx || 0;
-      const sx = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
-      const sy = shaking ? (Math.random() < 0.5 ? -shakePx : shakePx) : 0;
-      CV.ctx.save();
-      CV.ctx.translate(sx, sy);
-      rows.forEach((row) => {
-        const list = row.list;
-        if (!list.length) return;
-        const n = Math.max(1, list.length);
-        const g = 8 * CV.SCALE;
-        /* V1.0.1（父亲大人："我方人员的大小也很敌方的不一样，统一做成敌方那样的大小标准"）：
-           原来我方按 24% 宽、敌方按 30% —— 同一张卡两种尺寸。统一走 30%。 */
-        const maxW = U.cw() * 0.3;
-        const cw = Math.min(maxW, (U.cw() - g * (n - 1)) / n);
-        const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
-        /* 标准档传 av: 0 → unitCard 走它原来的 50（390/430 一个像素不动）；
-           压缩档才把反算出来的 av 传下去（同时也把"名字与血量% 并一行"打开）。 */
-        list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally,
-          { av: compact ? M.av : 0, compact: compact }));
-      });
-      /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
-         位置取自各卡刚才记下的 _cx/_top —— 所以先画完所有单位再画它。 */
-      (B.floaters || []).forEach(function (f) {
-        const u = B.units[f.uid];
-        if (!u || u._cx == null) return;
-        const p = Math.min(1, (Date.now() - f.t) / (f.ttl || D.BATTLE_GEOM.floatMs));
-        if (p >= 1) return;
-        const fy = u._top - 4 * CV.SCALE - D.BATTLE_GEOM.floatRise * CV.SCALE * p;
-        const alpha = 1 - p * p;
-        CV.ctx.save();
-        CV.ctx.globalAlpha = alpha;
-        const size = (f.size || D.BATTLE_GEOM.floatBase) * CV.SCALE;   // V1.0.1：原来写死 14（编外第六档）；现在按类型取（暴击走 floatCrit＝一级 17）
-        CV.ctx.lineWidth = 3 * CV.SCALE; CV.ctx.strokeStyle = CV.a(CV.C.shade, .75);
-        CV.ctx.font = '600 ' + size + 'px ' + CV.FONT;
-        CV.ctx.textAlign = 'center'; CV.ctx.textBaseline = 'middle';
-        CV.ctx.strokeText(f.text, u._cx, fy);
-        CV.ctx.fillStyle = f.color || CV.C.gold;
-        CV.ctx.fillText(f.text, u._cx, fy);
-        CV.ctx.restore();
-      });
-      /* 受击红闪：在头像外再描一圈（画在飘字之前，所以不会被盖） */
-      Object.keys(B.hitAt || {}).forEach(function (uid) {
-        const u = B.units[uid];
-        if (!u || u._cx == null) return;
-        const p = Math.max(0, 1 - (Date.now() - B.hitAt[uid]) / 300);
-        if (p <= 0) return;
-        CV.ctx.save();
-        CV.ctx.globalAlpha = 0.75 * p;
-        CV.ctx.strokeStyle = CV.C.dangerText; CV.ctx.lineWidth = 2.5 * CV.SCALE;
-        if (u.side === 'enemy') { CV.ctx.beginPath(); CV.ctx.arc(u._cx, u._top + u._av / 2, u._av / 2 + 2, 0, Math.PI * 2); CV.ctx.stroke(); }
-        else CV.round(u._cx - u._av / 2 - 2, u._top - 2, u._av + 4, u._av + 4, CV.RADIUS,  null, CV.C.dangerText, 2.5 * CV.SCALE);
-        CV.ctx.restore();
-      });
-      /* V1.0.1（父亲大人："波次卡的高度和战斗阵容的高度不一样，所以切到波次卡日志就向上补位"）：
-         真凶 —— 这一句原来写在 `if (!B.tip)` **外面**，而与之配对的 ctx.save()
-         在 if **里面**。战斗中两者配对；**一到波次卡，save 不执行、restore 照样执行**，
-         每帧多弹出一层画布状态，把外层 `translate(0, 顶栏+8)` 的坐标系弹掉，
-         整块内容（日志卡 + 撤离/速度按钮）就被顶偏；下一波 tip 变回假又恢复 ——
-         正是"弹上去又回来"。这也解释了为什么"去掉波次卡就不弹"。
-         修法：把它挪进 if，与 save 严格配对。 */
-      CV.ctx.restore();                       // 震屏结束：还原坐标系（必须与上面的 save 配对）
-    }
+      /* 战场那一片：整页这一趟与动效帧共用同一个 drawField（见上）。
+         布局快照顺手存进 B.field —— 动效帧就靠它"只重画这一块"（S2）。 */
+      B.field = { rows: rows, av: compact ? M.av : 0, compact: compact,
+        rect: fieldRect(FIELD_TOP, FIELD_BOTTOM_UNITS) };
+      drawField(B.field);
+    } else B.field = null;   // 波次卡那一段不画战场 → 动效帧也退回整页（见 fxPaint）
 
     /* 右下角三颗按钮：撤离 / N×速度 / ×5
        标准档：单独一行，压在日志卡上面（V9.6.8 父亲大人定的站位）；
@@ -684,7 +903,7 @@
        扫荡没有"胜负/回合"，所以大标题与第二行都允许外面直接给（不给就还是老样子）。
        `res` 也允许为空（扫荡那条路传 `null`）。 */
     const R = res || {};
-    const big = p.bigTitle || (R.win ? '胜 利' : '任务失败');
+    const big = p.bigTitle || (R.win ? '胜 利' : '战 败');
     CV.text(big, cx, y + 26 * CV.SCALE,
       { size: CV.DISP.d3 * CV.SCALE, bold: true, align: 'center', color: p.bigTitleColor || (R.win ? CV.C.gold : CV.C.accent) });
     y += 52 * CV.SCALE;
@@ -732,7 +951,7 @@
      所以这里把战斗那条路**整个借出去**（同一个 `drawSettle` / `drawChips` / 同一个页面），
      而不是在扫荡那边另写一套（那正是"两套写法迟早分叉"的老坑）：
        · `panel.title`   → 顶栏标题（战斗页那条头）
-       · `panel.bigTitle`→ 大字（战斗是"胜 利/任务失败"，扫荡给"扫荡完成"）
+       · `panel.bigTitle`→ 大字（战斗是"胜 利/战 败"，扫荡给"扫荡完成"）
        · `panel.line2`   → 第二行整句（扫荡写"扫荡 N 次 · 世界 第 X 关（难度）"）
        · `panel.rewards` → 胶囊（**只认 D.CURRENCIES/D.ITEMS 那套图标与名字**，内部键名漏不出来）
        · `panel.acts`    → 可选的动作按钮（扫荡传空 → 底下那颗变成主按钮）
@@ -744,6 +963,9 @@
     B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
     B.on = false; B.res = null; B.done = true; B.busy = false; B.cfg = null;
     B.autoIdx = -1; B.autoLeft = 0;
+    /* V1.0.4 · S1/S5：结算页是"画一次"的静态页（`CV.reset` 那一趟就画完了）——
+       动效帧 / 波次卡这两条循环在这里一并停掉，免得结算页上还挂着战斗的帧循环。 */
+    fxStop(); tipStop();
     if (B.autoT) { clearInterval(B.autoT); B.autoT = null; }
     B.panel = panel || {};
     B.panel.acts = B.panel.acts || [];
@@ -785,7 +1007,9 @@
     const w2 = CV.measure(spd, CV.FS.md) + 26 * CV.SCALE;
     const x5Left = (Core.speedLeftSec && Core.speedLeftSec()) || 0;
     const x5On = x5Left > 0;
-    const x5Label = x5On ? ('5× · ' + Math.floor(x5Left / 60) + ':' + String(x5Left % 60).padStart(2, '0')) : '📺 5×';
+    /* V1.0.4 · R3（父亲大人 09-27 点单）：未开时这颗走广告 ⇒ 弱网写「网络不太好」（同一处判定） */
+    const x5Label = x5On ? ('5× · ' + Math.floor(x5Left / 60) + ':' + String(x5Left % 60).padStart(2, '0'))
+      : (G.ADWEAK ? G.ADWEAK.label('📺 5×') : '📺 5×');
     const w3 = CV.measure(x5Label, CV.FS.md) + 26 * CV.SCALE;
     const x3 = U.pad() + U.cw() - w3, x2 = x3 - gap - w2, x1 = x2 - gap - w1;
     const y = bottomY - bh;
@@ -808,7 +1032,10 @@
     const next = freeSpeed() === 1 ? 2 : 1;
     if (Core.S.settings) { Core.S.settings.speed = next; Core.save(); }
     if (Core.effSpeed) { B.speed = Core.effSpeed(); CV.battleSpeed = B.speed; }
-    CV.toast(next + '× 速度', 1200);
+    /* ================= F7 ②（0928 · 父亲大人："战斗倍速上面那个小字弹幕提示会一直闪好几次"）=================
+       **删掉这条 `CV.toast(next + '× 速度')`** —— 点几次闪几次，而速度档位本来就写在那颗按钮上
+       （`×1 / ×2` 会当场变字样）。判据用的是他自己给的那条：**玩家能从界面上自己看出这件事成功了 → 删**。
+       下面 `×5` 那条不同：它报的是"还剩几分钟"（广告期倒计时，按钮上只写 ×5，看不到剩多久）→ 留。 */
     CV.render();
   });
   CV.on('battle_speed_x5', function () {
@@ -818,25 +1045,29 @@
       CV.toast('×5 还剩 ' + Math.floor(left / 60) + ' 分 ' + (left % 60) + ' 秒', 1800);
       return;
     }
+    if (G.ADWEAK && G.ADWEAK.block()) return;   // 弱网：一句人话，不白等（R3）
     const AD = G.AD;
     if (!AD || !AD.show) { CV.toast('这个版本没有广告模块（免费档 1×/2×）', 2000); return; }
     AD.show('speed_x5').then(function (r) {
       if (!r || !r.granted) { CV.toast('广告没看完，倍速没开'); CV.render(); return; }
       if (Core.grantSpeedAd) Core.grantSpeedAd();
       if (Core.effSpeed) { B.speed = Core.effSpeed(); CV.battleSpeed = B.speed; }
-      CV.toast('📺 ×5 已开 · 30 分钟（不限次数、不计总次数）', 2400);
+      /* F7 ②：一次性奖励类（看完广告才拿到的那 30 分钟）→ 留，缩到最短。 */
+      CV.toast('📺 ×5 已开 30 分钟（不限次数）', 2400);
       CV.render();
     });
   });
   /* ================= V1.1.8（丙组 B10 · 战斗复活）=================
-     父亲大人的口径：**每场 1 次**；复活续战 —— **敌人带剩余血量进场**、**只回阵亡者、血量 50%**。
+     父亲大人的口径：**每场 1 次**；复活续战 —— **敌人带剩余血量进场**、**全队按满血复活**
+       （F8 ⓪-a，09-28 由"只回阵亡者 50%"改成满血；代价见 `carryUnit` 那条注释）。
      做法：把这一场"打到一半的双方面板"原样搬进新一场（`B.units` 里每个单位的当前血量）：
        · **敌人**：`hp` 取当前值（不清空、不回满）——这就是"带剩余血量进场"；
-       · **我方**：活着的保留当前血量；**阵亡的按 `maxHp × 50%` 复活**；
+       · **我方**：**一律回满**（阵亡的满血起来，活着的也从残血补满）；
        · 状态/护盾/能量这些**战斗期的临时态不带过去**（新一场从干净状态起，能量按当前值续）；
        · 用**同一份 cfg** 重开 → 对上层（波次推进 / 结算 / 斗法台 / 深井）完全透明。
      配额：`AD.show('revive', {perBattle:true})` —— 日配额由 `LIMITS.revive` 表达，
-     但"每场 1 次"由 `B.revived` 把关（换一场自动复位），**并计入总闸**。 */
+     但"每场 1 次"由**这一场的账本**把关（`cfg.reviveState`，F2-2 见 `start()` 的注释；
+     换一场才归零），**并计入总闸**。 */
   function carryUnit(u, isAlly) {
     /* 界面层不用 `getProxied`（那是逻辑层给数据表用的包装，见 core.js 顶部）——
        这里就是一份临时规格对象，跟着本文件其它地方的写法用普通对象。 */
@@ -846,15 +1077,44 @@
       if (['uid', 'side', 'statuses', 'shield', 'phase70', 'phase30', 'revived', 'summoned'].indexOf(k) >= 0) return;
       spec[k] = u[k];
     });
+    /* ================= F6 #1 第二道闸 · 非数保护 =================
+       `atk`/`def` 这类"该是数字"的字段一旦是 NaN/undefined，伤害算式
+       `Math.max(1, Math.round(NaN))` = NaN → hp 变 NaN → `alive()` 判全灭 → 一回合瞬判胜负。
+       兜底顺序：**本场的当前值 → 开局快照（B.spec0）→ 硬默认**。
+       前面那条 loadRes 已经把"带全字段的规格"装进来了，这里是防"引擎那边以后再少给一个字段"
+       的同一类回归（报错也好过 silently 变成 NaN 直接通关）。 */
+    const base = (B.spec0 || {})[u.uid] || {};
+    const numOr = function (k, dflt) {
+      const v = (typeof spec[k] === 'number' && isFinite(spec[k])) ? spec[k]
+        : ((typeof base[k] === 'number' && isFinite(base[k])) ? base[k] : dflt);
+      return v;
+    };
+    spec.atk = numOr('atk', 10);          // 攻击：缺失时给一个"打得出伤害"的最小值
+    spec.def = numOr('def', 0);
+    spec.spd = numOr('spd', 60);
+    spec.crit = numOr('crit', 0.05);
+    spec.critDmg = numOr('critDmg', 2.0);
+    spec.eva = numOr('eva', 0.02);
+    spec.skillMult = numOr('skillMult', 1);
+    spec.lifesteal = numOr('lifesteal', 0);
+    spec.resPct = numOr('resPct', 0);
     spec.maxHp = u.maxHp;
-    spec.hp = isAlly ? (u.hp > 0 ? u.hp : Math.round(u.maxHp * 0.5)) : Math.max(1, Math.round(u.hp));
+    /* F8 ⓪-a（父亲大人 09-28 拍板：「**复活还是得满血复活**」）：
+       原来阵亡者只回 `maxHp × 50%`、活着的保留残血；现在**全队按满血**开打。
+       ⚠️ 代价（已在回单里如实报给父亲大人）：敌人**仍带着剩余血量**进场，而复活每场只准 1 次
+       ⇒ 这一下等于"花一次广告换一场几乎必胜"（这是他要的，不是 bug）。 */
+    spec.hp = isAlly ? Math.max(1, Math.round(u.maxHp)) : Math.max(1, Math.round(u.hp));
     spec.initEnergy = Math.max(0, Math.min(100, u.energy || 0));
     return spec;
   }
   function battleRevive() {
     const cfg = B.cfg;
     if (!cfg) { CV.toast('现在没有进行中的战斗'); return; }
-    if (B.revived) { CV.toast('这一场已经复活过了（每场 1 次）'); return; }
+    /* F2-2：账本＝`cfg.reviveState`（副本给的是它的 run）；没给就记在 cfg 自己身上。
+       这一句必须**先于**任何重开动作 —— 重开走的是 `run()→start()`，而那正是老写法被复位的地方。 */
+    const ledger = cfg.reviveState || cfg;
+    if (ledger.revived) { CV.toast('这一场已经复活过了（每场 1 次）'); return; }
+    if (G.ADWEAK && G.ADWEAK.block()) return;   // 弱网：一句人话，不白等（R3）
     const AD = G.AD;
     if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); return; }
     AD.show('revive', { perBattle: true }).then(function (r) {
@@ -864,10 +1124,13 @@
       const enemies = units.filter(function (u) { return u.side === 'enemy'; }).map(function (u) { return carryUnit(u, false); });
       if (!allies.length || !enemies.length) { CV.toast('这一场没有可复活的对象'); CV.render(); return; }
       const revived = allies.filter(function (s, i) { return units.filter(function (u) { return u.side === 'ally'; })[i].hp <= 0; }).length;
-      B.revived = true;
+      ledger.revived = true;                 // ← 先记账，再重开（账本随新 cfg 一起带过去）
+      const next = Object.assign({}, cfg, { allies: allies, enemies: enemies, reviveState: ledger });
       G.BattleUI.clear();                    // 收掉这一场（含 busy 闸门），下面立刻重开
-      G.BattleUI.run(Object.assign({}, cfg, { allies: allies, enemies: enemies }));
-      CV.toast('♻️ 已复活：阵亡 ' + revived + ' 人回 50% 血 · 敌人带剩余血量续战', 2600);
+      G.BattleUI.run(next);
+      /* F7 ②：一次性奖励类（看完广告拿到的那次复活）→ 留，缩到最短。
+         F8 ⓪-a：口径从"回 50% 血"改成"全队满血" —— 时长也一并收到 2000（同一条提示不啰嗦）。 */
+      CV.toast('♻️ 复活：全队满血（救回 ' + revived + ' 人）', 2000);
     });
   }
   CV.on('battle_revive', battleRevive);
@@ -875,10 +1138,37 @@
      只有连"从哪来"都没有（极端情况）才退到残域列表。 */
   function backToSource(kind) {
     const cfg = B.cfg; B.cfg = null;
-    if (cfg && cfg[kind]) { cfg[kind](); return; }
-    if (B.back && B.back.stack && B.back.stack.length) {
-      CV.stack = B.back.stack.slice();
-      CV.scroll = B.back.scroll || 0;
+    const back = B.back;
+    /* ================= F8 ①（父亲大人 09-28：「副本 / 深井的返回键没用，
+       就副本刚进去可以返回，打一关出来就不行了」）=================
+       真因不在返回键身上：副本给的 `onClose/onQuit` 是 `CV.reset('world')`、
+       深井给的是 `CV.reset('corridor')` —— 而 `CV.reset` 把页面栈**压成一层**，
+       于是回来那一页成了"根"，它的吸顶 ‹（`page_back` / `dun_back` → `CV.pop()`）
+       没地方可 pop ⇒ 看着就是"返回键没用"（"刚进去能返回"是因为那会儿它是 `CV.push`
+       进来的、栈里还有父页）。
+       修法**一处收口**（不逐页打补丁）：先照旧跑回调（该清的 State 照清，比如
+       `Core.clearPendingRun()`），然后判一句 —— 只要这一页被压成了根（栈只剩一层）、
+       而来路更深、且落点确实是来路上的那一页，就把 `B.back` 记下的栈与滚动位置还原回来。
+       于是副本回到[残域列表 → 世界页]、深井回到[灯阁 → 深井页]，两页的 ‹ 都有地方可回，
+       而且**回到的是来时那一页、滚动位置也在**（比原来"重置成根"更顺）。
+       ⚠️ "落点是来路上的一页"这半句不能省：回调若是有意跳到别处（比如结算直接去背包），
+          栈名对不上就不还原 —— 这条只治"被压成根"，不改别的跳转。 */
+    if (cfg && cfg[kind]) {
+      cfg[kind]();
+      const landed = (CV.stack && CV.stack[0] && CV.stack[0].name) || '';
+      const deeper = !!(back && back.stack && back.stack.length > 1);
+      const onTheWay = deeper && back.stack.some(function (lvl) { return lvl.name === landed; });
+      if (CV.stack.length <= 1 && onTheWay) {
+        CV.stack = back.stack.slice();
+        CV.scroll = back.scroll || 0;
+        CV.pageOverlay = null; CV.sticky = null;
+        CV.render();
+      }
+      return;
+    }
+    if (back && back.stack && back.stack.length) {
+      CV.stack = back.stack.slice();
+      CV.scroll = back.scroll || 0;
       CV.pageOverlay = null; CV.sticky = null;
       CV.render();
       return;
@@ -895,9 +1185,6 @@
     clearTimer(); B.on = false; B.res = null; B.panel = null; B.busy = false;
     backToSource('onClose');
   });
-  /* 结算面板上的自定义按钮（下一关 / 返回 / 继续） */
-  CV.on('battle_act', function () {});
-
   G.BattleUI = {
     buildAllies,
     showResult,
@@ -908,6 +1195,9 @@
     /* 打一场：cfg = { title, allies, enemies, worldId, maxRounds, onEnd(win,res,hpLeft), onQuit, onClose } */
     run(cfg) { if (this.busy()) { CV.toast('战斗进行中…'); return false; } start(cfg); fight(G.Battle.run({ allies: cfg.allies, enemies: cfg.enemies, worldId: cfg.worldId, maxRounds: cfg.maxRounds, allyHitMod: (G.Battle.MECHANICS[cfg.worldId] || {}).allyHitMod || 0 })); },
     fight,
+    /* 看广告期间的暂停/继续（唯一调用方：`js/wx-adapter.js` 的 showRewarded） */
+    pauseForAd: pauseForAd,
+    resumeAfterAd: resumeAfterAd,
     clear: function () { clearTimer(); B.on = false; B.res = null; B.panel = null; B.cfg = null; B.busy = false; },
     /* ---------- 测试口（只有尺子用，不参与游戏逻辑）----------
        `audio_audit` 要能**逐帧手推** `applyFrame`，验证"每一次伤害飘字都有同帧音效、
@@ -916,5 +1206,18 @@
     _load: loadRes,
     _applyFrame: applyFrame,
     _battle: B,
+    /* V1.0.4 · S2（`soak_audit` 用）：**单独画一帧动效帧**，不跑整页。
+       尺子拿它跟"整页那一帧"里同一片的绘制序列逐条比对 —— 证明局部重画画的就是
+       整页里那一块（同一份 drawField），而不是另写了一套画法。 */
+    _paint: fxPaint,
+    /* V1.0.4 · S1（`soak_audit` 用）：动效帧循环的账 ——
+         · `driver`：'raf' / 'timer'（**必须是 raf**：不然档位管不到它、切后台也停不了）；
+         · `paints` / `patch` / `full`：画了几帧、其中多少帧是"只重画战场那一片"；
+         · `running`：循环还在不在跑（"没动效就停"那条就靠它证明）。
+       做坏试验：把驱动换回 `setInterval(…, 55)` → driver 变 'timer'、paints 不再随档位变 → 尺子红。 */
+    _fx: function () {
+      return { driver: fxLoop.driver, running: fxLoop.running(),
+        paints: FX.paints, patch: FX.patch, full: FX.full, tier: fxTier() };
+    },
   };
 })();

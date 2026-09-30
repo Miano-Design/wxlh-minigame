@@ -14,6 +14,12 @@
     W: 375, H: 812, TOP: 0, NAV_H: 62,
     ctx: null, DPR: 1, safeTop: 0, safeBottom: 0,
     stack: [], hits: [], toasts: [],
+    pageHead: null,                        // 二级页那条吸顶顶栏（标题 + 返回），见 drawPageHead
+    /* F8 ②（父亲大人 09-28：「返回键下面留点空间，全部页面都是，一上滑返回键都跟内容贴一起了」）：
+       **呼吸带** —— 吸顶顶栏底下多铺这么高的一条不透光底，"正文滚上来"与顶栏之间永远留着它。
+       ⚠️ 这是**唯一**的定义处：铺底在 `drawPageHead`、正文起点让位在 `uiw.js` 的 `U.pageHead`，
+       两处都读这一个值（各写一份 8 是最容易改一处漏一处的写法）。 */
+    HEAD_GAP: 8,
     panels: {},
     /* —— 设计令牌：逐条抄自网页版 css/style.css 的 :root（唯一标准）——
        V1.1（视觉语言基准 §2）：含义色按语义命名 —— 红从"主动作"退回，只管危险／消耗／不可行；
@@ -161,16 +167,34 @@
        比定下的"字号下限 11px"还小（父亲大人一直说"字看不到"就是这个）。
        这里跟着把 k 固定成 1：字号恒为 11/11/12/13/15/17，间距/圆角/控件高也不再缩。
        代价是窄屏上内容大 10%（多滚一点），换来的是所有字都真的 ≥11px。 */
+    /* ================= F7 ①（0928 · 父亲大人："小屏幕的界面能按照大屏的比例等比缩放吗？
+       现在小屏的界面不好看啊，太臃肿了"）· 令牌缩放拆成**两条比例** =================
+       原来 `const k = 1` 把整块令牌钉死（V9.5.84 的历史取舍：375 及以下的手机上根字号只有 14.5px，
+       最小那档 11×0.906 = 9.97px，比定下的"字号下限 11px"还小）—— 代价就是今天这句"窄屏上内容大、显得臃肿"。
+       现在拆开，**三条约束同时成立**：
+         · k  ＝ **字号系数，恒为 1**：五级阶梯 17/15/13/12/11 在任何屏上都不缩，
+                320 宽的屏上最小那档仍然是 11px（他当年为"字看不到"提过一次，不许再犯回去）；
+         · kv ＝ **观感系数 = min(1, W/390)**：只缩"与辨读无关"的那批 —— 间距 CV.SP / 圆角 /
+                控件高 U.BTN_* / 卡片内边距 / 头像与图标。320 上 ≈ 0.82，430 上封顶 1（大屏不再变胖）。
+       ⚠️ **热区不在缩放里**：`CV.hit` 的 `minHitPx() = 44` 是物理口径（WCAG/HIG 那条他没撤）——
+          视觉可以小、热区照样长到 44，两者解耦（见下面 CV.hit 那一段）。
+       ⚠️ **字号一律走 CV.FS / CV.TIER 令牌，不许再写 `CV.FS.x * CV.SCALE`**（那会把字缩到 11 以下）。
+          `type_scale_audit` ⑦ 有一条扫描专门盯这个写法。 */
     const k = 1;
-    CV.SCALE = k;
-    CV.SP = [4, 10, 14, 18, 24].map((v) => v * k);
+    const kv = Math.min(1, CV.W / 390);
+    CV.SCALE = kv;
+    CV.SP = [4, 10, 14, 18, 24].map((v) => v * kv);
     /* V1.1（基准 §3.2 第 1 步）：sm / xs 从 11px 跟到四级 12px —— 它们原来是五级，
        结果 11px 占了全站 46% 的声明。第四级＝md/sm/xs（12px），
        11px 只留给"图形里的字"＝ tag。五级阶梯的数字没变（17/15/13/12/11）。 */
     CV.FS = { xs: 12 * k, sm: 12 * k, md: 12 * k, lg: 13 * k, f1: 15 * k, f2: 17 * k, tag: 11 * k };
-    CV.RADIUS = 10 * k; CV.RADIUS_SM = 7 * k; CV.RADIUS_CHIP = 3 * k;
-    CV.NAV_H = 62 * k;
-    CV.NAV_BASE = 62 * k;      // 底栏基准高：战斗页会把它清成 0（整屏接管），离开时必须恢复
+    CV.RADIUS = 10 * kv; CV.RADIUS_SM = 7 * kv; CV.RADIUS_CHIP = 3 * kv;
+    CV.NAV_H = 62 * kv;
+    CV.NAV_BASE = 62 * kv;     // 底栏基准高：战斗页会把它清成 0（整屏接管），离开时必须恢复
+    /* F6 #3：窗口尺寸变化 / 切回前台时把渲染闸复位并补画一帧 ——
+       那一次 rAF 万一没被平台派发（画布被重建、后台冻结），画面也不许停在旧帧（"假死"）。
+       开机时 `CV.resetRenderGate` 还没挂（uiw.js 后加载），这句自然跳过。 */
+    try { if (CV.resetRenderGate) CV.resetRenderGate(); } catch (e) {}
     return CV;
   };
 
@@ -658,15 +682,31 @@
        开销可以忽略。 */
     const curHits = CV.currencyIn(raw);
     if (curHits || CV.hasGlyph(raw)) {
-      /* 分段：普通文字照旧 fillText，缺字形的字符交给 CV.GLYPHS 画 */
+      /* ================= F6 #4（抢修单 0928 · 逐字 fillText）=================
+       分段粒度 ＝ **"连续普通文字段"或"单个自绘字形"**，不是"逐码点"。
+       以前只要一行里出现一个 ★ ◉ ⚠ ♾…，**整行**就被降级成"每个字一次 fillText + 一次 measure"：
+       实测单行 11 个纯中文＝1 次 fillText，带一个 ◉ 的 14 字＝13 次、带 ⚠ 的 31 字长文案＝30 次；
+       页面级（真代码整帧计数）**秘术阁 553 次里 335 次(61%)、游历 476 里 329(69%)、成长 260 里 219(84%)**
+       都来自这一条。现在连续段一次画完、一次量宽 —— 帧成本砍一半以上。
+       每一段的宽度口径与 `CV.measure` 完全同源（都按"段"量），所以排版位置不发生漂移。 */
       const size = opt.size || CV.FS.lg;
       /* 必须按**码点**切（Array.from），不能用逐码元切 —— emoji 是代理对，
          切开就变成两个半字符（🏪 会被劈成两半）。 */
-      const segs = Array.from(raw);
+      const chars = Array.from(raw);
+      /* 要单独画的字符：自绘字形（走 GLYPHS）＋ 带专属色的货币符（换色必须独立成段） */
+      const solo = (t) => !!CV.GLYPHS[t] || (curHits && !!CV.CUR_COLOR[t]);
+      const segs = [];
+      let buf = '';
+      chars.forEach(function (t) {
+        if (solo(t)) { if (buf) { segs.push({ t: buf, g: false }); buf = ''; } segs.push({ t: t, g: true }); }
+        else buf += t;
+      });
+      if (buf) segs.push({ t: buf, g: false });
       let total = 0;
-      segs.forEach(function (t) { total += CV.GLYPHS[t] ? size : CV.measure(t, size, opt.bold); });
+      segs.forEach(function (s) { total += s.g ? size : CV.measure(s.t, size, opt.bold); });
       let px = opt.align === 'center' ? x - total / 2 : (opt.align === 'right' ? x - total : x);
-      segs.forEach(function (t) {
+      segs.forEach(function (s) {
+        const t = s.t;
         if (CV.GLYPHS[t]) {
           /* ⚠️ V1.0.6（父亲大人 09-24 反馈的原话：「消费的货币还是没有用现在的货币图标，
              **还是用的白色图标**」）——**根因就在这一行**：
@@ -679,9 +719,10 @@
         }
         else {
           const ta = c.textAlign; c.textAlign = 'left';
-          if (curHits && CV.CUR_COLOR[t]) c.fillStyle = CV.CUR_COLOR[t];   // 货币符号：用自己的颜色
+          const cc = (curHits && CV.CUR_COLOR[t]) ? CV.CUR_COLOR[t] : null;   // 货币符：用自己的颜色（单字成段时）
+          if (cc) c.fillStyle = cc;
           c.fillText(t, px, y);
-          if (curHits && CV.CUR_COLOR[t]) c.fillStyle = opt.color || CV.C.text;
+          if (cc) c.fillStyle = opt.color || CV.C.text;
           c.textAlign = ta; px += CV.measure(t, size, opt.bold);
         }
       });
@@ -708,16 +749,37 @@
     c.font = `${bold ? '600 ' : ''}${size}px ${CV.FONT}`;
     const raw = _md(str);
     if (CV.hasGlyph(raw)) {
+      /* F6 #4：与 CV.text **同一套分段** —— 连续普通文字段整段量（一次 measureText），
+         自绘字形按其字号宽走。两边口径一致，画出来的位置才不会和量出来的对不上。 */
       let w = 0;
+      let buf = '';
+      const flush = function () {
+        if (!buf) return;
+        const s = buf; buf = '';
+        try { w += c.measureText(s).width || 0; } catch (e) { w += s.length * size * 0.9; }
+      };
       Array.from(raw).forEach(function (t) {
         if (!t) return;
-        w += CV.GLYPHS[t] ? size : (function () { try { return c.measureText(t).width || 0; } catch (e) { return t.length * size * 0.9; } })();
+        if (CV.GLYPHS[t]) { flush(); w += size; return; }
+        buf += t;
       });
+      flush();
       return _ret(w);
     }
     try { return _ret(c.measureText(raw).width || 0); } catch (e) { return _ret(raw.length * size * 0.9); }
   };
   const _mwCache = new Map();
+  /* V1.0.4 · R2（父亲大人 09-27 点单：「内存告警自救」）：
+     文本测量缓存是**纯派生数据** —— 清了只是下一次多调几次 measureText，绝不丢玩家数据。
+     告警时的清理入口收在这里（谁调见 `js/wx-cap.js`），别处不许直接动这张表。 */
+  CV.dropTextCache = function () {
+    /* V1.0.4 · S4：折行结果缓存与测量缓存同一性质（纯派生、可再生）—— 一起清，
+       免得"内存告急清了测量表、折行表还涨着"（`wx-cap` 只调这一个口子）。 */
+    const n = _mwCache.size + _wrapCache.size;
+    _mwCache.clear();
+    _wrapCache.clear();
+    return n;
+  };
   /* 圆角矩形（网页版 .card：bg #111621 / 边 #232b3b / 圆角 10） */
   CV.round = function (x, y, w, h, r, fill, stroke, lw) {
     const c = CV.ctx;
@@ -802,10 +864,29 @@
     return out + '…';
   };
   /* 折行：按可用宽度断行（返回行数组，最多 maxLines 行，超出末行加省略号） */
+  /* V1.0.4 · S4：折行结果缓存（key 见下；纯派生数据，内存告警时一起清 —— 见 dropTextCache）。
+     返回的数组**冻结**：命中时是同一个对象，调用方只许读不许改（改了会污染后面所有人）。 */
+  const _wrapCache = new Map();
+  const _wrapStat = { hit: 0, miss: 0 };
+  function wrapCached(k, v) {
+    if (_wrapCache.size > 400) _wrapCache.clear();
+    const f = Object.freeze(v);
+    _wrapCache.set(k, f);
+    return f;
+  }
+  /* 尺子读得到"命中了几次、真算了几次"（`soak_audit` 用它证明日志那一帧不再重折行） */
+  CV.wrapStats = function () { return { hit: _wrapStat.hit, miss: _wrapStat.miss, size: _wrapCache.size }; };
   CV.wrap = function (str, maxW, size, maxLines) {
     /* V1.0.1（性能）：原来是"每加一个字就把**整行**重新测一遍" —— O(n²)，
        一段 50 字要 50 次 measureText，一页几十条就是几千次，而滑动时**每帧都重来**。
        改成逐字宽度**累加**（O(n)），配合 CV.measure 的缓存，滑动的开销基本归零。 */
+    /* V1.0.4 · S4（父亲大人 09-27：「战斗时发烫」）：**折行结果也缓存**（key = 文本 + 宽度 + 字号 + 行数）。
+        逐字累加仍是 O(字数)，而战斗日志卡**每帧**都要把那几行重折一遍 —— 同一段文本
+        第二次起直接命中，只剩一次 Map 查找。文本有增删/换宽就自然换 key，不用手工失效。 */
+    const _k = 'w' + size + '|' + maxW + '|' + (maxLines || 0) + '|' + str;
+    const _hit = _wrapCache.get(_k);
+    if (_hit !== undefined) { _wrapStat.hit++; return _hit; }
+    _wrapStat.miss++;
     const chars = _md(str).split('');
     const lines = [];
     let line = '', w = 0;
@@ -821,9 +902,9 @@
     if (maxLines && lines.length > maxLines) {
       const keep = lines.slice(0, maxLines);
       keep[maxLines - 1] = CV.fit(keep[maxLines - 1] + (lines[maxLines] || ''), maxW, size);
-      return keep;
+      return wrapCached(_k, keep);
     }
-    return lines;
+    return wrapCached(_k, lines);
   };
 
   /* V1.0.6（父亲大人 09-24 反馈图 09）：**词级折行** —— CV.wrap 是逐字断的，
@@ -833,6 +914,11 @@
      断点字符（· / → / 空格 / 全角空格）**跟着前一个词走**，行尾不会只剩一个孤零零的「·」。 */
   CV.wrapTokens = function (str, maxW, size, maxLines) {
     const s = String(str == null ? '' : str);
+    /* V1.0.4 · S4：与 CV.wrap 同一条缓存（战斗日志那一行每帧都要过这里） */
+    const _tk = 't' + size + '|' + maxW + '|' + (maxLines || 0) + '|' + s;
+    const _th = _wrapCache.get(_tk);
+    if (_th !== undefined) { _wrapStat.hit++; return _th; }
+    _wrapStat.miss++;
     const tokens = [];
     let tk = '', sepNext = false;
     for (let i = 0; i < s.length; i++) {
@@ -872,9 +958,9 @@
     if (maxLines && out.length > maxLines) {
       const keep = out.slice(0, maxLines);
       keep[maxLines - 1] = CV.fit(keep[maxLines - 1] + (out[maxLines] || ''), maxW, size);
-      return keep;
+      return wrapCached(_tk, keep);
     }
-    return out;
+    return wrapCached(_tk, out);
   };
 
   /* ---------- 触摸命中区 ----------
@@ -908,24 +994,39 @@
         于是"同一颗按钮在大屏上反而不合格"这种荒唐结论会出现（实测：430 上多出 6 条假红）。 */
   function minHitPx() { return 44; }
   CV.minHitPx = minHitPx;
+  /* ================= F7 ①b（0928 · 小屏配平的收尾）· 撑热区改成"往空的那一侧长" =================
+     背景：F7 ① 把**视觉**按屏宽缩了（320 上 ≈0.82），控件高随之变矮（44→36 / 40→33）,
+     热区仍要长到物理下限 44 —— 这是《专业基准》交互档那条，他没撤。
+     原算法只会"**对称**往外撑"：撑完若与已登记的热区（两维都重叠 >2pt）撞上，就**整颗缩回原样**。
+     小屏上同一列两行之间只隔 ~8px（39×0.82+8.2 ≈ 41 的节距），对称撑必然撞上一行 ——
+     实测 320×568 上 **9 处**（设置页两个开关、炼化台三颗、队伍三颗预设、扫荡那颗）热区只剩 33/36 高，
+     `layout_audit` ④ 当场报红；而它们**下面本来就有一大片空地**（下一行隔 70px 以上）。
+     现在按"最小位移"依次试五个落位：居中 → 只往下长 → 只往上长 → 只往右长 → 只往左长，
+     取第一个**不撞**的。撞的判据、夹进画布、幽灵热区豁免全部照旧 ——
+     **"绝不造出『点 A 触发 B』"这条纪律不变**（兜底仍然是"缩回原样"）。
+     做坏试验：把 cands 收成只剩第一条（只居中撑）→ layout_audit ④ 立刻回到 9 条红。 */
   CV.hit = function (id, x, y, w, h) {
     const screen = CV.hitMode === 'screen' || CV.hitMode === 'overlay';
     const modal = CV.hitMode === 'overlay';
     const min = minHitPx();
-    if (w < min - 0.5 || h < min - 0.5) {
-      const dw = Math.max(0, min - w), dh = Math.max(0, min - h);
-      const nw = w + dw, nh = h + dh;
-      let nx = Math.max(0, Math.min(x - dw / 2, CV.W - nw));
-      let ny = Math.max(0, y - dh / 2);
+    const push = (nx, ny, nw, nh) => CV.hits.push({ id: id, x: nx, y: ny, w: nw, h: nh, screen: screen, modal: modal });
+    if (w >= min - 0.5 && h >= min - 0.5) { push(x, y, w, h); return; }
+    const dw = Math.max(0, min - w), dh = Math.max(0, min - h);
+    const nw = w + dw, nh = h + dh;
+    /* F6 #12：撞测跳过"幽灵热区"（屏外卡只量没画那一遍登记的）——
+       它们不会被派发，就不该挡住别人的 44px 放大。 */
+    const free = (nx, ny) => !CV.hits.some((o) => !o.ghost && o.screen === screen
+      && Math.min(nx + nw, o.x + o.w) - Math.max(nx, o.x) > 2
+      && Math.min(ny + nh, o.y + o.h) - Math.max(ny, o.y) > 2);
+    const CAND = [[x - dw / 2, y - dh / 2], [x - dw / 2, y], [x - dw / 2, y - dh],
+      [x, y - dh / 2], [x - dw, y - dh / 2]];
+    for (let i = 0; i < CAND.length; i++) {
+      const nx = Math.max(0, Math.min(CAND[i][0], CV.W - nw));
+      let ny = Math.max(0, CAND[i][1]);
       if (screen) ny = Math.max(0, Math.min(ny, CV.H - nh));
-      const clash = CV.hits.some((o) => o.screen === screen
-        && Math.min(nx + nw, o.x + o.w) - Math.max(nx, o.x) > 2
-        && Math.min(ny + nh, o.y + o.h) - Math.max(ny, o.y) > 2);
-      if (clash) { nx = x; ny = y; }
-      CV.hits.push({ id: id, x: nx, y: ny, w: clash ? w : nw, h: clash ? h : nh, screen: screen, modal: modal });
-      return;
+      if (free(nx, ny)) { push(nx, ny, nw, nh); return; }
     }
-    CV.hits.push({ id: id, x: x, y: y, w: w, h: h, screen: screen, modal: modal });
+    push(x, y, w, h);          /* 五个落位全撞：缩回原样（宁可这颗小，也不许造歧义） */
   };
   /* V9.6.108：这颗热区有没有处理器（精确 id 或前缀处理器）。
      "给引导当锚点"的整块区域（party_board / attr_card / stage_grid…）没有处理器 ——
@@ -979,9 +1080,74 @@
      键换成栈深之后，每一层各记各的，"返回恢复"才真的对得上"离开时那一层"。 */
   CV.scrollMemo = {};
   CV.reset = function (name, opts) {
-    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.grabCfg = null; CV.dropGrab();
+    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
     CV.scrollMemo = {};                      // 换标签＝从头看：整条栈的记忆一起清掉（键是栈深，清空才算干净）
+    /* ================= F6 #2（抢修单 0928 · 底栏四格各记各的现场，原来**是死代码**）=================
+     父亲大人 09-27 深夜（底栏切回来不丢位置）：「点下面的导航按钮又得重新进去界面重新找」。
+     `CV.switchTab` 的写法是"切走时 saveTabMemo、切回来时还原"，可它兜底那一步**必定**调到这里 ——
+     而这里原来写的是 `CV.tabMemo = {}`（**整表清空**）⇒ 还原分支永远为假 ⇒ 那条功能一次都没生效。
+     实测（真代码 + 真触摸）：灯阁滑到底（scroll=741/741）→ 背包 → 灯阁 ＝ 回到 0/741；
+     每次切完 `Object.keys(CV.tabMemo)` 都是空 `[]`。
+     现在**只清自己这一格**：reset(name) 就是"把 name 这一格的路从新走"，
+     别的三格各记各的现场（这正是 tabMemo 的语义）。"点当前那一格＝回这一格的家"不变 ——
+     `switchTab` 里那条 `CV.cur === id → CV.reset(id)` 会把这个 tab 自己的记忆清掉。
+     ⚠️ 与"每格 opts 可能已经对不上"的关系：作废由 `stackAlive()` 逐层查 `CV.panels` 把关
+        （页面被改名/删掉就落回该 tab 首页），不靠"整表清空"这种一刀切。
+     做坏试验（回单里有实测输出）：把这里改回 `CV.tabMemo = {};`
+     → 证据探针里"灯阁滑到底 → 背包 → 灯阁"从 `760/760 ✓` 变成 `0/760 ✗`、`tabMemo` 键为空。 */
+    if (name) CV.tabMemo[name] = null;
     CV.render();
+  };
+  /* ================= V1.1.17（父亲大人 09-27 深夜）· 底栏四格各记各的现场 =================
+     原话：「点下面的导航按钮又得重新进去界面重新找，就交互上还是差点」。
+     原来底栏那一格点下去走的是 `CV.reset(t.id)` —— 换页＝scroll 归零 + scrollMemo 清空，
+     于是"在执灯者里翻到第 80 个伙伴 → 去背包 → 再切回执灯者"必然回到最上面。
+     现在**每个 tab 记一份自己的现场**（整条栈 + 按栈深的滚动记忆 + 当前滚动量），
+     切走时存、切回来时还原 —— 回到那个 tab ＝ 回到离开时的样子（含当时停在的二级页）。
+     两条纪律（派单里点名的）：
+       · **栈已经没有了就落回该 tab 首页**：还原前逐层查 `CV.panels[name]` —— 页面被改名/删掉
+         （比如被"打扫"掉的那几页）就作废，宁可回首页，也不许画一个不存在的页；
+       · **战斗 / 结算这种一次性页不许被记回来**（打完就结束）：存的时候把它们从栈里剔掉。
+     ⚠️ 这里原来写着"注掉 `saveTabMemo(CV.cur)` → `scroll_fit_audit` ⑨ 立刻红" ——
+        R7 复审实测**不成立**（⑨ 量的是"进更矮页不许被夹到底"，与 tabMemo 无关）。
+        现在改挂到真能变红的那条：回单里的证据探针（注掉那行 → 切回来 scroll 从 760 变 0）。
+     ⚠️ 键是**tab 名**（底栏四格），与 `CV.scrollMemo` 的键（栈深）是两回事，两份并存、各管一段。 */
+  CV.tabMemo = {};
+  /* 一次性页面：打完就结束，切 tab 时不许把它们记进"现场" */
+  const ONESHOT_PAGES = ['battle', 'recruit_result'];
+  function memoStack() {
+    const out = [];
+    CV.stack.forEach(function (lvl) {
+      if (ONESHOT_PAGES.indexOf(lvl.name) >= 0) return;
+      out.push({ name: lvl.name, opts: lvl.opts || {} });
+    });
+    return out;
+  }
+  function stackAlive(stk) {
+    if (!stk || !stk.length) return false;
+    return stk.every(function (lvl) { return !!CV.panels[lvl.name]; });
+  }
+  function saveTabMemo(tab) {
+    if (!tab) return;
+    CV.tabMemo[tab] = { stack: memoStack(), scrollMemo: Object.assign({}, CV.scrollMemo), scroll: CV.scroll || 0 };
+  }
+  CV.switchTab = function (id) {
+    /* 点的是当前这一格＝"回到这一格的家"（与改前同一条行为）：清掉它的现场再走 reset。 */
+    if (CV.cur === id) { CV.cur = id; CV.reset(id); return; }
+    saveTabMemo(CV.cur);
+    CV.cur = id;
+    const m = CV.tabMemo[id];
+    if (m && m.stack.length && m.stack[0].name === id && stackAlive(m.stack)) {
+      CV.stack = m.stack.map(function (lvl) { return { name: lvl.name, opts: lvl.opts || {} }; });
+      CV.scrollMemo = Object.assign({}, m.scrollMemo);
+      CV.scroll = m.scroll || 0;             // 超出新内容高的部分由 render 里那一夹收回来
+      CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
+      CV.render();
+      return;
+    }
+    /* 这一格没有现场（第一次进来）／那条栈已经没有了 → 落回该 tab 首页 */
+    CV.tabMemo[id] = null;
+    CV.reset(id);
   };
   /* ---------- 长按抓起 · 拖动换位（V9.6.111） ----------
      父亲大人："小游戏队伍拖拽换位不了。"——以前这件事**根本没做**：
@@ -1004,13 +1170,13 @@
        被不同内容复用时会跳到很远的地方（伙伴详情那一类：一进去就在最底下）。
        现在 push 一律归零；"恢复"只发生在 pop（退回上一页）那一条路。 */
     CV.scroll = 0;
-    CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   CV.pop = function () {
     CV.scrollMemo[CV.stack.length - 1] = CV.scroll || 0;     // 离开这一层：记住它看到哪（键＝栈深）
     if (CV.stack.length > 1) CV.stack.pop();
     CV.scroll = CV.scrollMemo[CV.stack.length - 1] || 0;     // 回到上一层：**恢复它原来看到的位置**
-    CV.pageOverlay = null; CV.sticky = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
      中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
@@ -1020,7 +1186,8 @@
   CV.jump = function (name, opts) {
     CV.stack = [{ name: 'home', opts: {} }, { name: name, opts: opts || {} }];
     CV.scrollMemo = {};                      // 直接跳页＝新的一条路：按 A7① 归零，别带旧记忆
-    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null;
+    CV.tabMemo = {};                         // 同上：这是一条全新的路，四格的旧现场一并作废
+    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null;
     CV.render();
   };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
@@ -1038,6 +1205,13 @@
        并且 `ensureState()` 会 console.warn 出声（能自证：真机上看到那条 warn 就说明撞上了这条缝）。 */
     if (G.Core && G.Core.ensureState && !G.Core.S) G.Core.ensureState();
     CV.hits = [];
+    /* ================= F6 #11（抢修单 0928 · `CV.hitMode` 帧首复位）=================
+     `hitMode` 是**跨帧的全局状态**：登记热区的地方写着"设成 screen → 登记 → 还回 content"。
+     那两句之间只要有一步抛错（页头右侧件 / 引导文案最容易犯），它就会**留在 screen**，
+     下一帧起整页内容热区按屏幕坐标算 —— 表现就是"点哪儿都不对"，而且很难查。
+     这里在**帧首无条件复位**：任何一帧都从 content 起画（下面各处照旧自己设、自己还）。
+     ⚠️ 与各调用点的 try/finally 是两条互补的兜底（一个保证本帧之内还回去，一个保证下一帧干净）。 */
+    CV.hitMode = 'content';
     CV.y = 0;
     /* 开局三步（欢迎 / 起名 / 选血统）时**不画顶栏和底栏**——
        网页版这时整块界面是隐藏的（没签契约看不到游戏界面，V9.5.23 定的），这里照做。 */
@@ -1116,6 +1290,10 @@
       c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
       c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
       CV.y = 0;
+      /* 父亲大人 09-27 深夜：吸顶顶栏**每一帧由当前这一页自己登记** ——
+         先清空再画内容，于是"有顶栏的页"和"没顶栏的页"互相不会串台
+         （从二级页返回首页时，首页不调 U.pageHead，那条顶栏就不会留在屏幕上）。 */
+      CV.pageHead = null;
       const fn = CV.panels[CV.top().name];
       if (fn) fn(CV.top().opts);
       /* V9.6.30：引导气泡集中在这里挂 —— 页面画完、CV.hits 已经齐了，查表就知道该给哪颗按钮做引导。 */
@@ -1149,6 +1327,8 @@
     /* 吸顶条（背包的三大标签）：画在**内容裁剪之外 + 屏幕坐标**里，所以不跟着滚动。
        页面自己负责把内容从它下面开始排（U.y 先让出它的高度）。
        位置在顶栏之下、底栏之上，画在内容之后 → 内容从它下面滚过去。 */
+    /* 二级页顶栏（标题 + 返回）也走这一趟：先画它，页内自己的吸顶条（背包标签那种）再叠在下面。 */
+    if (CV.pageHead) CV.drawPageHead();
     if (CV.sticky) CV.sticky();
     if (!chromeless) CV.navbar();
     if (G.U && G.U.drawOverlay) G.U.drawOverlay();     // 确认弹窗画在最上面（通用件 U）
@@ -1162,7 +1342,11 @@
     if (CV.pageOverlay) CV.pageOverlay();
     /* 游戏圈入口（V1.0.4）：微信的原生游戏圈按钮不在 canvas 上，位置只能靠这里逐帧摆
        （谁登记的见 js/sc-gameclub.js）。放在内容画完之后 —— 它读的是这一帧刚登记好的位置。 */
-    if (G.GameClub) { try { G.GameClub.tick(); } catch (e) {} }
+    /* 原生按钮层（V1.0.4 起是**多颗**：游戏圈 ＋ 意见反馈）—— 统一走 G.NativeTick，
+       它内部逐个 try（见 js/sc-gameclub.js）。没有这一层时退回旧的单颗入口，
+       这样"只加载了 gameclub 模块"的旧链路（尺子的假环境）也照旧能跑。 */
+    if (G.NativeTick) { try { G.NativeTick(); } catch (e) {} }
+    else if (G.GameClub) { try { G.GameClub.tick(); } catch (e) {} }
     CV.drawToasts();
     /* 最顶层覆盖（V1.1.3）：开机首屏走这里 —— 它要盖住**一切**（包括 toast），
        因为它代表的是"游戏还没开机完成"。见 js/sc-splash.js。 */
@@ -1171,6 +1355,40 @@
       /* 外层的还原也必须无条件执行（顶栏 / 吸顶条 / 覆盖层任何一处抛错都不能把坐标系留给下一帧） */
       c.restore();
     }
+  };
+
+  /* ================= V1.0.4 · S2（父亲大人 09-27：「主要还是战斗的时候」发烫）=================
+     **局部重画**：只把屏幕上一块矩形按"整帧同一套口径"重画一遍。
+     为什么要有它：战斗的飘字/受击那一帧**真正在动的只有战场那一片**（单位卡 + 飘字），
+     可原来那一帧走的是 `CV.render()` —— 连日志折行、撤离/加速、顶栏、整屏渐变底都白画一遍
+     （每秒 18 次）。这里把"只重画一块"这条路开出来，画法与整帧**共用同一套**变换：
+       · DPR 归位 → 背景渐变（只铺这块矩形，不是整屏）→ pxW 居中 → 裁剪到这块矩形 → 内容位移；
+       · 只调 `drawFn`，**不碰** CV.hits / 顶栏 / 底栏 / 吸顶条 / 弹窗 / toast。
+     安全前提（调用方保证）：只在这块矩形里画东西、且不登记热区。目前唯一调用方是
+     `js/sc-battle.js` 的 `fxPaint()`（战斗动效帧），它在开画前自己确认"战斗页在最上面、
+     没有弹窗、没有结算层"。矩形用**屏幕坐标**（与命中区同一套，见 CV.hitMode 那段）。 */
+  CV.renderPatch = function (rect, drawFn) {
+    const c = CV.ctx;
+    if (!c || !rect || !(rect.w > 0) || !(rect.h > 0)) return false;
+    try { c.setTransform(CV.DPR, 0, 0, CV.DPR, 0, 0); } catch (e) {}
+    c.save();
+    try {
+      /* 背景：与整帧那条竖向渐变**同一条**（只铺这块矩形；渐变对象在同一个 user space 里定义，
+         所以这一块的颜色与整帧画出来的那块完全一致，接缝看不出来）。 */
+      const bg = c.createLinearGradient(0, 0, 0, CV.H);
+      bg.addColorStop(0, CV.C.bg2); bg.addColorStop(1, CV.C.bg);
+      c.fillStyle = bg;
+      c.fillRect(rect.x, rect.y, rect.w, rect.h);
+      c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
+      c.beginPath(); c.rect(rect.x, rect.y, rect.w, rect.h); c.clip();
+      c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
+      if (drawFn) drawFn(c);
+    } finally {
+      c.restore();
+    }
+    /* 尺子用：这一帧是"局部重画"（`soak_audit` 用它证明飘字帧不再整页重画） */
+    CV.patches = (CV.patches || 0) + 1;
+    return true;
   };
 
   /* ---------- 顶栏（照网页版 #topbar：玩家行 + 货币行） ----------
@@ -1201,8 +1419,11 @@
     /* Lv. 胶囊：网页版 .plv（金色描边 + 圆角 7 + 左右 6px） */
     const lvTxt = 'Lv.' + lv;
     const lw = CV.measure(lvTxt, CV.FS.sm) + 12 * CV.SCALE;
-    /* 名字最长 12 个字，得先按"胶囊让开后的可用宽度"截断（不然长名字会钻到系统胶囊底下） */
-    const name = CV.fit((S && S.player.name) || '执灯者', ROW_RIGHT - PAD - lw - 20 * CV.SCALE, CV.FS.f1, true);
+    /* 名字最长 12 个字，得先按"胶囊让开后的可用宽度"截断（不然长名字会钻到系统胶囊底下）。
+       V1.0.4 · V：名字**只从 `Core.charName('@player')` 取**（这里原来直接读 S.player.name，
+       是第二份来源）—— 以后榜单 / 日志也走同一个口子，展示层只有一处认名字。 */
+    const name = CV.fit((G.Core && G.Core.charName && G.Core.charName('@player')) || '执灯者',
+      ROW_RIGHT - PAD - lw - 20 * CV.SCALE, CV.FS.f1, true);
     CV.text(name, PAD, ny, { size: CV.FS.f1, bold: true });
     const nw = CV.measure(name, CV.FS.f1, true);
     CV.round(PAD + nw + 10 * CV.SCALE, ny - 8 * CV.SCALE, lw, 16 * CV.SCALE, CV.RADIUS_SM, null, CV.a(CV.C.gold, .4));
@@ -1250,12 +1471,14 @@
     /* 每一颗胶囊都登记热区 → 点它打开货币图鉴（V9.6.7 补的那条规矩，
        现在从"只有最后一颗能点"扩到"四颗都能点"）。 */
     CV.hitMode = 'screen';
-    main.forEach((cc) => {
-      const x0 = x;
-      const w = chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false);
-      CV.hit('cur:' + cc.id, x0, cy, w, CHIP_H);
-    });
-    CV.hitMode = 'content';
+    /* F6 #11：设了再还的写法一律 try/finally（中间抛错也不许把 hitMode 留在 screen） */
+    try {
+      main.forEach((cc) => {
+        const x0 = x;
+        const w = chip(fmt(cur[cc.id] || 0), cc.icon, cc.color, false, false);
+        CV.hit('cur:' + cc.id, x0, cy, w, CHIP_H);
+      });
+    } finally { CV.hitMode = 'content'; }
   };
 
   /* ---------- 底栏（V1.0.6：**纯文字**，与网页版一致） ----------
@@ -1268,6 +1491,43 @@
      也用不上这种降饱和补丁。 */
 
   /* ---------- 底栏（照网页版 #navbar：四格，选中金色） ---------- */
+  /* ================= V1.1.17（父亲大人 09-27 深夜 · 派单 Z-B）· 二级页顶栏吸顶 =================
+     原话：「每一屏的标题和返回键都固定在顶部吧，不然有时候要点返回又得滑回去」。
+     做法**照背包三大标签那条吸顶条**（CV.sticky）——同一套，不另起炉灶：
+       · 页面在正文开头调 `U.pageHead('标题')` 登记一次，并把正文从它下面开始排（U.y 先让出高度）；
+       · 这里在**内容画完之后**、按**屏幕坐标**把它画一遍 —— 所以它不跟着滚动；
+       · 底上必须铺一层**与整屏同一条的渐变**：正文从下面滚上来时要不透光
+         （CV.sticky 那句注释："不能用平色，平色会显出一条接缝"）；
+       · 返回键的热区用**屏幕坐标**登记（CV.hitMode='screen'）——
+         它是固定不动的，不许像正文那样按 `CV.localY` 随滚动量换算。
+     做坏试验：把 `if (CV.pageHead) CV.drawPageHead();` 注掉 → 二级页滚到底时返回键随内容滚走，
+     `scroll_fit_audit` ⑧⑨ 报红。 */
+  CV.headH = function () { return (CV.pageHead && CV.pageHead.h) || 0; };
+  CV.drawPageHead = function () {
+    const ph = CV.pageHead;
+    if (!ph || !G.U) return;
+    const c = CV.ctx, U = G.U;
+    const y0 = CV.TOP + 8, h = ph.h;
+    /* 整段（底 + 返回键 + 标题）都在**屏幕坐标**里画 —— `CV.hitMode='screen'` 一直保持到收尾，
+       尺子（inset_audit / layout_audit）据此把这一层和"按内容坐标排的正文"分开比，不混算。 */
+    const prevMode = CV.hitMode;
+    CV.hitMode = 'screen';
+    /* F6 #11：这一整段都在屏幕坐标里，中间任何一处抛错都不许把 hitMode 留在 screen。
+       原来"设了再还"的两句之间夹着画底、画返回键、画标题 —— 已改成 try/finally 包住。 */
+    try {
+    const bgGrad = c.createLinearGradient(0, 0, 0, CV.H);
+    bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+    c.fillStyle = bgGrad;
+    /* 连顶栏下那 8px 一起盖住，再往下多铺一条**呼吸带**（`CV.HEAD_GAP`）——
+       F8 ②：正文滚上来时不该贴着返回键的下沿。正文起点也同步让位（uiw.js 的 `U.pageHead`）。 */
+    c.fillRect(0, CV.TOP, CV.W, 8 + h + (CV.HEAD_GAP || 0));
+    U.btn(U.pad(), y0, 40 * CV.SCALE, h, '‹', 'ghost', ph.backId);
+    if (ph.right) { try { ph.right(U.pad() + U.cw() - 40 * CV.SCALE, y0, h); } catch (e) {} }
+    CV.text(ph.title, U.pad() + U.cw() / 2, y0 + h / 2,
+      { size: CV.FS.f2, bold: true, align: 'center', color: ph.color || CV.C.text });
+    } finally { CV.hitMode = prevMode; }
+  };
+
   CV.navbar = function () {
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
@@ -1319,10 +1579,23 @@
   };
   /* V9.6.90：加了时长参数（网页版 toast(msg, ms) 同款）——
      退款说明这类长句子 1.6 秒根本读不完。 */
+  /* ================= F6 #7（抢修单 0928 · toast 定时器互踩）=================
+     原来每个 toast 各起一个 setTimeout，超时回调**整段清空** CV.toasts ——
+     于是短 toast 的定时器会把后来那条长 toast 提前擦掉。
+     实测：toast(A,900) 之后 200ms 再 toast(B,3000) → t≈1.1s 时 toasts 已空，B 只活了 1 秒。
+     现在：句柄存下来、新的进来先 clearTimeout；超时回调里再比对一次"当前这条是不是我这一条"，
+     只清自己那条。 */
+  CV._toastTimer = null;
   CV.toast = function (msg, ms) {
-    CV.toasts = [{ msg, t: Date.now() }];
+    const mine = { msg, t: Date.now() };
+    CV.toasts = [mine];
+    if (CV._toastTimer) { clearTimeout(CV._toastTimer); CV._toastTimer = null; }
     CV.render();
-    setTimeout(() => { CV.toasts = []; CV.render(); }, ms || 1600);
+    CV._toastTimer = setTimeout(() => {
+      CV._toastTimer = null;
+      if (CV.toasts[0] !== mine) return;      // 期间又来了新的一条：这条已经不该清它了
+      CV.toasts = []; CV.render();
+    }, ms || 1600);
   };
 
   /* ---------- 触摸 ---------- */
@@ -1332,7 +1605,15 @@
   CV.bindTouch = function () {
     const toW = (e) => {
       const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
-      return { x: (t.clientX || t.pageX || 0) - Math.round((CV.pxW - CV.W) / 2), y: t.clientY || t.pageY || 0 };
+      /* ⚠️ V1.0.4 · R7（PC 鼠标 / 滚轮）：**两种坐标口径都要认** ——
+         触摸事件给的是 `clientX/pageX`，而 PC 的鼠标事件（`wx.onMouseDown/Move/Up`）
+         给的是 `{x, y}`（滚轮同）。只认前者的话，电脑上点得动才怪（
+         `wx-cap_audit` 里那条"鼠标点一下 ＝ 触摸点一下"就是钉它的）。
+         优先级 clientX → pageX → x：触摸那条路一个字没变。 */
+      return {
+        x: (t.clientX || t.pageX || t.x || 0) - Math.round((CV.pxW - CV.W) / 2),
+        y: (t.clientY || t.pageY || t.y || 0),
+      };
     };
     const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
     let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
@@ -1369,29 +1650,49 @@
        而引导在的时候 hitAt 只放行它自己那颗（队伍页放行的是 party_board 那块**没有动作**的锚点），
        于是长按拿到的是一块点不动的区域、CV.grabCfg.from() 返回 null → 抓不起来。
        玩家在引导里试拖 → 拖不动（父亲大人："还是拖拽不了"）。 */
-    const hitAt = (p, ignoreCoach) => {
+    /* ================= F6 #1（抢修单 0928 · 顶栏四颗货币胶囊被抢点）=================
+     扫描顺序 ＝ **层级优先**，不是"注册顺序倒着来"：
+       modal（弹窗自己那两颗） → screen（顶栏 / 底栏 / 吸顶条 / 二级页头） → content（页面正文）。
+     为什么必须分层：顶栏四颗胶囊在**内容之前**登记（`CV.topbar()` 在 render 里先画），
+     而内容层几百颗热区在后 —— 原来"从数组尾部往前扫、先中者赢"，
+     于是**已经滚出可视区**的内容热区只要矩形还压在顶栏那一条上，就永远赢顶栏。
+     实测（真代码 + 真触摸处理器，逐颗点顶栏）：home@scroll371 点「◉」派发成 `open_arena`、
+     keji@2754 点「♾」派发成 `keji_up:wudao`……684 次里 29 次被抢（约 4%）。
+     ⚠️ 不给顶栏单独开"更高优先级"的白名单 —— 那只是把同一个毛病换到别处长出来；
+        层级就是层级（弹窗 > 屏幕层 > 内容层），谁都不例外。
+     同一层内部仍然"后画的先中"（数组从尾往前），与改前一致；V9.6.108 那条
+     "没有处理器的锚点区域退成兜底"照旧（它只在整个三层都扫完、没有处理器可派发时才生效）。 */
+    const hitLayer = (h) => (h.modal ? 2 : (h.screen ? 1 : 0));
+    const scanHit = (p, ignoreCoach) => {
       const ly = CV.localY(p.y);
       const overlayOnly = !!(G.U && G.U.overlay);
       let fallback = null;          // 没有处理器的锚点区域 → 兜底候选
-      for (let i = CV.hits.length - 1; i >= 0; i--) {
-        const h = CV.hits[i];
-        /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
-        if (overlayOnly && !h.modal) continue;
-        /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
-        if (!ignoreCoach && G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
-        const wy = h.screen ? p.y : ly;
-        if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
-        /* V9.6.108（父亲大人："队伍上阵又上不了了，其他东西也都点不了了"）：
-           **优先给"有处理器"的热区**。没有处理器的是给引导当锚点的整块区域
-           （队伍阵型 party_board、六维卡 attr_card、关卡格 stage_grid…），
-           它们盖在真按钮上面，以前会把点击全吃掉 ——
-           实测：点队伍空位，派发的却是 party_board（没有处理器）→ 什么都不发生 → 上不了阵。
-           现在这类区域退成兜底：只有底下确实没有别的可点时才轮到它（那时点它＝关掉引导）。 */
-        if (!hitHasHandler(h)) { if (!fallback) fallback = h; continue; }
-        return h;
+      for (let L = 2; L >= 0; L--) {
+        for (let i = CV.hits.length - 1; i >= 0; i--) {
+          const h = CV.hits[i];
+          if (hitLayer(h) !== L) continue;
+          /* F6 #12：屏外卡的"幽灵热区"（只由量那一遍登记）不参与命中 ——
+             它们是引导的锚点，不是可点的东西（坐标本来就在可视窗口之外）。 */
+          if (h.ghost) continue;
+          /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
+          if (overlayOnly && !h.modal) continue;
+          /* 引导是**真模态**：只放行引导自己要的那两颗，其余热区一律不吃（V9.6.45） */
+          if (!ignoreCoach && G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
+          const wy = h.screen ? p.y : ly;
+          if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
+          /* V9.6.108（父亲大人："队伍上阵又上不了了，其他东西也都点不了了"）：
+             **优先给"有处理器"的热区**。没有处理器的是给引导当锚点的整块区域
+             （队伍阵型 party_board、六维卡 attr_card、关卡格 stage_grid…），
+             它们盖在真按钮上面，以前会把点击全吃掉 ——
+             实测：点队伍空位，派发的却是 party_board（没有处理器）→ 什么都不发生 → 上不了阵。
+             现在这类区域退成兜底：只有底下确实没有别的可点时才轮到它（那时点它＝关掉引导）。 */
+          if (!hitHasHandler(h)) { if (!fallback) fallback = h; continue; }
+          return h;
+        }
       }
       return fallback;
     };
+    const hitAt = (p, ignoreCoach) => scanHit(p, ignoreCoach);
     /* V9.6.111：手指这一点压在哪一格"能拿起的那格"上？不是就 null。
        （长按抓起与"拿着东西点目标格"都要用它，口径和 hitAt 完全一致） */
     const grabSlotAt = (p) => {
@@ -1401,8 +1702,34 @@
       const idx = CV.grabCfg.from(h.id);
       return (idx === null || idx === undefined) ? null : idx;
     };
-    wx.onTouchStart((e) => {
+    /* ================= V1.0.4 · R7（父亲大人 09-27 点单：「PC 端鼠标 / 滚轮」）=================
+       手势只有**一套**：触摸、鼠标按下/移动/抬起，走的都是下面这三个函数。
+       为什么不是"给鼠标再写一遍"：这套手势里塞着长按抓起、引导模态、惯性、原生按钮的
+       `CV.dragging` 时序 —— 抄一份出来等于以后每改一处都得改两遍，迟早两边不一致。
+       PC 微信（基础库一侧）派的是 `wx.onMouseDown / onMouseMove / onMouseUp / onWheel`，
+       **手机上没有这几个事件**；老基础库没有这几个函数 → 注册整段跳过（`typeof` 试一下）。
+       注册点在 `CV.bindTouch()` 里（与触摸同一处，都由 game.js 在**读档之后**调用）。 */
+    const onDown = function (e) {
       const p = toW(e);
+      /* ================= V1.1.21（2026-09-28 · 父亲大人：「输入文字的时候得支持点击空白区域退出输入框，
+         现在输入框一直收不起来」）=================
+         小游戏没有 `<input>`，输入是借 `wx.showKeyboard` 起一个**系统键盘**；而它一旦起来，
+         画布照旧收得到触摸 —— 可原来**没有任何一处**会因为"点在空白处"把它收掉
+         （全项目 `hideKeyboard()` 零调用，`onKeyboardComplete` 也没人听）。
+         做法：输入态由输入口自己立 `CV.kbActive`（起名 / 改名的 `NameCheck.ask`、
+         市集数量、删档确认三处），这里在**手势最开头**判一次 —— 点在**没有任何热区**的地方
+         ＝"空白"（页面底、卡片之间的空隙），就收起键盘并**吞掉这一下**（不往下传，免得顺手点到别处）。
+         点在按钮上照旧走原来的路（键盘留着，等他自己收）。 */
+      if (CV.kbActive) {
+        let hit = null;
+        try { hit = CV.hitAt(p.x, p.y); } catch (e2) { hit = null; }
+        if (!hit) {
+          CV.kbActive = false;
+          try { if (G.wx && G.wx.hideKeyboard) G.wx.hideKeyboard({}); } catch (e3) {}
+          CV.pressed = null;
+          return;
+        }
+      }
       /* V1.1.x（2026-09-27 · 音频系统）：微信不许自动播放 —— BGM 只能等**玩家的第一次触摸**。
          这里就是"第一次触摸"的唯一收口（含首屏那一下：首屏也是玩家点的）。
          AUD.unlock() 内部有"只解锁一次"的闸，每次都调不会重启音乐。 */
@@ -1458,8 +1785,8 @@
           }, GRAB_MS);
         }
       }
-    });
-    wx.onTouchMove((e) => {
+    };
+    const onMove = function (e) {
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
@@ -1481,8 +1808,8 @@
       lastY = p.y; lastT = now;
       const next = Math.max(0, Math.min(CV.maxScroll || 0, startScroll - dy));
       if (next !== CV.scroll) { CV.scroll = next; drawSoon(); }
-    });
-    wx.onTouchEnd((e) => {
+    };
+    const onUp = function (e) {
       const p = toW(e);
       clearGrabTimer();
       CV.dragging = false;                    // 抬手＝这一次手势结束（原生组件这才允许重建）
@@ -1501,7 +1828,8 @@
           try { CV.grabCfg.drop(g.from, to); } catch (e3) {}
         } else if (!wasFresh && to === g.from) {
           CV.grab = null;                       // 再点一下自己＝放回原位（网页版同款）
-          CV.toast('已放回原位');
+          /* F7 ②（父亲大人点名的例子）：**删「已放回原位」** —— 手里那张当场回到原位、抓起态解除，
+             看得见。这里连 toast 这一行都不留（队伍页那颗「取消」按钮的同一句也删了，见 sc-party）。 */
         } else {
           g.over = null;                        // 落在空白处：手里还拿着，落点高亮收掉
         }
@@ -1528,38 +1856,70 @@
       /* 点击：内容区登记的是"内容坐标"，这里换算（− 顶栏 − 8 + 滚动）后再比 ——
          以前两边坐标系不同直接比，内容区所有按钮的判定都偏了一整条顶栏。 */
       if (CV.pressed) { CV.pressed = null; CV.render(); }
-      const ly = CV.localY(p.y);
-      const overlayOnly = !!(G.U && G.U.overlay);   // 确认弹窗打开时，底下的内容不吃点击
-      let fallback = null;
-      for (let i = CV.hits.length - 1; i >= 0; i--) {
-        const h = CV.hits[i];
-        /* 弹窗打开 = 真模态：只放行弹窗自己那两颗按钮，底栏/顶栏/吸顶条一律不吃（V9.6.95） */
-        if (overlayOnly && !h.modal) continue;
-        /* 引导在的时候，只认它自己那颗（V9.6.66）—— 与 hitAt 同一条规矩，
-           否则"按下没反应、抬手却真的跳页了"。 */
-        if (G.U && G.U.coachAllows && !G.U.coachAllows(h)) continue;
-        const wy = h.screen ? p.y : ly;
-        if (!(p.x >= h.x && p.x <= h.x + h.w && wy >= h.y && wy <= h.y + h.h)) continue;
-        /* V9.6.108：优先给有处理器的热区；锚点区域退成兜底（同 hitAt） */
-        if (!hitHasHandler(h)) { if (!fallback) fallback = h; continue; }
-        CV.dispatch(h.id); return;
-      }
-      if (fallback) CV.dispatch(fallback.id);      // 底下没有别的可点：点它＝关掉引导
-    });
+      /* 抬手派发与按下态走**同一个** scanHit —— "按下亮 A、抬手触发 B"这类毛病
+         就是两处各写一遍扫描逻辑造出来的（F6 #1：两处都要按层级优先）。 */
+      const hit = scanHit(p);
+      /* 没有命中的那颗时什么都不做；命中的是"没有处理器的锚点"（fallback）
+         时让它自己派发（那时点它＝关掉引导，见 hitAt 的兜底说明）。 */
+      if (hit) CV.dispatch(hit.id);
+    };
+    /* 滚轮（R7）：只改 `CV.scroll`，**夹取规则与拖动完全同源**（同一个 `CV.maxScroll`），
+       所以后面的拖动、惯性、边界都当它是"拖出来的位置"，不需要任何特判。
+       步长按事件自带的两种编码各认一份：像素（大值）按 1，行数（小值）按 30 估 ——
+       不这么做的话，行数编码的一格只能滚 3px，滚起来像卡住。 */
+    const WHEEL_LINE = 30;
+    const onWheel = function (e) {
+      if (CV.splashActive && CV.splashActive()) return;
+      if (coachLock || coachOn()) return;
+      const raw = Number(e && (e.deltaY !== undefined ? e.deltaY : e.deltaX)) || 0;
+      if (!raw) return;
+      const d = (Math.abs(raw) <= 10 ? raw * WHEEL_LINE : raw);
+      stopMomentum();
+      const next = Math.max(0, Math.min(CV.maxScroll || 0, (CV.scroll || 0) + d));
+      if (next !== CV.scroll) { CV.scroll = next; CV.render(); }
+    };
+    /* 触摸取消（V9.6.90）：来电、切前后台、系统手势打断时微信只发 onTouchCancel。
+       鼠标没有对应事件（PC 上"按下时把指针移出窗口"这类罕见情况由 onMouseUp 兜）。 */
+    const onCancel = function () {
+      /* 手里拿着东西时被打断（来电/切后台/系统手势）：这一下不算"放下"，
+         继续拿着，但**不能再算"刚抓起的那一次手势"**（否则下一次点按钮会被当成继续拖）。 */
+      if (CV.grab) CV.grab.fresh = false;
+      gestureGrab = false;
+      CV.dragging = false;                    // 被打断也当成"手势结束"（否则原生按钮会一直不重建）
+      CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
+    };
+    wx.onTouchStart(onDown);
+    wx.onTouchMove(onMove);
+    wx.onTouchEnd(onUp);
     /* V9.6.90（技能《weixin-game》§触摸事件）：**触摸取消也要接**。
        来电、切前后台、系统手势打断时微信只发 onTouchCancel 不发 onTouchEnd ——
        原来没接，于是"按下态"和"滑动惯性"会卡在那里：按钮一直是按下样子，
        或者松手后还继续自己滚。取消 = 这一下不算点击，只把状态清干净。 */
-    if (wx.onTouchCancel) {
-      wx.onTouchCancel(() => {
-        /* 手里拿着东西时被打断（来电/切后台/系统手势）：这一下不算"放下"，
-           继续拿着，但**不能再算"刚抓起的那一次手势"**（否则下一次点按钮会被当成继续拖）。 */
-        if (CV.grab) CV.grab.fresh = false;
-        gestureGrab = false;
-        CV.dragging = false;                    // 被打断也当成"手势结束"（否则原生按钮会一直不重建）
-        CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
-      });
+    if (wx.onTouchCancel) wx.onTouchCancel(onCancel);
+    /* PC 端（R7 · 父亲大人 09-27：「PC 微信里能点击与滚轮翻页」）：
+       · `onMouseDown/onMouseMove/onMouseUp` 直接复用上面那一套（含点击派发与拖动滚动）；
+       · 只有**按下期间**的 onMouseMove 才算拖动/滚动 —— 鼠标不用按钮在页面上划过不该滚；
+       · `onWheel` 见上面 onWheel。
+       ⚠️ 手机端这些函数不存在（或存在也不派事件）⇒ 手机行为一个字不变；
+          老基础库没有它们 ⇒ 整段跳过，绝不影响开机。 */
+    if (typeof wx.onMouseDown === 'function') {
+      let mouseHeld = false;
+      try {
+        wx.onMouseDown(function (e) { mouseHeld = true; onDown(e); });
+        if (typeof wx.onMouseMove === 'function') {
+          wx.onMouseMove(function (e) {
+            if (!mouseHeld) return;             // 没按着 = 只是划过，不滚页
+            /* 鼠标的"移动"在按住时就是拖：touch 那条路是靠 onTouchMove 自己来的，
+               这里补一下"指针已经离开按下点"的判定（绝对值与触摸同一条 8px 阈值）。 */
+            onMove(e);
+          });
+        }
+        if (typeof wx.onMouseUp === 'function') {
+          wx.onMouseUp(function (e) { if (!mouseHeld) return; mouseHeld = false; onUp(e); });
+        }
+      } catch (e) {}
     }
+    if (typeof wx.onWheel === 'function') { try { wx.onWheel(onWheel); } catch (e) {} }
   };
 
   G.CV = CV;

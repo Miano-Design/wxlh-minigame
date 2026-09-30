@@ -1,7 +1,7 @@
 /* 主角详情（角色页）—— 照网页版 js/ui.js 的 protagonistDetail 一段一段复刻
    ------------------------------------------------------------------------------
    网页版结构（V9.5.x）：
-     ① 头部卡：头像 56 + 名字 +「执灯者本人」+ Lv·血统 + 铭刻/六维待分 + 右侧战力
+     ① 头部卡：头像 56 + 名字 +「主角本人」+ Lv·血统 + 铭刻/六维待分 + 右侧战力
         （下面还有一条 EXP 进度条 + 「EXP x% · 当前挂机 y EXP/分」）
      ② 六维属性：标题右侧"可用点数"+ 重置；每维一行（名字/说明、已分配 N 点 → +M、+1/+10）
      ③ 技能：标题右侧"可用技能点"+ 重置；三个技能行（等级标签 + +1 + 说明）+ 被动
@@ -25,8 +25,15 @@
       ['暴击', pc(st.crit)], ['暴击伤害', '×' + G.fmtMul(st.critDmg || 2)], ['闪避', pc(st.eva)],
       ['汲取', pc(st.lifesteal)],
     ];
-    const red = Math.min(0.6, (st.resPct || 0) + (st.dmgReduce || 0));
-    rows.push(['减伤', pc(red)]);                                       // 网页版这一行永远在（0% 也显示）
+    /* ================= V1.1.21（2026-09-28 · F8「举一反三」类④ 唯一剩下的那条）=================
+       原来这一行是 `resPct + dmgReduce` 一起报成「减伤」—— **把两个不同的东西加在一起了**：
+         · `dmgReduce` 才是真减伤（battle.js 在受伤时乘它）；
+         · `resPct` 是**异常状态抗性**（引擎只在"命中异常状态"时掷它，见 battle.js 的 isDebuff 分支）。
+       于是玩家在主角面板看到的「减伤」比实际减伤**高一截**（带 resPct 的法宝/秘术最明显）。
+       策划总监 0928 R1 已定口径：**resPct 是异常抗性、不是减伤**（只改字，不把它接成真减伤）。
+       这里跟着把显示拆开：减伤只报 dmgReduce（0% 也显示，与网页版同）；异常抗性**有才单列一行**。 */
+    rows.push(['减伤', pc(Math.min(0.6, st.dmgReduce || 0))]);
+    if ((st.resPct || 0) > 0) rows.push(['异常抗性', pc(Math.min(0.6, st.resPct || 0))]);
     rows.push(['技能加成', '+' + Math.round(((st.skillMult || 1) - 1) * 100) + '%']);
     return rows;
   }
@@ -34,11 +41,9 @@
   CV.register('protag', function () {
     const S = Core.S;
     U.begin();
-    /* 返回条（二级页左上角，照网页版 .page-head） */
-    const bh = 40 * CV.SCALE;
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, bh, '‹', 'ghost', 'back_home');
-    CV.text(Core.charName('@player') + '（主角）', U.pad() + U.cw() / 2, U.y + bh / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += bh + CV.SP[2];
+    /* 返回条（二级页左上角，照网页版 .page-head）——**吸顶**（父亲大人 09-27 深夜：
+       「每一屏的标题和返回键都固定在顶部吧」）；原来那个 `bh` 常量由 U.pageHead 内部算。 */
+    U.pageHead(Core.charName('@player') + '（主角）', { backId: 'back_home' });
 
     const P = Core.protagonistSkills();
     const st = Core.effectivePlayerStats();
@@ -59,7 +64,7 @@
       const tx = U.ix() + asz + 12 * CV.SCALE;
       CV.text(Core.charName('@player'), tx, top + 14 * CV.SCALE, { size: CV.FS.f1, bold: true });
       const nw = CV.measure(Core.charName('@player'), CV.FS.f1, true);
-      const tag = '执灯者本人';
+      const tag = '主角本人';
       const tw = CV.measure(tag, CV.FS.sm) + 12 * CV.SCALE;
       CV.round(tx + nw + 8 * CV.SCALE, top + 6 * CV.SCALE, tw, 18 * CV.SCALE, CV.RADIUS_SM, null, CV.a(CV.C.gold, .4));
       CV.text(tag, tx + nw + 8 * CV.SCALE + tw / 2, top + 15 * CV.SCALE, { size: CV.FS.sm, color: CV.C.gold, align: 'center' });
@@ -82,6 +87,9 @@
       U.h3('🎯 六维属性', '可用点数 ' + (S.player.attrPoints || 0),
         { btn: { label: '↺ 重置', id: 'attr_reset', dis: spentAttr <= 0 } });
       const has = (S.player.attrPoints || 0) > 0;
+      /* F2-5：没点数时那两颗「+1 / +10」以前是**画着能点的假按钮**（点下去什么都不发生）——
+         现在走 `dis` 变灰，差什么这句话就写在这儿（标题右边那行「可用点数 0」也是同一个意思）。 */
+      if (!has) U.hint('没有可用点数：升级 / 主线奖励会给 —— 想重新分配就点右上角「↺ 重置」', 2 * CV.SCALE);
       D.ATTR_META.forEach(function (a) {
         const n = (S.player.attrs && S.player.attrs[a.id]) || 0;
         const top = U.y;
@@ -93,8 +101,8 @@
         U.listRow({ t1: a.name, t1sub: a.desc, t2: '已分配 ' + n + ' 点 → +' + n * D.ATTR_POINT_VALUE, rightW: 110 * CV.SCALE });
         const bw = 52 * CV.SCALE, bw2 = 58 * CV.SCALE, gap = 6 * CV.SCALE;   // .btn.small：min-width 2.75rem
         const by = top + (U.y - top) / 2 - 20 * CV.SCALE;
-        U.btn(U.ix() + U.iw() - bw - bw2 - gap, by, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', has ? 'attr:' + a.id + ':1' : '');
-        U.btn(U.ix() + U.iw() - bw2, by, bw2, U.BTN_SM * CV.SCALE, '+10', 'ghost', has ? 'attr:' + a.id + ':10' : '');
+        U.btn(U.ix() + U.iw() - bw - bw2 - gap, by, bw, U.BTN_SM * CV.SCALE, '+1', 'ghost', 'attr:' + a.id + ':1', !has);
+        U.btn(U.ix() + U.iw() - bw2, by, bw2, U.BTN_SM * CV.SCALE, '+10', 'ghost', 'attr:' + a.id + ':10', !has);
       });
     });
     /* V9.6.67（父亲大人：点开角色卡"顺便就介绍六维"）：整块六维卡登记一颗**没有动作**的锚点，
@@ -221,7 +229,13 @@
     });
     /* ⑧ 修改名字（网页版主角详情最后一张卡） */
     U.card(function () {
-      U.btnRow([{ label: '✏️ 修改名字', style: 'ghost', id: 'rename' }]);
+      /* V1.0.4 · V（父亲大人 09-27）：**能敲、也能换** ——
+         左「✏️ 输入新名字」= 调系统键盘敲（过机审才落盘）；
+         右「🎲 换一个」= 从名单里轮换（本地白名单，**不联网**，断网照用）。 */
+      U.btnRow([
+        { label: '✏️ 输入新名字', style: 'ghost', id: 'rename' },
+        { label: '🎲 换一个', style: 'ghost', id: 'rename_roll' },
+      ]);
     });
   });
 
@@ -236,7 +250,9 @@
     [1, 10].forEach(function (n) {
       CV.on('attr:' + a.id + ':' + n, function () {
         const r = Core.allocateAttr(a.id, n);
-        CV.toast(r.msg || '已加点');
+        /* F7 ②（父亲大人点名的例子「已加号」）：六维数字当场变（看得见 → 删成功语）；
+           失败（点数不够）留。 */
+        if (!r.ok) CV.toast(r.msg || '加不了');
         CV.render();
       });
     });
@@ -244,57 +260,115 @@
   CV.on('attr_reset', function () {
     U.confirm('六维洗点', '把已经分出去的属性点全部退回来重新分配？六维总值不会掉，只是重新点一次。', function () {
       const r = Core.resetAttrs();
-      CV.toast(r.msg || '已重置');
+      /* F7 ②：洗点后六维当场回到基础值（看得见 → 删）；失败（没点可洗）留。 */
+      if (!r.ok) CV.toast(r.msg || '洗不了');
       CV.render();
     });
   });
   [0, 1, 2].forEach(function (i) {
     CV.on('pskill:' + i, function () {
       const r = Core.allocateSkill(i);
-      CV.toast(r.msg || '已升级');
+      /* F7 ②：技能等级当场变（看得见 → 删）；失败（技能点不够）留。 */
+      if (!r.ok) CV.toast(r.msg || '点不了');
       CV.render();
     });
   });
   CV.on('pskill_reset', function () {
     U.confirm('技能重置', '把投进去的技能点全部退回，技能回到 Lv.0 重新点？点数一点不少。', function () {
       const r = Core.resetSkills();
-      CV.toast(r.msg || '已重置');
+      /* F7 ②：同上（技能当场回 Lv.0）。 */
+      if (!r.ok) CV.toast(r.msg || '洗不了');
       CV.render();
     });
   });
   CV.on('pblup', function () {
     const r = Core.upgradePlayerBloodline();
-    CV.toast(r.msg || '已升级');
+    /* F7 ②：命格等级当场变（看得见 → 删）；材料不足这类失败留。 */
+    if (!r.ok) CV.toast(r.msg || '升不了');
     CV.render();
   });
   Object.keys(D.BLOODLINES).forEach(function (id) {
     CV.on('pbl:' + id, function () {
       const r = Core.choosePlayerBloodline(id);
-      CV.toast(r.msg || '已觉醒');
+      /* F7 ②：觉醒后命格区整块换掉（看得见 → 删）；失败留。 */
+      if (!r.ok) CV.toast(r.msg || '觉不了');
       CV.render();
     });
   });
   Object.keys(D.EQUIP_SLOTS).forEach(function (slot) {
     CV.on('punequip:' + slot, function () {
       Core.unequipItem('@player', slot);
-      CV.toast('已卸下');
+      /* F7 ②：卸下后那一格当场空出来（看得见 → 删）。 */
       CV.render();
     });
   });
+  /* ================= V1.0.4 · V（父亲大人 09-27：「自由命名可以接入 api 不……」）=================
+     这一处是当年**第三处漏网**（V1.0.1 提审前靠 `grep showKeyboard` 数出来的）：前两处堵了、
+     改名还在自由输入。当时的处置是"只能从灯阁名册里换"。
+     现在两样都给：🎲 那条是**老路原样保留**（白名单、不联网），✏️ 那条走 **机审闸**
+     （`G.NameCheck` → 云函数 `checkname`，过审才落盘）。
+     ⚠️ 改名**必须联网**：这台设备没云能力时给"联网后再改"的说法，**不许假装成功**。 */
+  let renameDraft = '';
+  function renameDialog() {
+    /* V1.0.4 · V2（父亲大人 09-27：「起名窗口不用有那么多小字注释」）：
+       弹窗只留 **标题 ＋ 输入格 ＋ 确定/取消** —— 正文与小字注释都撤了（长度写在输入格的提示语里）。
+       原来那句"会先送到微信内容安全那边审一下"属于解释性说明，现在**挪到该说话的时候再说**：
+       真审不过说"这个名字过不了"，我们这头不通说"改名暂时用不了"（见 js/sc-namecheck.js 顶部）。 */
+    U.confirm('改名字',
+      '',
+      /* 确定 → 机审 → 落盘；不过就不落盘，弹窗留着让他再改（与删档那套一个脾气）。 */
+      function () {
+        const nm = renameDraft;
+        G.NameCheck.submit(nm, function (r) {
+          if (!r.ok) {
+            /* **两类话分开**（康康 09-27 复核）：
+                 · 他的名字有问题（本地筛 / 命中敏感）→ 弹窗留着，让他接着改；
+                 · 我们这头不通（无云 / 接口失败 / 超时）→ **关掉弹窗**、指回名单那条路，
+                   而且**不许说成"你的名字没过审"**（父亲大人实测时正是被这句骗到，以为微信什么名字都不让起）。 */
+            if (r.why === '敏感' || r.why === '本地') { CV.toast(r.msg); renameDialog(); return; }
+            U.overlay = null;
+            CV.toast(G.NameCheck.MSG_DOWN_RENAME);
+            CV.render();
+            return;
+          }
+          const ok = Core.setPlayerName(r.name || nm);
+          /* F7 ②：改完名字在页面上就写着（看得见 → 删成功语）；"这个名字没通过"留。 */
+          if (!ok) CV.toast('这个名字没通过，换一个试试');
+          CV.render();
+        });
+      },
+      {
+        inputBox: { value: renameDraft, placeholder: '点这里输入新名字' },
+        inputId: 'rename_input',
+        okLabel: '用这个名字',
+      });
+  }
+  CV.on('rename_input', function () {
+    G.NameCheck.ask(renameDraft, function (text, err) {
+      if (err) { CV.toast(err); return; }
+      const l = G.NameCheck.local(text);
+      if (!l.ok) { CV.toast(l.msg); return; }
+      renameDraft = l.name;
+      renameDialog();
+    });
+  });
   CV.on('rename', function () {
-    /* V1.0.1（2026-09-23 · 平台 UGC 违规警告 · P0）
-       ────────────────────────────────────────────────────────────────
-       这里原来是**第三处漏网**：小游戏的主角改名还在用 wx.showKeyboard 自由输入。
-       康康提审前体检时用 `grep showKeyboard` 数出来的 —— 前两处（起名页 sc-start.js、
-       新建主角 sc-last.js）当时都堵了，**这一处漏了**。
-       现在改成与另外两处同一规矩：**只能从灯阁名册里换**，点一下换下一个，不再有键盘。
-       ⚠️ 别再改回 showKeyboard —— 平台 5.18.2 点的就是【可任意输入敏感违规内容、无安全过滤】，
-          现在这个项目**一个自由输入口都不该有**（改名前请先 grep showKeyboard 与 <input> 确认）。 */
+    if (!G.NameCheck.available()) {
+      /* 我们这头不通（连云能力都没有）：**不说"你的名字怎么样"**，直接指回名单那条路。 */
+      CV.toast(G.NameCheck.MSG_DOWN_RENAME);
+      return;
+    }
+    renameDraft = Core.isListName(Core.S.player.name) ? '' : Core.S.player.name;
+    renameDialog();
+  });
+  /* 老路（一个字都没改口径）：只能从灯阁名册里换，点一下换下一个，不联网。 */
+  CV.on('rename_roll', function () {
     const names = D.PROTAG_NAMES;
     let idx = Math.max(0, names.indexOf(Core.S.player.name));
     idx = (idx + 1) % names.length;
     const r = Core.setPlayerName(names[idx]);
-    CV.toast(r === false ? '这个名字不合规，再点一次' : ('已换为「' + names[idx] + '」'));
+    /* F7 ②：换名后名字当场变（看得见 → 删成功语）；"这个名字不合规"留。 */
+    if (r === false) CV.toast('这个名字不合规，再点一次');
     CV.render();
   });
   CV.on('autoeq_player', function () {

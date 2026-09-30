@@ -1,0 +1,9 @@
+{
+  "name": "checkname",
+  "version": "1.0.0",
+  "description": "自由命名机审：小游戏专用内容安全接口（wxa.game.contentSpam.msgSecCheck），只回 ok/why",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

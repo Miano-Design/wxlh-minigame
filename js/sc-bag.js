@@ -27,6 +27,12 @@
      照网页版做成选择模式：点格子选中 → 底栏显示"已选 N 件 · 预计 ◆ X" → 分解。 */
   let batchMode = false;
   const batchSel = new Set();
+  /* F2-6（抢修单 0928R3）：上一次画背包用的是**哪一层页面对象**（`CV.top()` 的引用）。
+     换页（reset / push / switchTab）每次都新建一层 → 判定为"进页第一帧"，把**模式类**
+     状态复位；同一层原地重画（CV.render）还是同一个引用 → 状态保留（批量挑选不能丢）。
+     真因（探针复现）：批量分解开着的时候从结算页点「📮 待领箱 · 去领回」进来
+     （`goto_stash` → `CV.reset('bag')`），以前会**直接落在批量分解模式**、底下挂着那条分解条。 */
+  let bagLevel = null;
   /* 装备页的两行分类（照网页版 equipFilterBar 的 .pill-tabs.tight）。
      V9.6.8（父亲大人）：分类保留，但去掉「普通」和「SSR+」——
      "普通"跟"全部"几乎重合；"SSR+"原来挂在部位那行末尾，七个部位 + 它挤到第三行、孤零零一个。 */
@@ -76,7 +82,12 @@
     });
     U.y = top + rows.length * h + (rows.length - 1) * gap + 6 * CV.SCALE;
   }
-  /* .eq-bar：左边「未穿戴 x / y 格」，右边「🧹 批量分解」（开了批量就换成一行状态文字） */
+  /* .eq-bar：左边「未穿戴 x / y 格」，右边「🧹 批量分解」
+     ================= F9 ①（父亲大人 09-29 ·「装备界面的标签和批量分解也固定在顶部吧」）=================
+     这一行原来是正文、跟着滚走；现在与上面两行筛选一起**吸顶**（见 eqControls / CV.sticky）。
+     批量分解模式下右端原来写「批量分解中 · 点格子挑选」，现在改成**选中状态**
+     （「已选 N 件 · 预计 ◆ X」）—— 父亲大人点名的就是这一条要钉在顶上看得见；
+     底栏那条批量条因此**不再重复画同一句**（分解 / 取消那两颗照旧贴底）。 */
   function eqBarRow() {
     const S = Core.S;
     const worn = new Set();
@@ -89,13 +100,27 @@
     const h = 34 * CV.SCALE, top = U.y;
     CV.text('未穿戴 ' + used + ' / ' + cap + ' 格', U.pad(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim });
     if (batchMode) {
-      CV.text('批量分解中 · 点格子挑选', U.pad() + U.cw(), top + h / 2, { size: CV.FS.xs, color: CV.C.dim, align: 'right' });
+      const txt = '已选 ' + batchSel.size + ' 件 · 预计 ◆ ' + fmt(batchGain());
+      CV.text(CV.fit(txt, U.cw() - 110 * CV.SCALE, CV.FS.xs, true), U.pad() + U.cw(), top + h / 2,
+        { size: CV.FS.xs, color: CV.C.gold, align: 'right', bold: true });
     } else {
       const lbl = '批量分解';
       const bw = CV.measure(lbl, CV.FS.sm) + 20 * CV.SCALE;
       U.btn(U.pad() + U.cw() - bw, top, bw, h, lbl, 'ghost', 'bag_batch');
     }
     U.y = top + h + 8 * CV.SCALE;
+  }
+  /* ================= F9 ① · 装备页那三行 = 一处定义 =================
+     分类筛选 / 部位筛选 / 「未穿戴 x / y 格 · 批量分解」——**只在这里排一次**：
+       · 正文那一遍只**量高度**（`U.dry`，见 register('bag')），量出来的那几条热区打 ghost；
+       · 真正落笔在 `CV.sticky` 那一趟按**屏幕坐标**画（与背包三大标签同一条路，不另起一套）。
+     返回这三行占的总高（含各自的下留白）。 */
+  function eqControls() {
+    const top = U.y;
+    pillRow(EQ_CATS, eqCat, 'ecat:');
+    pillRow(EQ_SLOTS, eqSlot, 'efilter:');
+    eqBarRow();
+    return U.y - top;
   }
   /* 一行「左文字 + 右按钮」（和 sc-last 的 coreRow 同一套写法；各文件各留一份，不跨文件依赖） */
   function listBtn(o) {
@@ -138,10 +163,11 @@
       x += bw + 6 * CV.SCALE;
     });
     U.btn(x, ry, 54 * CV.SCALE, bh, '清空', 'ghost', 'bclear');
-    /* 第二行：已选 / 预计收益 + 分解 / 取消 */
+    /* 第二行：分解 / 取消。
+       F9 ①：「已选 N 件 · 预计 ◆ X」这一句搬去了**顶部吸顶那一条**（eqBarRow）——
+         同一屏里写两遍就是"同一件事写两份"，而且父亲大人要的正是"滚到中间也看得见已选几件"。 */
     const ry2 = ry + bh + 8 * CV.SCALE;
-    CV.text(CV.fit('已选 ' + batchSel.size + ' 件 · 预计 ◆ ' + fmt(batchGain()), CV.W - pad * 2 - 180 * CV.SCALE, CV.FS.md),
-      pad + 12 * CV.SCALE, ry2 + bh / 2, { size: CV.FS.md });
+    CV.text('点格子挑选', pad + 12 * CV.SCALE, ry2 + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
     const b2 = 76 * CV.SCALE, g2 = 8 * CV.SCALE;
     U.btn(CV.W - pad - b2 * 2 - g2 - 12 * CV.SCALE, ry2, b2, bh, '⚡ 分解', 'primary', 'bgo');
     U.btn(CV.W - pad - b2 - 12 * CV.SCALE, ry2, b2, bh, '取消', 'ghost', 'bclose');
@@ -328,23 +354,63 @@
 
   /* ---------- 背包页 ---------- */
   CV.register('bag', function () {
+    const lvl = CV.top();
+    if (bagLevel !== lvl) {
+      bagLevel = lvl;
+      batchMode = false; batchSel.clear();     // 只复位"模式类"状态；分类 / 部位筛选（看哪一栏）不动
+    }
     const S = Core.S;
     U.begin();
     /* 三大标签吸顶：内容先让出它的高度，标签本身在 CV.sticky 那一趟按屏幕坐标画 */
     tabCards();
+    /* ================= F9 ①（父亲大人 09-29）=================
+       「装备界面的标签和批量分解也固定在顶部吧」—— 装备页那三行（分类筛选 / 部位筛选 /
+       「未穿戴 x / y 格 · 批量分解」）原来跟着内容滚走，现在并进同一条吸顶路（`CV.sticky`）：
+       正文这一遍**只量高度、不落笔**，让出的高度由 U.y 推进。
+       量高度那一遍走 `U.dry`（`CV.text` / `CV.round` 不画），但它顺手登记的几条热区
+       打成 `ghost`（与 `U.card` 处理"屏外卡只量没画"同一条口径：留在 CV.hits 里当锚点、
+       不参与派发与撞测）—— 真正生效的那几条由 sticky 那一趟按屏幕坐标登记。 */
+    let eqH = 0;
+    if (view === 'equip') {
+      const hitFrom = CV.hits.length, prevDry = U.dry, prevY = U.y;
+      U.dry = true; eqH = eqControls(); U.dry = prevDry;
+      for (let i = hitFrom; i < CV.hits.length; i++) CV.hits[i].ghost = true;
+      /* ================= 康康 2026-09-29 修 · 装备页"空出一大块"的真根因 =================
+         父亲大人截图问「为啥现在装备页空出来这么多」——量出来正文多让了约 110px（390）：
+         `eqControls()` 是**排布**函数，它内部跑一遍就已经把 `U.y` 推了 `eqH`；
+         这里原来又写 `U.y += eqH` ⇒ **同一段高度被算了两次**，正文被推到吸顶板底下再往下 110px，
+         中间那一截就是那块空白（320 上同样存在）。
+         正确写法：从**进函数之前**的 y 起算，再加一条**呼吸带** —— 这样正文起点与
+         `CV.sticky` 铺底的下沿**逐像素对齐**（`panelBottom = TOP + TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + HEAD_GAP`，
+         `contentStart = TOP + 8 + (32 + TAB_TOP_GAP + TAB_SAFE_GAP − 8) + eqH + HEAD_GAP`，两式相等）。
+         做坏试验：把这里改回 `U.y += eqH` → 真渲染上「未穿戴」行与格子卡之间会当场出现 ~110px 空白
+         （`_probe_bag_gap.js` 的像素带断言＋`验收截图-0929I/out-bagtop/` 那张图当场变样）。 */
+      U.y = prevY + eqH + (CV.HEAD_GAP || 0);
+    }
     CV.sticky = function () {
+      /* F6 #11：整段都在屏幕坐标里画，中间任何一处抛错都不许把 hitMode / U.y 留在半路。 */
+      const prevMode = CV.hitMode, prevY = U.y;
       CV.hitMode = 'screen';
-      /* 吸顶条要盖住从下面滚上来的内容，所以得铺一层底；但**不能用平色** ——
-         页面是竖向渐变，平色会显出一条接缝（父亲大人说的"边框"）。
-         这里把**和页面完全同一条渐变**重画一遍、只填这一条带：
-         颜色逐像素对上，等于没画底，却又能挡住内容。 */
-      const h = 32 * CV.SCALE;    // 标签行高（和 drawTabCards / 占位一致）
-      const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
-      bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
-      CV.ctx.fillStyle = bgGrad;
-      CV.ctx.fillRect(0, CV.TOP, CV.W, TAB_TOP_GAP + h + TAB_SAFE_GAP);
-      drawTabCards(CV.TOP + TAB_TOP_GAP);
-      CV.hitMode = 'content';
+      try {
+        /* 吸顶条要盖住从下面滚上来的内容，所以得铺一层底；但**不能用平色** ——
+           页面是竖向渐变，平色会显出一条接缝（父亲大人说的"边框"）。
+           这里把**和页面完全同一条渐变**重画一遍、只填这一条带：
+           颜色逐像素对上，等于没画底，却又能挡住内容。
+           F9 ①：这条带的高度跟着装备页那三行一起长；下沿再往下多铺一条呼吸带
+           （`CV.HEAD_GAP`）—— 正文从它下面滚上来时不贴在最后一行的下沿
+           （F8 ② 那条 R3-a1，inset_audit 盯着）。 */
+        const h = 32 * CV.SCALE;    // 标签行高（和 drawTabCards / 占位一致）
+        const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
+        bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+        CV.ctx.fillStyle = bgGrad;
+        CV.ctx.fillRect(0, CV.TOP, CV.W,
+          TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + (CV.HEAD_GAP || 0));
+        drawTabCards(CV.TOP + TAB_TOP_GAP);
+        /* 装备页那三行紧贴在标签下面（筛选在上、批量分解条紧贴其下 —— 派单给的顺序）。
+           U.y 在这里临时当**屏幕坐标**用：这三行本来就只读 U.y 做纵向推进，
+           折行 / 宽度全部自己按 U.iw() 算，换算过去一字不用改。 */
+        if (eqH) { U.y = CV.TOP + TAB_TOP_GAP + h + TAB_SAFE_GAP; eqControls(); }
+      } finally { CV.hitMode = prevMode; U.y = prevY; }
     };
     stashBar();
     const pool = POOLS[view];
@@ -356,12 +422,8 @@
     /* 装备页：两行分类（套装 / 部位）+ 一行「未穿戴 x / y 格 · 批量分解」
        —— V9.6.8（父亲大人）：小游戏的装备页原来**没有这些分类标签**（网页版有），
        而且「🧹 批量分解」原来挤在格子卡的标题行里、贴着卡片上沿。现在照网页版
-       拆成独立一行，跟分类同一层、上下留白一致。 */
-    if (view === 'equip') {
-      pillRow(EQ_CATS, eqCat, 'ecat:');
-      pillRow(EQ_SLOTS, eqSlot, 'efilter:');
-      eqBarRow();
-    }
+       拆成独立一行，跟分类同一层、上下留白一致。
+       F9 ①：这三行已经搬进吸顶层 —— 正文这里**不再画**，高度上面的 `U.y += eqH` 已经让出来了。 */
     const cost = D.bagExpandCost(S.bag[pool.expKey] || 0);
     const cells = [];
     let used = 0;
@@ -482,29 +544,44 @@
     const actFirst = firstScreen < 520 * CV.SCALE;
     /* 动作行（各类型一套，照网页版）——窄屏要提前画，所以提成一个函数 */
     const actionRow = function () {
+      /* ================= F2-5（抢修单 0928R3）=================
+         这一排（盒 / 经验 / 血清 / 材料 / 券 六型共 9 颗）原来写的是
+         `id: n >= 1 ? 'box:1' : ''` —— **没给 `dis`**，`U.btn` 只在 `id && !dis` 时登记热区，
+         于是"什么都没有"的时候按钮照常画成能点的样子、点下去既没反应也没提示（真死键）。
+         现在：**id 照留 ＋ 用 `dis` 进禁用态**（变灰 + 不登记热区），
+         并把"差什么"用一行小字写在旁边（正确写法见 sc-roster.js / sc-lines.js 那几处）。 */
       if (it.type === 'box') {
+        const can1 = n >= 1;
         U.btnRow([
-          { label: '开 1 个', style: 'ghost', id: n >= 1 ? 'box:1' : '' },
-          { label: '开 10 个', style: 'ghost', id: n >= 2 ? 'box:10' : '' },
-          { label: '全部开（' + n + '）', style: 'gold', id: n >= 1 ? 'box:0' : '' },
+          { label: '开 1 个', style: 'ghost', id: 'box:1', dis: !can1 },
+          { label: '开 10 个', style: 'ghost', id: 'box:10', dis: n < 2 },
+          { label: '全部开（' + n + '）', style: 'gold', id: 'box:0', dis: !can1 },
         ]);
+        if (!can1) U.hint('一个都没有，开不了 —— 从哪来见下面「去哪弄」', 2 * CV.SCALE);
+        else if (n < 2) U.hint('只剩 ' + n + ' 个，凑不够 10 个', 2 * CV.SCALE);
         return true;
       } else if (it.type === 'exp') {
+        const can1 = n >= 1;
         U.btnRow([
-          { label: '用 1 个', style: 'ghost', id: n >= 1 ? 'exp:1' : '' },
-          { label: '用 10 个', style: 'ghost', id: n >= 10 ? 'exp:10' : '' },
-          { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'exp:0' : '' },
+          { label: '用 1 个', style: 'ghost', id: 'exp:1', dis: !can1 },
+          { label: '用 10 个', style: 'ghost', id: 'exp:10', dis: n < 10 },
+          { label: '全部用（' + n + '）', style: 'gold', id: 'exp:0', dis: !can1 },
         ]);
+        if (!can1) U.hint('一个都没有，用不了 —— 从哪来见下面「去哪弄」', 2 * CV.SCALE);
+        else if (n < 10) U.hint('只剩 ' + n + ' 个，凑不够 10 个', 2 * CV.SCALE);
         return true;
       } else if (it.type === 'serum') {
         /* V9.6.7 自审抓到：血清以前**只有"炼"没有"喂"** —— 炼化台能做出来，
            道具卡上却一个动作按钮都没有（说明里还写着"点这张卡选伙伴喂下"）。
            补齐网页版那三个按钮 → 「使用血清」选人页。 */
+        const can1 = n >= 1;
         U.btnRow([
-          { label: '用 1 支', style: 'ghost', id: n >= 1 ? 'serum:1' : '' },
-          { label: '用 10 支', style: 'ghost', id: n >= 10 ? 'serum:10' : '' },
-          { label: '全部用（' + n + '）', style: 'gold', id: n >= 1 ? 'serum:0' : '' },
+          { label: '用 1 支', style: 'ghost', id: 'serum:1', dis: !can1 },
+          { label: '用 10 支', style: 'ghost', id: 'serum:10', dis: n < 10 },
+          { label: '全部用（' + n + '）', style: 'gold', id: 'serum:0', dis: !can1 },
         ]);
+        if (!can1) U.hint('一支都没有 —— 先到「炼化台」炼一支（配方在上面那张卡里）', 2 * CV.SCALE);
+        else if (n < 10) U.hint('只剩 ' + n + ' 支，凑不够 10 支', 2 * CV.SCALE);
         return true;
       } else if (it.type === 'ticket') {
         const pool = D.RECRUIT_POOLS[it.pool] || {};
@@ -515,14 +592,13 @@
       return false;                        // 材料没有动作（强化时自动消耗），不进"动作优先"这一条
     };
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'back_bag');
-    CV.text('道具详情', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    /* 父亲大人 09-27 深夜（派单 Z-B）：标题 + 返回**吸顶**，长页面滚到哪儿都点得到返回 */
+    U.pageHead('道具详情', { backId: 'back_bag' });
     U.card(function () {
       const top = U.y;
-      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true,
+      CV.text(it.name || curItem, U.ix(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true,
         color: it.rarity ? rarColor(it.rarity) : CV.C.text });
-      CV.text('×' + n, U.ix() + U.iw(), top + 10 * CV.SCALE, { size: CV.FS.f1 * CV.SCALE, bold: true, color: CV.C.gold, align: 'right' });
+      CV.text('×' + n, U.ix() + U.iw(), top + 10 * CV.SCALE, { size: CV.FS.f1, bold: true, color: CV.C.gold, align: 'right' });
       U.y = top + 26 * CV.SCALE;
       /* V1.1.9（续13 · 乙组）：道具 / 材料也要**看得出稀有**（父亲大人："像装备那样分稀有度展示"）。
          写法与色阶跟装备详情（本文件 eqdetail 里的 `U.kv('品质', …)`）**同一套**：
@@ -555,9 +631,7 @@
     const S = Core.S;
     const eq = S.equips[eqUid];
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'eq_back');
-    CV.text('装备详情', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('装备详情', { backId: 'eq_back' });     // 同上：吸顶（父亲大人 09-27 深夜）
     if (!eq) { U.card(function () { U.h3('装备详情'); U.hint('这件装备不在了', 4 * CV.SCALE); }); return; }
     const q = Core.enhanceQuote(eqUid);
     const est = Core.equipStats(eq);
@@ -675,9 +749,9 @@
       const canKind = rq.kindable && !rq.locked;
       U.btnRow([
         { label: rq.locked ? '🔒 先解锁再重铸' : ('🔨 重摇数值（石×' + cA.stoneN + '）'),
-          style: 'ghost', id: rq.locked ? 'noop' : 'eq_reforge', dis: rq.locked },
+          style: 'ghost', id: rq.locked ? '' : 'eq_reforge', dis: rq.locked },
         { label: (canKind ? '🎲 重抽词条（石×' + cC.stoneN + '）' : (rq.kindable ? '🎲 重抽词条（先解锁）' : '🎲 专属不可重抽')),
-          style: 'gold', id: canKind ? 'eq_reforge_kind' : 'noop', dis: !canKind },
+          style: 'gold', id: canKind ? 'eq_reforge_kind' : '', dis: !canKind },
       ]);
     });
     /* V9.6.15（父亲大人："装备的套装属性好像都没写，就算没激活也得用灰字写出来几件能激活什么"）：
@@ -741,7 +815,10 @@
       U.h3('强化', '+' + eq.enhance + '/20');
       U.kv('强化材料', q.matHave ? (q.itemName + ' ×1（现有 ' + q.matOwned + '）') : ('无' + q.itemName + ' → 用 ◉ ' + fmt(q.substitute) + ' 代用'));
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '强化（◉ ' + fmt(q.points) + ' + ◆ ' + q.otherworld + ' · ' + Math.round(q.rate * 100) + '%）', style: 'ghost', id: q.maxed ? '' : 'eq_enh' }]);
+      /* F2-5：+20 之后原来还写着「强化（◉10600 + ◆10 · 25%）」、还是一颗能点的样子
+         —— 现在满级走 `dis`（变灰 + 不登记热区），并把"封顶了"这句话写在这行小字里。 */
+      U.btnRow([{ label: q.maxed ? '强化（已满级）' : ('强化（◉ ' + fmt(q.points) + ' + ◆ ' + q.otherworld + ' · ' + Math.round(q.rate * 100) + '%）'), style: 'ghost', id: 'eq_enh', dis: !!q.maxed }]);
+      if (q.maxed) U.hint('已经 +20 封顶，不能再强化了（想再涨就换一件更高品质的）', 2 * CV.SCALE);
     });
     /* V1.1.8 那张独立的「🔨 重铸副词条」卡**已并进属性卡**（V1.1.12 · 父亲大人：
        "重铸的按钮离属性太远了，我每次重铸都得滑回去看哪里变了"）—— 逻辑不变：
@@ -751,8 +828,11 @@
       U.h3('操作');
       U.btnRow([
         { label: eq.lock ? '🔒 已锁定' : '🔓 锁定保护', style: eq.lock ? 'primary' : 'ghost', id: 'eq_lock' },
-        { label: '分解（◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3) + '）', style: 'ghost', id: eq.lock ? '' : 'eq_decomp' },
+        { label: '分解（◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3) + '）', style: 'ghost', id: 'eq_decomp', dis: !!eq.lock },
       ]);
+      /* F2-5：锁着的装备那颗「分解」以前是一颗画着能点、点了没反应的假按钮 ——
+         现在走 `dis` 变灰，并把"差什么"（先解锁）写在这儿。 */
+      if (eq.lock) U.hint('这件已锁定（锁＝别动它）：先点上面的「🔓 锁定保护」解锁，才能分解', 2 * CV.SCALE);
       /* V9.6.7 自审：伙伴身上的装备只能进详情、**没法卸下来**（主角那边才有「卸下」）。
          网页版两边都有，这里补上 —— 只有真穿在谁身上时才出现。 */
       if (wearer) {
@@ -765,12 +845,14 @@
     const r = Core.enhance(eqUid);
     /* 强化成功 / 失败：两种完全不同的音色（"叮" vs "嗡嗡"）—— 不看字也听得出成没成 */
     snd(r.ok ? 'enhanceOk' : 'enhanceFail');
-    CV.toast(r.msg || (r.ok ? '强化成功' : '强化失败'));
+    /* F7 ②：成功后卡片上"强化 +N"当场就变（看得见 → 删）；失败必须说（不够 / 失败率 / 已满）。
+       声音不变：成没成照样听得出来。 */
+    if (!r.ok) CV.toast(r.msg || '强化失败');
     CV.render();
   });
   CV.on('eq_lock', function () {
-    const r = Core.toggleEquipLock(eqUid);
-    CV.toast(r.lock ? '🔒 已锁定这件装备' : '🔓 已解锁');
+    /* F7 ②：锁定状态就在那颗按钮上写着（🔒 已锁定 / 🔓 锁定保护）＋列表里名字前带 🔒 —— 看得见，删 toast。 */
+    Core.toggleEquipLock(eqUid);
     CV.render();
   });
   /* ================= V1.1.15（2026-09-27 · 父亲大人："重铸数值/词条都不用有弹窗了，直接替换就行了"）
@@ -804,7 +886,8 @@
     const eq = Core.S.equips[eqUid];
     U.confirm('分解装备', '确定分解「' + eq.name + ' +' + eq.enhance + '」？将获得 ◆ ' + (D.DECOMPOSE_GAIN[eq.rarity] + eq.enhance * 3), function () {
       const r = Core.decompose(eqUid);
-      CV.toast(r.ok ? '分解成功，获得 ◆ ' + r.gain : (r.msg || '分解失败'));
+      /* F7 ②：保留"得了多少 ◆"（一次性奖励、别处看不到），去掉"分解成功"四个字。 */
+      CV.toast(r.ok ? ('◆ +' + fmt(r.gain)) : (r.msg || '分解失败'));
       CV.pop();
     });
   });
@@ -813,7 +896,7 @@
     const who = Object.keys(S.equipped).find(function (cid) { return Object.values(S.equipped[cid] || {}).indexOf(eqUid) >= 0; });
     if (!who) { CV.toast('这件装备没穿在身上'); return; }
     Core.unequipItem(who, (S.equips[eqUid] || {}).slot);
-    CV.toast('已卸下');
+    /* F7 ②：卸下后装备栏当场空出来（看得见 → 删 toast）。 */
     CV.render();
   });
 
@@ -844,7 +927,8 @@
     const label = { equip: '装备', mat: '背包', item: '背包' }[k];
     U.confirm('扩容', '是否支付 ◉ ' + fmt(cost) + '，把' + label + '格再加 ' + D.BAG_EXPAND_SIZE + ' 格？', function () {
       const r = Core.buyBagCap(k === 'equip' ? 'eq' : k);
-      CV.toast(r.msg || '已扩容');
+      /* F7 ②：扩容成功＝格子数当场变大（看得见 → 删）；失败要把"点数不足（需 ◉ N）"说出来。 */
+      if (!r.ok) CV.toast(r.msg || '扩不了');
       CV.render();
     });
   }
@@ -882,13 +966,17 @@
       const r = Core.openBoxes(curItem, cnt);
       /* 开箱：一声"咔"（开 10 个 / 全部开也只响一声 —— 这是"打开了"的反馈，不是每件一个音） */
       snd(r && r.ok === false ? 'error' : 'open');
-      CV.toast(r.msg || '已开启');
+      /* F7 ②：开箱"开出什么"是**一次性奖励**（别处看不到）→ 留；成功但没话可说＝纯确认 → 删。 */
+      if (r && r.msg) CV.toast(r.msg);
+      else if (!r || !r.ok) CV.toast('这次什么都没开出来');
       if ((Core.S.items[curItem] || 0) <= 0) CV.pop(); else CV.render();
     });
     CV.on('exp:' + v, function () {
       const cnt = v === 0 ? (Core.S.items[curItem] || 0) : v;
       const r = Core.useExpItem(curItem, cnt);
-      CV.toast(r.msg || '已使用');
+      /* F7 ②：成功那句是"+12,000 伙伴经验（×10）"（一次性奖励的**数额**，别处看不到）→ 留；
+         纯确认（成功又没话说）删掉。 */
+      if (r && r.msg) CV.toast(r.msg);
       if ((Core.S.items[curItem] || 0) <= 0) CV.pop(); else CV.render();
     });
   });
@@ -942,8 +1030,7 @@
        参数缺失就优雅退场，别照着上一局画。 */
     if (!it.serum) {
       U.begin();
-      U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
-      U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+      U.pageHead('使用精华', { backId: 'serum_back' });   // 吸顶（父亲大人 09-27 深夜）
       U.hint('这支精华的数据不在了（可能刚换过存档）—— 回背包重新点一次就好。', 0);
       return;
     }
@@ -952,16 +1039,22 @@
     const have = S.items[curItem] || 0;
     const cnt = Math.max(1, Math.min(serumCount || 1, have));
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'serum_back');
-    /* 命格专属精华：这一屏走本命格的灯色 + 标题右端挂印记（与网页版同源） */
+    /* 命格专属精华：这一屏走本命格的灯色 + 标题右端挂印记（与网页版同源）。
+       V1.1.17（父亲大人 09-27 深夜）：标题与返回**吸顶** —— 印记挂在标题右端（屏幕坐标）。 */
     const serumLamp = sd.bloodline ? CV.blLamp(sd.bloodline, Core.realmState().realm) : null;
-    CV.text('使用精华', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center', color: serumLamp || CV.C.text });
-    if (serumLamp) U.draw(function () { CV.blGlyph(sd.bloodline, U.pad() + U.cw() - 8 * CV.SCALE, U.y + U.BTN_SM * CV.SCALE / 2, 14 * CV.SCALE, serumLamp); });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('使用精华', { backId: 'serum_back', color: serumLamp || null,
+      right: serumLamp ? function (x, y, h) {
+        const prevMode = CV.hitMode;            // 框架整段是 screen 模式，这里只许还回去
+        CV.hitMode = 'screen';
+        U.draw(function () { CV.blGlyph(sd.bloodline, U.pad() + U.cw() - 8 * CV.SCALE, y + h / 2, 14 * CV.SCALE, serumLamp); });
+        CV.hitMode = prevMode;
+      } : null });
     U.note('选择要吃「' + (it.name || '') + ' ×' + cnt + '」的伙伴 —— 永久生效', 0);
     U.space(CV.SP[2]);
     /* 候选：主角 + 已拥有的伙伴，血统对得上才列出来 */
-    const rows = [{ id: '@player', name: (S.player.name || '主角'), sub: '主角 · ' + (S.player.bloodline || '未觉醒命格'), bl: S.player.bloodline || null }];
+    /* V1.0.4 · V：这一行原来直接读 `S.player.name`（第二份来源）—— 统一走 `Core.charName('@player')`，
+       以后真做榜单时，"显示出来的名字"只有一个口子，过没过审也在那一个口子上判。 */
+    const rows = [{ id: '@player', name: Core.charName('@player'), sub: '主角 · ' + (S.player.bloodline || '未觉醒命格'), bl: S.player.bloodline || null }];
     Object.keys(S.chars).forEach(function (id) {
       const ch = D.charById[id];
       if (!ch) return;
@@ -997,9 +1090,22 @@
     });
   });
   CV.on('serumtarget:*', function (id) {
-    const r = Core.useSerum(id, String(curItem).replace(/^serum_/, ''), serumCount);
-    CV.toast(r.msg || (r.ok ? '已喂下' : '不能喂'));
-    CV.render();
+    /* F2-7（抢修单 0928R3 · 不可逆补二次确认）：精华是**永久喂掉**的（一人一种有上限，
+       喂错了拿不回来）—— 以前点一下直接生效。数量与上限都用当前页面的那几个变量现算。 */
+    const it = D.ITEMS[curItem] || {};
+    const sid = String(curItem).replace(/^serum_/, '');
+    const have = Core.S.items[curItem] || 0;
+    const n = Math.max(1, Math.min(serumCount || 1, have));
+    const taken = ((Core.S.serums || {})[id] || {})[sid] || 0;
+    const max = (((D.serumById || {})[sid] || it.serum || {}).max) || 0;
+    U.confirm('喂下精华', '把「' + (it.name || curItem) + '」×' + n + ' 喂给 ' + Core.charName(id)
+      + '：永久生效、拿不回来（他这种精华 ' + taken + ' → ' + Math.min(max, taken + n) + ' / ' + max + '）。确定吗？',
+    function () {
+      const r = Core.useSerum(id, sid, serumCount);
+      /* F7 ②：成功那句带"永久 +X%"（喂下去的**效果**，别处看不到）→ 留；失败原样留。 */
+      CV.toast(r.msg || '不能喂');
+      CV.render();
+    }, { okLabel: '喂下' });
   });
   CV.on('serum_back', function () { CV.pop(); });
 
@@ -1033,10 +1139,18 @@
     const cur = (S.equipped[cid] || {})[slot];
     const curEq = cur && S.equips[cur];
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'equip_pick_back');
-    CV.text('选择' + (D.EQUIP_SLOTS[slot] || '') + '（' + Core.charName(cid) + '）', U.pad() + U.cw() / 2,
-      U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    /* F2-7（抢修单 0928R3）：这一页没有"参数不在了就优雅退场"的兜底 ——
+       冷渲染 / 换档之后 `Core.charName(null)` 会把标题画成**「选择（null）」**。
+       同类几页（血清 / 装备详情 / 精华…）都有这道兜底，照它们补一份。
+       ⚠️ `Core.charName(null)` 本身回吐 null 是逻辑层的事（js/core.js 不在本单可改范围，
+          归 F1 那单），这里先把**页面**挡住。 */
+    if (!cid || !slot) {
+      U.pageHead('选择装备', { backId: 'equip_pick_back' });
+      U.hint('这一页要知道「给谁换哪个部位」—— 信息不在了（可能刚换过存档），回上一页重新点一次就好。', 0);
+      return;
+    }
+    /* 吸顶（父亲大人 09-27 深夜）：标题 + 返回固定，正文从下面滚过去 */
+    U.pageHead('选择' + (D.EQUIP_SLOTS[slot] || '') + '（' + Core.charName(cid) + '）', { backId: 'equip_pick_back' });
     U.note(curEq ? ('当前：' + curEq.name + ' +' + curEq.enhance + ' · 下面是换成这件之后的属性变化')
       : '该部位还没有装备，装上即为净收益', 0);
     U.space(CV.SP[2]);
@@ -1079,7 +1193,10 @@
   CV.on('eqwear:*', function (uid) {
     const from = Core.equipWearer(uid);
     const ok = Core.equipItem(pickChar, uid);
-    CV.toast(ok ? (from && from !== pickChar ? ('已装备（从 ' + Core.charName(from) + ' 身上取下）') : '已装备') : '该伙伴无法穿戴此装备');
+    /* F7 ②：单纯"已装备"删（穿上后这位的装备格当场变）；但**从别人身上摘下来**这件事
+       在伙伴详情页上看不到 —— 那句留。失败照旧留。 */
+    if (!ok) CV.toast('该伙伴无法穿戴此装备');
+    else if (from && from !== pickChar) CV.toast('已装备（从 ' + Core.charName(from) + ' 身上取下）');
     CV.render();
   });
   CV.on('equip_pick_back', function () { CV.pop(); });

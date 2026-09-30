@@ -17,24 +17,10 @@
     return mq.length > 0 && mq.every(function (x) { return x.claimed; });
   }
 
-  /* ================= V1.1.18（N3 · 留存环第二格）=================
-     "今天还能做什么"的**唯一一份**清单：主页那条汇总条与它点开的只读弹窗
-     共用这一个函数 —— 否则两处各拼一遍，下次加一条日常就会只改一处。
-     数据全部来自已有的只读函数（`todayState` / `bountyState` / `gardenState`），
-     这里**不自己算第二遍**，也不碰任何存档（只读）。 */
-  function todayTodoList(Core2, TD2, bountyReady, gardenReady) {
-    const out = [];
-    if (TD2 && TD2.idleReady) out.push('挂机收益');
-    if (bountyReady) out.push('悬赏 ' + bountyReady);
-    if (TD2 && TD2.dailyClaimable) out.push('任务 ' + TD2.dailyClaimable);
-    if (TD2 && TD2.weeklyClaimable) out.push('周常 ' + TD2.weeklyClaimable);
-    if (TD2 && TD2.signReady) out.push('点灯');
-    if (TD2 && TD2.freeRecruitReady) out.push('免费招募');
-    if (gardenReady) out.push('药园 ' + gardenReady);
-    if (TD2 && TD2.achClaimable) out.push('成就 ' + TD2.achClaimable);
-    if (TD2 && TD2.codexClaimable) out.push('图鉴 ' + TD2.codexClaimable);
-    return out;
-  }
+  /* ================= V1.1.18（N3 · 留存环第二格）—— **已撤**（康康 09-29）=================
+     `todayTodoList()` 原来是"今天还能做什么"的唯一一份清单（主页那条汇总条 ＋ 它点开的只读弹窗共用）。
+     父亲大人 09-29：「主页还是像原来那样，**只是把那一行胶囊去掉了，不要了**」⇒ 函数、卡片、弹窗一起删。
+     要恢复去 `git show HEAD:js/sc-home.js` 取（连同那条 `CV.on('open_today', …)` 一起）。 */
 
   /* ---------- 首次操作引导（网页版 coachmark 的画布版）----------
      V9.6.30：集中一处按页面查表，挂在 cv.js 渲染完之后（那时 CV.hits 已经齐了）。
@@ -64,9 +50,10 @@
     { key: 'tut_blk2', page: 'home', target: 'grid:grow',
       /* V1.1.5（A2）：这一排现在**按常用度从高到低**排（药园 / 斗法台 / 队伍…最前，转生天赋最后），
          文案跟着说清"顺序的意思"，不然玩家会以为还是随手排的。 */
-      text: '② 养成区：养成线都在这排格子里，**按常用度从高到低**排 —— 药园、斗法台、队伍…排在最前面的每天都要回来点，越靠后越少动。前期不用全点，缺什么补什么。' },
+      text: '② 养成区：养成线都在这排格子里，按常用度从高到低排 —— 药园、斗法台、队伍…排在最前面的每天都要回来点，越靠后越少动。前期不用全点，缺什么补什么。' },
     { key: 'tut_blk3', page: 'home', target: 'grid:daily',
-      /* V1.1.5（A1）：悬赏并进「任务」页了，这一排只剩 5 格 —— 文案不能再说"限时悬赏"单独一格。 */
+      /* 康康 09-29：F9 改过的那一版（讲"今日那条 ＋ 日常任务那颗门"）**已随主页还原一起退回**，
+         现在这一句回到"五格摊在主页"的真实样子（`git show HEAD:js/sc-home.js` 逐字相同）。 */
       text: '③ 日常区：每天该做的事 —— 任务（悬赏＋每日＋周常并成一页，页头能一键领取）、点灯、招募、市集、成就。 有红点的就是"有东西可领"，别让它亮着。' },
     { key: 'tut_blk4', page: 'home', enter: true,
       /* 锚点与文案**按当前进度算**（V1.1.5 · A3 的"兜底"）：
@@ -82,7 +69,9 @@
   /* V9.6.69：首页那一行"还没解锁：…"点开要能看到"怎么解锁" —— 这里存一份当前未解锁的条目 */
   let lockedEntries = [];
   /* V9.6.69（资料 §7）：红点收敛 —— 一组里最多亮 2 个，多出来的收进标题的「+N」。
-     满屏红点＝没有红点：到处都亮，玩家反而看不出该先干哪件。 */
+     满屏红点＝没有红点：到处都亮，玩家反而看不出该先干哪件。
+     ⚠️ 康康 09-29：F9 把「日常」五格撤掉时这个函数被一起删了，现在五格回来了 —— **原样搬回**
+        （与 `git show HEAD:js/sc-home.js` 逐字相同），别再删第二次。 */
   function trimDots(list) {
     let shown = 0, hidden = 0;
     const out = list.map(function (x) {
@@ -213,7 +202,7 @@
     /* V9.6.112：锚点改成**下一关**（打完第 1 关就指第 2 关），文案也跟着说"接着打"。
        以前写死 stage:0：玩家刚打完第 1 关，出来又看见一条指着第 1 关的引导。 */
     q02:  { page: 'world',   s: function () { return [nextStageAnchor('W01'), 'stage_grid']; },
-            t: '接着往下打 —— 打完一关会自动解锁下一关，结算页右下角直接给你「下一关」。' },
+            t: '接着往下打 —— 打完一关会自动解锁下一关，结算页里那颗「› 下一关」直接接着打。' },
     /* V9.6.69：q04「并肩作战」原来没有专门一条（只在开场讲过招募/队伍）——
        父亲大人指的"第 5 步高亮只亮一小块"就是这一步。现在给它一条：锚点用**整块阵型区**
        （party_board，两排五格），而不是某个格子或"前排"两个字。 */
@@ -271,11 +260,11 @@
     q_arena:   { page: 'arena',     s: ['arena_fight'],    t: '斗法台：每天 5 次，赢了升一台拿 ◆ 异界结晶，输了退一台。' },
     q_mount:   { page: 'mount',     s: ['mount_buy:*'],    t: '坐骑：花 ◉ 点数驯服一匹，「乘骑」它给全队加属性。' },
     q_realm:   { page: 'realm',     s: ['realm_try'],      t: '境界渡劫：攒够材料就突破一小阶，全属性永久上涨；失败只扣材料、等级不掉。' },
-    q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：重置等级与世界进度换永久天赋点（条件逐次抬高，第 1 次 Lv.100 + 铭刻 2 阶 + 灯芯 Lv.20）。' },
+    q_reincarn:{ page: 'reincarn',  s: ['do_reincarn'],    t: '转生：只重置等级换永久天赋点；残域进度与深井层数都保留（条件逐次抬高，第 1 次 Lv.100 + 铭刻 2 阶 + 灯芯 Lv.20）。' },
     /* V9.6.75（父亲大人："你安排"）：再补两条每天都会碰的系统 —— 挂机分工 / 限时悬赏 */
     /* V9.6.112：派领队要有"没上阵的伙伴"才登记按钮 —— 手上只有一名伙伴、还上了阵的玩家，
        这一页一个按钮都没有（引导只能退成一张讲不清的卡片）。文案里把这条出路写上。 */
-    q_idle:    { page: 'idlelines', s: ['pickleader:*'],   t: '挂机分工：4 条产线各派 1 名领队（看领队**对应那一维**，不是战力）；没派领队的产线不产出。没有可派的伙伴就先回首页去招募。' },
+    q_idle:    { page: 'idlelines', s: ['pickleader:*'],   t: '挂机分工：4 条产线各派 1 名领队（看领队对应那一维，不是战力）；没派领队的产线不产出。没有可派的伙伴就先回首页去招募。' },
     q_bounty:  { page: 'bounty',    s: ['bounty_claim:*'], t: '限时悬赏：达成后手动领奖，到点作废 —— 别让它白白过期。' },
     /* 伴生体在潜影窟第 3 关解锁，灯录随收集推进 —— 都放在这个位置 */
     q_beast:   { page: 'beast',     s: ['beast_hatch1'],   t: '伴生体：用兽魂石孵化，孵出来带上场给全队加属性。' },
@@ -287,7 +276,7 @@
             t: '这一关打完就通关整个潜影窟了 —— 点第 12 关（守关 Boss）。' },
     q15:  { page: 'world', s: function () { return [nextStageAnchor('W03'), 'stage_grid']; },
             t: '最后这个世界「怨声旧宅」的守关 Boss —— 点第 12 关。打之前先把挂机收益收掉、装备拉满。' },
-    q13:  { page: 'protag',  s: ['pblup'], t: '命格升级消耗异界结晶 + 点数 —— 这是中期最猛的成长线，每级全属性都涨。' },
+    q13:  { page: 'protag',  s: ['pblup'], t: '命格升级消耗异界结晶 + 点数 —— 这是中期涨得最多的一条养成线（每升一级，你这支命格的两个属性一起涨）。' },
   };
   /* V9.6.99（"点去完成把我送到别的界面、弹窗内容还不对"）：
      每一步该去哪一页、指哪一颗，**这张表就是唯一出处**。
@@ -317,25 +306,25 @@
     ['world', function () { return [nextStageAnchor('W01')]; },
       '点这一关就直接开打 —— 一关是一口气打到底的，打完最后一波才算过关。', 'tut_q01b'],
     ['recruit', ['pull1:normal', 'pull1:normal:free'], '每天有免费的招募次数，先用掉 —— 免费抽也计入主线。', TOPIC_KEY.recruit],
-    ['protag', ['pblup'], '命格升级消耗异界结晶 + 点数，是中期最猛的成长线。', TOPIC_KEY.bloodline],
+    ['protag', ['pblup'], '命格升级消耗异界结晶 + 点数，是中期涨得最多的一条养成线。', TOPIC_KEY.bloodline],
     /* V9.6.51（复审查出：这 9 个模块页"解锁时只讲一句、进去后没人讲"）——
        每条都是"进这一页 + 这一课没讲过"才播，锚点是那颗**主操作按钮**（前缀锚点支持动态 id）。 */
     ['keji',     ['keji_up:*'],       '秘术阁：42 条长线，每条点一下按 ◆ 异界结晶升级、立刻生效 —— 前期挑两条主修的堆。'],
-    ['fabao',    ['fabao_buy:*'],     '法宝：花 ◉ 点数买，「带上」一个。它给的是**效果**（汲取 / 开场能量 / 减伤），不是数值。'],
-    ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性；养成线里最省事的一条。'],
+    ['fabao',    ['fabao_buy:*'],     '法宝：花 ◉ 点数买，「带上」一个。它给的是效果（汲取 / 开场能量 / 减伤），不是数值。'],
+    ['mount',    ['mount_buy:*'],     '坐骑：驯服后带上，给全队加属性（伙伴也吃）；不用给每个人各练一遍。'],
     ['garden',   ['garden_plant:*'],  '药园：空地上种，过一段时间回来收 —— 不收就一直长着，别忘了。'],
     ['arena',    ['arena_fight'],     '斗法台：每天 5 次机会，赢了升一台拿 ◆ 异界结晶，输了退一台（次数照常消耗，不会卡死在第 1 台）。'],
-    ['sign',     ['sign_draw'],       '点灯：每天免费点一次，灯焰给**当天**的挂机加成 + 一点硬通货。'],
-    ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼精华，精华喂给伙伴是**永久**加成（每人每种有上限）。'],
+    ['sign',     ['sign_draw'],       '点灯：每天免费点一次，灯焰给当天的挂机加成 + 一点硬通货。'],
+    ['refine',   ['craft:*'],         '炼化台：强化材料 + 点数炼精华，精华喂给伙伴是永久加成（每人每种有上限）。'],
     ['bounty',   ['bounty_claim:*'],  '限时悬赏：到点作废、达成才有奖励；四条全部结束后可以开新一期。'],
-    ['idlelines',['pickleader:*'],    '挂机分工：4 条产线各派 1 名领队，领队战力越高产出越高；没派领队的产线不产出。'],
+    ['idlelines',['pickleader:*'],    '挂机分工：4 条产线各派 1 名领队（看领队对应那一维，不是战力）；没派领队的产线不产出。'],
     /* 这四条是"看数值/被动成长"的页，没有单一主按钮 —— 锚点留空（引擎会自动退成"点一下继续"），
        但话必须说清"花什么、涨什么、多久涨"，不然玩家进来只会看到一屏数字。 */
-    ['authority', [], '灯阁权限：花 ✦ 圣洁晶石 + ◆ 结晶升，给的全是**倍率** —— 挂机产出、离线上限、离线效率、每日扫荡次数。'],
-    ['sect',      [], '灯阁评级：**打关卡自动涨**，每级全队全属性 +0.5% —— 不用手动点，所以别在这页找按钮。'],
-    ['realm',     [], '境界渡劫：每突破一小阶**全属性永久上涨**，36 阶走满合计 +50.4%。渡劫入口在这张卡下面的按钮。'],
+    ['authority', [], '灯阁权限：花 ✦ 圣洁晶石 + ◆ 异界结晶升，给的全是倍率 —— 挂机产出、离线上限、离线效率、每日扫荡次数。'],
+    ['sect',      [], '灯阁评级：打关卡自动涨，每级全队全属性 +0.5% —— 不用手动点，所以别在这页找按钮。'],
+    ['realm',     [], '境界渡劫：每突破一小阶全属性永久上涨，36 阶走满合计 +50.4%。渡劫入口在这张卡下面的按钮。'],
     ['codex',     [], '灯录：收集伙伴解锁里程碑奖励，收满了就回来领。'],
-    ['roster',    [], '执灯者：上阵的排前面（带红色角标），点卡片看详情 —— 等级、星级、命格、装备都在里面。'],
+    ['roster',    [], '伙伴：上阵的排前面（带红色角标），点卡片看详情 —— 等级、星级、命格、装备都在里面。'],
     ['char',      ['lv1'], '伙伴详情：升级 / 升星 / 命格升级 / 装备全在这一页；最下面是属性面板和队伍操作（从队伍点进来才有）。'],
     /* V9.6.112（父亲大人："上阵也得上两个"）：**两步的流程，第二步也要有人说话**。
        上阵 = 点空格 → 进挑人页 → 点一个伙伴；强化 = 点一件装备 → 进装备详情 → 点「强化」。
@@ -438,7 +427,7 @@
     bloodline:{ page: 'protag',   s: ['pblup'], t: '命格解锁了：升级消耗异界结晶 + 点数，每级全属性都涨。' },
     geneLock: { page: 'genelock', s: ['gl_unlock'], t: '铭刻解锁了：一条条点满，每条都是永久加成 —— 花的是异界结晶。' },
     beast:    { page: 'beast',    s: ['beast_hatch1', 'beast_hatch10'], t: '伴生体解锁了：花蛋孵出来能带上场，给全队加属性。' },
-    reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：重置等级和世界进度换永久天赋点 —— 中后期的主力成长线。' },
+    reincarn: { page: 'reincarn', s: ['do_reincarn'], t: '转生解锁了：只重置等级换永久天赋点；残域进度与深井层数都保留 —— 中后期的主力成长线。' },
   };
   /* V9.6.62（父亲大人拍板第 3 条：解锁弹窗"时机要准，不能影响体验"）—— 三道闸：
        ① 不在战斗中（战斗是整屏接管，弹层会打断节奏）；
@@ -498,9 +487,7 @@
   /* 未解锁一览：名字 + **怎么解锁**（对应网页版「🔒 还没解锁的功能」弹窗） */
   CV.register('locked', function () {
     U.begin();
-    U.btn(U.pad(), U.y, 44 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
-    CV.text('还没解锁的功能', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('还没解锁的功能');    // 标题 + 返回吸顶（父亲大人 09-27 深夜 · 派单 Z-B）
     if (!lockedEntries.length) { U.hint('该解锁的都解锁了。', 4 * CV.SCALE); return; }
     U.card(function () {
       U.h3('🔒 一共 ' + lockedEntries.length + ' 项', '解锁条件都写在下面');
@@ -630,10 +617,12 @@
     const keji = D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0);
     const bLv = Object.values(S.buildings).reduce((a, b) => a + b, 0);
     const arena = Core.arenaState(), signSt = Core.signState();
-    /* V9.5.68（父亲大人）：主页格子里**啥小字都不要，只留功能名**——
+    /* V9.5.68（父亲大人）：主页格子里**啥小字都不要，只留功能名** ——
        小游戏这边原来照"状态小字"画了「1 人上阵 / Lv.0 / 0 级 / 第 1 台·剩 5 次 …」一屏小字，
        和网页版已经不一样了。现在按网页版的 growBlock / dailyBlock 逐条对齐：
-       只有功能名；"有东西可领"用红点（悬赏可领 / 任务可领 / 成就有奖励 / 今天还没求签 / 免费抽可用）。 */
+       只有功能名；"有东西可领"用红点（悬赏可领 / 任务可领 / 成就有奖励 / 今天还没求签 / 免费抽可用）。
+       ⚠️ 这五张红点表**是跟着「日常」那五格走的**：F9 把那五格撤掉时它们也一起被撤了，
+          现在五格回来了，它们必须一起回来（不然"今天还有东西没领"在主页上完全看不见）。 */
     const achDot = Core.achievementSummary().list.filter((x) => x.done && !x.claimed).length > 0;
     const signReady = !!signSt.canDraw;
     const today = Core.todayState ? Core.todayState() : null;
@@ -643,6 +632,7 @@
        三个来源都是"真的能领"的函数，与一键领取同源。 */
     const taskDot = bountyDot || !!(today && (today.dailyClaimable + today.weeklyClaimable > 0));
     const freeDot = Core.isUnlocked('recruit') && (Core.freeState('normal').ready || Core.freeState('advanced').ready);
+    const DOT_OF = { open_tasks: taskDot, open_sign: signReady, open_recruit: freeDot, open_ach: achDot };
     /* ---------- 两块顺序：**从逻辑层那张表读**（V1.1.5 · A2）----------
        父亲大人：「养成和日常你整理一下顺序，从常用到不常用重新排下序」。
        表在 `data.js` 的 `HOME_GROUPS`（组名 ＋ 成员顺序 ＋ 每条常用度分，判据写在表头注释里），
@@ -652,8 +642,8 @@
     const groupOf = (id) => GROUPS.filter(function (g) { return g.id === id; })[0] || { name: id, members: [] };
     const asTiles = (g) => g.members.map(function (m) { return [m.id, m.name, null, m.unlock || null]; });
     const growGroup = groupOf('grow');
-    const dailyGroup = groupOf('daily');
     const growAll = asTiles(growGroup);
+    const dailyGroup = groupOf('daily');
     U.sectionTitle(growGroup.name || '养成');
     U.tiles(growAll.filter((x) => !x[3] || Core.isUnlocked(x[3])), 3, 'grid:grow');
     lockedEntries = growAll.filter((x) => x[3] && !Core.isUnlocked(x[3]));
@@ -666,7 +656,16 @@
       const h = U.hint('还没解锁：' + locked.join(' / ') + '  ›', 0);
       CV.hit('open_locked', U.ix() - 2, U.y - h, U.iw() + 4, h);
     }
-    /* 日常（网页版 .grid-title「日常」+ 六格；红点与"真的能领"同源） */
+    /* 日常（网页版 .grid-title「日常」+ 五格；红点与"真的能领"同源）
+       ================= 康康 2026-09-29 · **还原**（F9 ② 试过的那套已被父亲大人否掉）=================
+       他拿着自己划过的图说：「**主页还是像原来那样，只是把那一行胶囊去掉了，不要了**」。
+       所以这一块＝**原来那块一个字不改地回来**：「日常」小标题 ＋ 它下面那五格
+       （任务 / 点灯 / 招募伙伴 / 市集 / 成就）＋ 红点收敛（最多亮 2 个、多的进「+N」胶囊）；
+       唯一删掉的是 N3 那条「今日 · …」只读汇总（图 1 上被划掉的那条，见上面那段注释）。
+       ⚠️ 别再动这里：F9 那次"撤标题＋五格、改成一条「日常任务 › 门」"他明确说了"没对"。
+       ⚠️ `grid:daily` 这个引导锚点由 `U.tiles(...)` 自己登记（整块无动作区域）——
+          开场链第 ③ 步（tut_blk3）就锚在它上面，**锚点必须没有动作**，否则一点就跳页/弹窗、
+          把整条开场链堵死（`coachFor` 见弹窗就整条不登记）。 */
     U.space(CV.SP[2]);
     /* 网页版 .grid-title 的 margin 是 `var(--sp3) 2px var(--sp2)`：上 14 / 下 **10**。
        以前只推进了行高、没有下边距，标题跟下面那排卡片贴在一起了（父亲大人截图点出来的）。 */
@@ -679,7 +678,6 @@
        · 「任务」那一格现在是**三源合一**（悬赏可领 ＋ 每日可领 ＋ 周常可领）——
          悬赏并进任务页之后，红点只挂在悬赏那一格的话，玩家就再也看不到"有悬赏能领"了
          （《定调与口径》§3.3 末条点名的那个坑）。 */
-    const DOT_OF = { open_tasks: taskDot, open_sign: signReady, open_recruit: freeDot, open_ach: achDot };
     const dailyList = trimDots(dailyGroup.members
       .map(function (m) { return [m.id, m.name, null, m.unlock || null, !!DOT_OF[m.id]]; })
       .filter((x) => !x[3] || Core.isUnlocked(x[3])));
@@ -695,34 +693,6 @@
       CV.round(chipX, dailyTitleY - chipH / 2, chipW, chipH, CV.PILL, null, CV.a(CV.C.gold, .45));
       CV.text(txt, chipX + chipW / 2, dailyTitleY, { size: CV.FS.tag, color: CV.C.gold, align: 'center' });
     }
-    /* ================= V1.1.18（N3 · 留存环第二格：把"今天还能做什么"汇总成一条）===
-       父亲大人拍板「把留存环做了」；策划总监 N 单的 N3：主页现在只有 2 个红点 ＋ 一个「+N」，
-       玩家想知道"到底还剩什么"得一格一格翻。这里在「日常」标题下加**一条可点的汇总**，
-       点开是一个**只读**清单。
-       ⚠️ 这不是"把红点全亮回去"（那会推翻已定过的降噪决策）：**红点照旧收敛**，
-         这里只是给红点加一个"汇总出口"；也**不新增页面、不新增红点**。
-       数据全部来自**已有的只读函数**（`todayState` / `bountyState` / `gardenState`），
-       这里一个数都不自己算第二遍（同一件事写两份就是下次不一致的种子）。 */
-    const TD = Core.todayState ? Core.todayState() : null;
-    const bountyReady = Core.bountyState ? Core.bountyState().claimable : 0;
-    const gardenReady = (Core.gardenState ? Core.gardenState() : [])
-      .filter(function (p) { return p && p.ready; }).length;
-    const todayTodo = todayTodoList(Core, TD, bountyReady, gardenReady);
-    U.card(function () {
-      const h = 30 * CV.SCALE, top = U.y, cy = top + h / 2;
-      const arrow = '›';
-      const aW = CV.measure(arrow, CV.FS.md) + 2 * CV.SCALE;
-      const head = todayTodo.length ? ('今日 · ' + todayTodo.join(' · ')) : '今日 · 日常都做完了';
-      CV.text(CV.fit(head, U.iw() - aW, CV.FS.md), U.ix(), cy,
-        { size: CV.FS.md, color: todayTodo.length ? CV.C.gold : CV.C.dim });
-      CV.text(arrow, U.ix() + U.iw(), cy, { size: CV.FS.md, color: CV.C.dim, align: 'right' });
-      /* `U.card` 会先把内容体跑一遍**只量高度**（那一遍 `U.dry = true`，`CV.text` 自己会跳过）——
-         热区必须跟着跳过，否则同一颗按钮会被登记两次（量高的那一遍位置还差了几像素）。
-         与 `sc-start.js` 那一处同一个写法。 */
-      if (!U.dry) CV.hit('open_today', U.pad(), top, U.cw(), h);
-      U.y = top + h;
-    }, { padY: 2 });
-    U.space(CV.SP[0]);
     U.tiles(dailyList.list, 3, 'grid:daily');
     /* V9.6.7：这一行「全部养成线的总览在「执灯者 → 成长」。」网页版**没有** ——
        父亲大人的规矩是"主页只留功能名，非必要的注释都不要"，删掉。 */
@@ -848,8 +818,10 @@
         const leftN = AD.left ? AD.left('idle_boost') : 0;
         U.space(CV.SP[1]);
         U.btnRow([{
-          label: '📺 看广告 · 加速 2 小时（今日还剩 ' + leftN + ' 次）',
-          style: 'ghost', id: leftN > 0 ? 'ad_idle_boost' : 'noop', dis: leftN <= 0,
+          /* V1.0.4 · R3（父亲大人 09-27 点单）：弱网时这颗变「网络不太好」（判定只在 G.ADWEAK 一处） */
+          label: (G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 加速 2 小时（今日还剩 ' + leftN + ' 次）')
+            : '📺 看广告 · 加速 2 小时（今日还剩 ' + leftN + ' 次）'),
+          style: 'ghost', id: leftN > 0 ? 'ad_idle_boost' : '', dis: leftN <= 0,
         }]);
         U.y = U.y;                       // btnRow 已经推进游标
       }
@@ -870,31 +842,27 @@
   /* ---------- 首页动作 ---------- */
   /* B5 · 挂机加速：广告 → 直接发 2 小时产出（逻辑层 `Core.adIdleBoost`，折算与真挂机同源） */
   CV.on('ad_idle_boost', function () {
+    /* 弱网：先给一句人话，不让玩家白看一条拉不起来的广告（R3 · 09-27 口径） */
+    if (G.ADWEAK && G.ADWEAK.block()) return;
     const AD = G.AD;
     if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); return; }
     AD.show('idle_boost').then(function (r) {
       if (!r || !r.granted) { CV.toast(r && r.reason === 'total' ? '今天看广告的次数用完了' : '今天这个加速次数用完了'); CV.render(); return; }
       const b = Core.adIdleBoost();
       const g = (b && b.gains) || {};
-      CV.toast('📺 已加速 2 小时：◉+' + fmt(g.points || 0) + ' · EXP+' + fmt(g.exp || 0) + ((g.otherworld || 0) ? (' · ◆+' + g.otherworld) : ''), 2600);
+      /* F7 ②：一次性奖励类（看完广告拿到的 2 小时产出）→ 留（拿到多少别处看不到），缩到最短。 */
+      CV.toast('📺 +2 小时：◉' + fmt(g.points || 0) + ' · EXP' + fmt(g.exp || 0) + ((g.otherworld || 0) ? (' · ◆' + g.otherworld) : ''), 2600);
       CV.render();
     });
   });
-  /* 今日汇总（N3 · 留存环）：**只读** —— 不领、不跳、不改任何数，看清楚了自己去点那一格。
-     内容与主页那条汇总条**同源**（都走 `todayTodoList`）。 */
-  CV.on('open_today', function () {
-    const TD = Core.todayState ? Core.todayState() : null;
-    const bountyReady = Core.bountyState ? Core.bountyState().claimable : 0;
-    const garden = (Core.gardenState ? Core.gardenState() : []).filter(function (p) { return p; });
-    const gardenReady = garden.filter(function (p) { return p.ready; }).length;
-    const todo = todayTodoList(Core, TD, bountyReady, gardenReady);
-    const chips = todo.slice();
-    if (TD && TD.dailyTotal) chips.unshift('每日任务 今天 ' + TD.dailyDone + '/' + TD.dailyTotal);
-    if (!todo.length) chips.push('今天的日常都做完了');
-    U.confirm('今天还能做什么', '照这张单子收一圈就行。', function () { CV.render(); },
-      { cancel: false, okLabel: '知道了', chips: chips,
-        note: garden.length ? ('药园 ' + garden.length + ' 块在用' + (gardenReady ? '，其中 ' + gardenReady + ' 块能收了' : '')) : '' });
-  });
+  /* ================= 康康 2026-09-29 · 「今日汇总」整条**撤掉**（父亲大人的图为准）=================
+     原话：「**主页还是像原来那样，只是把那一行胶囊去掉了，不要了**」——他指的就是主页那条
+     「今日 · 挂机收益 · 悬赏 1 · …」的只读汇总（图上被划掉的那一条）。
+     连带一起撤：它点开的这个只读弹窗、主页那条卡、`todayTodoList()` 这个函数。
+     ⚠️ N3 那套（策划总监 0927 的留存环第二格）**是父亲大人 09-29 亲自撤的**，
+        不是它坏了 —— 要恢复的话去 git 历史里取，别在这儿临时拼。
+     ⚠️ 主页「日常」那一块（标题 ＋ 任务/点灯/招募伙伴/市集/成就 五格）**照原样回来**，
+        红点与「+N」也一起回来（见下面 ③ 那一段）。 */
   /* ================= V1.1.16（M 轮 · 挂机结算面板 ＋ 看广告双倍领取）=================
      父亲大人：「现在这个领取奖励也可以像战斗的结算那样把有什么奖励列举出来，然后两个选项，
      一个领取奖励，一个看广告双倍领取奖励，这个看广告双倍领取的次数也是不限次数」。
@@ -913,6 +881,7 @@
     if (U.idleSettle && U.idleSettle()) return;
     const r = Core.claimEverything();
     snd(r && r.total ? 'claim' : 'error');
+    /* F7 ②：一次性奖励类（"一键领取"是**聚合**动作，领了几项别处不显示）→ 留，本来就最短。 */
     CV.toast(r && r.total ? '已领取 ' + r.total + ' 项' : '暂时没有可领的');
   });
   /* ================= V1.1.x（0927-P · 挂机结算改成半透明弹窗）=================
@@ -931,6 +900,7 @@
     const r = Core.claimEverything();
     snd(r && r.total ? 'claim' : 'error');
     U.overlay = null;                   // 关掉挂机结算弹窗（不再去关"战斗那一层"）
+    /* F7 ②：同上 —— 挂机银行一次结算几项，聚合动作 → 留。 */
     CV.toast(r && r.total ? '已领取 ' + r.total + ' 项' : '暂时没有可领的');
   });
   /* 挂机结算 ·「看广告 · 双倍领取」
@@ -938,6 +908,7 @@
         所以这里既不判"今天还剩几次"、也不给按钮加禁用条件；真正的口径在那一处，
         谁把它从 FREE_SLOTS 里挪走，这把尺子（`idle_double_audit`）当场会红。 */
   CV.on('idle_double', function () {
+    if (G.ADWEAK && G.ADWEAK.block()) return;   // 弱网：一句人话，弹窗原地留着（R3）
     const AD = G.AD;
     if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); CV.render(); return; }
     /* 关弹窗 ＋ 报一句（0927-P 起面板是 `U.confirm` 那一层，不再有"从战斗页来"那本账）。 */
@@ -989,12 +960,14 @@
       U.confirm('挂机结算', '已挂 ' + durOf(base.seconds || 0) + ' · 收益 ×2',
         function () { CV.render(); },
         { cancel: false, okLabel: '收下', chips: U.idleChips(pv), blankClose: true });
-      CV.toast('📺 挂机收益已翻倍', 1600);
+      /* F7 ②：一次性奖励类（看完广告拿到的双倍）→ 留，缩到最短。 */
+      CV.toast('📺 挂机收益 ×2', 1600);
     });
   });
   CV.on('claim_travel', function () {
     const r = Core.claimTravel();
     snd(r && r.ok ? 'claim' : 'error');
+    /* F7 ②：游历给的是"哪一个奇遇 ＋ 它的奖励"（别处看不到）→ 留；失败留。 */
     CV.toast(r && r.ok ? '🎁 ' + r.msg : (r && r.msg) || '还没有新的游历');
     CV.render();
   });
@@ -1017,7 +990,8 @@
     if (!cu.done) { CV.toast('这一步还没完成'); return; }
     const r = Core.claimQuest(cu.q.id);
     snd(r && r.ok ? 'claim' : 'error');
-    CV.toast((r && r.msg) || (r && r.ok ? '已领取' : '还没完成'));
+    /* F7 ②：主线那一行领完当场变成"已领"（看得见 → 删成功的"已领取"）；失败照旧说。 */
+    if (!r || !r.ok) CV.toast((r && r.msg) || '还没完成');
     CV.render();
   });
   CV.on('open_party', function () { CV.push('party'); });

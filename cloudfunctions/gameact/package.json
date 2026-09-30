@@ -1,0 +1,9 @@
+{
+  "name": "gameact",
+  "version": "1.0.0",
+  "description": "游戏圈活跃任务：自定义条件回调（minigame_act_event_query_condition）· 验签/解密 + 读 saves.act 回进度",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

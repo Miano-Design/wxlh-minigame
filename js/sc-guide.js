@@ -12,12 +12,10 @@
   /* 从顶栏点某颗货币胶囊进来时记住是哪一种（给货币图鉴那张卡加个"你刚点的是这个"） */
   let currencyFocusId = null;
 
-  /* 指标题行用（网页版那些页是 showPanel 的标题，这边统一用返回键 + 居中标题那一行） */
-  function head(title) {
-    U.btn(pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
-    CV.text(title, pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
-  }
+  /* 指标题行用（网页版那些页是 showPanel 的标题，这边统一用返回键 + 居中标题那一行）——
+     **吸顶**（父亲大人 09-27 深夜：「每一屏的标题和返回键都固定在顶部吧」）：
+     落笔由框架按屏幕坐标画一次，这里只登记 + 把正文让开，见 uiw.js 的 U.pageHead。 */
+  function head(title) { return U.pageHead(title); }
 
   /* 指南正文里的 **加粗**（数据表里就这个约定）：拆成"普通 / 粗体"两截分别画，
      不能像网页版那样交给 HTML —— 画布上得自己分段。

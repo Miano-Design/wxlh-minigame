@@ -86,7 +86,7 @@ window.Core = (function () {
   // row：主角站前排还是后排（V8.3 新增）。默认前排——和旧存档的战场表现一致。
   /* V9.5.69（父亲大人）：**所有等级从 0 起算**——数字就是"已经升过几次"。
      主角 Lv.0 / 技能 Lv.0 / 建筑 0 级 / 评级 Lv.0 / 伴生体 0 级（血统、铭刻、境界、权限本来就是 0 起）。 */
-  function freshProtagonist(name) {
+  function freshProtagonist(name, nameAudited) {
     /* 这一份就是**新档初值**的唯一定义：新档、新建主角、老档补字段都从这里取。
        V1.0.3（产品经理报的 P1）：`realm / talents / reincarnations / geneLock` 原来
        只写在 defaultState() 里，freshProtagonist 里一个都没有 —— 于是"新建主角"
@@ -94,11 +94,22 @@ window.Core = (function () {
        新主角一出生就带着这些）。现在四样都归零，名单也补进了 PROTAGONIST_KEYS。 */
     return  getProxied({ name: name || '', level: 0, exp: 0, bloodline: null, bloodlineLv: 0, attrPoints: 0,
       attrs: ATTR_ZERO(), skillPoints: 0, skillLv:  getProxied([0, 0, 0]), row: 'front',
-      realm: 0, geneLock: 0, reincarnations: 0, talents: TALENT_ZERO() });
+      realm: 0, geneLock: 0, reincarnations: 0, talents: TALENT_ZERO(),
+      /* V1.0.4 · V：这一位主角的名字**是不是过了机审的**（名单外的自由名字才记，见 setPlayerName）。 */
+      nameAudited: nameAudited || '' });
   }
   function defaultState() {
     return  getProxied({
       v: 5,
+      /* V1.1.20（F1-1 · 云同步"谁新听谁的"）：**玩家最后一次真正产生进度/操作的时刻**（毫秒）。
+         为什么不用 `idle.lastTs`：那个字段会被开机流程（settleOffline 结算、每 15 秒心跳）盖章成
+         "现在"，于是判据变成"谁刚开过游戏"，而不是"哪份档更新"—— 云上那份再新也拉不下来（阻塞级）。
+         口径（三句话，全在 save() / settleOffline() 里）：
+           · **玩家驱动的存盘** → 刷新它；
+           · **开机自愈 / 离线结算那一段** → 一个字都不许动（settleWriting 那道闸）；
+           · **自动存盘（15 秒心跳 / 开机提示）** → 落盘照旧，但不刷新它（save({auto:true})）。
+         老档没有这个字段 → `migrate()` 用 `idle.lastTs` 兜底补一次（别让老档判成 0 ⇒ 被云端随便盖）。 */
+      savedAt: 0,
       player: Object.assign(freshProtagonist('执灯者'),  getProxied({ geneLock: 0, reincarnations: 0, talents: TALENT_ZERO(),
         /* V1.1.9（续13 · P0-4）：**历史最高通关世界的下标**（0 = 还没通关任何世界）。
            为什么要单独存：转生会把 `player.level` 清零、也会把 `S.worlds` 清空，
@@ -158,12 +169,39 @@ window.Core = (function () {
       beast:  getProxied({ owned:  getProxied({}), active: null }),                       // 伴生体：owned[id] = {lv, soul}；active = 随行的那只
       stats:  getProxied({ battles: 0, wins: 0, bosses: 0, runs: 0, recruits: 0, enhances: 0, bestFloor: 0, profileViews: 0,
         taskClaims: 0, signDraws: 0 }),   // V9.6.74：主线新步骤要用的两个计数（老档没有 → 一律 || 0 兜底）
+      /* ================= V1.0.4 · W（游戏圈活跃任务的三个计数）=================
+         父亲大人 09-27：「7，可以」（游戏圈活跃任务 / 每日抽奖）。平台侧的活动任务要问我们
+         "这个玩家达成了没"，判据只能来自玩家自己的档 —— 所以这里有三个**只涨**的计数：
+           · `loginDays` 累计登录天数（跨天在 `ensureDaily` 里 +1）；
+           · `playSec`   累计在线秒数（`actTick()` 按心跳累加，一天封顶 8 小时防挂机刷）；
+           · 通关次数不在这里 —— 直接复用已有的 `S.stats.runs`（累计通关副本关卡，转生不清）。
+         ⚠️ **不是新系统**：它不进任何奖励环、不改任何数值、界面上一个字都不显示
+            （唯一出口是 `Core.actSnapshot()`，客户端推档时顺手带一小块数字給云函数）。
+            `lastTickAt` / `day` / `daySec` 只服务于"防改时间"，不往外发。
+         老档没有这一段 → `fillDefaults` 自动补空、从 0 起（见 scripts/activity_audit.js ④）。 */
+      /* ================= V1.0.4 · X（订阅消息 · 父亲大人「2，可以」）=================
+         多两个**随档上云**的数（都是数字，绝不含身份信息）：
+           · `subMsg`      玩家有没有订阅"收益满了提醒我"（0/1）；
+           · `bankFullAt`  挂机银行**满**的时刻（毫秒；没满＝0）。
+         云函数 `notify` 靠这两个数（＋"满那一刻能收多少"的 `bankAmount`）决定发不发服务通知。
+         ⚠️ **"这一次满已经发过"的记号不在这里**：那一位是**云端写在记录顶层的 `notifyAt`**
+            （见 cloudfunctions/notify/index.js）。写在 `act` 里存不住 —— 推档是**整块覆盖** `act`
+            （`js/sc-cloud.js` 的 `data.act = act`），本地这份永远不知道该位被云端改过，
+            下一次推档一覆盖就没了 ⇒ 判据会以为"没发过"，同一份满被一遍遍重发。
+            （这条是 X 轮复核时实测出来的，别再搬回去。） */
+      act:  getProxied({ day: '', loginDays: 0, playSec: 0, daySec: 0, lastTickAt: 0,
+        subMsg: 0, bankFullAt: 0 }),
       /* V9.6.115（父亲大人）：自动战斗整条下线 —— 默认值里也不留这个键（老存里的残留值没人读了）。
          autoNext 保留（结算 5 秒自动进下一关）。 */
       /* V1.1.x（2026-09-27 · 音频系统）：`bgm` / `sfx` ＝ 音乐 / 音效两个开关，**默认都开**。
          老档没有这两个键 → 下面 migrate 那句 `S.settings = Object.assign(def.settings, S.settings || …)`
          会把默认值补上（老玩家进游戏照样有声音；见 scripts/audio_audit.js ③）。 */
-      settings:  getProxied({ speed: 1, autoSellN: false, autoSellR: false, bgm: true, sfx: true, autoNext: true }),
+      /* V1.0.4 · T（父亲大人 09-27 第 14 条）：`savePower` ＝ 省电模式开关，**默认关**。
+         老档没有这个键 → `fillDefaults`（本函数返回的默认结构）**自动补空成 false**，
+         与 bgm / sfx / favAt 同一条路：**不用写迁移，packSave / unpackSave / SAVE_KEY 那五个口子一个字没动**。
+         （存档里它就是 settings 下的一个布尔，`js/wx-cap.js` 的 CAP.powerOn() / `js/audio.js` 的 bgmOn() 读它。） */
+      /* `subMsg`（V1.0.4 · X）：玩家有没有订阅"收益满了提醒我"。默认 false —— 订阅必须玩家**自己点**。 */
+      settings:  getProxied({ speed: 1, autoSellN: false, autoSellR: false, bgm: true, sfx: true, autoNext: true, savePower: false, subMsg: false }),
       codex:  getProxied({ chars:  getProxied([]), equipNames:  getProxied([]), equipsSeen: 0, claimed:  getProxied([]) }),
       achievements:  getProxied({}),       // achId → true（已领取）
       presets:  getProxied([null, null, null]),   // 3 组编队预设（保存队伍成员）
@@ -171,6 +209,10 @@ window.Core = (function () {
       unlocks:  getProxied({}),
       quests:  getProxied({ claimed:  getProxied([]) }),
       ssrTicket: 0,
+      /* V1.0.4 · R8（父亲大人 09-27 点单：「收藏事件」）：玩家点右上角"收藏"的那一天。
+         一个时间戳就够（0 ＝ 没收藏过），**老档由 fillDefaults 自动补空**，不用写迁移；
+         只在"进游戏说一句话"这一处用（`js/wx-cap.js`），不进任何奖励环、不算数值。 */
+      favAt: 0,
     });
   }
 
@@ -187,18 +229,38 @@ window.Core = (function () {
      小游戏 V9.6.90 真的踩到了（coachFunnel 在首帧渲染时存了一次）。
      现在改成：**载入存档后、结算完成前，任何存盘都不动 lastTs**。 */
   let offlineSettled = false;
-  function save() {
+  /* ================= V1.1.20（F1-1 · 阻塞级）：`savedAt` 的两道闸 =================
+     上面那条（offlineSettled）管的是 `idle.lastTs` —— 那是"离线窗口"，权威用法在 settleOffline。
+     本条新加的是**"谁新听谁的"判据（savedAt）**，它比 idle.lastTs 严一档，多两道闸：
+       ① `settleWriting`：settleOffline 自己那一段写盘（＝开机自愈/结算）—— 玩家这时还没进游戏，
+          **一个字都不许刷**。这就是那条阻塞级的根因（原来开机结算把判据盖成"现在"）。
+       ② `save({auto:true})`：自动存盘（15 秒心跳、开机那几条提示）—— 照常落盘、也照常推
+          idle.lastTs，但**不算玩家在玩**。没有这道闸，"开着游戏发呆"也会把判据推成"现在"，
+          玩家回到另一台设备就拉不到云上更新的那份。 */
+  let settleWriting = false;
+  function save(opt) {
     if (suppressSave) return;
-    if (offlineSettled) S.idle.lastTs = Date.now();
+    const auto = !!(opt && opt.auto);
+    if (offlineSettled && !settleWriting) {
+      const now = Date.now();
+      S.idle.lastTs = now;                 // 存盘 = 刚见过玩家（V9.6.92 的既有口径，离线窗口用它）
+      if (!auto) S.savedAt = now;          // F1-1：只有玩家驱动的那几次存盘才算"真的在玩"
+    }
     try {
-      localStorage.setItem(SAVE_KEY, packSave(S));
+      const wrote = localStorage.setItem(SAVE_KEY, packSave(S));
+      /* F1-3：写盘失败**不许被静默吞掉** —— 适配层的 localStorage 现在失败会抛（真异常走 catch），
+         这里再认一次它返回的 false（老垫片 / 尺子的假环境只返回布尔，不会抛）。 */
+      if (wrote === false) throw new Error('storage setItem returned false');
       saveFailed = false;
     } catch (e) {
       // 存储不可用（隐私模式）/ 配额满：只提示一次，别让玩家打完一整局才发现没存上
       if (!saveFailed) {
         saveFailed = true;
-        notice('⚠ 存档写入失败：浏览器存储不可用或已满，请到「设置 → 导出存档」先备份');
+        /* V1.1.20（F1-3）：原来这句指的是「设置 → 导出存档」—— 那个入口父亲大人 09-27 已经撤了
+           （存档那一块收口成唯一一颗「找回存档」）。指一个不存在的入口＝玩家照做也找不到东西。 */
+        notice('⚠ 存档写入失败：微信存储写不进去（可能已满或不可用），请到「设置 → 找回存档」看看有没有旧备份，或清理一下微信存储后重试');
       }
+      try { console.warn('[save] 写盘失败（这次进度没落盘）：' + (e && e.message)); } catch (e2) {}
     }
   }
   /* ================= 渲染前的兜底闸（V1.0.6 · P0 提审驳回：真机"卡在此界面"） =================
@@ -212,7 +274,8 @@ window.Core = (function () {
     if (S) return 'ok';
     let loaded = false;
     try { loaded = load(); } catch (e) { loaded = false; }
-    if (!loaded) { newGame(); ensureDaily(); }
+    /* V1.1.20（F1-5）：这条也是"开机兜底"（不是玩家选择）—— 读不出来时照样禁写。 */
+    if (!loaded) { newGame({ keepRescue: true }); ensureDaily(); }
     try {
       console.warn('[boot] 渲染前发现 S=null：' + (loaded ? '已重新读档' : '已先建内存档')
         + '，界面继续画（正常开机不该走到这里，请把这条日志交给康康）');
@@ -233,6 +296,7 @@ window.Core = (function () {
     S = defaultState();
     offlineSettled = true;      // 全新档没有离线窗口要保
     lastLoadIssue = null;       // 玩家自己按的"删档"＝这条诊断该收起来了（V1.1.15）
+    rescue = null;              // V1.1.20（F1-5）：玩家**自己选**的"删档重开"＝救援态到期（他明确不要那份了）
     /* suppressSave 仍然保持"关着"：网页版删完档会立刻 reload，
        期间任何一次 beforeunload / 定时存盘都不许把**旧档写回去**（这是它原来的用处）。
        存盘开关由 newGame() 负责恢复 —— "开始新游戏"才代表真的重新开始。 */
@@ -241,6 +305,11 @@ window.Core = (function () {
   }
   function load() {
     /* V9.6.113：读档分成"能读 / 读不出但保住"两条路，任何一条都不许毁数据 */
+    /* V1.1.20（F1-1 的连带）：**这一句必须在最前面** —— migrate() 里有一处 `save()`（碎片合并），
+       而从第二次 load 开始，`offlineSettled` 可能还留着上一次 settleOffline 的 true；
+       那样一来"读档过程中"的存盘就会把 idle.lastTs / savedAt 盖成现在（离线窗口与判据一起被抹）。
+       读档路径上的存盘一律不许盖章 —— 与 V9.6.92 那条不变量同一个口径，只是提前到第一行。 */
+    offlineSettled = false;
     let raw = null;
     try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return false; }
     if (!raw) return false;
@@ -252,12 +321,13 @@ window.Core = (function () {
       const why = lastUnpackIssue || 'json';
       lastLoadIssue = issue(why, raw, e);
       backupSave(raw, why);
+      enterRescue(why, raw);
       return false;
     }
-    if (!data || typeof data !== 'object') { lastLoadIssue = issue('shape', raw); backupSave(raw, 'shape'); return false; }
+    if (!data || typeof data !== 'object') { lastLoadIssue = issue('shape', raw); backupSave(raw, 'shape'); enterRescue('shape', raw); return false; }
     const ver = Number(data.v || 0);
     /* 来自**更高版本**的存档（玩家装过新版又回到旧版）：不覆盖、不删，原样备份后退出去 */
-    if (ver > SAVE_VER) { lastLoadIssue = issue('future-v' + ver, raw); backupSave(raw, 'future-v' + ver); return false; }
+    if (ver > SAVE_VER) { lastLoadIssue = issue('future-v' + ver, raw); backupSave(raw, 'future-v' + ver); enterRescue('future-v' + ver, raw); return false; }
     legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
     /* 缺字段自动补齐（新系统上线后老档也能直接读），再跑语义迁移（改名 / 换算 / 退款这类） */
     S = fillDefaults(defaultState(), data);
@@ -283,6 +353,7 @@ window.Core = (function () {
   }
   /* 读档失败时**先备份**：玩家的一点进度都不许因为一次更新凭空消失。
      备份里连"什么时候、为什么读不出来"一起记，出了问题能追。 */
+  let lastBackupIssue = null;          // V1.1.20（F1-5）：备份**没写下来**这件事本身也要留痕（原来静默）
   function backupSave(raw, why) {
     try {
       /* V1.1.15（2026-09-27 · P0"我手里的存档没了"）：**备份只许变好，不许变坏** ——
@@ -299,7 +370,41 @@ window.Core = (function () {
         } catch (e) { /* 旧备份自己也坏了 → 让新的盖上（新的至少是最近那份） */ }
       }
       localStorage.setItem(SAVE_BAK, JSON.stringify( getProxied({ at: Date.now(), why: why || 'unknown', raw: String(raw) })));
-    } catch (e) { /* 存不下也没关系，主存档还在原地没动 */ }
+    } catch (e) {
+      /* V1.1.20（F1-5）：**备份写不下就没声了** —— 那条是玩家的最后一条救命绳，必须出声。
+         （原来这里是空 catch：主档读不出来、备份又没写上，玩家和我们都拿不到任何线索。） */
+      lastBackupIssue =  getProxied({ at: Date.now(), why: String(why || 'unknown'), err: String((e && e.message) || '') });
+      try { console.warn('[save] 读档失败时那份**原样备份没写下来**（why=' + lastBackupIssue.why + '）：' + lastBackupIssue.err
+        + ' —— 主档还在原地没动，但请尽快把这条日志交给康康'); } catch (e2) {}
+    }
+  }
+  /* ================= V1.1.20（F1-5 · 严重）：读档失败 / 更高版本 → **救援态（禁写）** =================
+     与文件头那句口径对齐：「万一真读不出来（文件损坏 / 来自更高版本），先把原始内容原样备份再退出去，
+     **绝不让玩家的一点进度被下一次存盘悄悄覆盖掉**」。
+     原来这条只有前半句做到了 —— 备份是"尽力而为"，而覆盖是**立刻发生**的：
+     读不出来 → game.js 走 `Core.newGame()` → newGame 里那句 `save()` 当场把主键写成一份空新档；
+     紧接着 15 秒心跳也照写。玩家那一份（也许只是这一版读不懂、下个版本就能读）就这么被顶掉了。
+     现在：读不出来就进**救援态** —— `suppressSave = true`，主键一个字节都不许动，
+     等玩家**显式选择**（① 开机那个弹窗点「继续新档」＝ rescueConfirmNewGame；② 设置页的「找回存档」
+     恢复成功；③ 设置页的「删档重开」）才解闸。三条都是"玩家自己按的"，没有一条是自动的。
+     ⚠️ 救援态里**云同步也停**（sc-cloud 的 sync/push 读 rescueInfo）：那时的内存档是空新档，
+       推上去等于把玩家云上那份真进度顶掉（还会把 `_bak` 里那份原文覆盖掉）。 */
+  let rescue = null;
+  function enterRescue(why, raw) {
+    if (rescue) return rescue;                    // 已经是救援态：不覆盖原因，只留第一次那一条
+    rescue =  getProxied({ why: String(why || 'unknown'), at: Date.now(), len: String(raw == null ? '' : raw).length });
+    suppressSave = true;                          // ← 主键禁写（本档想在救援态里活下来）
+    try { console.warn('[save] 读档失败 → 进入救援态（自动存盘已停，等玩家显式选择）：' + rescue.why); } catch (e) {}
+    return rescue;
+  }
+  function rescueInfo() { return rescue; }
+  /** 玩家显式选择「继续新档」：解闸 + 立刻落一份新档（这一刻起主键才允许被覆盖）。 */
+  function rescueConfirmNewGame() {
+    if (!rescue) return false;
+    rescue = null;
+    suppressSave = false;
+    save();
+    return true;
   }
   /* ================= V1.1.15（2026-09-27 · P0「我手里的存档没了」）=================
      背景：父亲大人重新上传到手机之后，手里的进度不见了。老实说 —— **先修好这三件事**，
@@ -336,6 +441,17 @@ window.Core = (function () {
     S.v = SAVE_VER;
     try { migrate(); } catch (e) { /* 恢复优先：迁移这一步出问题也不拦着玩家把进度拿回来 */ }
     lastLoadIssue = null;
+    /* V1.1.20（F1-5 / F1-2）：恢复成功＝玩家**显式**选定了这份档 —— 救援态到此结束（主键可以写了）。 */
+    rescue = null;
+    /* savedAt 按"现在"（与"删档重开 / 新档"同一口径）：玩家这一下是明确要这一份。
+       —— 若不盖，这份档会因为 savedAt 老（老档补的是 idle.lastTs）被云上那份盖回去。 */
+    S.savedAt = Date.now();
+    /* V1.1.20（F1-2）：这份档自带的**离线窗口要补跑一次**。
+       原来这里直接 `offlineSettled = true; save();` —— 等于把那份档的 idle.lastTs 盖章成"现在"，
+       它自带的离线收益（比如"8 小时没玩"那一段）当场归零。现在：闸门先关回去，按它自己的
+       时间戳补跑一次结算（沿用开机那一条唯一的结算函数），再落盘。 */
+    offlineSettled = false;
+    try { settleOffline(); } catch (e) { /* 补结算出错不该拦着"把进度拿回来"这件事本身 */ }
     offlineSettled = true;
     save();
     return  getProxied({ ok: true, at: o.at || 0, msg: '已恢复到 ' + (o.at ? new Date(o.at).toLocaleString() : '备份那份') });
@@ -347,6 +463,8 @@ window.Core = (function () {
       key: SAVE_KEY, has: !!raw, len: raw ? String(raw).length : 0,
       enc: !!raw && String(raw).slice(0, 5) === 'MPG1:',
       ver: (S && S.v) || 0, bak: backupInfo(), issue: lastLoadIssue,
+      /* V1.1.20（F1-1 / F1-5）：判据时刻、救援态、以及"备份没写下来"那条 —— 设置页/日志看它 */
+      savedAt: (S && S.savedAt) || 0, rescue: rescue, backupFailed: lastBackupIssue,
     });
   }
   /* 按默认结构**递归**补齐：缺的字段给默认值，多出来的字段原样保留。
@@ -383,6 +501,13 @@ window.Core = (function () {
   // 旧档迁移：C001 林默不再是主角占位，主角为独立实体
  function migrate() {
     const def = defaultState();
+    /* ================= V1.1.20（F1-1）：老档补 `savedAt` =================
+       没有这个字段的老档（本字段是 09-28 才加的）**不许判成 0** —— 0 会让云端那份（哪怕更旧）
+       无条件盖上来。兜底就用它唯一的"最后落盘时刻" `idle.lastTs`；连那个也没有（理论上不会，
+       defaultState 的 idle.lastTs 就是 Date.now()）就用"现在" —— 宁可本机保守一点，
+       也别把一份活着的档判成"从来没玩过"。
+       幂等：本字段一旦 > 0 就不再进这段（老档只会被补一次）。 */
+    if (!(S.savedAt > 0)) S.savedAt = Math.max(0, Number(S.idle && S.idle.lastTs) || 0) || Date.now();
     S.stats = Object.assign(def.stats, S.stats ||  getProxied({}));
     // V8.0 新增的三块（灯阁评级 / 秘术阁 / 挂机游历）：老档补默认值，缺字段不会读出 undefined
     S.sect = Object.assign( getProxied({ lv: 1, exp: 0 }), S.sect ||  getProxied({}));
@@ -486,6 +611,15 @@ window.Core = (function () {
     }
     // 老存档补新字段：设置项 / 图鉴领取记录 / 登录轮次
     S.settings = Object.assign(def.settings, S.settings ||  getProxied({}));
+    /* ================= V1.0.4 · A2②（父亲大人 2026-09-27 深夜：「**结算的自动下一关保留**，
+       只是设置页里的不要」）=================
+       事实：设置页那张「战斗」卡（＝自动进下一关）早先按他的要求**整张撤掉**了，
+       可战斗页仍然读 `S.settings.autoNext` —— 于是**老档里把它关过**的玩家，
+       现在**没有任何入口能再开回来**（每个结算页都会一直等他点，像卡住一样）。
+       他现在的口径：**功能保留**（结算 5 秒自动进下一关照旧），只是不要设置页那张卡。
+       ⇒ 迁移里**把这一位强制归正为 true**：玩家没有入口可改的东西，就不该留着他当年关过的状态。
+       （战斗页那句判据一个字没动：`sc-battle.js` 仍然读 `settings.autoNext !== false`。） */
+    S.settings.autoNext = true;
     S.tasks = Object.assign(def.tasks, S.tasks ||  getProxied({}));
     S.tasks.weekly = S.tasks.weekly ||  getProxied({});
     S.tasks.weeklyClaimed = S.tasks.weeklyClaimed ||  getProxied({});
@@ -713,8 +847,32 @@ window.Core = (function () {
       const n = String(old == null ? '' : old).length;
       return D.PROTAG_NAMES[n % D.PROTAG_NAMES.length];
     };
-    S.player.name = cleanName(S.player.name) || nameFallback(S.player.name);
-    (S.altPlayers ||  getProxied([])).forEach(p => { if (p) p.name = cleanName(p.name) || nameFallback(p.name); });
+    /* ================= V1.0.4 · V（2026-09-27 · 自由命名 ＋ 内容安全机审）=================
+       名字的保留判据多了一条出口：`nameAudited` 里记着"这一个名字是过了微信内容安全机审的"
+       （`js/sc-namecheck.js` 过审后写、`setPlayerName` 落盘时写）。
+       放行条件是**记着的那串字与当前名字一模一样** —— 这样：
+         · 老档（没有 `nameAudited`）：判据还是"必须在名单里"，当年那个违规名照旧一个字都不留；
+         · 本机刚过审的自由名字：读档不再被下面这行兜底换成预设名（否则玩家改完名字、
+           退一次游戏，名字就自己变回去了）。
+       ⚠️ 平台那条【整改清除线上违规内容】的口径没变：**名单外的、又拿不出过审凭据的，一律换掉。 */
+    const keepName = function (p) {
+      const listed = cleanName(p && p.name);
+      if (listed) return listed;
+      const raw = shapeName(p && p.name);
+      /* ================= V1.0.4 · A2①（父亲大人 2026-09-27 深夜：「**现在有审核的话不用按老规则走了**」）===
+         老规则（V1.0.1 那次平台违规警告的整改）：**名单外的名字一律换成预设名** ——
+         当时是因为"自由输入已经关掉、拿不出过审凭据"，所以只能见一个清一个。
+         现在**自由输入开回来了、而且每次输入都过微信内容安全机审**（`js/sc-namecheck.js`），
+         这条老规则就只剩副作用：**老档里玩家自己起过的名字，读档时会被悄悄换成预设名**
+         （玩家会说"我的名字被人改了"）。
+         ⇒ 新口径：**读档放行老名字**（不在名单里也留）；**新输入照旧必须过机审**（那条一点没松）。
+         平台"整改清除线上违规内容"这条要求仍由**输入侧**保证：能进来的名字都过审。 */
+      if (raw) return raw;
+      const signed = (p && p.nameAudited) ? shapeName(p.nameAudited) : '';
+      return (raw && signed === raw) ? raw : '';
+    };
+    S.player.name = keepName(S.player) || nameFallback(S.player.name);
+    (S.altPlayers ||  getProxied([])).forEach(p => { if (p) p.name = keepName(p) || nameFallback(p.name); });
     S.player.attrs = Object.assign(ATTR_ZERO(), S.player.attrs ||  getProxied({}));
     S.player.attrPoints = S.player.attrPoints || 0;
     /* V9.5.69：技能等级从 1 起改成 0 起。老档一次性把已点等级整体减 1（Lv.1→Lv.0），
@@ -797,16 +955,73 @@ window.Core = (function () {
        "当年"那个数字在任何地方都没有留痕（转生会清 `S.worlds`），所以补不出来 ——
        这种情况会从"当前进度"起算（也就是只赚不亏，但拿不回那一次的腰斩）。新档起不会有这个问题。 */
     S.player.bestWorldIdx = Math.max(S.player.bestWorldIdx || 0, bestWorldIdx());
+    /* ================= 2026-09-27（父亲大人深夜拍板）· **已转过生的老档补偿** =================
+       背景：转生原来是"清 `S.worlds` ＋ 清 `S.worldFirstClear` ＋ 深井回第 1 层"（见 reincarnate 的说明），
+       现在改成"残域与深井都保留"。已经照旧规则转过生的档，进度是真被清掉了 —— 但
+       `S.player.bestWorldIdx`（历史最高通关世界，转生不清）还在，用它把**能进 / 已解锁**恢复回来：
+         · **只恢复"解锁"，不补星**：星数在旧档里没有任何留痕，凭空造星＝编数据（进度条仍从 0 起）；
+         · 范围到 `bestWorldIdx + 1`：**通关第 k 张图本来就会解锁第 k+1 张**
+           （stageComplete 里 `diff === 'normal'` 那一步），所以"当年解锁到哪儿"是可证的，
+           恢复它不算送东西（门禁仍走 unlockWorld 的转生门槛，该锁的照样锁）。
+         · **不补发任何首通奖励** —— 那笔账早就花过了。世界 `_normal` 的通关是**有凭据**的：
+           `bestWorldIdx = k` 的定义就是"第 k 张图某个难度 12/12"，而困难必须先通普通
+           （见 stageUnlocked），所以第 0…k 张图的普通难度**必定**通关过、首通也必定领过
+           ⇒ 标成"已领"，重打不再发钱（与 V9.2"老档里已打穿的世界当场标成已领过"同一手法）。
+           ⚠️ hard / hell **没有凭据**（错标＝扣他真该拿的那份），一律不动。
+         · 条件本身自洽：恢复后 0…k 都已解锁 → 不再进这段；标记只写一次，重复跑没有任何可改的。
+       顺手把**深井那一半**也补回来（父亲大人原话是"世界进度和深井进度都被重置了"，
+       只补世界等于只补了一半）：深井被清成 `floor: 1`，而 `best`（历史最高层）留着。
+       代码里**只有一个地方写 floor**（sc-last.js：打过一个赢就 `best = max(best, floor)` ＋ `floor = floor + 1`），
+       所以"当前层"恒等于 `best + 1`（新档 best 0 / floor 1 也成立，见 defaultState）。
+       ⇒ 只在"被清过的签名"上动手：`floor <= 1 且 best > 0` 时恢复成 `best + 1`；
+          正常档永远不会命中（正常档 floor = best + 1，best = 0 时 floor = 1 → 两条都不满足）。
+          ⚠️ 不给补偿的情况：`best` 也是 0 的档什么都不做（他本来就没进过深井）。
+          ⚠️ 深井奖励每层都能重拿（不是首通制），所以这条也等于"不再靠重爬深井刷一遍"。
+       ⚠️ 幂等标记**不能写进 defaultState**（fillDefaults 会先把它补进老档 → 这段永远不进），
+          与 realmScaled / a12Pack / skillZeroBased 同一写法。
+       ⚠️ 这里**刻意不 save()**：读档路径上任何一次存盘都可能把 `idle.lastTs` 顶到"现在"、
+          抹掉离线收益（V9.6.92 的边界）。这段的结果会在开机后的第一次正常存盘落盘，
+          万一没落成也不怕 —— 条件自洽，重跑结果一模一样。 */
+    {
+      const hi = Math.max(0, S.player.bestWorldIdx || 0);          // 历史最高**通关**的图（下标）
+      const hiW = Math.min(D.WORLDS.length - 1, hi + 1);           // 通关第 hi 张 → 第 hi+1 张当年也解锁过
+      let missing = 0;
+      for (let i = 0; i <= hiW; i++) { const w = S.worlds[D.WORLDS[i].id]; if (!w || !w.unlocked) missing++; }
+      if (missing && !S.reincarnWorldRestored) {
+        for (let i = 0; i <= hiW; i++) {
+          const wid = D.WORLDS[i].id;
+          unlockWorld(wid);                                    // 能进 / 已解锁（不受等级与星数影响）
+          if (i <= hi) S.worldFirstClear[wid + '_normal'] = true;  // 那笔首通账早花过了：不许重打重发（第 hi+1 张没通关，不标）
+        }
+        S.reincarnWorldRestored = true;
+      }
+      const cf = S.corridor || (S.corridor =  getProxied({ floor: 1, best: 0 }));
+      if ((cf.floor || 1) <= 1 && (cf.best || 0) > 0 && !S.reincarnCorridorRestored) {
+        cf.floor = cf.best + 1;                                // 深井停在哪层：唯一解（见上面的不变量）
+        S.reincarnCorridorRestored = true;
+      }
+    }
     refreshUnlocks();
   }
-  function newGame() {
+  /* V1.1.20（F1-5）：`opt.keepRescue` ＝ 这条路只是"把内存档建起来让界面能用"
+     （开机 boot / 渲染兜底 ensureState），**不算玩家选择** ⇒ 救援态那道禁写继续留着。
+     不带参数 = "玩家自己按的开始新游戏 / 删档重开" ⇒ 清掉救援态（那是显式选择）。 */
+  function newGame(opt) {
     S = defaultState();
     offlineSettled = true;     // 新档没有"离线窗口"要保，存盘照常盖章（V9.6.92）
+    /* V1.1.20（F1-1）：新档的 savedAt 就是"现在" —— 空壳判 0 会让云端那份（哪怕更旧）
+       无条件盖上来；而"删档重开 / 新玩家"这两条路本来就该以本机为准（与旧行为一致）。 */
+    S.savedAt = Date.now();
     /* V9.6.100：**开始新游戏 = 恢复存盘**。
        wipeSave() 会把 suppressSave 关上（防"删档后又被 beforeunload 写回旧档"），
        小游戏没有 reload 这一步，所以必须由 newGame 负责重新打开存盘开关 ——
        否则"删档重开"之后玩家这一局玩多久都不会落盘。 */
     suppressSave = false;
+    /* V1.1.20（F1-5）：**救援态里建档不许覆盖主键** —— 开机读到一份读不出来的档时，
+       game.js 照样会调 newGame() 把内存档建起来（界面要能用），但那一份不许落到主键上；
+       等玩家在弹窗里点「继续新档」（rescueConfirmNewGame）或自己走删档重开才解闸。 */
+    if (!(opt && opt.keepRescue)) rescue = null;      // 玩家主动开的这一局 = 显式选择
+    if (rescue) suppressSave = true;
     S.player.name = '';   // 创建角色时填写
     // 旧档境界换算（10 大境 → 36 小阶，×4）只能作用在"V9 之前的老档"上。
     // 这个标记以前要等第一次读档才写入，于是新档第一次读档时也被乘了 4
@@ -849,15 +1064,86 @@ window.Core = (function () {
 
      配合：起名/改名/新建主角三处的自由输入**全部去掉**（小游戏 sc-start.js 与 sc-last.js、
      网页版同一个 modal），入口只剩【从名单里换一个】。 */
+  /* ================= V1.0.4（2026-09-27 · 父亲大人："12个字是中文字符，不是英文，我刚打拼音都超了"）===
+     名字上限**按"中文字符"算，不按"字符个数"算**：
+       · 一个汉字（含全角标点）＝ 2 个宽度单位；字母 / 数字 / 半角标点 ＝ 1；
+       · 上限 **24 个宽度单位**（＝12 个汉字，或者 24 个字母）——
+         所以"打拼音打一半就超了"这件事不会再发生。
+     ⚠️ 这条口径在**三处**必须一致（前端 core / 前端 sc-namecheck / 云函数 checkname 各一份，
+        云函数那边是另一个运行时，没法 require 同一个文件，所以三份都要带同一段注释）。
+     名字宽度函数：一处定义在这里，另两处照抄同一套判据。 */
+  function nameWidth(s) {
+    let w = 0;
+    for (const ch of String(s == null ? '' : s)) {
+      const c = ch.codePointAt(0);
+      w += ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF)
+        || (c >= 0x3000 && c <= 0x303F) || (c >= 0xFF00 && c <= 0xFF60)) ? 2 : 1;
+    }
+    return w;
+  }
+  /* 按宽度截断：超了就掐（不切断半个"字"的算法 —— 全角算 2，掐的时候整块留或整块丢） */
+  function clipName(s, maxW) {
+    const M = maxW || 24;
+    let w = 0, out = '';
+    for (const ch of String(s == null ? '' : s)) {
+      const c = ch.codePointAt(0);
+      const cw = ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF)
+        || (c >= 0x3000 && c <= 0x303F) || (c >= 0xFF00 && c <= 0xFF60)) ? 2 : 1;
+      if (w + cw > M) break;
+      out += ch; w += cw;
+    }
+    return out;
+  }
+  const NAME_MAX_W = 24;                       // ＝ 12 个汉字 / 24 个字母
   function cleanName(n) {
-    const s = String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+    const s = clipName(String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim(), NAME_MAX_W);
     if (!s) return '';
     return D.PROTAG_NAMES.indexOf(s) >= 0 ? s : '';   // 不在白名单 → 返回空，调用方据此拒绝
   }
+
+  /* ================= V1.0.4 · V（2026-09-27 · 自由命名 ＋ 内容安全机审 · 父亲大人）=================
+     父亲大人原话：「自由命名可以接入 api 不，可以的话我感觉还是可以开的，之前就是因为命名没有限制
+     被警告了才关的，现在开了云开发能接吗」。所以这一轮把自由输入开回来，**但必须带审**：
+       · 白名单（`cleanName`）**一个字都没删** —— 它是"没网 / 没云"时唯一的降级路径；
+       · 名单外的名字要落盘，必须带一份**刚过审的凭据**（`takeNameTicket`）；
+       · 凭据由 `js/sc-namecheck.js` 在云函数 `checkname` 返回通过时签发，**一次一用、60 秒过期**
+         （够走完"敲字 → 点确定"这一下，又不至于留成一张长期通行证）。
+
+     "凭据"这层为什么值：`cleanName` 的白名单能自证，而那正是它的局限 —— 名单里的名字
+     永远只有 18 个。开自由输入要么受控地放开白名单，要么把"谁审过"这件事记下来。
+     这里选后者：**审过才放行、审过才记档**（`S.player.nameAudited`），
+     读档时还要再对一次（见 migrate 里的 `keepName`）。 */
+  const NAME_TICKET_MS = 60 * 1000;
+  let nameTicket = null;                       // { name, at } —— 一次一用的过审凭据
+  /* 名字的"形状"：去危险字符、压空白、**按宽度掐到 24 个单位（＝12 个汉字 / 24 个字母）**。
+     判据与界面、云函数三处同口径（见上面 `nameWidth` / `clipName` 的注释）。 */
+  function shapeName(n) {
+    return clipName(String(n == null ? '' : n).replace(NAME_BAD, '').replace(/\s+/g, ' ').trim(), NAME_MAX_W);
+  }
+  function isListName(n) { return D.PROTAG_NAMES.indexOf(String(n == null ? '' : n)) >= 0; }
+  /* 机审通过后签发（只认名单外的名字）；签发后 60 秒内、且**字串一字不差**才认。 */
+  function grantNameTicket(name) {
+    const s = shapeName(name);
+    if (!s || isListName(s)) return false;
+    nameTicket = { name: s, at: Date.now() };
+    return true;
+  }
+  function takeNameTicket(name) {
+    if (!nameTicket || nameTicket.name !== name) return false;
+    if (Date.now() - nameTicket.at > NAME_TICKET_MS) { nameTicket = null; return false; }
+    nameTicket = null;                         // 一次一用：同一张凭据不许落两个名字/两个主角
+    return true;
+  }
   function setPlayerName(name) {
-    const clean = cleanName(name);
-    if (!clean) return false;
-    S.player.name = clean;
+    const s = shapeName(name);
+    if (!s) return false;
+    const listed = isListName(s);
+    /* 名单外 → 必须拿得出刚过审的凭据；拿不出就拒绝（调用方据此给玩家一句人话）。 */
+    if (!listed && !takeNameTicket(s)) return false;
+    S.player.name = s;
+    /* 记下"这一个名字审过了"（名单里的名字不需要 —— 它自己能自证，所以这里清空，
+       免得旧的凭据跟着新名字一起留在档里）。 */
+    S.player.nameAudited = listed ? '' : s;
     save();
     return true;
   }
@@ -885,6 +1171,12 @@ window.Core = (function () {
     try { prevRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
     try {
       if (prevRaw) { try { localStorage.setItem(SAVE_KEY + '_pre_switch', prevRaw); } catch (e) {} }
+      /* V1.1.20（F1-2 / F1-1）：切档期间**一律不许盖章** —— 下面 `migrate()` 与那句 `save()`
+         都可能写盘，而这份新档自带的时间戳（离线窗口 ＋ savedAt）正是它最值钱的东西。
+         原来这里没有重置 offlineSettled：在"本会话已经结算过"的情况下（offlineSettled=true），
+         那句 save() 会当场把新档的 idle.lastTs 盖成"现在" —— 探针实测：8 小时的离线窗口 → 0。
+         （回滚栈里已经存着 prevOffline，下面 catch 那支照旧整份还原。） */
+      offlineSettled = false;
       legacyRaw = (rawData.c001Merged === undefined) && (rawData.altPlayers === undefined) && (rawData.fabao === undefined);
       S = fillDefaults(defaultState(), rawData);
       S.v = SAVE_VER;
@@ -896,7 +1188,20 @@ window.Core = (function () {
         if (prevRaw) backupSave(prevRaw, 'migrate');
         try { console.warn('[save] 迁移这一步出错了（' + why + '），进度按已读到的样子保留：' + (e && e.message)); } catch (e2) {}
       }
+      /* V1.1.20（F1-5）：换档成功＝玩家**显式**选定了这一份（云取回 / 存档码 / 导入 / 读档槽）——
+         救援态到此结束，并把那道禁写一起解掉（否则刚换进来的这份永远落不了盘）。 */
+      if (rescue) { rescue = null; suppressSave = false; }
       save();
+      /* ================= V1.1.20（F1-2）：给**换进来的这份档**补跑一次离线结算 =================
+         换档（云取回 / 存档码 / 导入 / 读档槽 / 恢复备份）之后，新档自带的离线窗口必须按它自己的
+         `idle.lastTs` 结算一次 —— 否则那份窗口要么被盖章抹掉（上面那句 save 的老行为），
+         要么永远拿不到（没有任何路径给它跑 settleOffline）。
+         补结算失败**不算换档失败**（档已经换好并落盘了），只留一条日志。 */
+      try { settleOffline(); }
+      catch (e) {
+        offlineSettled = true;
+        try { console.warn('[save] 换档后的离线补结算出错（档已经换好、没丢）：' + (e && e.message)); } catch (e2) {}
+      }
       return true;
     } catch (e) {
       S = prevS; offlineSettled = prevOffline; legacyRaw = prevLegacy;      // 整份回滚，绝不留下半迁移的 S
@@ -1572,6 +1877,9 @@ window.Core = (function () {
          跟着折扣浮动会让"每人 145 块"这个口径当场失效（尺子也钉不住）。 */
       mat: cost.mat || D.BLOODLINE_MAT,
       matN: cost.matN || 0,
+      /* V1.1.16（0927-Y 数值轮 · 报告 §五 I2）：末段第二种料，与第一种同一条口径（不吃折扣） */
+      mat2: cost.mat2 || D.BLOODLINE_MAT2,
+      mat2N: cost.mat2N || 0,
     }));
     if (charId === '@player') {
       if (!S.player.bloodline || S.player.bloodlineLv >= D.BLOODLINE_MAX) return null;
@@ -1588,14 +1896,20 @@ window.Core = (function () {
     if (!isUnlocked('bloodline')) return  getProxied({ ok: false, msg: `🔒 ${unlockTip('bloodline')}` });
     if (c.bloodlineLv >= D.BLOODLINE_MAX) return  getProxied({ ok: false, msg: '命格已满级' });
     const q = bloodlineQuote(charId);            // 与界面同一份报价（已含血统实验室折扣）
-    /* V1.1.4：材料先判、再扣钱 —— 反过来的话"钱扣了料不够"就要退款，多一条回滚路径。 */
+    /* V1.1.4：材料先判、再扣钱 —— 反过来的话"钱扣了料不够"就要退款，多一条回滚路径。
+       V1.1.16（0927-Y 数值轮 · 报告 §五 I2）：命格末段（Lv.40 起）多一种料（`mat2`）。 */
     const matId = q.mat, matN = q.matN || 0;
     if (matN && (S.items[matId] || 0) < matN) {
       return  getProxied({ ok: false, msg: `${(D.ITEMS[matId] ||  getProxied({})).name || matId} 不足（${S.items[matId] || 0}/${matN}）` });
     }
+    const mat2Id = q.mat2, mat2N = q.mat2N || 0;
+    if (mat2N && (S.items[mat2Id] || 0) < mat2N) {
+      return  getProxied({ ok: false, msg: `${(D.ITEMS[mat2Id] ||  getProxied({})).name || mat2Id} 不足（${S.items[mat2Id] || 0}/${mat2N}）` });
+    }
     const cost =  getProxied({ otherworld: q.otherworld, points: q.points });
     if (!spend(cost)) return  getProxied({ ok: false, msg: '异界结晶或点数不足' });
     if (matN) addItem(matId, -matN);
+    if (mat2N) addItem(mat2Id, -mat2N);
     c.bloodlineLv++;
     save();
     return  getProxied({ ok: true, msg: `${base.bloodline}命格 Lv.${c.bloodlineLv}` });
@@ -1969,17 +2283,28 @@ window.Core = (function () {
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
     /* 专属装备的基础值按**玩家当前进度**那张图的档位生成（V9.6.83）——
-       以前是写死的 320，第 20 张图之后随便一件普通 UR 武器都比它强，专属成了纪念品。 */
+      以前是写死的 320，第 20 张图之后随便一件普通 UR 武器都比它强，专属成了纪念品。 */
     const eq = D.makeSignatureEquip(sigId, uid, boxSourceWorld());
     if (!eq) return  getProxied({ sold: false });
     S.equips[uid] = eq;
     S.codex.equipsSeen++;
-    if (S.codex.equipNames && eq.name && S.codex.equipNames.indexOf(eq.name) < 0) S.codex.equipNames.push(eq.name);
+    /* ================= 0928 抢修单 F5 #3：专属装备满格时**不许"折现即永久消失"** =================
+       旧顺序是"先写图鉴名字（equipNames）→ 再判容量 → 满了就 delete + 折现 240◆"。
+       而 `pickSignatureEquip` 正是拿 `equipNames` 判"这件有没有拥有过"——
+       于是一件被折现的本命装备，系统此后永远认定"已拥有"，**对玩家永久消失**
+       （36 件收集线那一条直接断掉，结算页还只写"已折现"）。
+       处置：① 容量判定挪到**写图鉴名字之前**；② 与 `grantEquip` **共用同一个出口**
+       （`stashEquip`：装得下 → 进包；装不下 → 进装备待领箱，可领回；只有待领箱也满 60 件才折现）。 */
     if (bagUsage().eqUsed > S.bag.eqCap) {
       delete S.equips[uid];
-      addCur('otherworld', D.DECOMPOSE_GAIN.UR);
-      return  getProxied({ sold: true, gain: D.DECOMPOSE_GAIN.UR, bagFull: true });
+      const sr = stashEquip(eq);
+      if (sr.stashed) {
+        if (S.codex.equipNames && eq.name && S.codex.equipNames.indexOf(eq.name) < 0) S.codex.equipNames.push(eq.name);
+        return  getProxied({ equip: null, stashed: true, eq: eq, bagFull: true, signature: true });
+      }
+      return  getProxied({ sold: true, gain: sr.gain || 0, bagFull: true, overflow: !!sr.overflow, signature: true });
     }
+    if (S.codex.equipNames && eq.name && S.codex.equipNames.indexOf(eq.name) < 0) S.codex.equipNames.push(eq.name);
     return  getProxied({ equip: eq, signature: true });
   }
 
@@ -2047,7 +2372,16 @@ window.Core = (function () {
   function sanitizeSave() {
      getProxied(['chars', 'items', 'equips', 'serums']).forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] =  getProxied({}); });
     Object.keys(S.chars).forEach(id => { if (!D.charById[id]) delete S.chars[id]; });
-    Object.keys(S.items).forEach(k => { if (!D.ITEMS[k]) delete S.items[k]; });
+    /* V1.1.20（F1-7）：道具**件数也要洗**。原来这里只删未知 id，件数原样收下 ——
+       一份被改过的档塞进 `NaN` / 负数 / 字符串，`bagUsage()` 会整串变 NaN ⇒ 背包显示 NaN、
+       `canAddItem()` 恒假 ⇒ 之后掉的东西全进待领箱、而 `stashNeedCells()` 也是 NaN 领不回来。
+       口径：非有限数按 0、负数/0 直接删键（与"未知 id 就删"同一条：宁可少，绝不崩）。 */
+    Object.keys(S.items).forEach(k => {
+      if (!D.ITEMS[k]) { delete S.items[k]; return; }
+      const n = Math.floor(numOr(S.items[k], 0));
+      if (!(n > 0)) { delete S.items[k]; return; }
+      S.items[k] = n;
+    });
     Object.keys(S.equips).forEach(uid => {
       const e = S.equips[uid];
       /* V9.5.86（自审·战斗引擎压测）：这里原来只校验槽位和稀有度——
@@ -2279,7 +2613,12 @@ window.Core = (function () {
   // 强化所需材料：无材料时按 tier 折算点数代用
   function enhanceMat(eq) {
     const tier = D.enhanceMatTier(eq.enhance);
-    const itemId = 'mat_t' + tier;
+    /* V1.1.16（0927-Y 数值轮 · 报告 §五 I1）：一档可能有好几种料（`MAT_TIER_IDS`）——
+       **功能等价，谁有吃谁**，`mat_tN` 排第一（先把玩家手里那一大堆花掉）。
+       这一处的效果正是报告要的"把一些货币消耗换成道具/材料"：
+       以前同档只有一种料、没有了就用点数代用（`MAT_SUBSTITUTE_POINTS`）；
+       现在同档有兄弟料就直接吃料、不代用。**报价与扣款仍走同一个 quote**（结构上不允许分叉）。 */
+    const itemId = D.mathaveOfTier ? D.mathaveOfTier(tier, S.items) : ('mat_t' + tier);
     const has = (S.items[itemId] || 0) > 0;
     return  getProxied({ itemId, tier, has, subPoints: has ? 0 : D.MAT_SUBSTITUTE_POINTS[tier] });
   }
@@ -2796,6 +3135,33 @@ window.Core = (function () {
     save();
     return  getProxied({ results, usedTickets });
   }
+  /* ================= V1.1.16（0927-Y 数值轮 · 报告 §6-8①）：点数出口＝普通池「百连」=================
+     起因（报告 §四 / §6-8）：**建筑是点数唯一的出口**，而它在广告档 90 天就点满了
+     → `longrun_sim 90 ads` 实测第 90 天手里剩 **727 万 ◉**（等级 / 主角血统 / 建筑三条线全到顶）。
+     普通池单抽 ◉500 本来就是现成的出口（727 万 ＝ 14,500 抽），**问题只是"一次一次点不现实"**。
+     做法：**复用 `recruitTen` 连打 times 次**（默认 10 次 ＝ 100 抽）——
+       出率 / 保底 / "有券先用券" / 每日任务记账 全在原来那一段里，**零新内容、零新概率**。
+     ⚠️ **一笔一笔付**（`recruitTen` 自己扣钱扣券）：所以"抽到一半钱不够"是真实会发生的，
+        返回里必须带 `done`（真抽了几组）与 `stopped`（为什么停）—— 界面按这个报账，
+        不许把"以为抽了 100 次"当成 100 次。
+     ⚠️ 上限 20 组（＝200 抽）只是防误触；`×0` / 负数一律夹到 1 组。 */
+  function recruitBulk(pool, times) {
+    const p = D.RECRUIT_POOLS[pool];
+    if (!p) return  getProxied({ error: '卡池不存在' });
+    const n = Math.max(1, Math.min(20, Math.floor(times) || 1));
+    const results = [];
+    let done = 0, usedTickets = 0, stopped = null;
+    for (let i = 0; i < n; i++) {
+      const r = recruitTen(pool);
+      if (r.error) { stopped = r.error; break; }
+      results.push.apply(results, r.results || []);
+      usedTickets += r.usedTickets || 0;
+      done++;
+    }
+    if (!done) return  getProxied({ error: stopped || '抽不了' });
+    save();
+    return  getProxied({ results, usedTickets, done, stops: stopped, pool });
+  }
   /* 每日免费抽（V9.5.51 父亲大人）：
      普通池：每天 3 次，且**两次之间隔 10 分钟**；高级池：每天 1 次；
      限定池没有免费。次数和"上次用的时间"都按自然日刷新（和每日任务同一把钟）。 */
@@ -2985,46 +3351,56 @@ window.Core = (function () {
     const now = Date.now();
     const last = S.idle.lastTs || now;
     offlineSettled = true;    // 从这一刻起，存盘可以正常把 lastTs 推到"现在"（V9.6.92）
-    if (now < last - 60000) { S.idle.lastTs = now; return  getProxied({ cheat: true }); }   // 防改时间
-    const elapsedSec = Math.min((now - last) / 1000, offlineCapHours() * 3600);
-    if (elapsedSec < 60) { S.idle.lastTs = now; return null; }
-    const eff = offlineEfficiency();
-    const r = idleRates();
-    const mins = elapsedSec / 60 * eff;
-    const gains =  getProxied({
-      points: Math.round(r.pointsPerMin * mins),
-      exp: Math.round(r.expPerMin * mins),
-      otherworld: Math.floor(elapsedSec / 600) * r.otherworldPer10Min,
-      mat: Math.floor((r.matPerMin || 0) * mins),
-    });
-    /* ⚠️ 离线收益必须**在这里**入账。
-       以前入账写在 UI.showOfflineGains 里（那是"弹结算窗"的地方），而 main.js 只在
-       离线 ≥5 分钟时才调它——于是离线 1~5 分钟的收益算完就被丢掉，lastTs 却已经推到当前时间，
-       玩家白等一场。现在改成：核心负责入账，UI 只负责显示，弹不弹窗与拿不拿到彻底分开（V9.5 修）。 */
-    addCur('points', gains.points);
-    addCur('otherworld', gains.otherworld);
-    addPlayerExp(gains.exp);
-    const matOut = grantIdleMat(gains.mat);
-    if (matOut && matOut.count > 0) { gains.matItem = matOut.item; gains.matCount = matOut.count; gains.mat = matOut.count; }
-    else { gains.matFull = !!(matOut && matOut.full); gains.matStashed = (matOut && matOut.stashed) || 0; gains.mat = 0; }
-    /* ================= V1.1.8（乙组 B4 · 离线翻倍）=================
-       父亲大人的口径：**全额 ×2、不限次数**；【定】**每个离线结算窗口只能翻一次**。
-       落地：把"这一次结算给了多少"原样记下来（秒数 ＋ 各项实际到账数），
-       广告翻倍就是**照这份记录再发一份** —— 所以：
-         · 翻的一定是"这一次真的拿到的"，不是重算一遍（重算会跟当时的效率/加成对不上）；
-         · `doubled` 标记保证同一个窗口**只翻一次**（不然回主页还能反复点）；
-         · 下一次 `settleOffline` 会把记录整条换掉（新窗口、doubled 复位）。 */
-    S.idle.lastSettle =  getProxied({
-      sec: elapsedSec,
-      points: gains.points, exp: gains.exp, otherworld: gains.otherworld,
-      matItem: gains.matItem || null, matCount: gains.matCount || 0,
-      doubled: false, at: now,
-    });
-    S.idle.lastTs = now;
-    travelAccrue(elapsedSec);      // 离线时间同样攒"游历奇遇"
-    addSectExp(Math.floor(elapsedSec / 60 * D.SECT_EXP.perMin));
-    save();
-    return  getProxied({ seconds: elapsedSec, gains, efficiency: eff });
+    /* ================= V1.1.20（F1-1 · 根因闸）=================
+       **这一段是"开机自愈 / 离线结算"，不是玩家在玩** —— 所以整段（含里面每一次
+       addCur / grantIdleMat / save）都不许把 `savedAt`（"谁新听谁的"判据）刷新成"现在"。
+       原来没有这道闸：开机结算最后那句 `save()` 当场把判据盖章，于是
+       `cloudTs > localTs()` 恒假 ⇒ **云上那份再新也拉不下来**（父亲大人报的"手机推到第三关、
+       电脑上还是第二关"就是这么来的）。`save({auto:true})` 那道闸管的是心跳（隔一层），
+       这一道管的是结算本体（近因）—— 两道都要，缺一条都不行。 */
+    settleWriting = true;
+    try {
+      if (now < last - 60000) { S.idle.lastTs = now; return  getProxied({ cheat: true }); }   // 防改时间
+      const elapsedSec = Math.min((now - last) / 1000, offlineCapHours() * 3600);
+      if (elapsedSec < 60) { S.idle.lastTs = now; return null; }
+      const eff = offlineEfficiency();
+      const r = idleRates();
+      const mins = elapsedSec / 60 * eff;
+      const gains =  getProxied({
+        points: Math.round(r.pointsPerMin * mins),
+        exp: Math.round(r.expPerMin * mins),
+        otherworld: Math.floor(elapsedSec / 600) * r.otherworldPer10Min,
+        mat: Math.floor((r.matPerMin || 0) * mins),
+      });
+      /* ⚠️ 离线收益必须**在这里**入账。
+         以前入账写在 UI.showOfflineGains 里（那是"弹结算窗"的地方），而 main.js 只在
+         离线 ≥5 分钟时才调它——于是离线 1~5 分钟的收益算完就被丢掉，lastTs 却已经推到当前时间，
+         玩家白等一场。现在改成：核心负责入账，UI 只负责显示，弹不弹窗与拿不拿到彻底分开（V9.5 修）。 */
+      addCur('points', gains.points);
+      addCur('otherworld', gains.otherworld);
+      addPlayerExp(gains.exp);
+      const matOut = grantIdleMat(gains.mat);
+      if (matOut && matOut.count > 0) { gains.matItem = matOut.item; gains.matCount = matOut.count; gains.mat = matOut.count; }
+      else { gains.matFull = !!(matOut && matOut.full); gains.matStashed = (matOut && matOut.stashed) || 0; gains.mat = 0; }
+      /* ================= V1.1.8（乙组 B4 · 离线翻倍）=================
+         父亲大人的口径：**全额 ×2、不限次数**；【定】**每个离线结算窗口只能翻一次**。
+         落地：把"这一次结算给了多少"原样记下来（秒数 ＋ 各项实际到账数），
+         广告翻倍就是**照这份记录再发一份** —— 所以：
+           · 翻的一定是"这一次真的拿到的"，不是重算一遍（重算会跟当时的效率/加成对不上）；
+           · `doubled` 标记保证同一个窗口**只翻一次**（不然回主页还能反复点）；
+           · 下一次 `settleOffline` 会把记录整条换掉（新窗口、doubled 复位）。 */
+      S.idle.lastSettle =  getProxied({
+        sec: elapsedSec,
+        points: gains.points, exp: gains.exp, otherworld: gains.otherworld,
+        matItem: gains.matItem || null, matCount: gains.matCount || 0,
+        doubled: false, at: now,
+      });
+      S.idle.lastTs = now;
+      travelAccrue(elapsedSec);      // 离线时间同样攒"游历奇遇"
+      addSectExp(Math.floor(elapsedSec / 60 * D.SECT_EXP.perMin));
+      save();
+      return  getProxied({ seconds: elapsedSec, gains, efficiency: eff });
+    } finally { settleWriting = false; }
   }
   /* 离线翻倍（B4）：把最近一次离线结算**再发一份**；同一个窗口只许翻一次。 */
   function lastOfflineSettle() { return S.idle.lastSettle || null; }
@@ -3120,6 +3496,10 @@ window.Core = (function () {
       }
     }
     S.idle.bankSec = 0;
+    /* V1.0.4 · X（订阅消息）：把银行**领空**了 ⇒"满了的那一刻"当场作废。
+       不清掉的话，下一拍心跳之前推一次档，云端会看到"还满着"而补发一条已经过期的提醒
+       （`scripts/notify_audit.js` ④ 那条"领走之后立刻回 0"钉着这一处）。 */
+    if (S.act) S.act.bankFullAt = 0;
     task('idle1', 1);
     S.idle.lastIdleClaim =  getProxied({
       points: g.points, exp: g.exp, otherworld: g.otherworld,
@@ -3283,6 +3663,10 @@ window.Core = (function () {
      改一个动两个，比"没重置"更难查。 */
   const PROTAGONIST_KEYS =  getProxied(['name', 'level', 'exp', 'bloodline', 'bloodlineLv', 'attrPoints', 'attrs',
     'skillPoints', 'skillLv', 'realm', 'talents', 'reincarnations', 'geneLock', 'row',
+    /* V1.0.4 · V：`nameAudited` 必须跟着主角走 —— 不然切一位主角再切回来，
+       那位过审的自由名字就"丢了凭据"，下一次读档被换成预设名（test_game 那条
+       "快照要覆盖 S.player 每一个字段"也会当场红）。 */
+    'nameAudited',
     /* V1.1.9（续13 · P0-4）：`bestWorldIdx`（历史最高通关世界）也是 `S.player` 上的一个字段 ——
        不列进来的话，`test_game` 那条"快照必须覆盖 S.player 的每一个字段"当场红（本轮实测踩到），
        而且新建主角会**继承上一任的进度档**（和 V1.0.3 那五个字段同一个坑）。
@@ -3317,13 +3701,18 @@ window.Core = (function () {
     ]);
   }
   function createProtagonist(name) {
-    name = (name || '').trim();
-    if (!name) return  getProxied({ ok: false, msg: '名字不能为空' });
+    /* V1.0.4 · V：新建主角的名字也走**同一条判据**（名单里 → 免审；名单外 → 必须带过审凭据）。
+       以前这里只 `.trim()`，等于"名字从哪来的"没人把关 —— 现在三个入口（起名 / 改名 / 新建主角）
+       都从 `setPlayerName` 或这里进，规则只有这一份。 */
+    const nm = shapeName(name);
+    if (!nm) return  getProxied({ ok: false, msg: '名字不能为空' });
     if (S.altPlayers.length >= 6) return  getProxied({ ok: false, msg: '最多创建 6 个额外主角' });
+    const listed = isListName(nm);
+    if (!listed && !takeNameTicket(nm)) return  getProxied({ ok: false, msg: '这个名字还没过审，换一个试试' });
     S.altPlayers.push(snapshotProtagonist());
-    restoreProtagonist(freshProtagonist(name));
+    restoreProtagonist(freshProtagonist(nm, listed ? '' : nm));
     save();
-    return  getProxied({ ok: true, msg: `新主角「${name}」已创建，天赋与命格从 Lv.1 重新选` });
+    return  getProxied({ ok: true, msg: `新主角「${nm}」已创建，天赋与命格从 Lv.1 重新选` });
   }
   function switchProtagonist(altIndex) {
     const alt = S.altPlayers[altIndex];
@@ -3336,12 +3725,22 @@ window.Core = (function () {
   }
 
   /* ================= 建筑 ================= */
+  /* 每栋建筑的上限（`upgradeBuilding` 那道闸）；5 栋全满 ＝ 250 级 —— `sc-grow.js` 那行
+     「Lv.X / 250」就是这个口径。**只此一处**，`buildingMaxed()`（下面的死条闸门）也读它。 */
+  const BUILDING_MAX_LV = 50;
+  /** 建筑**全满**了没（每栋都到顶）。用途只有一个：满级后「基地建设升级 1 级」这条额外任务
+      再派发就没意义了 —— **满级后不留死条**（父亲大人 0929-I 点头的口子）。 */
+  function buildingMaxed() {
+    const list = D.BUILDINGS || [];
+    return list.length > 0 && list.every(b => (S.buildings[b.id] || 0) >= BUILDING_MAX_LV);
+  }
   function upgradeBuilding(id) {
     const lv = S.buildings[id];
-    if (lv >= 50) return  getProxied({ ok: false, msg: '已满级' });
+    if (lv >= BUILDING_MAX_LV) return  getProxied({ ok: false, msg: '已满级' });
     const cost =  getProxied({ points: D.buildingCost(id, lv) });
     if (!spend(cost)) return  getProxied({ ok: false, msg: '点数不足' });
     S.buildings[id]++;
+    task('build1', 1);          // 0929-I 额外任务：基地建设升级 1 级（周常不接这条 → TASK_SRC 里是 null）
     save();
     return  getProxied({ ok: true, msg: `升到 Lv.${S.buildings[id]}` });
   }
@@ -3561,11 +3960,12 @@ window.Core = (function () {
     const rolled = travelDayRoll(t);      // 跨天才来领：这一轮按新的一天从头算
     t.pending = null;
     t.round = rolled ? 0 : t.round + 1;   // 领完才开始算下一轮，间隔按节奏表往后走
-    t.bankSec = 0;
-    t.got = (t.got || 0) + 1;
-    save();
-    return  getProxied({ ok: true, msg: `${tv.name}：${travelRewardText(tv)}`, travel: tv });
-  }
+   t.bankSec = 0;
+   t.got = (t.got || 0) + 1;
+    task('travel1', 1);         // 0929-I 额外任务：领取游历奇遇 1 次（不接周常 → TASK_SRC['travel1'] 是 null）
+   save();
+   return  getProxied({ ok: true, msg: `${tv.name}：${travelRewardText(tv)}`, travel: tv });
+ }
   function travelRewardText(tv) {
     return rewardTextOf(tv.effect);
   }
@@ -3635,6 +4035,7 @@ window.Core = (function () {
     spend( getProxied({ points: g.points }));
     addItem(seedId, -seedN);
     S.garden[idx] =  getProxied({ id: g.id, at: Date.now() + g.sec * 1000 });
+    task('gard1', 1);           // 0929-I 额外任务：药园种植 1 次（周常 w_garden 由 TASK_SRC['gard1']='garden' 自动喂）
     save();
     return  getProxied({ ok: true, msg: `已种下「${g.name}」，${Math.round(g.sec / 60)} 分钟后可收` });
   }
@@ -3939,8 +4340,8 @@ window.Core = (function () {
         Object.entries(firstClearReward).forEach(([k, v]) => addCur(k, v));
       }
     }
-    S.stats.runs++;
-    task('dungeon1', 1);
+    /* F5 #7：通关计数走**唯一出口**（手动通关与扫荡共用，见 registerStageClear）。 */
+    registerStageClear();
     // 灯阁评级经验：打关卡就涨，首通给全额，重复刷给一半（对标"宗门等级随进度涨"）
     const sectGain = Math.round((D.SECT_EXP[diff] || D.SECT_EXP.normal) * (first ? 1 : 0.5));
     const sectUp = addSectExp(sectGain);
@@ -4253,11 +4654,109 @@ window.Core = (function () {
   /* ================= 任务 / 登录 ================= */
   function ensureDaily() {
     const today = dailyDate();
+    actRoll(today);                              // V1.0.4 · W：跨天就把"累计登录天数"记一笔（幂等）
     if (S.tasks.date !== today) {
       if (S.tasks.date) carryOverDailies();        // 跨天：先把昨天"做完没领"的补发掉（见下）
       S.tasks.date = today; S.tasks.daily =  getProxied({}); S.tasks.claimed =  getProxied({}); S.tasks.allClaimed = false;
     }
     ensureWeekly();
+  }
+  /* ================= V1.0.4 · W：游戏圈活跃任务的三个计数（判据出口只此一处）=================
+     父亲大人 09-27「7，可以」；平台侧活动任务来问"达成没"，我们就按这三样答。
+     这一块**只记账、不发奖、不显示**，唯一的出口是 `actSnapshot()`（云同步推档时带走）。
+
+     两条防作弊口径（照离线收益那套"防改时间"的思路，派单点名）：
+       · **按心跳累加**：`actTick()` 由 game.js 的 1 秒心跳调用，两次心跳之间的间隔
+         只认 **0 < dt ≤ 5 秒** —— 玩家把手机时间往前拨（dt 巨大）、往回拨（dt ≤ 0）、
+         或者游戏被切到后台（定时器被微信掐住，回来那一跳 dt 远大于 5 秒）都不记账；
+       · **每天封顶 8 小时**：`daySec` 记当天已经算过的秒数，到顶就一天都不再涨
+         （挂机一整天最多算 8 小时，"在线时长"类任务刷不出花来）。
+     跨天那一笔在 `ensureDaily()` 里（全项目唯一的"今天开始了"口子）：
+     `day` 记当天日期、`daySec` 归零、`loginDays` ＋1 —— 幂等，同一天进多少次都只算一天。 */
+  const ACT_DAY_CAP_SEC = 8 * 3600;      // 一天最多记 8 小时在线
+  const ACT_TICK_MAX_SEC = 5;            // 单次心跳最多认 5 秒（防改时间 / 防后台挂机）
+  function actRoll(today) {
+    if (!S.act) S.act =  getProxied({ day: '', loginDays: 0, playSec: 0, daySec: 0, lastTickAt: 0 });
+    if (S.act.day === today) return false;
+    /* 从"没有这一天"到"新的这一天"：+1。player 把时间拨到明天再拨回来 = 一天只加一次
+       （`day` 已经是明天了，拨回来时 `day !== today` 会再 +1 —— 这条**故意的**：
+        宁可多算一天登录，也不让"拨表"把登录天数卡死；而在线秒数那一边是分秒不差的）。 */
+    S.act.day = today;
+    S.act.loginDays = Math.max(0, Number(S.act.loginDays) || 0) + 1;
+    S.act.daySec = 0;
+    return true;
+  }
+  /** 心跳记账（game.js 每秒叫一次）。返回这一次真的记了多少秒（尺子读它）。 */
+  function actTick(now) {
+    if (!S || !S.act) return 0;
+    /* V1.0.4 · X：顺手对一次"挂机银行满了没"（满了就记时刻，云端 `notify` 靠它发服务通知）。
+       放在所有提前 return 之前 —— 时钟异常那些分支也不该漏掉这一件事。 */
+    try { actBankFullAt(); } catch (e) {}
+    const t = Number(now) || Date.now();
+    const last = Number(S.act.lastTickAt) || 0;
+    S.act.lastTickAt = t;
+    if (!last) return 0;                                   // 第一次心跳：只对表，不记账
+    const dt = (t - last) / 1000;
+    if (!(dt > 0) || dt > ACT_TICK_MAX_SEC) return 0;       // 时钟跳了 / 后台被挂起 → 不记
+    const used = Math.max(0, Number(S.act.daySec) || 0);
+    if (used >= ACT_DAY_CAP_SEC) return 0;                  // 今天已经记满 8 小时
+    const add = Math.min(dt, ACT_DAY_CAP_SEC - used);
+    S.act.daySec = used + add;
+    S.act.playSec = Math.max(0, Number(S.act.playSec) || 0) + add;
+    return add;
+  }
+  /** **唯一出口**：随档上云的那一小块**明文数字**（全是整数；通关次数复用 `S.stats.runs`）。
+      两个消费方各取所需：`gameact` 取前三个（平台判活跃任务），`notify` 取后三个（订阅消息）。
+      注意这里**不返回** day / daySec / lastTickAt —— 内部对表字段一个都不往外发。 */
+  function actSnapshot() {
+    const a = S && S.act ? S.act : {};
+    /* V1.0.4 · X（复核时补的一处口径）：满了那一刻报的**两个数**都从现成的 `idleBankGains()` 出来
+       （不在这儿重算第二份公式）：
+         · `bankAmount` ＝ 这时候收能拿到多少点点；
+         · `bankSec`    ＝ **银行里攒了多久**（满的时候就是本档的挂机上限，6～12 小时）。
+       ⚠️ 为什么要有 `bankSec`：模板那句话是「离线收益 ＋ 挂机时长」，问的是"你挂了多久、攒了多少"。
+          复核时用"满了之后过了多久"填这一格，推出去的是「离线收益 54000 / 挂机时长 1分钟」——
+          两个数自相矛盾（挂一分钟攒不出 54000）；而且本档上限带 0.5 小时那种加成，
+          正确值正是"2小时30分"这种形状（派单里的例子就是这个形状）。 */
+    let g = null;
+    try { g = (typeof idleBankGains === 'function') ? idleBankGains() : null; } catch (e) { g = null; }
+    const bankAmount = Math.max(0, Math.floor((g && g.points) || 0));
+    const bankSec = Math.max(0, Math.floor((g && g.seconds) || 0));
+    return {
+      loginDays: Math.floor(Math.max(0, Number(a.loginDays) || 0)),
+      playMinutes: Math.floor(Math.max(0, Number(a.playSec) || 0) / 60),
+      clears: Math.floor(Math.max(0, Number((S && S.stats && S.stats.runs) || 0))),
+      /* V1.0.4 · X（订阅消息）：这两个也随档上云 —— 云端 `notify` 靠它们决定发不发服务通知。
+         "这一次满发过没有"那一位**根本不在这里**（它是云端写在记录顶层的字段，见文件头那条）。 */
+      subMsg: (S && S.settings && S.settings.subMsg === true) ? 1 : 0,
+      /* "满的时刻"**只在真的满着**的时候才往外报 —— 判据就是那个唯一的口 `idleFull()`，
+         谁也别拿存档里那个可能会过期的数直接当"满"（领走 / 新档 / 任何清空银行的路径之后，
+         它还留着上一轮的值；报了它，云端就可能补发一条已经过期的提醒）。 */
+      bankFullAt: ((typeof idleFull === 'function' && idleFull()) ? Math.max(0, Math.floor(Number(a.bankFullAt) || 0)) : 0),
+      /* 满了那一刻"能收多少 / 挂了多久"（推送里那两个数字）；没满就是 0（见上面那段）。 */
+      bankAmount: bankAmount,
+      bankSec: bankSec,
+    };
+  }
+  /* 挂机银行**满了**的那一刻（毫秒）；没满返回 0。判据只有一处：`idleFull()`（别自己算）。 */
+  function actBankFullAt() {
+    if (!S || !S.act) return 0;
+    const full = (typeof idleFull === 'function') ? !!idleFull() : false;
+    if (!full) { S.act.bankFullAt = 0; return 0; }
+    if (!S.act.bankFullAt) S.act.bankFullAt = Date.now();
+    return S.act.bankFullAt;
+  }
+  /** 界面/尺子用的读数（含"今天记了多少"这种只用于排查的字段，**不往云端发**） */
+  function actInfo() {
+    const a = (S && S.act) || {};
+    return {
+      day: String(a.day || ''),
+      loginDays: Math.floor(Math.max(0, Number(a.loginDays) || 0)),
+      playSec: Math.floor(Math.max(0, Number(a.playSec) || 0)),
+      todaySec: Math.floor(Math.max(0, Number(a.daySec) || 0)),
+      dayCapSec: ACT_DAY_CAP_SEC,
+      snap: actSnapshot(),
+    };
   }
   /* ================= V1.1.18（N4 · 留存环：跨天不再把"昨天做完没领"的奖励吃掉）=================
      父亲大人拍板「把留存环做了」；策划总监 N 单的 N4：这里跨天那一句原来把 `daily / claimed`
@@ -4267,22 +4766,24 @@ window.Core = (function () {
      （货币直接入账、道具走 `addItem`，装不下自动进「📮 待领箱」）—— **不新写第二套设施**，
      也**不弹窗**（不打扰）；玩家该得的东西自己就到账/进箱了。
      ⚠️ 只结清**一份**：`S.tasks.date` 一换就等于结清，不会跨好几天累积补发。
-     上限算得死：一天最多 8 条每日任务（合计 ◉3,000 ＋ ◆70 ＋ ✦20）＋ 全清那份，
-     占日收入（◉≈39,946 / ◆≈3,600 / ✦≈145）不到 10% —— 不破坏经济。 */
+     上限算得死（0929-I 重算）：**核心 8 条**（合计 ◉3,000 ＋ ◆70 ＋ ✦20）
+     ＋ **额外 4 条**（额外上限 ◉500 ＋ ◆100 —— `travel1` ◉500、`gard1`/`build1`/`corridor1` 各 ◆30/40/30）
+     ＋ 全清那份；占日收入（◉≈39,946 / ◆≈3,600 / ✦≈145）不到 10% —— 不破坏经济。 */
   function carryOverDailies() {
     const list = D.DAILY_TASKS || [];
     const daily = S.tasks.daily || {};
     const claimed = S.tasks.claimed || {};
-    let n = 0, done = 0;
+    let n = 0;
+    /* 每一条"做完没领"的都补发 —— **含额外那 4 条**（它们同样是玩家做出来的，一并算清）。 */
     list.forEach(t => {
       if ((daily[t.id] || 0) < t.target) return;
-      done++;
       if (claimed[t.id]) return;                   // 领过的照旧不补
       applyRewardObj(t.reward);
       n++;
     });
-    /* 全清那份同理：八条都做完却忘了点「全部领取」→ 一起补上 */
-    if (done >= list.length && list.length && !S.tasks.allClaimed) { applyRewardObj(D.DAILY_ALL_REWARD); n++; }
+    /* 全清那份同理：**核心**那 8 条都做完却忘了点「全部领取」→ 一起补上。
+       判据走唯一出口 `dailyCoreDone()`（额外 4 条做没做都不影响全清 —— H 单 §4）。 */
+    if (dailyCoreDone() && !S.tasks.allClaimed) { applyRewardObj(D.DAILY_ALL_REWARD); n++; }
     if (n) notice('昨日有 ' + n + ' 项日常奖励已自动补发（已存入待领箱或直接入账）');
     return n;
   }
@@ -4301,8 +4802,12 @@ window.Core = (function () {
     }
   }
   // 每日任务的进度同时喂给对应周常（同一套动作，不额外要求玩家改变玩法）
-  // 每日任务 → 周常进度来源的映射（新加的求签 / 斗法台不进周常，所以 src 留空）
-  const TASK_SRC =  getProxied({ battle5: 'battle', idle1: 'idle', enhance1: 'enhance', recruit1: 'recruit', dungeon1: 'dungeon', item1: 'item', sign1: null, arena1: null });
+  /* 每日任务 → 周常进度来源的映射（`null` ＝ 这条不进周常）。
+     0929-I：斗法台由 `null` 改成 `'arena'`（新增的周常 `w_arena` 就用它；`arenaSettle` 那行一个字没加）；
+     新增三条额外日常各自带上自己的 src（`garden` / `corridor`），周常那三条由这里的映射自动喂。 */
+  const TASK_SRC =  getProxied({ battle5: 'battle', idle1: 'idle', enhance1: 'enhance', recruit1: 'recruit',
+    dungeon1: 'dungeon', item1: 'item', sign1: null, arena1: 'arena',
+    gard1: 'garden', build1: null, corridor1: 'corridor', travel1: null });
   function weeklyTick(src, n) {
     if (!src) return;
     ensureWeekly();
@@ -4313,6 +4818,30 @@ window.Core = (function () {
     S.tasks.daily[id] = (S.tasks.daily[id] || 0) + n;
     weeklyTick(TASK_SRC[id], n);
   }
+  /* ================= V1.0.4（0929-I）：两档「全清」判据的**唯一出口** =================
+     `claimAllTasks()` / `claimAllWeekly()` / `todayState()` / `carryOverDailies()` /
+     界面 `allDailyDone`・`allWeeklyDone` / 尺子 —— **全读这里**。
+
+     判据 ＝「**没标 `bonus` 的那些**全做完」：新增的 7 条是「额外任务」，各自独立领，
+     **不进全清的门槛**（父亲大人拍的 A 案；全清奖励的数值逐字不动 —— H 单 §4）。
+     ⚠️ 判据只此一处：这四处以前各自 `every(...)` 一遍，加了 bonus 之后只要漏改一处
+        （最典型的是跨天补发的 `carryOverDailies()`）就会"界面说能领、点下去说没完成"。
+     ⚠️ 这两个函数**故意不调 `ensureDaily()`**：`carryOverDailies()` 就是在 `ensureDaily()`
+        内部被调用的（那时 `S.tasks.date` 还是昨天），在这里再进一次会自递归。
+        调用方该 `ensureDaily()` 的自己先调（现有四个调用点都调了）。 */
+  const coreTasksOf = (list) => (list || []).filter(t => !t.bonus);
+  function dailyCoreDone() {
+    const l = coreTasksOf(D.DAILY_TASKS);
+    return l.length > 0 && l.every(t => (S.tasks.daily[t.id] || 0) >= t.target);
+  }
+  function weeklyCoreDone() {
+    const l = coreTasksOf(D.WEEKLY_TASKS);
+    return l.length > 0 && l.every(t => (S.tasks.weekly[t.id] || 0) >= t.target);
+  }
+  /** 这条任务现在还要不要**派发**（不派发 ＝ 界面不画那一行）。判据只此一处；
+      `buildingMaxed()` 在建筑那一节（同一条闸门 `upgradeBuilding` 也在用）；
+      已完成当天的进度不受影响（`claimTask` 照旧能把它结清，不吞掉已经做出来的东西）。 */
+  function taskVisible(id) { return !(id === 'build1' && buildingMaxed()); }
   function weeklyState() {
     ensureWeekly();
     return D.WEEKLY_TASKS.map(t => ( getProxied({
@@ -4332,7 +4861,7 @@ window.Core = (function () {
   function claimAllWeekly() {
     ensureWeekly();
     if (S.tasks.weeklyAllClaimed) return  getProxied({ ok: false, msg: '已领取' });
-    if (!D.WEEKLY_TASKS.every(t => (S.tasks.weekly[t.id] || 0) >= t.target)) return  getProxied({ ok: false, msg: '本周任务尚未全部完成' });
+    if (!weeklyCoreDone()) return  getProxied({ ok: false, msg: '本周任务尚未全部完成' });
     S.tasks.weeklyAllClaimed = true;
     applyRewardObj(D.WEEKLY_ALL_REWARD);
     save();
@@ -4370,8 +4899,8 @@ window.Core = (function () {
   function claimAllTasks() {
     ensureDaily();
     if (S.tasks.allClaimed) return  getProxied({ ok: false, msg: '已领取' });
-    const allDone = D.DAILY_TASKS.every(t => (S.tasks.daily[t.id] || 0) >= t.target);
-    if (!allDone) return  getProxied({ ok: false, msg: '尚未完成全部任务' });
+    /* 判据＝**核心 8 条**全做完（额外 4 条不进门槛）—— 唯一出口 `dailyCoreDone()`。 */
+    if (!dailyCoreDone()) return  getProxied({ ok: false, msg: '尚未完成全部任务' });
     S.tasks.allClaimed = true;
     S.stats.taskClaims = (S.stats.taskClaims || 0) + 1;   // 一键全领也算领过
     applyRewardObj(D.DAILY_ALL_REWARD);
@@ -4382,13 +4911,17 @@ window.Core = (function () {
     const today = dailyDate();
     if (S.login.lastClaim === today) return null;
     S.login.lastClaim = today;
-    // 七天一循环：第 7 天领完后回到第 1 天，而不是永远停在第 7 天重复发 SSR 自选券
-    if (S.login.day >= D.LOGIN_REWARDS.length) { S.login.day = 0; S.login.round = (S.login.round || 1) + 1; }
+    /* 七天一循环：第 7 天领完后回到第 1 天，而不是永远停在第 7 天重复发 SSR 自选券。
+       V1.1.16（0927-Y 数值轮 · 报告 §6-6 N2）：**第 8 天起换一张表**（常规轮）——
+       表挂在轮次上（`D.loginTableOf`，全项目唯一一处），第 2 轮起都读常规轮，
+       所以"第 8 天"不再掉回首轮那个最薄的格子（落差 4.91× ＝现状水平，见 data.js 那张注释）。 */
+    if (S.login.day >= D.loginTableOf(S.login.round || 1).length) { S.login.day = 0; S.login.round = (S.login.round || 1) + 1; }
     S.login.day += 1;
-    const r = D.LOGIN_REWARDS[S.login.day - 1];
+    const tbl = D.loginTableOf(S.login.round || 1);
+    const r = tbl[S.login.day - 1];
     applyRewardObj(r);
     save();
-    return  getProxied({ day: S.login.day, reward: r, round: S.login.round || 1, cycleDays: D.LOGIN_REWARDS.length });
+    return  getProxied({ day: S.login.day, reward: r, round: S.login.round || 1, cycleDays: tbl.length });
   }
   /* ================= V1.1.18（N5 · 留存环：回归礼）=================
      父亲大人拍板「把留存环做了」；策划总监 N 单的 N5：断了一阵子再回来，给一份"回来的理由"。
@@ -4425,7 +4958,9 @@ window.Core = (function () {
     if (!st) return null;
     S.login.comeback = dailyDate();
     applyRewardObj(st.reward);
-    save();
+    /* V1.1.20（F1-1）：这一句是**开机**跑的（game.js 在玩家动手之前就调），所以走自动存盘 ——
+       它照常落盘，但不许把"谁新听谁的"判据推成"现在"（那不是"玩家在玩"）。 */
+    save({ auto: true });
     return  getProxied({ days: st.days, reward: st.reward });
   }
   /* ================= V1.1.8（乙组 B8 · 签到全双倍）=================
@@ -4439,7 +4974,8 @@ window.Core = (function () {
     const today = dailyDate();
     if (!S.login.day) return  getProxied({ ok: false, msg: '今天还没签到' });
     if (S.login.doubledDay === today) return  getProxied({ ok: false, msg: '今天的签到已经翻过倍了' });
-    const r = D.LOGIN_REWARDS[S.login.day - 1];
+    /* V1.1.16：翻倍要翻**今天那一格**，所以也得走"轮次 → 表"这同一个出口（别在第二处再读首轮表） */
+    const r = D.loginTableOf(S.login.round || 1)[S.login.day - 1];
     if (!r) return  getProxied({ ok: false, msg: '没有可翻倍的签到奖励' });
     S.login.doubledDay = today;
     applyRewardObj(r);
@@ -4504,22 +5040,26 @@ window.Core = (function () {
     const rp = Math.floor(100 * Math.pow(n, 1.15));
     S.player.reincarnations = n;
     addCur('rp', rp);
-    /* 重置：玩家等级、世界进度。
+    /* 重置只动"等级"这一条线：等级 / 经验 / 按等级重算的可用点数（六维与技能点）。
        V9.5.78（自审）：这里原来写的是 level = 1 —— 等级改 0 基之后，转生会把玩家"送"到 Lv.1。
        改成回 Lv.0（和新建档同一个起点）。
        另外：技能点不再随重练重复发放（见 addPlayerExp 里"按等级重算"的说明），
-       所以转生后一路练回 Lv.100 也不会多出 100 点没处花的技能点。 */
+       所以转生后一路练回 Lv.100 也不会多出 100 点没处花的技能点。
+       ⚠️ 六维**已投入的点数不清**（`attrPointsForLevel()` 只重算"可用点"＝等级应得 − 已投）。 */
     S.player.level = 0; S.player.exp = 0;
     S.player.skillPoints = skillPointsForLevel();
     attrPointsForLevel();                 // V1.0.1：六维点也按等级重算（原来累加，重练会再发一遍）
-    S.worlds =  getProxied({});
-    /* V1.0.1（游戏策划总监会诊查出，**转生成了负收益事件**）：
-       这里原来只清 `S.worlds`，**`worldFirstClear` 留着** —— 于是转生后重打 12 个世界的
-       首通奖励**一点都拿不到**，✦ 从 326/天 掉到 54/天（−83%），灯阁权限（159 天）
-       转生后基本点不动。转生本来就是"重来一遍"，世界里的一次性奖励理应跟着重开。 */
-    S.worldFirstClear =  getProxied({});
-    unlockWorld('W01');
-    S.corridor.floor = 1;
+    /* ================= 2026-09-27（父亲大人深夜拍板）· 转生**不再清残域与深井** =================
+       父亲大人的原话：「然后现在转生把世界进度和深井进度都重置了！这么离谱吗」→
+       「**深井和世界进度都保留啊**」。所以原来这里那三行"清进度"全部去掉：
+         · `S.worlds = {}`         → 保留（已解锁的世界 / 星数 / 三档难度进度全不动）
+         · `S.worldFirstClear = {}` → 保留（首通记录保留 ⇒ 重打也不重发首通）
+         · `S.corridor.floor = 1`   → 保留（深井停在哪层就还在哪层；`best` 本来就保留）
+       ⚠️ 一条**如实记下的代价**（不是 bug，是父亲大人拍的板，两版数在同期回单里）：
+         当年 V1.0.1 那三行是一次**收益修正** —— 世界进度清了、首通也跟着重开，转生后重练期间
+         靠"重打首通"回一波钱。现在进度与首通都保留 ⇒ **转生不再带来任何"重打首通"的收益**。
+       ⚠️ 已经转过生的老档（进度真被清过）由 migrate() 里 `bestWorldIdx` 那一段补偿。 */
+    unlockWorld('W01');   // 兜底：万一是空档也保证第一张进得去（正常档早解锁了，这行是无操作）
     save();
     return  getProxied({ ok: true, rp, count: n });
   }
@@ -4575,7 +5115,7 @@ window.Core = (function () {
     S.codex.claimed.push(volId + ':' + n);
     applyRewardObj(r.reward);
     save();
-    return  getProxied({ ok: true, msg: `图鉴奖励已领取（${st.name} ${n} 个）` });
+    return  getProxied({ ok: true, msg: `灯录奖励已领取（${st.name} ${n} 个）` });
   }
 
   /* ================= 今日概览 / 收取奖励 ================= */
@@ -4592,7 +5132,7 @@ window.Core = (function () {
     const weekly = weeklyState();
     const dailyClaimable = daily.filter(x => x.done && !x.claimed).length;
     const weeklyClaimable = weekly.filter(x => x.done && !x.claimed).length
-      + (weekly.every(x => x.done) && !S.tasks.weeklyAllClaimed ? 1 : 0);
+      + (weeklyCoreDone() && !S.tasks.weeklyAllClaimed ? 1 : 0);   // 全清那 1 项：判据的唯一出口（额外 3 条不进门槛）
     const achClaimable = achievementState().filter(a => a.done && !a.claimed).length;
     const codexClaimable = codexState().rewards.filter(r => r.reached && !r.claimed).length;
     const idleReady = bank.seconds >= 60;
@@ -4750,10 +5290,13 @@ window.Core = (function () {
   function elementMultiplier(worldId) {
     const mine = activeBeastElem();
     const foe = D.worldElement(worldId);
-    if (!mine || !foe) return  getProxied({ mine: null, foe: null, mult: 1, state: 'none' });
-    if (D.ELEMENT_COUNTER[mine] === foe) return  getProxied({ mine, foe, mult: 1 + D.ELEMENT_BONUS, state: 'up' });
-    if (D.ELEMENT_COUNTER[foe] === mine) return  getProxied({ mine, foe, mult: 1 - D.ELEMENT_PENALTY, state: 'down' });
-    return  getProxied({ mine, foe, mult: 1, state: 'even' });
+    if (!mine || !foe) return  getProxied({ mine: mine || null, foe: foe || null, mult: 1, state: 'none' });
+    /* 0928 抢修单 F5 #2：算式只留一份（`D.elementMult`）—— **战斗公式读的是同一份**
+       （`js/battle.js` 的 dealDamage），所以界面这句 "+15% / -8%" 从此与伤害数字同源，
+       不再是"界面写一套、战斗写一套（而战斗那套从没跑过）"。 */
+    const mult = D.elementMult(mine, foe);
+    const state = mult > 1 ? 'up' : mult < 1 ? 'down' : 'even';
+    return  getProxied({ mine, foe, mult, state });
   }
   function hatchBeast(n) {
     n = Math.max(1, Math.floor(n || 1));
@@ -4891,6 +5434,43 @@ window.Core = (function () {
     S.charExp = (S.charExp || 0) + n;
     return n;
   }
+  /* ================= 0928 抢修单 F5 #7：两条路共用的两个出口 ================= */
+  /* ① 通关经验：**角色经验 ×2、战绩（主角战斗经验）×1**（父亲大人 0928 拍板）。
+     以前"手打"与"扫荡"各写一份系数（手打 ×2/×1、扫荡 ×1/×0.5），而紧邻的注释还写着
+     "经验与战绩必须和手打一致"——纯扫荡党的成长速度只有手打的一半，扫荡又正是官方主推的减负手段。
+     现在两支都调这里，系数只此一处。 */
+  const STAGE_EXP_CHAR_MULT = 2;      // 角色经验（伙伴经验池）
+  const STAGE_EXP_PLAYER_MULT = 1;    // 战绩（主角战斗经验）
+  function grantStageExp(exp) {
+    const base = Number(exp) || 0;
+    if (base <= 0) return  getProxied({ char: 0, player: 0 });
+    const charN = addCharExp((S.party ||  getProxied([])).filter(Boolean), base * STAGE_EXP_CHAR_MULT);
+    const playerN = Math.round(base * STAGE_EXP_PLAYER_MULT);
+    addPlayerBattleExp(playerN);
+    return  getProxied({ char: charN || 0, player: playerN });
+  }
+  /* ② 通关计数：「完成 1 次副本」日常（dungeon1）与「本周通关 10 次副本」周常（w_run，
+     由 task 的 TASK_SRC 自动喂）都从这一处走。**只计次数**——首通 / 星级 / 首通奖励
+     仍只挂在 `stageComplete` 上，扫荡不许把它们一起带出来。 */
+  function registerStageClear(n) {
+    const k = Math.max(1, Math.round(n || 1));
+    S.stats.runs += k;
+    task('dungeon1', k);
+  }
+  /* ③ 深井推过一层：`registerStageClear()` 的先例 —— **手打与"长线模拟"共用的唯一出口**。
+     0929-I 新增的「深井挑战成功 1 次」日常（`corridor1`）与「本周深井推进 10 层」周常
+     （`w_corridor`，由 `task` 的 `TASK_SRC['corridor1']='corridor'` 自动喂）都从这一处走。
+     `floor` / `best` 的推进也收在这里（"推过一层"就是这么定义的），奖励的发放仍留在调用方
+     （界面层要塞结算页、模拟只用记账）。
+     ⚠️ **为什么必须落 core**：`longrun_sim.js` 的深井循环**不走界面层**（原来直接改
+        `S.corridor` ＋ `addCur`）。打点若留在界面层，尺子里"本周深井"会永远是 0，两套口径当场打架。 */
+  function registerCorridorClear(floor) {
+    const f = Math.max(1, Math.round(Number(floor)) || (S.corridor.floor || 1));
+    S.corridor.best = Math.max(S.corridor.best || 0, f);
+    S.corridor.floor = f + 1;
+    task('corridor1', 1);
+    return f;
+  }
   // 战斗获得的玩家经验（同样吃经验天赋）；挂机经验已在 idleRates 里算过，不重复加成
   function addPlayerBattleExp(exp) {
     addPlayerExp(Math.round((exp || 0) * graceExpMult()));
@@ -4901,12 +5481,16 @@ window.Core = (function () {
     save, load, newGame, wipeSave, ensureState, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
     /* V1.1.15（P0 存档）：读档诊断 / 从备份恢复（设置页用） */
     saveDiag, backupInfo, restoreFromBackup, loadIssue,
+    /* V1.1.20（F1-5）：读档失败/更高版本 → **救援态**（禁写）＋ 玩家显式"继续新档"才解闸 */
+    rescueInfo, rescueConfirmNewGame,
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
     shardPoolOf, addShardPool, addShardsToPool, shardsOf, starInfo,
     setNoticeListener, stashItem, stashCount, stashList, stashNeedCells, claimStash,
     /* V1.1.15：装备待领箱（满格时掉的/开出来的装备先存这儿，扩容后领回） */
     stashEquip, stashEqCount, stashEqList, claimStashEq,
     bagUsage, buyBagCap,
+    /* F5 #7：扫荡与手打共用的两个出口（通关经验 ×2/×1、通关计数） */
+    grantStageExp, registerStageClear, registerCorridorClear,
     tallyCur, addChar, addShards, levelCost, levelUp, useExpItem, swapPartyMember, partnerExp, expSpentOn, rebornChar, starUp, skillUp, SKILL_CHIP_COST,
     craftSerum, craftReforgeStone, useSerum, serumTaken, serumApplied, serumUnlocked, serumUnlockTip,
     bloodlineUpgrade, geneLockInfo, geneLockUnlock,
@@ -4921,7 +5505,7 @@ window.Core = (function () {
     unequipEverywhere, equipWearer, dedupeEquips,
     playerRow, setPlayerRow, swapPartySlots, moveMemberRow, rowLayout, ROW_NAME, rowOfSlots, normalizeParty,
     parsePos, posRow, swapPositions,
-    recruitOnce, recruitTen, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
+    recruitOnce, recruitTen, recruitBulk, freeRecruit, freeRecruitAvailable, freeState, ssrTicketUse, ticketOf,
     idleRates, idleBaseRates, idleLines, idleLineBonus, setIdleLeader, idleMatItem, grantIdleMat,
     progressTier, bestWorldIdx,
     settleOffline, onlineTick, idleBankGains, claimIdle, claimIdleDouble, lastIdleClaimOf, addPlayerExp, offlineCapHours, offlineEfficiency, idleFull,
@@ -4943,10 +5527,19 @@ window.Core = (function () {
     refreshUnlocks, isUnlocked, unlockTip, skillPointsForLevel,
     mainQuestState, currentQuest, claimQuest,
     setPlayerName, charName,
+    /* V1.0.4 · V：自由命名的判据出口（界面层只读这几个，不自己再写一套）
+       —— `shapeName` 成型、`isListName` 是否在可自证的白名单里、
+       `grantNameTicket` 机审通过后签发那张一次性凭据。 */
+    shapeName, isListName, grantNameTicket,
     buyShopItem, shopMaxQty, openBox, openBoxes, openMatPack, boxSourceWorld, dailyDate, sweepLeft, enhanceMat,
     addSweepBonus, ensureSweepDay,
     shopReq,
     ensureDaily, task, claimTask, claimAllTasks, loginReward, ensureSweepDay,
+    /* 0929-I：两档「全清」判据的唯一出口（界面 / 尺子都读它，别再各自 every 一遍）
+       ＋ 建筑满级「不留死条」的闸门 */
+    dailyCoreDone, weeklyCoreDone, buildingMaxed, taskVisible,
+    /* V1.0.4 · W（游戏圈活跃任务）：三个计数的唯一出口 —— 心跳记账 / 读数 / 快照 */
+    actTick, actSnapshot, actInfo, actBankFullAt,
     ensureWeekly, weeklyState, claimWeekly, claimAllWeekly, weekKey,
     achievementState, achievementSummary, claimAchievement,
     todayState, claimEverything, nextStage,

@@ -1,7 +1,7 @@
 /* 执灯者 = 伙伴总览（照网页版 js/ui.js 的 rosterScreen→charsScreen / charDetail）
    ------------------------------------------------------------------------------
    网页版 V9.5.45 起：执灯者这一栏**直接就是伙伴总览**（队伍/成长搬去主页养成）。
-   总览页结构：筛选胶囊行（右端是「📕 图鉴」）→ 排序行 → 已收集提示 → 三列卡片网格。
+   总览页结构：筛选胶囊行（右端是「📕 灯录」）→ 排序行 → 已收集提示 → 三列卡片网格。
    卡片照网页版 .char-card：上阵角标 + 头像 + 名字 + 星级 + Lv·战力 + 装备状态。
 */
 (function () {
@@ -66,18 +66,18 @@
   CV.register('roster', function () {
     U.begin();
     /* V9.6.8（父亲大人）：分类（全部/已上阵/SSR+/N/R/SR）和排序（默认/战力/…）两行都删了 ——
-       "默认的排序顺序就已经能很好的区分这些了"。只留默认顺序 + 右端「📕 图鉴」。 */
+       "默认的排序顺序就已经能很好的区分这些了"。只留默认顺序 + 右端「📕 灯录」。 */
     /* V9.6.10（父亲大人："那个已收集的小字跟图鉴那个按钮水平对齐，现在不是很浪费空间吗"）：
-       把「已收集…」搬到**图鉴那一行**、左边，整块内容跟着往上提一行。 */
+       把「已收集…」搬到**灯录那一行**、左边，整块内容跟着往上提一行。 */
     const pillH = 36 * CV.SCALE;
-    const codexW = CV.measure('图鉴', CV.FS.sm) + 24 * CV.SCALE;
+    const codexW = CV.measure('灯录', CV.FS.sm) + 24 * CV.SCALE;
     const gy = U.y;
     const cs = Core.codexState();
     const infoTxt = '已收集 ' + cs.owned + '/' + cs.total + ' · 拥有 ' + Object.keys(Core.S.chars).length
       + ' · 当前显示 ' + listSorted().length;
     CV.text(CV.fit(infoTxt, U.cw() - codexW - 10 * CV.SCALE, CV.FS.sm), U.pad(), gy + pillH / 2,
       { size: CV.FS.sm, color: CV.C.dim });
-    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '图鉴', 'ghost', 'open_codex');
+    U.btn(U.pad() + U.cw() - codexW, gy, codexW, pillH, '灯录', 'ghost', 'open_codex');
     U.y = gy + pillH + 8 * CV.SCALE;
     /* 三列卡片网格（.char-grid + .char-card） */
     const list = listSorted();
@@ -157,11 +157,9 @@
        正确来源是数据表 D.STAR_COST（core 的升星也是查它）。 */
     const starCost = c.star < maxStar ? D.STAR_COST[c.star] : null;
     U.begin();
-    /* 返回条（二级页左上角返回，照网页版 .page-head） */
-    const bh = 40 * CV.SCALE;
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, bh, '‹', 'ghost', 'back');
-    CV.text(nm(id), U.pad() + U.cw() / 2, U.y + bh / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += bh + CV.SP[2];
+    /* 返回条（二级页左上角返回，照网页版 .page-head）——**吸顶**（父亲大人 09-27 深夜：
+       「每一屏的标题和返回键都固定在顶部吧，不然有时候要点返回又得滑回去」）。 */
+    U.pageHead(nm(id), { backId: 'back' });
 
     /* ① 头部：头像 + 名字/稀有度/星级/Lv·碎片·血统 + 右侧战力 */
     U.card(function () {
@@ -209,15 +207,22 @@
       U.kv('伙伴经验', fmt(Core.partnerExp()), CV.C.gold);
       U.space(CV.SP[2]);
       U.btnRow([
-        { label: '升 1 级', style: cost ? 'ghost' : 'ghost', id: cost ? 'lv1' : 'noop' },
-        { label: '升 10 级', style: 'ghost', id: cost ? 'lv10' : 'noop' },
-        { label: '重生', style: 'ghost', id: c.lv > 1 ? 'reborn' : 'noop' },
+        /* V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A「无效按键普查」）：
+           原来满级时这三颗绑的是 `'noop'`（一个空处理器），**画出来是正常按钮、点了一点反应都没有**
+           —— 正是他说的"诸如此类的无效按键"。现在一律走 `dis`（压暗 + 不登记热区），
+           而且为什么不能点写在下面那句 hint 里（满级 / 未重生过）。 */
+        { label: '升 1 级', style: 'ghost', id: cost ? 'lv1' : '', dis: !cost },
+        { label: '升 10 级', style: 'ghost', id: cost ? 'lv10' : '', dis: !cost },
+        { label: '重生', style: 'ghost', id: c.lv > 1 ? 'reborn' : '', dis: !(c.lv > 1) },
       ]);
       U.space(CV.SP[1]);
       /* V9.6.90：与网页版同一句（网页版还带一句"经验模块在背包里用，直接进这个池子"） */
-      U.hint(cost ? '升下一级需要 ' + fmt(cost.exp) + ' 伙伴经验 + ◉ ' + fmt(cost.points)
+      /* V1.1.17（父亲大人 09-27 深夜）：三颗按钮的**禁用原因**都写在这一行里 ——
+         以前满级只写"已满级"、而"重生"为什么灰着没人说，玩家只能猜"是不是有前置条件"。 */
+      U.hint((cost ? '升下一级需要 ' + fmt(cost.exp) + ' 伙伴经验 + ◉ ' + fmt(cost.points)
         + ' · 经验模块在背包里用，直接进这个池子'
-        : '已满级', 4 * CV.SCALE);
+        : '已满级（Lv.' + D.PLAYER_MAX_LV + ' 封顶）：升 1 级 / 升 10 级不能再点；重生可以把投进去的经验全退回来重练')
+        + (c.lv > 1 ? '' : ' · 重生要 Lv.2 起（现在还没投过经验）'), 4 * CV.SCALE);
     });
 
     /* ③ 星级（碎片升星） */
@@ -250,7 +255,10 @@
       /* V1.1.14：加了两行说明之后，按钮离上方小字只剩 1.2pt（inset_audit 当场报红）——
          补一个 SP[1] 的净距（别处按钮行前都是这个量级）。 */
       U.space(CV.SP[1]);
-      U.btnRow([{ label: (si && si.full) ? '已满星' : '升星', style: 'ghost', id: (si && si.full) ? 'noop' : 'starup' }]);
+      /* V1.1.17（父亲大人 09-27 深夜）：满星那颗原来绑 'noop'（画成正常按钮、点了没反应），
+         现在走 dis —— 变灰、不登记热区；为什么不能点就在上面那行「已满星」+ kv 里写着。 */
+      U.btnRow([{ label: (si && si.full) ? '已满星' : '升星', style: 'ghost',
+        id: (si && si.full) ? '' : 'starup', dis: !!(si && si.full) }]);
     });
 
     /* ④ 血统（等级 + 升级） */
@@ -271,7 +279,9 @@
       }
       U.btnRow([{
         label: blCost ? '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
-        style: 'ghost', id: (blCost && blMatOk) ? 'blup' : 'noop', dis: !!(blCost && !blMatOk),
+        /* V1.1.17（父亲大人 09-27 深夜）：满级 / 材料不够都走 dis（不再用 'noop' 假按钮）——
+           差什么写在卡片上方那行材料 kv 与「已满级」标签里。 */
+        style: 'ghost', id: (blCost && blMatOk) ? 'blup' : '', dis: !(blCost && blMatOk),
       }]);
     });
 
@@ -281,12 +291,23 @@
       [ch.skills.s1, ch.skills.s2, ch.skills.ult].forEach(function (sk, i) {
         if (!sk) return;
         const lv = (c.skillLv || [0, 0, 0])[i];   // V9.5.82：技能从 0 级起
+        /* ================= V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A，**他点名的第一处**）=================
+           原话：「伙伴技能加到 10 点后加不了了，不知道是如果是有前置条件也没说明呀」。
+           真因：**上限写死在界面上**了 —— 这里的判定是 `lv < 10`，而真实上限是
+           `D.SKILL_MAX_BY_INDEX = [35, 35, 30]`（core.skillUp 查的就是它）。
+           于是 Lv.10 一到，+1 就被压成禁用态、而胶囊上写着「Lv.10/35」——
+           玩家只看到"点不动"，自然怀疑有前置条件（数据层从来没这道门）。
+           现在判定改读**同一张上限表**，并顺带把"这一级要多少 ◆ 异界结晶"也纳进来
+           （不够时同样走禁用态，价位就写在下面那行小字里，不再"看着能点、点了没反应"）。 */
+        const maxLv = D.SKILL_MAX_BY_INDEX[i];
+        const nextCost = lv < maxLv ? (Core.SKILL_CHIP_COST[lv] || 0) : 0;
+        const canUp = lv < maxLv && (S.cur.otherworld || 0) >= nextCost;
         /* V9.6.117（排版层级 + 间距，父亲大人："技能版面…间距又贴在一起"）：
            这里原来是"名字挤在 20px 行高里 + 描述紧跟 + 一个整行大按钮"，
            和主角详情那套完全不一样。现在两个页面**共用 U.skillRow**（＝网页版 .skill-row）。 */
         U.skillRow({
           name: ['技能', '技能', '必杀'][i] + '·' + sk.name,
-          tag: 'Lv.' + lv + '/' + D.SKILL_MAX_BY_INDEX[i],
+          tag: 'Lv.' + lv + '/' + maxLv,
           /* V1.0.6（父亲大人 09-24 反馈图 11「伙伴技能升级消耗没写」）：
              网页版这一行的 .sdesc 末尾带着「（每级 +X% 效果 · 下级需 ◆ N）」，画布这边只传了
              sk.desc —— 玩家看不到升下一级要多少异界结晶，只有一颗说不出价钱的按钮。
@@ -302,10 +323,13 @@
              于是那一行画出来以 `·` 结尾（尺子按"行尾挂着 · → + / ："判成半句话，父亲大人看着也像）。
              `U.skillRow` 本身是折行的（`CV.wrap`），所以只要**别让分隔符落在行尾**就行：
              句内改成顿号式连接、并把「下级需」收成「升下级」，整句短一截、断点不再挂在连接符上。 */
-          desc: (sk.desc || '') + '（每级 +' + Math.round((D.SKILL_PCT_PER_LV || 0.02) * 100) + '%；升下级 ◆ '
-            + (Core.SKILL_CHIP_COST[lv] || '—') + '）',
-          btnId: lv < 10 ? 'sk' + i : '',
-          btnDis: !(lv < 10),      // 满级 → 禁用态（原来绑的是 'noop'：看着能点、点了什么都不发生）
+          /* 满级 / 缺结晶都把"差什么"写在这行小字里（派单 Z-A 要的就是"别让他猜"）。 */
+          desc: (sk.desc || '') + (lv >= maxLv
+            ? '（已满级：这一项封顶 Lv.' + maxLv + '，没有前置条件）'
+            : '（每级 +' + Math.round((D.SKILL_PCT_PER_LV || 0.02) * 100) + '%；升下级 ◆ ' + nextCost
+              + '，现有 ◆ ' + fmt(S.cur.otherworld || 0) + '）'),
+          btnId: canUp ? 'sk' + i : '',
+          btnDis: !canUp,          // 满级 / 结晶不够 → 禁用态（不再出现"看着能点、点了没反应"）
           last: false,
         });
       });
@@ -355,7 +379,6 @@
     });
   });
   CV.on('back', () => CV.pop());
-  CV.on('noop', () => {});
   /* 队伍操作：无损换将（挑人，继承等级/装备）、下阵 */
   CV.on('swap', function () {
     const S = Core.S;
@@ -370,28 +393,34 @@
       if (i >= 0) S.party[i] = null;
       Core.save();
       CV.pop();
-      CV.toast('已下阵');
+      /* F7 ②：下阵后队伍页那一格当场空出来（看得见 → 删）；确认弹窗已经把话说过一遍了。 */
       CV.render();
     });
   });
   /* 详情页的动作：升级 / 重生 / 升星 / 血统升级 / 技能 +1 —— 都走 core，页内原地重画 */
-  CV.on('lv1', () => { const r = Core.levelUp(cur, 1); CV.toast(r.msg); CV.render(); });
-  CV.on('lv10', () => { const r = Core.levelUp(cur, 10); CV.toast(r.msg); CV.render(); });
+  /* ================= F7 ②（0928 · 父亲大人：只留操作失败的提醒）=================
+     这一整组的成功语全是"等级/星级当场变"（等级数字、星级、血统等级都在卡面上）——**删**；
+     失败语（点数不够 / 伙伴经验不够（用经验模块补）/ 已满级）**一个字不改、照旧弹**。 */
+  CV.on('lv1', () => { const r = Core.levelUp(cur, 1); if (!r.ok) CV.toast(r.msg || '升不了'); CV.render(); });
+  CV.on('lv10', () => { const r = Core.levelUp(cur, 10); if (!r.ok) CV.toast(r.msg || '升不了'); CV.render(); });
   CV.on('reborn', function () {
     U.confirm('伙伴重生', '把「' + nm(cur) + '」重置回 Lv.0，返还 ' + fmt(Core.expSpentOn(cur)) + ' 伙伴经验（点数不返还）。星级 / 命格 / 装备 / 精华都不动。', function () {
       const r = Core.rebornChar(cur);
-      CV.toast(r.msg || '已重生');
+      /* F7 ②：重生后等级当场回 Lv.0（看得见 → 删）；失败（"已经是 Lv.0 了"）留。 */
+      if (!r.ok) CV.toast(r.msg || '重生不了');
       CV.render();
     });
   });
-  CV.on('starup', () => { const r = Core.starUp(cur); CV.toast(r.msg); CV.render(); });
+  CV.on('starup', () => { const r = Core.starUp(cur); if (!r.ok) CV.toast(r.msg || '升不了星'); CV.render(); });
   /* V1.1.6（A4）：伙伴详情「一键最优装备」—— 与主角页那颗同一份实现与文案
      （`Core.autoEquipBest(id)` 只给这一个人配，绝不碰别人的装备）。 */
   CV.on('autoeq:*', function (id) {
     const r = Core.autoEquipBest(id);
+    /* F7 ②：这**两**句都留 —— "已换上 N 件"是一次批量结果、"背包里没有更好的了"是失败，
+       都不在界面上直接看得出（装备栏是好几格一起变的）。 */
     CV.toast(r.changed ? '已换上 ' + r.changed + ' 件（只从背包里没穿的装备挑）' : '背包里没有更好的了', 2400);
     CV.render();
   });
-  CV.on('blup', () => { const r = Core.bloodlineUpgrade(cur); CV.toast(r.msg); CV.render(); });
-  [0, 1, 2].forEach((i) => CV.on('sk' + i, () => { const r = Core.skillUp(cur, i); CV.toast(r.msg); CV.render(); }));
+  CV.on('blup', () => { const r = Core.bloodlineUpgrade(cur); if (!r.ok) CV.toast(r.msg || '升不了'); CV.render(); });
+  [0, 1, 2].forEach((i) => CV.on('sk' + i, () => { const r = Core.skillUp(cur, i); if (!r.ok) CV.toast(r.msg || '升不了'); CV.render(); }));
 })();

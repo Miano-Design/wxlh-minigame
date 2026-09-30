@@ -24,11 +24,12 @@
   /* 法宝 / 坐骑的养成线（祭炼 / 喂养）V9.6.133 起搬到**二级界面**。
      起因（父亲大人）：「法宝和坐骑做的养成系统挡到数值了，点名字进去看详细信息以及养成」——
      原来一行里挤两个按钮，名字和效果都没地方站。现在列表行只留一个按钮。 */
-  const GEAR_EFF_LABEL = {
-    atkPct: '攻击', hpPct: '生命', defPct: '防御', spdPct: '速度', critPct: '暴击率',
-    critDmg: '暴击伤害', skillPct: '技能伤害', evaPct: '闪避', resPct: '减伤',
-    dmgReduce: '减伤', lifesteal: '汲取', spiritPct: '精神', initEnergy: '开场能量',
-  };
+  /* V1.1.17（0928 抢修单 F3-2 · 唯一真相）：这张表原来是**第二份**百分比名字表，
+     与 `data.js` 的 `D.PCT_LABEL` 只在一个 key 上分歧 —— `resPct` 在这里被写成「减伤」，
+     而它其实是「异常抗性」（引擎只把它当异常状态抗性用，真减伤是 `dmgReduce`）。
+     现在**只留一份**：法宝 / 坐骑的效果文字直接读 `D.PCT_LABEL`（那边已补齐
+     `dmgReduce` / `initEnergy` 两个 key），以后改名字只改一处、不可能再分叉。 */
+  const GEAR_EFF_LABEL = D.PCT_LABEL;
   /* 百分比留一位小数 —— 祭炼一级 +5%，4% 会点出 4.2% 这种数，取整就看不出差别了 */
   function gearEffText(o) {
     const parts = Object.keys(o || {}).map(function (k) {
@@ -38,13 +39,11 @@
     return parts.length ? parts.join(' · ') : '—';
   }
 
-  /* 顶部返回条（二级页统一样式） */
-  function head(title) {
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'page_back');
-    CV.text(title, U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
-  }
-  CV.on('page_back', () => CV.pop());
+  /* 顶部返回条（二级页统一样式）——**吸顶**（父亲大人 09-27 深夜：「每一屏的标题和返回键
+     都固定在顶部吧，不然有时候要点返回又得滑回去」）：唯一实现是 U.pageHead（见 uiw.js），
+     这里只登记 + 让开高度，落笔由框架按屏幕坐标画。 */
+  function head(title) { return U.pageHead(title); }
+  /* 二级页返回：实现**收口在 uiw.js 一处**（F2-7）—— 本文件那份已删。 */
 
   /* ---------- 秘术阁 ---------- */
   CV.register('keji', function () {
@@ -93,9 +92,13 @@
         });
         /* 材料进"能不能点"的判定（与逻辑层 kejiUp 的判据同一条：每 5 级 1 张）。 */
         const can = cost !== null && coin >= cost && matHave >= matNeed;
+        /* V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A）：满级那颗原来写 `id: cost===null ? '' : …，
+           dis: cost!==null && !can` —— **满级时 dis 是 false**，于是画出来是一颗正常按钮、
+           既没有热区也没有提示（点了什么都不发生）。现在满级也走 dis：
+           变灰、不登记热区，标签就写着「满级」，旁边那行 kv 写着 Lv.x/上限。 */
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
           cost === null ? '满级' : '升 1 级', 'ghost',
-          cost === null ? '' : (can ? 'keji_up:' + k.id : 'noop'), cost !== null && !can);
+          can ? 'keji_up:' + k.id : '', cost === null || !can);
         U.y = top + h;
       });
     });
@@ -104,7 +107,8 @@
     CV.on('keji_up:' + k.id, function () {
       const r = Core.kejiUp(k.id);
       snd(r.ok ? 'levelup' : 'error');
-      CV.toast(r.msg || (r.ok ? '已升级' : '升不了'));
+      /* F7 ②：秘术等级当场变（看得见 → 删成功语）；材料/点数不够这类失败要读得到。 */
+      if (!r.ok) CV.toast(r.msg || '升不了');
       CV.render();
     });
   });
@@ -117,7 +121,7 @@
     head('法宝');
     U.card(function () {
       U.h3('法宝', '已得 ' + st.own.length + ' / ' + D.FABAO.length + ' 件');
-      U.note('主角同时只带 1 件 · 用 ◆ 异界结晶 购买', 2 * CV.SCALE);
+      U.note('主角同时只带 1 件 · 花 ◉ 点数购买（祭炼才用 ◆ 异界结晶）', 2 * CV.SCALE);
       U.kv('当前佩戴', on ? (on.name + '（' + on.desc + '）') : '未佩戴', CV.C.gold);
     });
     U.card(function () {
@@ -141,28 +145,39 @@
         if (!own) {
           /* V9.6.112：法宝改扣 **◉ 点数**（和网页版一致的修正）——原来的 ◆ 异界结晶
              最便宜也要 1000，新号根本买不起，主线"获得 1 件法宝"永远完不成。 */
+          /* F2-5（抢修单 0928R3）：点数不够时这颗原来是"画着能点、点了没反应"
+             （`id` 传空串、又没给 `dis`）—— 现在 `dis` 变灰，差多少写在按钮左边那行小字里。 */
           const can = (Core.S.cur.points || 0) >= f.cost;
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-            '◉ ' + fmt(f.cost), 'ghost', can ? 'fabao_buy:' + f.id : '');
+            '◉ ' + fmt(f.cost), 'ghost', 'fabao_buy:' + f.id, !can);
+          if (!can) {
+            CV.text('◉ 不够·还差 ' + fmt(Math.max(0, f.cost - (Core.S.cur.points || 0))), U.ix() + 40 * CV.SCALE,
+              top + (36 + dLines.length * 17) * CV.SCALE, { size: CV.FS.xs, color: CV.C.accent });
+            U.y = top + Math.max(h, (52 + dLines.length * 17) * CV.SCALE);
+          }
         } else {
+          /* F2-5：戴着/骑着的那颗「佩戴中 / 乘骑中」以前也是假按钮 —— 现在变灰（`dis`），
+             状态本身写在按钮上，不需要再点。 */
           U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-            wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', wearing ? '' : 'fabao_wear:' + f.id);
+            wearing ? '佩戴中' : '佩戴', wearing ? 'primary' : 'ghost', 'fabao_wear:' + f.id, wearing);
           /* V9.6.133：祭炼搬进二级页，这里只留一个"点名字进详情"的整块热区 */
           CV.hit('fabao_detail:' + f.id, U.ix(), top, U.iw() - bw - 6 * CV.SCALE, h);
         }
-        U.y = top + h;
+        U.y = Math.max(U.y, top + h);
       });
     });
   });
   D.FABAO.forEach(function (f) {
     CV.on('fabao_buy:' + f.id, function () {
       const r = Core.buyFabao(f.id);
-      CV.toast(r.msg || (r.ok ? '已购入' : '买不了'));
+      /* F7 ②：**新到手一件东西**（法宝）＝ 别处看不到，留；失败留。 */
+      CV.toast(r.msg || '买不了');
       CV.render();
     });
     CV.on('fabao_wear:' + f.id, function () {
       const r = Core.wearFabao(f.id);
-      CV.toast(r.msg || '已佩戴');
+      /* F7 ②：法宝页"当前佩戴"那行当场变（看得见 → 删）；失败留。 */
+      if (!r.ok) CV.toast(r.msg || '戴不上');
       CV.render();
     });
   });
@@ -212,13 +227,15 @@
   CV.on('fabao_detail:*', function (id) { fabaoDetailId = id; CV.push('fabao_detail'); });
   CV.on('fabao_refine_now', function () {
     const r = Core.refineFabao(fabaoDetailId);
-    CV.toast(r.msg || '祭炼过了');
+    /* F7 ②：祭炼等级当场变（看得见 → 删）；"到顶 / 结晶不足"这类失败留。 */
+    if (!r.ok) CV.toast(r.msg || '祭炼不了');
     CV.render();
   });
   CV.on('fabao_wear_now', function () {
     const on = Core.S.fabao.on === fabaoDetailId;
     const r = Core.wearFabao(on ? null : fabaoDetailId);
-    CV.toast(r.msg || (on ? '已摘下' : '已佩戴'));
+    /* F7 ②：摘下/佩戴都在页面状态上写着（看得见 → 删）；失败留。 */
+    if (!r.ok) CV.toast(r.msg || '换不了');
     CV.render();
   });
 
@@ -259,8 +276,10 @@
         if (!own) U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE, '驯服', 'ghost', 'mount_buy:' + m.id);
         else {
           /* V9.6.133：喂养搬进二级页（原来两个按钮把名字和效果挤没了） */
+          /* F2-5（抢修单 0928R3）：骑着的那颗「乘骑中」原来是一颗点了没反应的假按钮
+             —— 现在 `dis` 变灰（状态已经写在按钮上了，不用再点）。 */
           U.btn(U.ix() + U.iw() - bw, by, bw, U.BTN_SM * CV.SCALE,
-            riding ? '乘骑中' : '乘骑', riding ? 'primary' : 'ghost', riding ? '' : 'mount_wear:' + m.id);
+            riding ? '乘骑中' : '乘骑', riding ? 'primary' : 'ghost', 'mount_wear:' + m.id, riding);
           CV.hit('mount_detail:' + m.id, U.ix(), top, U.iw() - bw - 6 * CV.SCALE, h);
         }
         U.y = top + h;
@@ -270,12 +289,14 @@
   D.MOUNTS.forEach(function (m) {
     CV.on('mount_buy:' + m.id, function () {
       const r = Core.buyMount(m.id);
-      CV.toast(r.msg || (r.ok ? '已驯服' : '驯服不了'));
+      /* F7 ②：**新到手一匹坐骑**＝别处看不到，留；失败留。 */
+      CV.toast(r.msg || '驯服不了');
       CV.render();
     });
     CV.on('mount_wear:' + m.id, function () {
       const r = Core.wearMount(m.id);
-      CV.toast(r.msg || '已乘骑');
+      /* F7 ②：乘骑状态当场变（看得见 → 删）；失败留。 */
+      if (!r.ok) CV.toast(r.msg || '骑不上');
       CV.render();
     });
   });
@@ -322,13 +343,15 @@
   CV.on('mount_detail:*', function (id) { mountDetailId = id; CV.push('mount_detail'); });
   CV.on('mount_feed_now', function () {
     const r = Core.feedMount(mountDetailId);
-    CV.toast(r.msg || '喂养不了');
+    /* F7 ②：坐骑等级当场变（看得见 → 删）；"喂到顶 / 点数不足"这类失败留。 */
+    if (!r.ok) CV.toast(r.msg || '喂养不了');
     CV.render();
   });
   CV.on('mount_ride_now', function () {
     const riding = Core.S.mount.on === mountDetailId;
     const r = Core.wearMount(riding ? null : mountDetailId);
-    CV.toast(r.msg || (riding ? '已下坐骑' : '已乘骑'));
+    /* F7 ②：上下坐骑的状态当场变（看得见 → 删）；失败留。 */
+    if (!r.ok) CV.toast(r.msg || '骑不上');
     CV.render();
   });
 
@@ -407,9 +430,16 @@
             /* 空地且种子不够 → 按钮进禁用态（`dis`：压暗 + 不给热区），
                与「背包满了不该让玩家白点」是同一套处理。种子来源写在卡片顶上那条 hint。 */
             const noSeed = !p.plot && seedHave < (D.GARDEN_SEED_N || 1);
+            /* V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A）：**生长中的「未熟」原来是 'noop'**
+               —— 一颗画成正常按钮、点了什么都不发生的假按钮（他说的"无效按键"）。
+               现在"未熟"与"没种子"都走 dis（变灰 + 不登记热区）：
+                 · 未熟 → 理由就是这一行description 里的「成熟还需 M:SS」；
+                 · 没种子 → 理由在卡片顶上那条 hint（副本掉 / 市集买）。
+               能种的仍然登记 `garden_plant:<块号>`，点了有 toast。 */
+            const canPlant = !p.plot && !noSeed;
+            const btnId = ready ? 'garden_get:' + i : (canPlant ? 'garden_plant:' + i : '');
             U.btn(U.ix() + U.iw() - bw, cy - bh / 2, bw, bh,
-              btnLabel, ready ? 'primary' : 'ghost',
-              ready ? 'garden_get:' + i : (p.plot || noSeed ? 'noop' : 'garden_plant:' + i), noSeed);
+              btnLabel, ready ? 'primary' : 'ghost', btnId, !ready && !canPlant);
           }
           /* .list-row 的行分隔线（最后一行由 :last-child 去掉那一笔） */
           if (i < plots.length - 1) {
@@ -424,20 +454,35 @@
       U.btnRow([{ label: '一键收成熟的地', style: 'ghost', id: 'garden_all' }]);
     });
   });
-  [0, 1, 2, 3].forEach(function (i) {
-    CV.on('garden_plant:' + i, function () {
-      const r = Core.plantGarden(i, (D.GARDEN[i] || {}).id);
-      CV.toast(r.msg || '已播种');
-      CV.render();
-    });
-    CV.on('garden_get:' + i, function () {
-      const r = Core.harvestGarden(i);
-      CV.toast(r.msg || '已收获');
-      CV.render();
-    });
-  });
+  /* ================= V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A，**他点名的第二处**）=================
+     原话：「然后药园第五块地也种不了」。
+     真因：这一圈**只注册了 0~3 号地**（`[0,1,2,3].forEach`）—— 而地块上限是
+     `D.GARDEN_MAX = 8`（基础 4 块 + 每通关 9 张图多 1 块）。第 5 块地一旦按进度开出来，
+     它那颗「播种」在界面上照常登记热区、点了却是**没有处理器的死键**（什么都不发生）。
+     顺带第二处：`D.GARDEN[i]` 只到 [0..3]（4 种灵田），i≥4 时是 undefined ——
+     就算补上处理器，"第 5 块地"也会拿不到灵田 id、被逻辑层判成「没有这种灵田」。
+     `core.gardenState()` 早定了口径：**第 i 块地取第 i%4 种灵田**（同一种可以多种一块），
+     这里照同一条口径取 id。
+     判据（`deadkey_audit` 的药园场景）：8 块全开 + 有种子时，每一块的按钮点下去都要有变化。 */
+  for (let gi = 0; gi < D.GARDEN_MAX; gi++) {
+    (function (i) {
+      CV.on('garden_plant:' + i, function () {
+        const r = Core.plantGarden(i, (D.GARDEN[i % D.GARDEN.length] || {}).id);
+        /* F7 ②：地块当场变成"生长中"（看得见 → 删成功）；"这块地还没开"这类前置不足留。 */
+        if (!r.ok) CV.toast(r.msg || '种不了');
+        CV.render();
+      });
+      CV.on('garden_get:' + i, function () {
+        const r = Core.harvestGarden(i);
+        /* F7 ②：**收到什么**（`收获：灵米 ×3`）＝ 一次性奖励，别处看不到 → 留。 */
+        CV.toast(r.msg || '收不了');
+        CV.render();
+      });
+    })(gi);
+  }
   CV.on('garden_all', function () {
     const r = Core.harvestAllGarden();
+    /* F7 ②：一次性奖励（一次收了几块地）→ 留，本来就是最短的一句。 */
     CV.toast(r.msg || '有成熟的地就收了');
     CV.render();
   });
@@ -515,6 +560,10 @@
     if (G.BattleUI.clear) G.BattleUI.clear();
     arenaStart();
   });
+  /* ⚠️ 2026-09-28 一条**自我纠错**：康康一时按 F8 的"死处理器清单"把这颗删了，
+     结果 `battle_return_audit` ② 当场红 —— 它的 id 是**拼出来的**（斗法台结算面板把
+     `kind + '_back'` 拼成热区 id），字面 grep 数到 0 并不等于没人用。
+     **判"死处理器"必须看运行时 `CV.hits`，不能看字面量** —— 恢复原样： */
   CV.on('arena_back', function () { G.BattleUI.clear && G.BattleUI.clear(); CV.reset('arena'); });
 
   /* ---------- 点灯（原「求签」，V1.0.1 改壳） ----------
@@ -555,6 +604,7 @@
   });
   CV.on('sign_draw', function () {
     const r = Core.drawSign();
+    /* F7 ②：点灯**必须留** —— 它给的是"今天的签文"（别处看不到），不是"已点灯"这种确认语。 */
     CV.toast(r.msg || '已点灯');
     CV.render();
   });

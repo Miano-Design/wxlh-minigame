@@ -12,6 +12,14 @@
   const curIcon = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.icon : k; };
   const curName = (k) => { const m = (D.CURRENCIES || []).find((c) => c.id === k); return m ? m.name : k; };
   let shopTab = 'god';
+  /* F2-6：深井那条路会**先**调 `G.setShopTab('corridor')` 再 `CV.push('shop')` ——
+     这里记下"下一次进店该用哪家店"，由市集页**第一帧**消费一次（消费完就清空）。
+     其余任何路径进店都没有这个记号 → 一律回到默认的「灯阁市集」。 */
+  let pendingShopTab = null;
+  /* F2-6：上一次画市集用的是**哪一层页面对象**（`CV.top()` 的引用）——
+     换页（reset / push / switchTab）每次都新建一层，同一层原地重画还是同一个引用，
+     于是"进店第一帧复位、页内重画保状态"两件事同时成立（见市集页顶部那段注释）。 */
+  let shopLevel = null;
   /* V1.1.15（2026-09-27 · 父亲大人口径）：购买数量弹窗的状态 —— 买哪一行、当前选几个。
      `buyDialog = null` 表示没弹窗；非 null 时市集页会**只画这张小弹窗**（暗底＋居中卡片，
      天然模态：底下的商品行连热区都不登记，点不穿）。 */
@@ -27,7 +35,7 @@
     const kejiLv = D.KEJI.reduce((s, k) => s + Core.kejiLv(k.id), 0);
     const rows = [
       { act: 'open_buildings', unlock: 'buildings', ico: '🏗', name: '基地建设', cur: 'Lv.' + bLv + ' / ' + Object.keys(S.buildings).length * 50,
-        desc: '花 ◉ 点数，永久提升挂机产出 / 经验 / 离线上限 / 强化折扣' },
+        desc: '花 ◉ 点数永久提升：挂机产出 / 挂机经验 / 离线效率 / 强化与命格升级折扣' },
       { act: 'open_authority', unlock: 'buildings', ico: '🔑', name: '灯阁权限', cur: 'Lv.' + au.lv + ' / ' + au.max,
         desc: '花 ✦ 圣洁晶石 + ◆ 异界结晶，永久提升挂机产出、离线效率、每日扫荡次数' },
       { act: 'open_sect', unlock: null, ico: '🏯', name: '灯阁评级', cur: 'Lv.' + Core.sectInfo().lv + ' / ' + D.SECT_MAX,
@@ -57,12 +65,12 @@
         desc: '第二条养成线：随行 1 只给全队加成，带对五行进本全队伤害 +15%' },
       { act: 'open_reincarn', unlock: 'reincarn', ico: '♾', name: '转生天赋',
         cur: S.player.reincarnations > 0 ? (S.player.reincarnations + ' 世') : '未转生',
-        desc: '满级后重置进度换永久天赋点，四支天赋各 10 级；越早开始攒越划算' },
+        /* 2026-09-27：转生只收等级，残域与深井都留着（见 core.js reincarnate 的说明） */
+        desc: '满级后把等级收回 Lv.0 换永久天赋点（残域与深井进度保留），四支天赋各 10 级；越早开始攒越划算' },
     ];
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'grow_back');
-    CV.text('成长', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    /* 标题 + 返回吸顶（父亲大人 09-27 深夜 · 派单 Z-B） */
+    U.pageHead('成长', { backId: 'grow_back' });
     rows.forEach(function (x) {
       const ok = !x.unlock || Core.isUnlocked(x.unlock);
       const rowH = 62 * CV.SCALE;
@@ -96,12 +104,24 @@
   /* ---------- 市集（原「兑换大厅」· V1.1.9 正名：数据里一直叫「灯阁市集」，
      父亲大人找不到「兑换大厅」这个名字 —— 入口名、屏标题、来源文案统一成「市集」） ---------- */
   CV.register('shop', function () {
+    /* ================= F2-6（抢修单 0928R3）· 进店第一帧把"模式类"状态复位 =================
+       两个真状态残留（都探针复现过）：
+         · `buyDialog`：点「购买」弹出选数量 → 点**吸顶返回**退页 → 再进市集，
+           弹窗自己又跳出来（带着上次那一行、上次选的数量）；
+         · `shopTab`：逛过深井商店之后，从**首页**点「市集」进去的是**深井商店**
+           （货架与结算货币全换了，看着像"市集被换了"）。
+       ⚠️ 判据只能是"这一层第一次被画到"，不能用 `onEnter`（cv.js 不在本单可改范围）。 */
+    const lvl = CV.top();
+    if (shopLevel !== lvl) {
+      shopLevel = lvl;
+      buyDialog = null; buyIdx = -1; buyQty = 1;
+      shopTab = pendingShopTab || 'god';
+      pendingShopTab = null;
+    }
     const S = Core.S;
     const shop = D.SHOPS[shopTab];
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'shop_back');
-    CV.text('市集', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('市集', { backId: 'shop_back' });     // 吸顶（父亲大人 09-27 深夜）
     /* 店铺胶囊（横排，放不下就先不画） */
     const keys = Object.keys(D.SHOPS);
     const pillH = 44 * CV.SCALE, gap = 6 * CV.SCALE;
@@ -152,8 +172,11 @@
         });
         const bw = 78 * CV.SCALE;
         const can = req.ok && !soldOut;
+        /* F2-5（抢修单 0928R3）：售罄 / 未解锁时这颗原来写 `id: can ? 'buy:'+i : ''` 又没给 `dis`
+           —— 画出来是颗能点的按钮、点下去什么都不发生。现在 `dis` 变灰 + 不登记热区；
+           "差什么"（🔒 还差哪个条件 / 今日已购 N）本来就在同一行的 t2 里，一个字没动。 */
         U.btn(U.ix() + U.iw() - bw, top + (U.y - top) / 2 - U.BTN_SM * CV.SCALE / 2, bw, U.BTN_SM * CV.SCALE,
-          req.ok ? (soldOut ? '已售罄' : '购买') : '未解锁', 'ghost', can ? 'buy:' + i : '');
+          req.ok ? (soldOut ? '已售罄' : '购买') : '未解锁', 'ghost', 'buy:' + i, !can);
       });
     });
     /* V1.1.15（2026-09-27 · 父亲大人："背景也不用遮罩，就正常的弹窗"）：
@@ -163,8 +186,8 @@
     if (buyDialog) { CV.hits = []; drawBuyDialog(); }
   });
   CV.on('shop_back', function () { CV.pop(); });
-  /* 供别的页面打开指定店铺（深井商店） */
-  G.setShopTab = function (k) { if (D.SHOPS[k]) shopTab = k; };
+  /* 供别的页面打开指定店铺（深井商店）：记成"下一次进店要用的店"（见 pendingShopTab） */
+  G.setShopTab = function (k) { if (D.SHOPS[k]) { shopTab = k; pendingShopTab = k; } };
   Object.keys(D.SHOPS || {}).forEach(function (k) {
     CV.on('shoptab:' + k, function () { shopTab = k; CV.render(); });
   });
@@ -252,10 +275,18 @@
   CV.on('buycancel', function () { buyDialog = null; CV.render(); });
   CV.on('buynum', function () {
     const W = G.wx;
-    if (!W || !W.showKeyboard) { CV.toast('这台设备不支持输入，用 − / + 调吧'); return; }
+    /* 2026-09-28：与起名那句同族 —— **别断言"设备不支持"**（手机电脑都有键盘），
+       说的是"这个环境暂时调不起手动输入"，并给一条立刻能走的路。 */
+    if (!W || !W.showKeyboard) { CV.toast('这个版本暂时调不起手动输入，用 − / + 调吧'); return; }
     try {
       if (W.offKeyboardConfirm) W.offKeyboardConfirm();
-      W.onKeyboardConfirm(function (res) {
+      if (W.offKeyboardComplete) W.offKeyboardComplete();
+      /* V1.1.21（2026-09-28 · 父亲大人：「点空白区域要能退出输入框」）：
+         输入态立 `CV.kbActive`（`cv.js` 的手势开头靠它实现"点空白＝收起键盘"），
+         并且**同时听 confirm 与 complete** —— 玩家用键盘上的"完成"、或微信自己收掉键盘，
+         两条路都要把数字落下来（原来只听了 confirm）。 */
+      const apply = function (res) {
+        CV.kbActive = false;
         const raw = String((res && (res.value !== undefined ? res.value : res.data)) || '');
         let v = parseInt(raw.replace(/[^0-9]/g, ''), 10);
         if (!isFinite(v) || v < 1) v = 1;
@@ -263,13 +294,24 @@
         buyQty = Math.min(v, max);                      // ← 超上限自动压到上限（父亲大人的例子：99 → 50）
         if (v > max) CV.toast('超过能买的上限，已改成 ' + max + ' 个');
         CV.render();
+      };
+      W.onKeyboardConfirm(function (res) {
+        if (!buyDialog) return;                        // 弹窗已经关掉：这一下不算（与删档那段同一条规矩）
+        apply(res);
       });
-      W.showKeyboard({ type: 'number', defaultValue: String(buyQty), maxLength: 4, success: function () {}, fail: function () { CV.toast('这台设备不支持输入，用 − / + 调吧'); } });
-    } catch (e) { CV.toast('这台设备不支持输入，用 − / + 调吧'); }
+      if (W.onKeyboardComplete) W.onKeyboardComplete(function (res) {
+        if (!buyDialog) return;
+        apply(res);
+      });
+      CV.kbActive = true;
+      W.showKeyboard({ type: 'number', defaultValue: String(buyQty), maxLength: 4, success: function () {}, fail: function () { CV.toast('这个版本暂时调不起手动输入，用 − / + 调吧'); } });
+    } catch (e) { CV.toast('这个版本暂时调不起手动输入，用 − / + 调吧'); }
   });
   CV.on('buyok', function () {
     const r = Core.buyShopItem(shopTab, buyIdx, buyQty);
-    CV.toast(r.msg || (r.ok ? '购买成功' : '买不了'), 2600);
+    /* F7 ②：买成功后货架那行的"已有 ×N"和顶栏货币当场变（看得见 → 删成功语）；
+       失败留（钱不够 / 今日售罄 / 背包放不下）。 */
+    if (!r.ok) CV.toast(r.msg || '买不了', 2600);
     buyDialog = null;
     CV.render();
   });

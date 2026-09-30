@@ -1,0 +1,417 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - link [ref=e7] [cursor=pointer]:
+        - /url: /doc/
+      - generic [ref=e10]: 小游戏
+    - navigation [ref=e14]:
+      - link "介绍" [ref=e16] [cursor=pointer]:
+        - /url: /minigame/introduction/
+      - link "开发" [ref=e18] [cursor=pointer]:
+        - /url: /minigame/dev/guide/
+      - link "设计" [ref=e20] [cursor=pointer]:
+        - /url: /minigame/design/
+      - link "运营" [ref=e22] [cursor=pointer]:
+        - /url: /minigame/product/
+      - link "数据" [ref=e24] [cursor=pointer]:
+        - /url: /minigame/analysis/
+    - generic [ref=e25]:
+      - navigation [ref=e26]:
+        - link "社区" [ref=e28] [cursor=pointer]:
+          - /url: https://developers.weixin.qq.com/community/minigame
+        - link "学堂" [ref=e30] [cursor=pointer]:
+          - /url: https://developers.weixin.qq.com/community/business/CategorySearch?cid=119
+      - list [ref=e31]:
+        - listitem [ref=e32] [cursor=pointer]
+      - button [ref=e37] [cursor=pointer]
+  - list [ref=e41]:
+    - listitem [ref=e42]:
+      - link "指南" [ref=e44] [cursor=pointer]:
+        - /url: /minigame/dev/guide/
+    - listitem [ref=e45]:
+      - link "框架" [ref=e47] [cursor=pointer]:
+        - /url: /minigame/dev/reference/
+    - listitem [ref=e48]:
+      - link "API" [ref=e50] [cursor=pointer]:
+        - /url: /minigame/dev/api/
+    - listitem [ref=e51]:
+      - link "服务端" [ref=e53] [cursor=pointer]:
+        - /url: /minigame/dev/api-backend/
+    - listitem [ref=e54]:
+      - link "工具" [ref=e56] [cursor=pointer]:
+        - /url: /minigame/dev/devtools/devtools
+    - listitem [ref=e57]:
+      - generic [ref=e58] [cursor=pointer]: 云服务
+    - listitem [ref=e61]:
+      - link "云测试" [ref=e63] [cursor=pointer]:
+        - /url: /minigame/dev/minigame-testtool/
+  - generic [ref=e65]:
+    - complementary [ref=e66]:
+      - list [ref=e69]:
+        - listitem [ref=e70]:
+          - link "基础" [ref=e75] [cursor=pointer]:
+            - /url: /minigame/dev/api/base/wx.env.html
+        - listitem [ref=e76]:
+          - link "跳转" [ref=e81] [cursor=pointer]:
+            - /url: /minigame/dev/api/navigate/wx.restartMiniProgram.html
+        - listitem [ref=e82]:
+          - link "转发" [ref=e87] [cursor=pointer]:
+            - /url: /minigame/dev/api/share/wx.updateShareMenu.html
+        - listitem [ref=e88]:
+          - link "聊天工具" [ref=e93] [cursor=pointer]:
+            - /url: /minigame/dev/api/chattool/wx.shareVideoToGroup.html
+        - listitem [ref=e94]:
+          - link "界面" [ref=e99] [cursor=pointer]:
+            - /url: /minigame/dev/api/ui/interaction/wx.showToast.html
+        - listitem [ref=e100]:
+          - link "网络" [ref=e105] [cursor=pointer]:
+            - /url: /minigame/dev/api/network/request/wx.request.html
+        - listitem [ref=e106]:
+          - link "虚拟支付" [ref=e111] [cursor=pointer]:
+            - /url: /minigame/dev/api/midas-payment/wx.requestMidasPaymentGameItem.html
+        - listitem [ref=e112]:
+          - link "数据缓存" [ref=e117] [cursor=pointer]:
+            - /url: /minigame/dev/api/storage/wx.setStorageSync.html
+        - listitem [ref=e118]:
+          - link "数据分析" [ref=e123] [cursor=pointer]:
+            - /url: /minigame/dev/api/data-analysis/wx.reportUserBehaviorBranchAnalytics.html
+        - listitem [ref=e124]:
+          - link "渲染" [ref=e129] [cursor=pointer]:
+            - /url: /minigame/dev/api/render/canvas/wx.createPath2D.html
+        - listitem [ref=e130]:
+          - link "媒体" [ref=e135] [cursor=pointer]:
+            - /url: /minigame/dev/api/media/audio/wx.setInnerAudioOption.html
+        - listitem [ref=e136]:
+          - link "位置" [ref=e141] [cursor=pointer]:
+            - /url: /minigame/dev/api/location/wx.getLocation.html
+        - listitem [ref=e142]:
+          - link "文件" [ref=e147] [cursor=pointer]:
+            - /url: /minigame/dev/api/file/wx.saveFileToDisk.html
+        - listitem [ref=e148]:
+          - generic [ref=e149]:
+            - link "开放接口" [ref=e153] [cursor=pointer]:
+              - /url: /minigame/dev/api/open-api/user-info/wx.getUserInfo.html
+            - list [ref=e154]:
+              - listitem [ref=e155]:
+                - link "用户信息" [ref=e160] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/user-info/wx.getUserInfo.html
+              - listitem [ref=e161]:
+                - link "登录" [ref=e166] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/login/wx.login.html
+              - listitem [ref=e167]:
+                - link "授权" [ref=e172] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/authorize/wx.authorize.html
+              - listitem [ref=e173]:
+                - link "开放数据" [ref=e178] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/data/wx.shareMessageToFriend.html
+              - listitem [ref=e179]:
+                - link "开放数据域" [ref=e184] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/context/wx.onMessage.html
+              - listitem [ref=e185]:
+                - link "防沉迷" [ref=e187] [cursor=pointer]:
+                  - /url: /minigame/dev/api/(防沉迷).html
+              - listitem [ref=e188]:
+                - link "意见反馈" [ref=e193] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/feedback/wx.createFeedbackButton.html
+              - listitem [ref=e194]:
+                - link "设置" [ref=e199] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/setting/wx.openSetting.html
+              - listitem [ref=e200]:
+                - link "游戏圈" [ref=e205] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/game-club/wx.getGameClubData.html
+              - listitem [ref=e206]:
+                - link "客服消息" [ref=e211] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/customer-message/wx.openCustomerServiceConversation.html
+              - listitem [ref=e212]:
+                - link "微信运动" [ref=e217] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/werun/wx.getWeRunData.html
+              - listitem [ref=e218]:
+                - link "OPENLINK" [ref=e223] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/openlink/wx.createPageManager.html
+              - listitem [ref=e224]:
+                - link "平台组件" [ref=e229] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/game-component/wx.getRankManager.html
+              - listitem [ref=e230]:
+                - link "微信小店" [ref=e235] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/store-gift/wx.createStoreGift.html
+              - listitem [ref=e236]:
+                - link "卡券" [ref=e241] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/card/wx.openCard.html
+              - listitem [ref=e242]:
+                - link "我的小程序" [ref=e247] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/my-miniprogram/wx.checkIsAddedToMyMiniProgram.html
+              - listitem [ref=e248]:
+                - link "人脸检测" [ref=e253] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/face/wx.requestFacialVerify.html
+              - listitem [ref=e254]:
+                - link "账号信息" [ref=e259] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/account-info/wx.requestFacialRecognition.html
+              - listitem [ref=e260]:
+                - link "视频号" [ref=e265] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/channels/wx.reserveChannelsLive.html
+              - listitem [ref=e266]:
+                - link "微信群" [ref=e271] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/group/wx.getGroupEnterInfo.html
+              - listitem [ref=e272]:
+                - link "隐私信息授权" [ref=e277] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/privacy/wx.requirePrivacyAuthorize.html
+              - listitem [ref=e278]:
+                - link "微信客服" [ref=e283] [cursor=pointer]:
+                  - /url: /minigame/dev/api/open-api/service-chat/wx.openCustomerServiceChat.html
+              - listitem [ref=e284]:
+                - generic [ref=e285]:
+                  - link "订阅消息" [ref=e289] [cursor=pointer]:
+                    - /url: /minigame/dev/api/open-api/subscribe-message/wx.requestSubscribeSystemMessage.html
+                  - list [ref=e290]:
+                    - listitem [ref=e291]:
+                      - link "wx.requestSubscribeSystemMessage" [ref=e293] [cursor=pointer]:
+                        - /url: /minigame/dev/api/open-api/subscribe-message/wx.requestSubscribeSystemMessage.html
+                    - listitem [ref=e294]:
+                      - link "wx.requestSubscribeMessage" [ref=e296] [cursor=pointer]:
+                        - /url: /minigame/dev/api/open-api/subscribe-message/wx.requestSubscribeMessage.html
+        - listitem [ref=e297]:
+          - link "设备" [ref=e302] [cursor=pointer]:
+            - /url: /minigame/dev/api/device/keyboard/wx.updateKeyboard.html
+        - listitem [ref=e303]:
+          - link "AI" [ref=e308] [cursor=pointer]:
+            - /url: /minigame/dev/api/ai/inference/wx.getInferenceEnvInfo.html
+        - listitem [ref=e309]:
+          - link "Worker" [ref=e314] [cursor=pointer]:
+            - /url: /minigame/dev/api/worker/wx.createWorker.html
+        - listitem [ref=e315]:
+          - link "游戏对局回放" [ref=e320] [cursor=pointer]:
+            - /url: /minigame/dev/api/game-recorder/wx.operateGameRecorderVideo.html
+        - listitem [ref=e321]:
+          - link "游戏服务" [ref=e326] [cursor=pointer]:
+            - /url: /minigame/dev/api/game-server-manager/wx.getGameServerManager.html
+        - listitem [ref=e327]:
+          - link "第三方平台" [ref=e332] [cursor=pointer]:
+            - /url: /minigame/dev/api/ext/wx.getExtConfigSync.html
+        - listitem [ref=e333]:
+          - link "广告" [ref=e338] [cursor=pointer]:
+            - /url: /minigame/dev/api/ad/wx.onDirectAdStatusChange.html
+        - listitem [ref=e339]:
+          - link "工具" [ref=e344] [cursor=pointer]:
+            - /url: /minigame/dev/api/util/wx.encode.html
+        - listitem [ref=e345]:
+          - generic [ref=e349]:
+            - link:
+              - /url: /minigame/dev/api/offline-mode/wx.onOfflineModeStateChange.html
+    - main [ref=e351]:
+      - generic [ref=e352]:
+        - generic [ref=e353]:
+          - generic [ref=e354]:
+            - generic [ref=e355]: 开放接口 /
+            - generic [ref=e356]: 订阅消息 /
+            - generic [ref=e357]: wx.requestSubscribeMessage
+          - generic [ref=e358]:
+            - heading "wx.requestSubscribeMessage(Object object)" [level=1] [ref=e359]
+            - blockquote [ref=e360]:
+              - paragraph [ref=e361]:
+                - text: 基础库 2.4.4 开始支持，低版本需做
+                - link "兼容处理" [ref=e362] [cursor=pointer]:
+                  - /url: ../../../guide/runtime/client-lib/compatibility.html
+                - text: 。
+            - blockquote [ref=e363]:
+              - paragraph [ref=e364]:
+                - strong [ref=e365]:
+                  - text: 以
+                  - link "Promise 风格" [ref=e366] [cursor=pointer]:
+                    - /url: ../../../game-engine/worker/api.html#%E5%BC%82%E6%AD%A5-API-%E8%BF%94%E5%9B%9E-Promise
+                  - text: 调用
+                - text: ：支持
+              - paragraph [ref=e367]:
+                - strong [ref=e368]: 微信 Windows 版
+                - text: ：支持
+              - paragraph [ref=e369]:
+                - strong [ref=e370]: 微信 Mac 版
+                - text: ：支持
+              - paragraph [ref=e371]:
+                - strong [ref=e372]: 微信 鸿蒙 OS 版
+                - text: ：支持
+              - paragraph [ref=e373]:
+                - strong [ref=e374]: 限制
+                - text: ：仅在
+                - link "点击行为" [ref=e375] [cursor=pointer]:
+                  - /url: ../../../guide/base-ability/touch-limit.html
+                - text: 时调用
+            - heading "功能描述" [level=2] [ref=e376]
+            - paragraph [ref=e377]:
+              - text: 调起客户端小游戏订阅消息界面，返回用户订阅消息的操作结果。当用户勾选了订阅面板中的“总是保持以上选择，不再询问”时，模板消息会被添加到用户的小游戏设置页，通过
+              - link "wx.getSetting" [ref=e378] [cursor=pointer]:
+                - /url: ../setting/wx.getSetting.html
+              - text: 接口可获取用户对相关模板消息的订阅状态。
+            - heading "注意事项" [level=2] [ref=e379]
+            - list [ref=e380]:
+              - listitem [ref=e381]: 一次性模板 id 和永久模板 id 不可同时使用。
+              - listitem [ref=e382]: 低版本基础库2.4.4~2.8.3 已支持订阅消息接口调用，仅支持传入一个一次性 tmplId / 永久 tmplId。
+              - listitem [ref=e383]:
+                - link "2.8.2" [ref=e384] [cursor=pointer]:
+                  - /url: ../../../guide/runtime/client-lib/compatibility.html
+                - text: 版本开始，用户发生点击行为或者发起支付回调后，才可以调起订阅消息界面。
+              - listitem [ref=e385]:
+                - link "2.10.0" [ref=e386] [cursor=pointer]:
+                  - /url: ../../../guide/runtime/client-lib/compatibility.html
+                - text: 版本开始，开发版和体验版小游戏将禁止使用模板消息 fomrId。
+              - listitem [ref=e387]:
+                - text: 使用前建议阅读
+                - link "小游戏订阅消息使用指引" [ref=e388] [cursor=pointer]:
+                  - /url: ../../../guide/open-ability/subscribe-message.html
+                - text: 。
+              - listitem [ref=e389]: 一次授权调用里，每个tmplId对应的模板标题不能存在相同的，若出现相同的，只保留一个。
+            - heading "参数" [level=2] [ref=e390]
+            - heading "Object object" [level=3] [ref=e391]
+            - table [ref=e393]:
+              - rowgroup [ref=e394]:
+                - row [ref=e395]:
+                  - columnheader "属性" [ref=e396]
+                  - columnheader "类型" [ref=e397]
+                  - columnheader "默认值" [ref=e398]
+                  - columnheader "必填" [ref=e399]
+                  - columnheader "说明" [ref=e400]
+              - rowgroup [ref=e401]:
+                - row [ref=e402]:
+                  - cell "tmplIds" [ref=e403]
+                  - cell "Array.<string>" [ref=e404]
+                  - cell [ref=e405]
+                  - cell "是" [ref=e406]
+                  - cell "需要订阅的消息模板的id的集合，一次调用最多可订阅3条消息（注意：iOS客户端7.0.6版本、Android客户端7.0.7版本之后的一次性订阅/长期订阅才支持多个模板消息，iOS客户端7.0.5版本、Android客户端7.0.6版本之前的一次订阅只支持一个模板消息）消息模板id在[微信公众平台(mp.weixin.qq.com)-功能-订阅消息]中配置。每个tmplId对应的模板标题需要不相同，否则会被过滤。" [ref=e407]
+                - row [ref=e408]:
+                  - cell "success" [ref=e409]
+                  - cell "function" [ref=e410]
+                  - cell [ref=e411]
+                  - cell "否" [ref=e412]
+                  - cell "接口调用成功的回调函数" [ref=e413]
+                - row [ref=e414]:
+                  - cell "fail" [ref=e415]
+                  - cell "function" [ref=e416]
+                  - cell [ref=e417]
+                  - cell "否" [ref=e418]
+                  - cell "接口调用失败的回调函数" [ref=e419]
+                - row [ref=e420]:
+                  - cell "complete" [ref=e421]
+                  - cell "function" [ref=e422]
+                  - cell [ref=e423]
+                  - cell "否" [ref=e424]
+                  - cell "接口调用结束的回调函数（调用成功、失败都会执行）" [ref=e425]
+            - heading "object.success 回调函数" [level=4] [ref=e426]
+            - heading "参数" [level=5] [ref=e427]
+            - heading "Object res" [level=6] [ref=e428]
+            - table [ref=e430]:
+              - rowgroup [ref=e431]:
+                - row [ref=e432]:
+                  - columnheader "属性" [ref=e433]
+                  - columnheader "类型" [ref=e434]
+                  - columnheader "说明" [ref=e435]
+              - rowgroup [ref=e436]:
+                - row [ref=e437]:
+                  - cell "errMsg" [ref=e438]
+                  - cell "String" [ref=e439]
+                  - cell "接口调用成功时errMsg值为'requestSubscribeMessage:ok'" [ref=e440]
+                - row [ref=e441]:
+                  - 'cell "[TEMPLATE_ID: string]" [ref=e442]'
+                  - cell "String" [ref=e443]
+                  - 'cell "[TEMPLATE_ID]是动态的键，即模板id，值包括''accept''、''reject''、''ban''、''filter''。''accept''表示用户同意订阅该条id对应的模板消息，''reject''表示用户拒绝订阅该条id对应的模板消息，''ban''表示已被后台封禁，''filter''表示该模板因为模板标题同名被后台过滤。例如 { errMsg: \"requestSubscribeMessage:ok\", zun-LzcQyW-edafCVvzPkK4de2Rllr1fFpw2A_x0oXE: \"accept\"} 表示用户同意订阅zun-LzcQyW-edafCVvzPkK4de2Rllr1fFpw2A_x0oXE这条消息" [ref=e444]'
+            - heading "object.fail 回调函数" [level=4] [ref=e445]
+            - heading "参数" [level=5] [ref=e446]
+            - heading "Object res" [level=6] [ref=e447]
+            - table [ref=e449]:
+              - rowgroup [ref=e450]:
+                - row [ref=e451]:
+                  - columnheader "属性" [ref=e452]
+                  - columnheader "类型" [ref=e453]
+                  - columnheader "说明" [ref=e454]
+              - rowgroup [ref=e455]:
+                - row [ref=e456]:
+                  - cell "errMsg" [ref=e457]
+                  - cell "String" [ref=e458]
+                  - cell "接口调用失败错误信息" [ref=e459]
+                - row [ref=e460]:
+                  - cell "errCode" [ref=e461]
+                  - cell "Number" [ref=e462]
+                  - cell "接口调用失败错误码" [ref=e463]
+            - heading "错误码" [level=2] [ref=e464]
+            - table [ref=e466]:
+              - rowgroup [ref=e467]:
+                - row [ref=e468]:
+                  - columnheader "errCode" [ref=e469]
+                  - columnheader "errMsg" [ref=e470]
+                  - columnheader "说明" [ref=e471]
+              - rowgroup [ref=e472]:
+                - row [ref=e473]:
+                  - cell "10001" [ref=e474]
+                  - cell "TmplIds can't be empty" [ref=e475]
+                  - cell "参数传空了" [ref=e476]
+                - row [ref=e477]:
+                  - cell "10002" [ref=e478]
+                  - cell "Request list fail" [ref=e479]
+                  - cell "网络问题，请求消息列表失败" [ref=e480]
+                - row [ref=e481]:
+                  - cell "10003" [ref=e482]
+                  - cell "Request subscribe fail" [ref=e483]
+                  - cell "网络问题，订阅请求发送失败" [ref=e484]
+                - row [ref=e485]:
+                  - cell "10004" [ref=e486]
+                  - cell "Invalid template id" [ref=e487]
+                  - cell "参数类型错误" [ref=e488]
+                - row [ref=e489]:
+                  - cell "10005" [ref=e490]
+                  - cell "Cannot show subscribe message UI" [ref=e491]
+                  - cell "无法展示 UI，一般是小游戏这个时候退后台了导致的" [ref=e492]
+                - row [ref=e493]:
+                  - cell "20001" [ref=e494]
+                  - cell "No template data return, verify the template id exist" [ref=e495]
+                  - cell "没有模板数据，一般是模板 ID 不存在 或者和模板类型不对应 导致的" [ref=e496]
+                - row [ref=e497]:
+                  - cell "20002" [ref=e498]
+                  - cell "Templates type must be same" [ref=e499]
+                  - cell "模板消息类型 既有一次性的又有永久的" [ref=e500]
+                - row [ref=e501]:
+                  - cell "20003" [ref=e502]
+                  - cell "Templates count out of max bounds" [ref=e503]
+                  - cell "模板消息数量超过上限" [ref=e504]
+                - row [ref=e505]:
+                  - cell "20004" [ref=e506]
+                  - cell "The main switch is switched off" [ref=e507]
+                  - cell "用户关闭了主开关，无法进行订阅" [ref=e508]
+                - row [ref=e509]:
+                  - cell "20005" [ref=e510]
+                  - cell "This mini program was banned from subscribing messages" [ref=e511]
+                  - cell "小游戏被禁封" [ref=e512]
+            - heading "示例代码" [level=2] [ref=e513]
+            - code [ref=e516]: "wx.requestSubscribeMessage({ tmplIds: [''], success (res) { console.log(res) res === { errMsg: \"requestSubscribeMessage:ok\", \"zun-LzcQyW-edafCVvzPkK4de2Rllr1fFpw2A_x0oXE\": \"accept\" } } })"
+        - generic [ref=e517]:
+          - list [ref=e518]:
+            - listitem [ref=e519]:
+              - link "关于腾讯" [ref=e520] [cursor=pointer]:
+                - /url: http://www.tencent.com/zh-cn/index.shtml
+            - listitem [ref=e521]:
+              - link "文档中心" [ref=e522] [cursor=pointer]:
+                - /url: https://mp.weixin.qq.com/debug/wxadoc/introduction/index.html?t=1484641676
+            - listitem [ref=e523]:
+              - link "辟谣中心" [ref=e524] [cursor=pointer]:
+                - /url: https://kf.qq.com/faq/17030722muuu170307MFBny2.html
+            - listitem [ref=e525]:
+              - link "客服中心" [ref=e526] [cursor=pointer]:
+                - /url: http://kf.qq.com/faq/120911VrYVrA1509086vyumm.html
+          - paragraph [ref=e527]: Copyright © 2012-2026 Tencent. All Rights Reserved.
+    - generic [ref=e529]:
+      - list [ref=e530]:
+        - listitem [ref=e531]:
+          - generic [ref=e532] [cursor=pointer]: 功能描述
+      - list [ref=e533]:
+        - listitem [ref=e534]:
+          - generic [ref=e535] [cursor=pointer]: 注意事项
+      - list [ref=e536]:
+        - listitem [ref=e537]:
+          - generic [ref=e538] [cursor=pointer]: 参数
+          - list [ref=e540]:
+            - listitem [ref=e541]:
+              - generic [ref=e542] [cursor=pointer]: · Object object
+      - list [ref=e543]:
+        - listitem [ref=e544]:
+          - generic [ref=e545] [cursor=pointer]: 错误码
+      - list [ref=e546]:
+        - listitem [ref=e547]:
+          - generic [ref=e548] [cursor=pointer]: 示例代码
+  - generic [ref=e551] [cursor=pointer]

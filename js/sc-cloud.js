@@ -28,6 +28,13 @@
   const G = (typeof GameGlobal !== 'undefined') ? GameGlobal : globalThis;
   const CV = G.CV;
   const WX = (typeof wx !== 'undefined') ? wx : null;
+  /* ================= V1.0.4 · R1（父亲大人 09-27 点单：「云同步（推送成功或失败、取回、冲突取值）」）===
+     云同步是**唯一一条会自己动玩家存档的联网链路**，偏偏它全程静默 ——
+     出问题的时候"玩家没看到任何提示"就等于"我们也没有任何线索"。
+     所以这一条链上只补日志（**口径一个字不改**）：推送成功/失败、取回（带上字节数与时间戳）、
+     以及"谁新听谁的"那一刻的取值。只报字节数/时间戳这类短字段，**两份存档内容都不上报**。 */
+  const LOG = G.LOG || null;
+  function clog(action, data) { try { if (LOG) LOG.info('cloud', action, data || {}); } catch (e) {} }
 
   /* ---------- 环境与集合（**环境 ID 只有这一处**） ---------- */
   const ENV_ID = 'cloudbase-d0gk9s3sv8a797189';
@@ -77,7 +84,14 @@
     return cache;
   }
   function savePrefs() {
-    try { localStorage.setItem(PREF_KEY, JSON.stringify(cache)); } catch (e) {}
+    try {
+      const w = localStorage.setItem(PREF_KEY, JSON.stringify(cache));
+      /* V1.1.20（F1-3）：写盘失败不许静默 —— 这一份是"今天推了几次 / 上次推的是哪一版"的账本，
+         写不下就会重复推（次数上限失效）。至少留一条日志，别让它无声无息。 */
+      if (w === false) clog('prefs_write_fail', { key: PREF_KEY });
+    } catch (e) {
+      clog('prefs_write_fail', { key: PREF_KEY, err: String((e && e.message) || '') });
+    }
     return cache;
   }
   /** 跨天就把"今天的推送次数"清零（和广告配额同一套口径）。 */
@@ -99,10 +113,19 @@
     return (h >>> 0).toString(16);
   }
   function fpOf(openid) { return openid ? ('A' + hash(openid)) : ''; }
-  /** 本地档"最后一次落盘"的时间 —— 存档本体自己的时间戳（与云端那条的 ts 同一口径）。 */
+  /** 本地档"最后一次**玩家真的在玩**"的时刻 —— 与云端那条的 ts 同一口径（都是 `savedAt`）。
+      ⚠️ V1.1.20（F1-1 · 阻塞级）：**不许再用 `idle.lastTs` 当冲突判据**。
+     它会被开机流程（离线结算、15 秒心跳、开机那几条提示）盖上"现在"，于是"谁新听谁的"
+     实际比的是"谁刚开过游戏" ⇒ `cloudTs > localTs()` 恒假，云上更新的那份永远拉不下来
+     （父亲大人报的"手机推到第三关、电脑上还是第二关"）。`savedAt` 只由玩家驱动的存盘刷新，
+     开机结算那一段有专门的闸（core.js 的 settleWriting）拦着。
+     老档还没补上这个字段时（正常路径上 `migrate()` 已经兜底补过）退到 `idle.lastTs`，再退到 0。 */
   function localTs() {
     const s = G.Core && G.Core.S;
-    const t = s && s.idle && s.idle.lastTs;
+    if (!s) return 0;
+    const a = Number(s.savedAt);
+    if (a > 0) return a;
+    const t = s.idle && s.idle.lastTs;
     return Number(t) || 0;
   }
   /** 现在这份存档的密文（**内存里的**那份，不是磁盘上 15 秒前那份）。 */
@@ -121,6 +144,35 @@
       localStorage.setItem(SAVE_BAK, JSON.stringify({ at: Date.now(), why: why || 'cloud', raw: String(raw) }));
       return true;
     } catch (e) { return false; }
+  }
+
+  /* ================= V1.0.4 · W（游戏圈活跃任务）：随档带走的一小块计数 =================
+     `gameact` 云函数要能回答平台"累计登录几天 / 在线多少分钟 / 通关几次"，而**存档本体是密文**
+     （解它的算法在 js/mem-guard.js，只有一份，**不许抄到云函数里当第二份**——派单点名）。
+     所以推档时**另带一小块数字**写进同一条记录的 `act` 字段：
+       · 只有整数（`Core.actSnapshot()` 的出口），没有名字、没有存档内容、没有密文；
+       · 服务端只读这一小块，`payload` 一个字都不碰；
+       · **不顺路多发一次网络请求**：就挂在原有那三种推送（第一次交互 / 切后台 / 打关结算）上，
+         口径与次数上限一个字没改（还是每天 20 次）。玩家一旦切出去看活动页，走的正是"切后台必推"。
+     ================= V1.0.4 · X（订阅消息）在这里补了三行 =================
+       上一版这里只搬了三个数，**云端 `notify` 要的 `subMsg / bankFullAt / bankAmount` 漏在门口
+       没搬上去**（`actSnapshot()` 里有、`act` 里没有）—— 结果是"整条链一次都不会发"，
+       而且**静默**：云函数扫不到候选、日志里连一行都没有。这三行就是那处接线。
+       ⚠️ 三个数全部来自 `Core.actSnapshot()` 的同一个出口（判据不在这儿重算第二份）。 */
+  function actBlock() {
+    const C0 = G.Core;
+    if (!C0 || typeof C0.actSnapshot !== 'function') return null;
+    try {
+      const s = C0.actSnapshot() || {};
+      const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+      return {
+        loginDays: n(s.loginDays), playMinutes: n(s.playMinutes), clears: n(s.clears),
+        /* V1.0.4 · X（订阅消息）：云端 `notify` 判据只认这几个 —— 全是数字、不含身份信息。
+           `bankSec` 是"银行里攒了多久"（推给玩家那句「挂机时长」用它，不是"满了之后过了多久"）。 */
+        subMsg: n(s.subMsg), bankFullAt: n(s.bankFullAt), bankAmount: n(s.bankAmount), bankSec: n(s.bankSec),
+        at: Date.now(),
+      };
+    } catch (e) { return null; }
   }
 
   /* ---------- 云开发（客户端 SDK；没有云能力就是"这台设备同步不了"，不影响本机存档） ---------- */
@@ -232,7 +284,7 @@
 
   const NET_MSG = function (r) {
     if (r && r.why === 'unsupported') return '这台设备没有云开发能力，存档只在本机';
-    if (r && r.why === 'multi') return '云端这个集合里有不止一条记录（权限可能设成了"所有人可读"），已停手：请把它改成"仅创建者可读写"';
+    if (r && r.why === 'multi') return '云端这份存档读不出来（云端的配置有问题），先照本机这份玩，稍后再试。';
     return '云端连不上（' + ((r && (r.err || r.why)) || '网络问题') + '）';
   };
 
@@ -251,6 +303,8 @@
     P.lastPushHash = hash(currentRaw());   // 刚换上的这份 = 云端已有，别马上又推回去
     P.lastSyncAt = Date.now();
     savePrefs();
+    /* 取回（R1）：谁新听谁的 —— 这一条记录的是"换上了云端那份"，字节数 + 那份自己的时间戳 */
+    clog('take', { bytes: payload.length, ts: Number(ts) || 0, why: String(why || '') });
     return { ok: true, ts: Number(ts) || 0 };
   }
 
@@ -263,7 +317,11 @@
        页面会说一句"本机和云端已经一样了"）。`reason` 留着只为将来区分口径用。 */
     if (h === P.lastPushHash) return Promise.resolve({ ok: true, skip: 'clean' });
     if (P.pushes >= PUSH_CAP_PER_DAY) return Promise.resolve({ ok: false, skip: 'cap' });
+    /* V1.1.20（F1-1）：这一条记录的 `ts`（对面那台设备比新旧的唯一依据）＝ **这份档自己**的
+       `savedAt`（玩家最后一次真在玩的时刻）。整条链（本地判据 / 推上去的 ts / prev* 的 ts）同一个口径。 */
     const data = { payload: raw, ts: localTs() || Date.now(), bytes: raw.length, ver: String(G.GAME_VER || ''), at: Date.now() };
+    const act = actBlock();
+    if (act) data.act = act;                            // V1.0.4 · W：只加这一小块数字（见上）
     if (doc && doc.payload && String(doc.payload) !== raw) {
       /* 云端被本地覆盖 → **旧云端另留一份**（同一条记录里的 `prev*` 栏，设置页能取回）。 */
       data.prevPayload = String(doc.payload);
@@ -272,30 +330,41 @@
       data.prevAt = Date.now();
     }
     return writeDoc(doc, data).then(function (w) {
-      if (!w.ok) return { ok: false, skip: 'fail', why: w.why, msg: NET_MSG(w) };
+      if (!w.ok) { clog('push_fail', { bytes: raw.length, why: String(w.why || '') }); return { ok: false, skip: 'fail', why: w.why, msg: NET_MSG(w) }; }
       P.pushes++;
       P.lastPushHash = h;
       P.lastPushAt = Date.now();
       P.lastSyncAt = P.lastPushAt;
       if (data.prevPayload) { P.prevAt = data.prevAt; P.prevTs = data.prevTs; P.prevBytes = data.prevBytes; }
       savePrefs();
+      clog('push_ok', { bytes: raw.length, ts: data.ts, n: P.pushes });
       return { ok: true, pushed: true, bytes: raw.length, ts: data.ts, prev: !!data.prevPayload };
     });
   }
 
   /* ---------- 静默结算（**唯一的一处收口**：读一次云端 → 谁新听谁的） ---------- */
-  let busy = false, retryTimer = null, retryTries = 0, progressTimer = null;
+ let busy = false, retryTimer = null, retryTries = 0, progressTimer = null;
   function sync(reason) {
     const P = rollDay();
     if (!P.on) return Promise.resolve({ ok: false, skip: 'off' });
     if (!WX || !WX.cloud) return Promise.resolve({ ok: false, skip: 'unsupported' });
     if (busy) return Promise.resolve({ ok: false, skip: 'busy' });
+    /* V1.1.20（F1-5）：**救援态（本机存档读不出来、主键禁写）期间云同步也停** ——
+       那一刻内存里是"空新档"，推上去等于把玩家云上那份真进度顶掉（还会顺手覆盖
+       读档失败时留的那份原样备份）；拉下来又会把救援现场换掉。等玩家显式选择之后再说。 */
+    if (G.Core && G.Core.rescueInfo && G.Core.rescueInfo()) return Promise.resolve({ ok: false, skip: 'rescue' });
     busy = true;
+    /* V1.1.20（F1-1）：冲突判据在**这一轮同步开始的那一刻**取一次快照 —— readOwn() 要过网络，
+       期间玩家操作 / 心跳存盘都可能把本机判据抬新；拿"网络回来那一刻的本机"去比，
+       比的就不是"这一轮开始时谁新"了（第一下触摸之后紧跟的那次存盘最典型）。
+       ⚠️ 光靠这一步还不够：真正让判据"不虚高"的是 core 的 settleWriting 那道闸
+       （开机结算不许刷新 savedAt）—— 两条一起才成立。 */
+    const localAtStart = localTs();
     return readOwn().then(function (got) {
       if (!got.ok) return { ok: false, skip: 'fail', why: got.why, msg: NET_MSG(got) };
       const doc = got.doc || null;
       const cloudTs = doc ? (Number(doc.ts) || 0) : 0;
-      if (doc && cloudTs > localTs()) {
+      if (doc && cloudTs > localAtStart) {
         /* 云端更新 → **直接换上**（不弹窗、不提示）；万一那份读不出来（比如来自更新的版本），
            退到"用本地推上去"——推的时候旧云端会进 `prev*`，两头都不丢。 */
         const r = applyCloudSave(doc.payload, doc.ts, 'cloud');
@@ -309,6 +378,11 @@
       });
     }).then(function (r) {
       busy = false;
+      /* 一次静默结算的最后取值（R1）：local ＝ 本地新推上去 / cloud ＝ 云端新换下来 /
+         none ＝ 两边一样 / fallback ＝ 云端那份读不出来、改推本地 / fail ＝ 没通 */
+      clog(r && r.ok ? 'sync' : 'sync_fail', {
+        from: String((r && (r.took || r.skip)) || '?'), bytes: (r && r.bytes) || 0, ok: !!(r && r.ok),
+      });
       if (r && r.ok) { retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
       else if (r && r.skip === 'fail') scheduleRetry();
       return r;
@@ -384,7 +458,7 @@
     const me = prefs().accountId;
     if (env.fp) {
       if (!me) return { ok: true, data: env.data, note: '本机还没绑上微信账号，本次不做账号校验' };
-      if (env.fp !== me) return { ok: false, foreign: true, msg: '这份存档是**另一个微信账号**导出的，为了不覆盖错人，已拒绝导入' };
+      if (env.fp !== me) return { ok: false, foreign: true, msg: '这份存档是另一个微信账号导出的，为了不覆盖错人，已拒绝导入' };
       return { ok: true, data: env.data, note: '' };
     }
     return { ok: true, data: env.data, note: '这份导出档没带账号指纹（导出时还没绑上账号），本次不做账号校验' };

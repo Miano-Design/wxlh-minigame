@@ -25,6 +25,7 @@
           "js/sc-home.js",
           "js/sc-last.js",
           "js/sc-lines.js",
+          "js/sc-namecheck.js",
           "js/sc-party.js",
           "js/sc-protag.js",
           "js/sc-recruit.js",
@@ -32,7 +33,8 @@
           "js/sc-splash.js",
           "js/sc-start.js",
           "js/uiw.js",
-          "js/wx-adapter.js"
+          "js/wx-adapter.js",
+          "js/wx-cap.js"
         ]
       }
     ]

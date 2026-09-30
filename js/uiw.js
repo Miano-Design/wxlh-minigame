@@ -73,8 +73,35 @@
   U.space = function (px) { U.y += px; };
   const draw = (fn) => { if (!U.dry) fn(); };
   /* 页面要自己排"两栏卡"（左文字 + 右按钮列）时用 U.draw —— 它认得 U.card 的先量后画，
-     不会在量高度那一趟把东西画两遍。 */
+    不会在量高度那一趟把东西画两遍。 */
   U.draw = (fn) => draw(fn);
+
+  /* ================= V1.1.17（父亲大人 09-27 深夜 · 派单 Z-B）· 二级页顶栏（吸顶）=================
+     原话：「每一屏的标题和返回键都固定在顶部吧，不然有时候要点返回又得滑回去」。
+     这一段是**唯一**的二级页顶栏写法（原来 6 个文件各抄了一遍 `head(title)`：
+     画一颗 40×40 的「‹」+ 标题，然后 `U.y += 40 + SP[2]`）——
+     现在统一成"登记 + 让出高度"，**真正落笔由框架在屏幕坐标里画**（见 cv.js 的 CV.drawPageHead）：
+       · 页面写法：`U.begin(); U.pageHead('秘术阁');` 之后照旧从 U.y 往下排正文；
+       · 好处：标题与返回键固定不动，长页面（背包 / 灯录 / 秘术阁 / 伙伴…）滚到哪儿都点得到返回；
+       · 正文从它**下面**滚过去（顶栏底下铺的是一条与整屏同源的渐变底，不透光）。
+     可选：
+       · backId  —— 返回键的热区 id（默认 'page_back'，与原来那批同名）；
+       · right(x,y,h) —— 页头右端的额外件（现在只有招募页那颗「i」概率公示），
+                        x/y 是**屏幕坐标**，里面自己登记热区时记得 `CV.hitMode='screen'`；
+       · color  —— 标题色（默认正文色）。
+     做坏试验：把本函数改成只登记不放高度（不推进 U.y）→ 正文会被顶栏压住，
+     `scroll_fit_audit` ⑧ 的"顶栏底下不许有正文"当场红。 */
+  U.pageHead = function (title, o) {
+    o = o || {};
+    const h = U.BTN_SM * CV.SCALE;                 // 与网页版 .page-head 的 40px 同高
+    CV.pageHead = { title: String(title == null ? '' : title), backId: o.backId || 'page_back',
+      h: h, right: o.right || null, color: o.color || null };
+    /* F8 ②（父亲大人 09-28：「返回键下面留点空间…一上滑返回键都跟内容贴一起了」）：
+       让位的高度里还得加上**呼吸带** `CV.HEAD_GAP` —— 顶栏底下多铺的那一条不留缝的底
+       会盖住首屏正文，正文起点必须同步下移（值与 `CV.drawPageHead` 共用一个常量）。 */
+    U.y = h + CV.SP[2] + (CV.HEAD_GAP || 0);        // 正文从这里往下（顶栏 + 呼吸带替它占掉这一段）
+    return h;
+  };
 
   /* ================= V1.1.15（2026-09-27 · 父亲大人："全都改了吧"）=================
      **dry 模式收口**。`U.card` 为了算卡片高度会先把内容跑一遍（"只量不画"），
@@ -88,6 +115,42 @@
   CV.text = function () { if (U.dry) return undefined; return _cvText.apply(CV, arguments); };
   CV.round = function () { if (U.dry) return undefined; return _cvRound.apply(CV, arguments); };
   CV.drawIcon = function () { if (U.dry) return undefined; return _cvIcon.apply(CV, arguments); };
+  /* ================= F2-7（抢修单 0928R3）· 卡内热区不再登记两遍 =================
+     上一轮读代码抓到的病：`U.card` 为了算高度会先把内容跑一遍（"只量不画"，见上一条），
+     而 `CV.hit` **没有 dry 闸** ⇒ 同一颗按钮被登记两遍；第二遍登记时**和自己的第一遍相撞**，
+     于是 `CV.hit` 里那条"撞上就缩回原样"的保护自己把自己废掉 ——
+     V1.1.12"所有热区长到 ≥88rpx"在卡内按钮上**只落地一半**
+     （实测：法宝页 29 个唯一 id 登记成 49 条、其中 20 条是重复的）。
+
+     ⚠️ 这个闸改了两版，两版都是**尺子当场否掉**的（记在这儿，别再退回去）：
+       ① 第一版"dry 期间直接不登记" → `guide_audit` 红（主线 q13 的锚点 `pblup` 不存在）：
+          因为**屏外那张卡只跑量那一遍**（`U.card` 见 `cardVis=false` 就不画第二遍），
+          热区只可能由量那一遍登记，而引导（`U.drawCoach`）正是拿 `CV.hits` 里的锚点矩形找目标；
+       ② 第二版"按 id 去重（同 id 就跳）" → `scroll_fit_audit` 红（点第六张命格卡不命中）：
+          **同一个 id 故意登记两次、第二次是更大的那一份**是既有写法
+          （选命格卡：右侧那颗「觉醒」小按钮 + 整张卡的落点，`sc-start.js:219`），
+          按 id 去重会把那张**大卡**一起跳掉 ⇒ 点卡片正中不命中。
+       ⇒ 最后的口径：**只在"实画这一遍登记的矩形被量那一份包住"时才跳**
+          （＝被"防撞"缩回原样的那个重复件；放大后的那一份留下，
+            而"第二次更大"的那种落点照旧登记）。
+     ⚠️ `CV.hit` 在 js/cv.js 里，**不在本单可改范围** → 在这一层包住它（同一个出口、同一套语义）。
+     做坏试验：把 `U.hitSkip` 那两行去掉 → 重复条数回到 20/29（见回单里的前后对照）。 */
+  U.hitSkip = null;            // Map<id, rect>：量那一遍登记的热区（实画那一遍据此跳重复件）
+  const _cvHit = CV.hit;
+  CV.hit = function (id, x, y, w, h) {
+    const m = U.hitSkip && U.hitSkip.get(String(id));
+    if (m && x >= m.x - 0.5 && y >= m.y - 0.5 && x + w <= m.x + m.w + 0.5 && y + h <= m.y + m.h + 0.5) return undefined;
+    return _cvHit.call(CV, id, x, y, w, h);
+  };
+
+  /* ================= F2-7（抢修单 0928R3）· `page_back` **只留这一份实现** =================
+     这颗 id（每个二级页吸顶条上那颗「‹ 返回」）原来在四个文件里各注册了一份一字不差的
+     `CV.on('page_back', () => CV.pop())`（sc-core-pages / sc-lines / sc-last / sc-guide）
+     —— "同一件事写四份"就是"改一处漏一处"的种子。现在收在这儿一处（uiw.js 先于所有页面加载，
+     `CV.on` 是覆盖语义，后面没人再注册它）。
+     ⚠️ `js/sc-guide.js` 里还留着一份**一模一样**的注册（那个文件不在本单可改范围）：
+        行为完全一致、不是 bug，但它也该跟着删 —— 记在回单的反对/待办里。 */
+  CV.on('page_back', function () { CV.pop(); });
 
   /* ================= V1.1.15（2026-09-27 · 父亲大人："快速点击连点会很卡"）=================
      **连点合帧**：一次点击常常触发好几处 `CV.render()`（处理器自己一次、toast 一次、
@@ -100,13 +163,34 @@
        · 延迟最多一帧（16ms），肉眼无感。
      做坏试验：把 `if (typeof requestAnimationFrame !== 'function')` 那行删掉 → 尺子立刻红一片。 */
   const _cvRender = CV.render;
-  let renderQueued = false;
+  let renderQueued = false, renderQueuedAt = 0;
   CV.render = function () {
     if (typeof requestAnimationFrame !== 'function') return _cvRender.apply(CV, arguments);
-    if (renderQueued) return undefined;
+    /* ================= F6 #3（抢修单 0928 · 渲染闸加看门狗）=================
+     这道闸只有"入口置位、rAF 回调复位"一条路。只要那一次 rAF 回调**没被平台派发**
+     （切后台冻结渲染循环、画布被重建、低电量档把 rAF 节流到几乎不走），
+     `renderQueued` 就永远是 true —— 此后**所有** CV.render() 被静默吞掉：
+     画面冻在旧帧，而热区还在、点击还有反应、音效照响（最难查的一种"假死"）。
+     现在加一条**看门狗**：置位超过 200ms 还没画成，就当那次 rAF 丢了 ——
+     复位并**同步补画一帧**（同时把 `CV.resetRenderGate` 交给 onShow / relayout 兜底）。
+     ⚠️ 用"时间戳比对"而不是 `setTimeout`：不打新计时器、不在尺子的计时器堆里留东西
+        （`soak_audit` 的"计时器不越堆越多"那条判据本来就卡得很紧，别去动它）。 */
+    if (renderQueued) {
+      if (Date.now() - renderQueuedAt < 200) return undefined;
+      renderQueued = false;
+      return _cvRender.apply(CV, arguments);    // 上一次那帧没来：不再欠着，**同步补画一帧**
+    }
     renderQueued = true;
+    renderQueuedAt = Date.now();
     requestAnimationFrame(function () { renderQueued = false; return _cvRender(); });
     return undefined;
+  };
+  /* 强制复位渲染闸并立刻补画一帧（切回前台 / 窗口尺寸变化时用）；
+     正常路径下它只是"把还可能欠着的那一帧立刻补上"，不改变任何既有行为。 */
+  CV.resetRenderGate = function () {
+    renderQueued = false;
+    if (typeof requestAnimationFrame !== 'function') return undefined;
+    return _cvRender.call(CV);
   };
 
   /* ================= V1.1.15（2026-09-27 · 父亲大人："全都改了吧"）=================
@@ -174,8 +258,13 @@
     const pad = CV.SP[2], padY = (opt && opt.padY !== undefined) ? opt.padY * CV.SCALE : pad;
     const top = U.y, outer = U.inCard;
     U.inCard = true;
+    /* F2-7：记下"量这一遍"登记了哪些热区 —— 实画那一遍同一颗就不再登记（见 CV.hit 那段注释）。 */
+    const hitFrom = (CV.hits || []).length;
     U.dry = true; U.y = top + padY; content(); const inner = U.y - top - padY;
     U.dry = false;
+    /* 量这一遍登记了哪些热区（id → 矩形）：实画那一遍"被它包住的重复件"才跳（见 CV.hit 那段注释）。 */
+    const measured = new Map();
+    (CV.hits || []).slice(hitFrom).forEach(function (o) { measured.set(String(o.id), o); });
     /* V1.0.1（父亲大人："新的一波开始上一波的日志会清空，日志卡就缩上去重新拉长，
        你直接锁定卡片的高度"）：加一个 minH —— 内容变少时卡片也撑住固定高度，
        高度不再随内容涨缩。 */
@@ -191,7 +280,26 @@
        六张命格卡的边框各走本命格的暗档。canvas 这端原来 CV.card 只吃默认描边，
        于是"选命格"页在小游戏里是六张一模一样的灰卡（网页版是六种颜色的卡）。 */
     if (h > 4 && cardVis) CV.card(U.pad(), top, U.cw(), h, (opt && opt.line) ? { line: opt.line } : null);
-    if (cardVis) { U.y = top + padY; content(); }
+    if (cardVis) {
+      const prevSkip = U.hitSkip;
+      U.hitSkip = measured;
+      U.y = top + padY; content();
+      U.hitSkip = prevSkip;
+    } else {
+      /* ================= F6 #12（抢修单 0928 · 屏外卡的"幽灵热区"）=================
+       `U.dry` 那一遍**照样登记热区**（那条规矩不能动：屏外卡只有这一遍登记，
+       引导（`U.drawCoach`）就是拿 `CV.hits` 里的锚点矩形把目标滚进视野的 ——
+       改成"dry 不登记"会让主线引导指不到目标，V1.1.15 已经栽过一次）。
+       但"实画那一遍不跑"意味着这些矩形**永远不会被第二遍覆盖/校正**：
+       实测 61 屏共 915 条热区里 **130 条落在内容坐标可达窗口之外**（最远超出 5409px）。
+       它们打不着（坐标根本不在可视窗口里），却会：
+         · 参与 `CV.hit` 里那条"撞上就缩回原样"的 `some()` 撞测（每帧 ~n²）；
+         · 让 `CV.hits` 越滚越长，将来更容易真撞车。
+       处置：**打标记 `ghost`**，命中层（`scanHit`）与撞测层（`CV.hit`）都跳过它，
+       但**留在 CV.hits 里**给引导与尺子当锚点 —— 两边的要求同时满足。
+       ⚠️ 不改成"直接 CV.hits.length = hitFrom"就是因为引导那条硬依赖（见上）；这是有依据的偏离。 */
+      for (let i = hitFrom; i < CV.hits.length; i++) CV.hits[i].ghost = true;
+    }
     U.inCard = outer;
     U.y = top + h + CV.SP[2];
     U.lastBottom = CV.SP[2];
@@ -509,7 +617,14 @@
     /* V1.0.6：列表行的第二行（任务条件 / 奖励这类带数字的话）同样走词级折行 ——
        "…奖励 ◆ 100 · ✦ 200" 原来会被劈成「…◆ 10」/「0 · ✦ 200」。 */
     const l2 = o.t2 ? CV.wrapTokens(o.t2, availW, CV.FS.sm) : [];
-    const h = Math.max(pad * 2 + l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0), 44 * CV.SCALE);
+    /* ================= F7 ①b（0928）· 列表行的高度下限走**物理口径** =================
+       这条下限原来是 `44 * CV.SCALE`：F7 ① 之后小屏上 CV.SCALE ≈ 0.82 → 行高只有 36.6，
+       而行与行之间只隔几个像素 —— **热区怎么摆都挤不进 44**
+       （实测 320×568 设置页 `toggle:savePower`：上面 36.6、下面 31，左边右边都是别人，五路皆撞）。
+       现在下限固定 44（＝ `CV.minHitPx()`，WCAG/HIG 那条物理口径，**不跟屏宽缩**）：
+       小屏上行的**视觉**（按钮高 33 / 内边距 / 圆角）照旧是缩过的，动的只是"这一行占多高" ——
+       行内反而多出 11px 呼吸位，比原来"按钮几乎撑满行"更松。 */
+    const h = Math.max(pad * 2 + l1.length * t1 + (l2.length ? 4 * CV.SCALE + l2.length * t2 : 0), CV.minHitPx());
     const top = U.y;
     draw(() => {
       if (o.dim) CV.ctx.save(), CV.ctx.globalAlpha = 0.45;   /* 网页版已领取行 opacity:.45/.5 */
@@ -585,6 +700,14 @@
       });
       if (dis) CV.ctx.restore();
     });
+    /* ================= F2-5（抢修单 0928R3）· 假按钮的**运行时**告警 =================
+     "空 id 且没给 `dis`" ＝ 一颗画成正常样子、却没有热区的按钮（看着能点、点了没反应）。
+     全项目一批 14 处就是这么来的（`id: 条件 ? 'x' : ''` 漏了 `dis`）。静态那条尺子
+     （`tap_audit` 的⓪）只认一种写法、还可能被新的写法绕过去；这条谁写都躲不掉。
+     ⚠️ 只**出声**、不抛不拦 —— 玩家不该为开发者的一行疏忽买单（线上多一条崩点更糟）。 */
+    if (!id && !dis) {
+      try { if (typeof console !== 'undefined' && console.warn) console.warn('[tap-guard] 空 id 且未禁用（看着能点、点了没反应）：' + label); } catch (e) {}
+    }
     if (id && !dis) CV.hit(id, x, y, w, h);
     return h;
   };
@@ -625,7 +748,18 @@
       const s = ws.reduce((a, b) => a + b, 0) || 1;
       const widths = ws.map((w) => Math.max(minw, w * avail / s));
       let x = U.ix();
-      ws.forEach((w, k) => { U.btn(x, y, widths[k], h, list[idx].label, list[idx].style, list[idx].id, list[idx].dis); idx++; x += widths[k] + gap; });
+      ws.forEach((w, k) => {
+        const b = list[idx] || {};
+        /* ================= V1.0.4 · R10（父亲大人 09-27 点单：原生按钮那一排）=================
+           `b.native(x, y, w, h)` —— "这一格由**原生组件**占着"的钩子（现在是意见反馈那颗）。
+           它返回 true ＝ 原生已经摆在这一格上，画布**不要再画**（画了就是两层叠着、字重影）；
+           返回 false ＝ 原生这会儿不在位（开发者工具 / 老基础库 / 正在滑动），
+           由下面的 `U.btn` 画兜底那颗顶上 —— 这正是 gameclub 那套"原生在位才交给它"。
+           ⚠️ 宽度与排布**照旧按 `b.label` 算**（原生那颗就是盖在这颗的位置上的），
+              所以这一格不会被挤窄、也不会跟旁边那颗错位；也没有第二份排版算式。 */
+        if (typeof b.native === 'function' && b.native(x, y, widths[k], h)) { idx++; x += widths[k] + gap; return; }
+        U.btn(x, y, widths[k], h, b.label, b.style, b.id, b.dis); idx++; x += widths[k] + gap;
+      });
       y += h + gap;
     });
     U.y = top + rows.length * h + (rows.length - 1) * gap;
@@ -654,10 +788,82 @@
      （离线收益 / 七日登录），canvas 原来只有"两行字 + 取消/确定"，
      所以那两个弹窗在小游戏里根本没法照着做。现在支持：
        opt.chips   奖励胶囊文案数组（自动居中折行）
+       opt.blocks  方块阵：[{ title, body, state }]（V1.1.21 · 七日登录"一天一个方块"）；
+                   state ∈ 'today'|'done'|'future' —— **判定由调用方给**（`U.loginDayState`），
+                   这里只按 state 取色（`BLK_TONE`），不传就退化成 future 那一档。
+       opt.blockCols 方块阵列数（**一般不传**：默认 3 列，单格窄于 BLK_MIN_W 时自动退 2 列；
+                   七日登录 7 格 ⇒ 390 上 3+3+1、320 上 2+2+2+1，末行不满时居中）
        opt.note    按钮上方的一行灰色小字
        opt.cancel  false = 只有一个按钮（offline / 公告这类）
        opt.okLabel 那个按钮的字（默认"确定"） */
   const CHIP_H = 26, CHIP_GAP = 6 * CV.SCALE;
+  /* ================= V1.1.21（F10 · 2026-09-29）· 七日登录"一天一个方块" =================
+     父亲大人原话：「7日登陆换成一天一个方块那样显示么，然后能领的才高亮，不能领的就灰色，
+                   你现在全都高亮我以为都能领呢」。
+     起因：N1 那版把 7 格全塞进 `U.confirm` 的胶囊，而胶囊**只有一种样式**（金框 ＋ 金字），
+     于是七天看着"全都能领"。这一单的重点不是排版，是**状态要一眼分得清**。
+
+     `BLK_TONE` ＝ 方块阵三档状态的**唯一一套配色**（画布只按 state 取色，不自己算）：
+       · today  ＝ 金框 ＋ 金字 ＋ 「今天」标记 —— 整屏**唯一**亮的那一格；
+       · done   ＝ 灰底 ＋ ✓ —— 领过了（看得见"拿过了"，但不再抢眼）；
+       · future ＝ 更暗一档的灰底、**没有标记**、整格再压一档透明度（还没到）。
+     `done` 与 `future` 的区别不只靠颜色（✓ 是硬标记 ＋ 低一档的对比度），这是"两档必须能分开"的兜底。 */
+  const BLK_TONE = {
+    today: { fill: CV.C.sel, line: CV.C.gold, text: CV.C.gold, mark: '今天', markCol: CV.C.goldBright, alpha: 1, bold: true, lw: 2 },
+    done: { fill: CV.C.panel2, line: CV.C.line2, text: CV.C.text2, mark: '✓', markCol: CV.C.text2, alpha: 1, bold: false, lw: 1 },
+    future: { fill: CV.C.panel, line: CV.C.line, text: CV.C.dim, mark: '', markCol: CV.C.dim, alpha: .62, bold: false, lw: 1 },
+  };
+  /* 只读出口：尺子（overlay_audit / retention_audit / boot_audit）拿它当"三档互不相同"的判据 */
+  U.blkTone = function (state) { return BLK_TONE[state] || BLK_TONE.future; };
+  /* 方块阵的度量基数（列数 / 间距 / 内距；行高在 U.confirm 里按当次的 CV.FS 算）
+     列数＝3：七格摆成 3+3+1（末行居中）。**为什么不是 4+3 或一行 7 格**——
+     见回单：4 列时格子只有 ~74px（320 上 ~59px），"引灯招募券×1" 这种串会被迫逐字断，
+     真机折出 `SS / R装备箱`、`× / 1`（看着像错字）；3 列时 390 上每格 ~102px、
+     第 7 天那格正好两行摆下"🎫 SSR 自选券 · ／圣契招募令×1"，钩子一个字不省。 */
+  /* 列数：**按"单格装不装得下一整串奖励"定**，不按机型写死 —— 最长的尾串是「引灯招募券×1」
+     （≈73px）＋ 两侧内距 12px ⇒ 单格 <88px 时退成 2 列（390 是 3 列 / 320 退 2 列）。
+     实测依据（真 Chrome，见回单）：4 列时 390 上每格 75px、320 上 59px，折出 `SS / R装备箱`、
+     `× / 1` 这种像错字的断行；3 列在 390 上两行摆平、2 列在 320 上两行摆平。 */
+  const BLK_COLS = 3, BLK_MIN_W = 88, BLK_PAD = 6, BLK_GAP = 8;
+  /* ================= V1.1.21（F10）· 方块里的折行（与 CV.wrap 不同的那一件事）=================
+     `CV.wrap` 是**逐字断**（页面文案用它，快、够用）。方块格子窄，逐字断会把
+     "SSR装备箱" 折成 `SS / R装备箱`、"×1" 折成 `× / 1` —— 那不是排版，是错字。
+     这里只做两件小事：① **优先在空格处断**（"◉ 7000 · 引灯招募券×1" 先断在中点）；
+     ② 一段自己就超宽时才逐字断，且**尾巴上的 ×N 保成一体**。
+     ⚠️ 只服务方块阵（`opt.blocks`），**不碰** `chipRows` / `CV.wrap` —— 老弹窗的胶囊像素级不变。 */
+  function blkWrap(text, maxW, size) {
+    const parts = String(text == null ? '' : text).split(' ');
+    const toks = [];
+    parts.forEach(function (p, i) {
+      const t = i < parts.length - 1 ? p + ' ' : p;
+      if (t === '') return;
+      /* " · " 这种分隔符跟着**前一段**走（否则折到下一行会变成行首一个孤零零的"·"） */
+      if (/^·\s*$/.test(t) && toks.length) { toks[toks.length - 1] += t; return; }
+      toks.push(t);
+    });
+    const lines = [];
+    let cur = '';
+    const push = function (s) { if (s !== '') lines.push(s.replace(/\s+$/, '')); };
+    toks.forEach(function (t0) {
+      if (CV.measure(cur + t0, size) <= maxW) { cur += t0; return; }
+      if (cur) { push(cur); cur = ''; }
+      if (CV.measure(t0, size) <= maxW) { cur = t0; return; }
+      /* 这一段自己就超宽：逐字断，但把尾巴的 ×N 摘出来保成一体 */
+      const t = t0.replace(/\s+$/, '');
+      const m = /^(.*?)(×\d+)$/.exec(t);
+      const head = m ? m[1] : t, tail = m ? m[2] : '';
+      let rest = head;
+      while (rest) {
+        let acc = '', k = 0;
+        for (; k < rest.length; k++) { if (acc && CV.measure(acc + rest[k], size) > maxW) break; acc += rest[k]; }
+        rest = rest.slice(Math.max(1, k));
+        if (rest) push(acc); else cur = acc;
+      }
+      if (tail) { if (CV.measure(cur + tail, size) <= maxW) cur += tail; else { push(cur); cur = tail; } }
+    });
+    push(cur);
+    return lines.length ? lines : [''];
+  }
   /* 输入格（opt.inputBox）：高度照购买弹窗那颗数字格（46）——同一套控件口径。 */
   const INP_H = 46 * CV.SCALE;
   /* 胶囊居中折行：返回 [[{t,w},…], …] */
@@ -689,11 +895,55 @@
     const lines = CV.wrap(text, inner, CV.FS.lg, 9);
     const rows = (opt.chips && opt.chips.length) ? chipRows(opt.chips.filter(Boolean), inner) : [];
     const note = opt.note ? CV.wrap(opt.note, inner, CV.FS.xs, 3) : [];
+    /* ================= V1.1.21（F10）· 方块阵（`opt.blocks`）=================
+       `opt.blocks` ＝ [{ title, body, state }]：一天一个方块。
+       分工是死的：**state 由调用方判定**（七日登录走 `U.loginDayState`，全项目唯一一处），
+       这里只按 state 取 `BLK_TONE` 的配色 ＋ 按格宽把 body 折行 ＋ 排坐标；
+       绘制那一侧（`U.drawOverlay`）只读排好的方块，不再自己算"今天 / 领过"。
+       行内等高（同一行取最高的那一格，像 grid 的 `stretch`），行与行之间再留 BLK_GAP。 */
+    const blk = [];
+    let blkH = 0;
+    const blkT = CV.FS.sm * 1.4, blkB = CV.FS.xs * 1.4, blkM = CV.FS.tag * 1.4;
+    const blkPad = BLK_PAD * CV.SCALE, blkGap = BLK_GAP * CV.SCALE;
+    if (opt.blocks && opt.blocks.length) {
+      let cols = Math.max(1, Math.min(opt.blockCols || BLK_COLS, opt.blocks.length));
+      /* 没点名列数时按"单格装不装得下一整串奖励"退档（见 BLK_COLS 那段注释） */
+      if (!opt.blockCols && cols === 3 && (inner - blkGap * 2) / 3 < BLK_MIN_W) cols = 2;
+      const cw = (inner - blkGap * (cols - 1)) / cols;
+      opt.blocks.forEach(function (b, i) {
+        const state = b.state || 'future';
+        const tone = BLK_TONE[state] || BLK_TONE.future;
+        const body = String(b.body == null ? '' : b.body);
+        /* 奖励文案**不截断**：第 7 天的钩子（🎫 SSR 自选券 ＋ 圣契招募令）宁可让格子长高一行，
+           也不许折出省略号把钩子吃掉 —— 那正是本单要保住的东西（`blkWrap` 不会加省略号）。 */
+        const bl = blkWrap(body, cw - blkPad * 2, CV.FS.xs);
+        blk.push({
+          title: String(b.title == null ? '' : b.title), body: body, state: state, tone: tone,
+          mark: tone.mark, lines: bl, col: i % cols, row: Math.floor(i / cols), w: cw,
+          /* 格子内部各行的中心 y（相对格子左上角）—— 排一次，绘制只照着画 */
+          ty: blkPad + blkT / 2, b0: blkPad + blkT + blkB / 2, bStep: blkB,
+          my: blkPad + blkT + bl.length * blkB + blkM / 2,
+          h: blkPad * 2 + blkT + bl.length * blkB + (tone.mark ? blkM : 0),
+        });
+      });
+      let ay = 0;
+      for (let r = 0; r * cols < blk.length; r++) {
+        const row = blk.slice(r * cols, r * cols + cols);
+        const rh = row.reduce(function (m, b) { return Math.max(m, b.h); }, 0);
+        /* 末行不满时**居中**（七格 3+3+1：最后一格落在中间，不然左边吊着一格很怪） */
+        const off = (cols - row.length) * (cw + blkGap) / 2;
+        row.forEach(function (b, j) { b.rh = rh; b.x = off + j * (cw + blkGap); b.y = ay; });
+        ay += rh + blkGap;
+      }
+      blkH = Math.max(0, ay - blkGap);
+    }
     let cy = PAD;
     const titleY = cy + LH_T / 2; cy += LH_T;
     const lineY = [];
     if (lines.length) cy += 8 * CV.SCALE;
     lines.forEach(function () { cy += LH_L; lineY.push(cy - LH_L / 2); });
+    /* 方块阵整块占位（方块的 x/y 都是**相对这张卡片**的，绘制时才加 o.y） */
+    if (blk.length) { cy += 10 * CV.SCALE; blk.forEach(function (b) { b.y += cy; }); cy += blkH; }
     const chipY = [];
     if (rows.length) {
       cy += 10 * CV.SCALE;
@@ -716,6 +966,9 @@
     U.overlay = {
       x: x, y: y, w: bw, h: h, title: title, lines: lines, text: text, onOk: onOk,
       rows: rows, note: note, single: opt.cancel === false, okLabel: opt.okLabel || '确定',
+      /* 方块阵（V1.1.21 · F10）：排好的格子（含 state / tone / 折行 / 相对坐标）——
+         绘制与尺子都读这一份，谁都不许再自己算"今天 / 领过"。 */
+      blocks: blk,
       /* V1.1.x（0927-P · 父亲大人：「设置界面的内容和顺序应该是…最下面就一个红色边框按钮写
          删除当前进度重新开始，点击删档跳出来一个确认弹窗随机生成 4 个数字」）：
          通用弹窗这一轮多了三样**可选**能力，都是给"删档二次确认"和"挂机结算"用的 ——
@@ -754,6 +1007,18 @@
       if (onOk) onOk(); else CV.render();
     }, { cancel: false, okLabel: '我知道了', tone: 'text2' });
   };
+  /* ================= V1.0.4 · R5 版本更新提示（父亲大人 09-27 点单）=================
+     `wx.getUpdateManager().onUpdateReady` 之后由 `js/wx-cap.js` 排队到这里（它排在开机弹窗队列里，
+     不会抢离线收益 / 七日登录 / 忠告那几层）。单按钮形态：**没有"取消"** ——
+     点一下＝立即重启进新代码，正是这一条要的效果（"让玩家真的走到新代码"）。
+     为什么不是"点×先玩着"：这一类更新一旦就绪，玩家继续玩的还是旧代码，
+     今晚改的东西明天他看不见 —— 而存档兼容那套（密钥表＋迁移＋备份）已经做好了，重启是安全的。 */
+  U.updateReady = function () {
+    U.confirm('新版本已就绪', '重启一下就能用上新版本。', function () {
+      if (G.CAP && G.CAP.applyUpdate) G.CAP.applyUpdate();
+      CV.render();
+    }, { cancel: false, okLabel: '立即重启' });
+  };
   /* 离线收益 / 时间异常（与网页版 showOfflineGains 同一份文案，V9.6.90） */
   U.offlineGains = function (g) {
     if (!g) return;
@@ -785,12 +1050,14 @@
            上线后换成真广告；额度：不限次数、不计总闸（时间权益类）。
          · 翻倍成功后**原地再画一遍**这个弹窗，胶囊换成翻倍后的数字 —— 让玩家看见"×2"到底给了多少。 */
     const paintOffline = function (mult, usable) {
-      const line = usable ? ('离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）· **收益 ×' + mult + '**')
+      const line = usable ? ('离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）· 收益 ×' + mult + ')')
         : ('离线 ' + dur + '（效率 ' + Math.round(g.efficiency * 100) + '%）');
       const opt = { okLabel: '收下', chips: chips, note: '离线期间挂机分工的产线一样在跑。' };
       if (usable) {
-        opt.cancelLabel = '📺 看广告 · 收益 ×2';
+        /* V1.0.4 · R3：弱网变脸（判定只在 G.ADWEAK）；点了给一句人话、不白等 */
+        opt.cancelLabel = G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 收益 ×2') : '📺 看广告 · 收益 ×2';
         opt.onCancel = function () {
+          if (G.ADWEAK && G.ADWEAK.block()) return;
           const AD = G.AD;
           if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); CV.render(); return; }
           AD.show('offline_double').then(function (r) {
@@ -812,7 +1079,8 @@
             ];
             if ((g2.otherworld || 0) + (a2.otherworld || 0)) cs.push('◆ +' + ((g2.otherworld || 0) + (a2.otherworld || 0)));
             if (g2.matCount && g2.matItem) cs.push(((G.DATA.ITEMS[g2.matItem] || {}).icon || '🎒') + ' ' + ((G.DATA.ITEMS[g2.matItem] || {}).name || g2.matItem) + '×' + g2.matCount);
-            CV.toast('📺 离线收益已翻倍', 1600);
+            /* F7 ②：一次性奖励类（看完广告拿到的双倍）→ 留，缩到最短。 */
+            CV.toast('📺 离线收益 ×2', 1600);
             U.confirm('欢迎回来，执灯者', line + '（已翻倍）', function () { CV.render(); },
               { cancel: false, okLabel: '收下', chips: cs, note: '下一次离线结算会重新给一次翻倍机会。' });
           });
@@ -891,7 +1159,11 @@
       blankClose: true,               // ← 父亲大人 09-27：「支持点击空白处返回」
     };
     /* 有广告模块才给第二颗按钮 —— 没有模块时留一颗"点不动的广告键"就是死键。 */
-    if (G.AD && G.AD.show) { opt.cancelLabel = '📺 看广告 · 双倍领取'; opt.cancelId = 'idle_double'; }
+    if (G.AD && G.AD.show) {
+      /* V1.0.4 · R3：弱网时这颗也写「网络不太好」（判定只在 G.ADWEAK 一处） */
+      opt.cancelLabel = G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 双倍领取') : '📺 看广告 · 双倍领取';
+      opt.cancelId = 'idle_double';
+    }
     else opt.cancel = false;
     U.confirm('挂机结算', '已挂 ' + dur + (Core.idleFull && Core.idleFull() ? '（已满）' : ''), null, opt);
     return true;
@@ -910,29 +1182,39 @@
       { cancel: false, okLabel: '收下', chips: chips,
         note: '离线挂机的收益另有结算；这条只在隔了一天以上没上线时给一次。' });
   };
+  /* ================= V1.1.21（F10 · 2026-09-29 · 父亲大人）=================
+     「7日登陆换成一天一个方块那样显示么，然后能领的才高亮，不能领的就灰色，
+      你现在全都高亮我以为都能领呢」。
+     N1 那版把 7 格全塞进 `U.confirm` 的胶囊，而胶囊**只有一种样式**（金框 ＋ 金字）⇒
+     七天看着"全都能领"（父亲大人自己也这么误读了）。这一单不是排版，是**状态要一眼分得清**：
+       · **一天一个方块**（`opt.blocks`，4 列 → 4+3 两行，列数理由见回单）；
+       · **三档**：今天＝金框金字的唯一亮格 / 已领＝灰底 ＋ ✓ / 还没到＝更低一档的灰、无标记；
+       · 判定**只写一处**（`U.loginDayState`），绘制只读 state（画布代码里不再算第二遍）。
+     ⚠️ 数值一个字没动（`D.LOGIN_REWARDS` 与 `core.js` 的发奖照旧），只是把本来就发的东西画清楚；
+       第 7 天那颗仍是这一屏的主角（🎫 SSR 自选券 ＋ 圣契招募令**写全**，一个字不省）。 */
+  U.loginDayState = function (day, curDay) {
+    if (day === curDay) return 'today';
+    return day < curDay ? 'done' : 'future';
+  };
   U.loginReward = function (r) {
     if (!r) return;
     const D = G.DATA || {};
-    /* ================= V1.1.18（N1 · 留存环第一格：让"第 7 天的钩子"看得见）=================
-       父亲大人拍板「把留存环做了」；策划总监 N 单的结论是**钩子从来不缺、缺的是"看得见"**：
-       七日登录是全游戏**唯一一处"每天必定被玩家看到"**的留存件（`game.js` 无条件入队、一天一次），
-       而原来这里只画**当天那一格** —— 玩家从头到尾不知道第 7 天有 🎫SSR自选券。
-       改法：把 `D.LOGIN_REWARDS` **7 格全列**（`U.confirm` 的 chips 本来就自动居中折行 ⇒
-       不新造界面、不碰数值、不碰存档、不碰 `core.js` / `data.js`）：
-         · 领过的 → 前缀 `✓`　· 今天 → 后缀 `（今天）`　· 还没到的 → 只写「第 N 天 ＋ 内容」
-       第 7 天那颗是这一屏的主角，所以它把限定招募券一起写全（原来只写了"SSR自选券"）。
-       ⚠️ 一处口径没变：**奖励表一个字没动**，只是把本来就发的东西画出来（"同样的钱买明天还想来"）。 */
     const bodyOf = function (rw) {
       const it = (D.ITEMS || {})[rw.item] || null;
       const itemTxt = rw.item ? (((it && it.name) || rw.item) + '×1') : '';
-      if (rw.ssrTicket) return ['🎫 SSR自选券', itemTxt].filter(Boolean).join(' · ');
+      if (rw.ssrTicket) return ['🎫 SSR 自选券', itemTxt].filter(Boolean).join(' · ');
       return (G.Core && G.Core.rewardTextOf) ? G.Core.rewardTextOf(rw) : (itemTxt || '奖励');
     };
-    const ladder = function (curDay) {
-      const list = D.LOGIN_REWARDS || [];
+    /* 七天 → 七个方块（`title` 第 N 天 ／ `body` 当天奖励 ／ `state` 三档）——
+       **状态判定只在这一处**（`U.loginDayState`），页面与绘制都不许再算一遍。 */
+    const blocksOf = function (curDay) {
+      /* V1.1.16（0927-Y 数值轮 · 报告 §6-6 N2）：表挂在**轮次**上（第 8 天起是常规轮）——
+         这里必须走 `D.loginTableOf` 那同一个出口，否则第 8 天以后玩家看到的还是首轮那 7 格，
+         "今天这一格"会对不上真正发到手的东西（画出来的和发出去的不是同一个东西 = 静默错）。 */
+      const list = (D.loginTableOf ? D.loginTableOf(r.round || 1) : D.LOGIN_REWARDS) || [];
       return list.map(function (rw, i) {
         const n = i + 1;
-        return (n < curDay ? '✓' : '') + '第' + n + '天 ' + bodyOf(rw) + (n === curDay ? '（今天）' : '');
+        return { title: '第' + n + '天', body: bodyOf(rw), state: U.loginDayState(n, curDay) };
       });
     };
     /* ================= V1.1.8（乙组 B8 · 签到全双倍）=================
@@ -940,24 +1222,28 @@
        翻倍 = 当天那一格**原样再发一份**（含 ✦ 与招募券 —— 走的是同一个 `applyRewardObj`）。
        这里同样是**第二颗按钮**；翻过之后弹窗重画成"已翻倍"的样子（不再给第二颗）。 */
     const paintLogin = function (doubled) {
-      const chips = ladder(r.day);
-      if (doubled) chips.push('📺 今日已翻倍');
-      const opt = { okLabel: '收下', chips: chips };
+      /* 列数交给 `U.confirm` 按单格宽度定（390 → 3 列，320 退 2 列；理由见 BLK_COLS 那段） */
+      const opt = { okLabel: '收下', blocks: blocksOf(r.day) };
+      if (doubled) opt.chips = ['📺 今日已翻倍'];
       if (doubled) {
         opt.cancel = false;
         opt.note = '今天这一格已经翻倍领过了。';
       } else {
-        opt.cancelLabel = '📺 看广告 · 双倍';
+        /* V1.0.4 · R3：弱网变脸（同一处判定）；点了给一句人话、不发奖（见下面 onCancel） */
+        opt.cancelLabel = G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 双倍') : '📺 看广告 · 双倍';
         opt.onCancel = function () {
+          if (G.ADWEAK && G.ADWEAK.block()) return;      // 弱网：不白等，弹窗原地留着
           const AD = G.AD;
           if (!AD || !AD.show) { CV.toast('这个版本没有广告模块'); CV.render(); return; }
           AD.show('login_double').then(function (res) {
             if (!res || !res.granted) { CV.toast('广告没看完，奖励没发'); CV.render(); return; }
             const d = (G.Core && G.Core.claimLoginDouble) ? G.Core.claimLoginDouble() : null;
             if (!d || !d.ok) { CV.toast((d && d.msg) || '今天已经翻过倍了'); CV.render(); return; }
-            CV.toast('📺 签到奖励已翻倍', 1600);
+            /* F7 ②：同上（看完广告拿到的签到双倍）。 */
+            CV.toast('📺 签到奖励 ×2', 1600);
             U.confirm('七日登录 · 第 ' + r.day + ' 天', '今日奖励 ×2 已到手', function () { CV.render(); },
-              { cancel: false, okLabel: '收下', chips: ladder(r.day).concat(['📺 今日已翻倍']), note: '明天还有一次翻倍机会。' });
+              { cancel: false, okLabel: '收下', blocks: blocksOf(r.day),
+                chips: ['📺 今日已翻倍'], note: '明天还有一次翻倍机会。' });
           });
         };
       }
@@ -1192,7 +1478,10 @@
        实测复现（`/tmp/coach_loop_probe.js`）：`coachSeen` 卡在 3 条、`tourForce` 永远 true，
        每轮都在「登记 tut_blk4（目标=去完成）→ 点 goto_quest → 落到 world/reincarn → 回主页」之间打转。
        修法：**旁路照样要"执行 ＋ 收掉"**（与"点高亮那颗"同一条口径，V9.6.107 那套）。 */
-    if (id === 'goto_quest' || id === 'claim_quest') {
+    /* F2-3（抢修单 0928R3）：悬赏那颗「去完成」（`bounty_go:*`）与这两颗同性质 ——
+       玩家明确要求"带我去做这一步"，不是路过顺手点了一下。引导挂着的时候把它吃掉，
+       就又变成一颗"点了没反应"的死键（那正是这一单要修的毛病）。 */
+    if (id === 'goto_quest' || id === 'claim_quest' || id.indexOf('bounty_go:') === 0) {
       if (st) {
         coachFunnel(st.key, 'tap', st._t0 ? (Date.now() - st._t0) : 0);
         U.coachMark(st);
@@ -1405,6 +1694,24 @@
        "读得清"，与网页版 .notice-advice 同一档（两端各钉一次对比度）。 */
     o.lines.forEach((ln, i) => CV.text(ln, o.x + PAD, o.y + o.lineY[i],
       { size: CV.FS.lg, color: o.tone === 'text2' ? CV.C.text2 : CV.C.dim }));
+    /* ================= V1.1.21（F10）· 方块阵：一天一个方块 =================
+       **只按 state 取色**（`BLK_TONE`，帧里不再算"今天 / 领过"）。
+       三档的样子：今天＝金框金字 ＋「今天」；已领＝灰底 ＋ ✓；还没到＝更暗的灰底、连标记都没有。 */
+    (o.blocks || []).forEach(function (b) {
+      const bx = o.x + b.x, by = o.y + b.y;
+      const t = b.tone || BLK_TONE.future;
+      CV.ctx.globalAlpha = t.alpha;
+      CV.round(bx, by, b.w, b.rh, CV.RADIUS_SM, t.fill, t.line, t.lw);
+      CV.text(b.title, bx + b.w / 2, by + b.ty,
+        { size: CV.FS.sm, bold: t.bold, align: 'center', color: t.text });
+      b.lines.forEach(function (ln, i) {
+        CV.text(ln, bx + b.w / 2, by + b.b0 + i * b.bStep,
+          { size: CV.FS.xs, align: 'center', color: t.text });
+      });
+      if (b.mark) CV.text(b.mark, bx + b.w / 2, by + b.my,
+        { size: CV.FS.tag, align: 'center', color: t.markCol });
+      CV.ctx.globalAlpha = 1;
+    });
     /* 奖励胶囊（居中折行）——网页版 .reward-chips */
     (o.rows || []).forEach(function (row, ri) {
       const cy = o.y + o.chipY[ri];

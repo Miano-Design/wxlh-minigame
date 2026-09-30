@@ -45,9 +45,7 @@
     const S = Core.S;
     const fb = Core.factionBuffs(S.party);
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'party_back');
-    CV.text('队伍', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('队伍', { backId: 'party_back' });    // 吸顶（父亲大人 09-27 深夜 · 派单 Z-B）
 
     /* ① 小队 */
     U.card(function () {
@@ -99,7 +97,8 @@
         },
         drop: function (a, b) {
           const r = Core.swapPositions(a, b);
-          CV.toast((r && r.msg) || (r && r.ok ? '已换位' : '换不了'));
+          /* F7 ②：拖拽换位的结果当场看得见（两格对调）→ 删成功语；"位置不对 / 这个位置是空的"留。 */
+          if (!r || !r.ok) CV.toast((r && r.msg) || '换不了');
           CV.render();
         },
       };
@@ -264,9 +263,7 @@
   CV.register('pickparty', function () {
     const S = Core.S;
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'party_back');
-    CV.text('选伙伴上阵', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('选伙伴上阵', { backId: 'party_back' });   // 吸顶（父亲大人 09-27 深夜）
     /* V1.0.6（父亲大人 09-24 反馈图 10「顺序问题」）：
        这一页原来直接吃 `Object.keys(S.chars)` —— **没排序**，顺序就是存档里的键序
        （抽卡先后决定的插入序，读档后还会变），所以他看到的是"乱排序"。
@@ -297,9 +294,7 @@
   CV.register('pickswap', function () {
     const S = Core.S;
     U.begin();
-    U.btn(U.pad(), U.y, 40 * CV.SCALE, U.BTN_SM * CV.SCALE, '‹', 'ghost', 'party_back');
-    CV.text('无损换将', U.pad() + U.cw() / 2, U.y + U.BTN_SM * CV.SCALE / 2, { size: CV.FS.f2, bold: true, align: 'center' });
-    U.y += U.BTN_SM * CV.SCALE + CV.SP[2];
+    U.pageHead('无损换将', { backId: 'party_back' });     // 吸顶（父亲大人 09-27 深夜）
     const from = G.__swapFrom;
     /* V9.6.19（父亲大人）：换将列表的排序要**跟执灯者那边一样** ——
        直接复用 G.charSortDefault（那边是唯一实现），不再各排各的。 */
@@ -331,13 +326,15 @@
   });
   CV.on('party_back', function () { CV.pop(); });
   /* 抓起状态里点「取消」＝放回原位（提示条上那颗按钮；离开队伍页也会自动放下） */
-  CV.on('pgrab_cancel', function () { CV.grab = null; CV.grabCfg = null; CV.toast('已放回原位'); CV.render(); });
+  /* F7 ②（父亲大人点名的例子）：**删「已放回原位」** —— 抓起的那一张当场回到原位，看得见。 */
+  CV.on('pgrab_cancel', function () { CV.grab = null; CV.grabCfg = null; CV.render(); });
   /* 无损换将：挑一个伙伴换到这一格（等级继承、装备能穿就跟着转 —— 走 core.swapPartyMember） */
   CV.on('pickswap:*', function (id) {
     const slot = G.__swapSlot;
     if (slot === undefined || slot === null || slot < 0) { CV.toast('这一格不能换'); return; }
     const r = Core.swapPartyMember(slot, id);
-    CV.toast(r && r.msg ? r.msg : '已换将');
+    /* F7 ②：换将结果当场看得见（那格换成谁了）→ 删成功语；"主角必上阵 / 他已经在这一格了"留。 */
+    if (r && r.ok === false) CV.toast(r.msg || '换不了');
     /* V9.6.22（父亲大人："换完将都是回到队伍界面算了，这样比较合理"）：
        换将是从**队伍页 → 伙伴详情 → 选人**这么 push 上来的，换完直接把
        char / pickswap 这两层一起弹掉、回到队伍页 —— 换将本来就是在队伍页反复调阵，
@@ -374,17 +371,20 @@
     Core.save();
     pickSlot = null;
     CV.pop();
-    CV.toast(Core.charName(id) + ' 已上阵');
+    /* F7 ②：上阵后那格当场填上人（看得见 → 删）；不再念一遍名字。 */
   });
   [0, 1, 2].forEach(function (i) {
     CV.on('preset_save:' + i, function () {
       const r = Core.savePreset(i);
+      /* F7 ②：存预设是**覆盖式**的（存的是当前的队伍，没有任何界面元素会变）——
+         "存到第几号"这件事只有这句话说得出 → 留；失败留。 */
       CV.toast(r && r.msg ? r.msg : ('已存预设 ' + (i + 1)));
       CV.render();
     });
     CV.on('preset_use:' + i, function () {
       const r = Core.applyPreset(i);
-      CV.toast(r && r.msg ? r.msg : ('已套用预设 ' + (i + 1)));
+      /* F7 ②：套预设后队伍整排当场变（看得见）→ 删成功语；"该预设还是空的"留。 */
+      if (!r || !r.ok) CV.toast((r && r.msg) || '这套预设还用不了');
       CV.render();
     });
   });

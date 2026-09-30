@@ -39,10 +39,17 @@ function randCode() {
   for (let i = 0; i < CODE_LEN; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
   return out;
 }
+/* V1.1.20（F1-7）：归一化**用同一套字母表**（就是生成用的 ALPHABET），不再另写一份判据。 */
+const CODE_RE = new RegExp('^[' + ALPHABET + ']{' + CODE_LEN + '}$');
+const CODE_PICK = new RegExp('[' + ALPHABET + ']{' + CODE_LEN + '}');
 function normCode(s) {
   const t = String(s == null ? '' : s).toUpperCase().replace(/[^0-9A-Z]/g, '');
-  if (t.length === CODE_LEN) return t;
-  const m = new RegExp('[A-HJ-NP-Z2-9]{' + CODE_LEN + '}').exec(t);
+  /* 原来这里是 `if (t.length === CODE_LEN) return t;` —— 客户端是严的
+     （js/sc-cloud.js 的 `CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/`，排除易混的 O/0/I/1），
+     服务端只要 8 位就收（含 O/0/I/1 也认）：生成侧不会产出这些字符，所以现在不误伤，
+     但两处各写一份判据，将来谁改一边就当场不一致。现在两边同一套（生成用的 ALPHABET）。 */
+  if (CODE_RE.test(t)) return t;
+  const m = CODE_PICK.exec(t);
   return m ? m[0] : '';
 }
 

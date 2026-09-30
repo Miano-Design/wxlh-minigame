@@ -114,18 +114,29 @@
   /* ================= ② 起名（网页版 showCharCreate） ================= */
   const NAMES = ['夜行者', '渡鸦', '白泽', '北辰', '惊蛰', '拾荒者', '阿岚', '无常', '青槐', '孤鸿', '墨白', '临渊'];
   let nameIdx = Math.floor(Math.random() * NAMES.length);
+  /* V1.0.4 · V（父亲大人 09-27）：名字框**能敲、也能换**。
+     `nameDraft` = 玩家自己敲的那个（空 = 用名单里的 NAMES[nameIdx]，也就是从前的走法）。 */
+  let nameDraft = '';
+  let nameBusy = false;          // 机审在跑：这一下别让他连点（一次请求 <1s）
   CV.register('create', function () {
     U.begin();
     U.card(function () {
       U.h3('创建你的执灯者');
-      U.eventDesc(['灯阁需要一个名字来记录你的行程。这个名字将伴随你进入每一个世界。'], 2 * CV.SCALE);
-      U.space(CV.SP[2]);
-      /* 名字框：网页版是一个 input，canvas 里点一下弹微信键盘；右边一个 🎲 换一个 */
+      /* V1.0.4 · V2（父亲大人 09-27：「起名窗口不用有那么多小字注释」）：
+         原来这里是一整段说明文（"灯阁需要一个名字来记录你的行程……"）—— **删掉**。
+         V1.0.4（09-27 深夜再改，父亲大人：「**起名窗口的小字都删了**」）：
+         最后那一行操作提示（"点名字框可以自己敲…"）也**一并删掉** —— 起名卡里从此**一行小字都没有**，
+         只留：标题 ＋ 名字框（点它能敲）＋ 🎲（从名单换一个）＋ 底下那颗主按钮。
+         ⚠️ 名字上限改成**按中文字符算**（12 个汉字 / 24 个字母），见 `js/sc-namecheck.js` 的 `MAX_W`。 */
+      U.space(CV.SP[1]);
+      /* 名字框：点它弹微信键盘敲字；右边那个 🎲 = 从名单里换一个（快捷入口，不联网） */
       const h = 44 * CV.SCALE, gap = 8 * CV.SCALE;
       const bw = 52 * CV.SCALE;
       const top = U.y;
       CV.round(U.ix(), top, U.iw() - bw - gap, h, CV.RADIUS_SM, CV.C.panel, CV.C.line);
-      CV.text(CV.fit(NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, CV.FS.f1 * CV.SCALE), U.ix() + 12 * CV.SCALE, top + h / 2, { size: CV.FS.f1 * CV.SCALE });
+      /* F7 ①：字号**不许**再乘 CV.SCALE（那是观感系数）—— 一乘就把二级字缩到 12.3px、破了五级阶梯 */
+      CV.text(CV.fit(nameDraft || NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, CV.FS.f1),
+        U.ix() + 12 * CV.SCALE, top + h / 2, { size: CV.FS.f1 });
       CV.hit('name_type', U.ix(), top, U.iw() - bw - gap, h);
       U.btn(U.ix() + U.iw() - bw, top, bw, h, '🎲', 'ghost', 'name_roll');
       U.y = top + h;
@@ -135,27 +146,39 @@
     U.btnRow([{ label: '创建并开始探索', style: 'primary', id: 'name_ok' }]);
 
   });
-  CV.on('name_roll', () => { nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });
-  /* V1.0.1（2026-09-23 · 平台违规警告 · P0 事故，康康漏改的那一处）
-     ────────────────────────────────────────────────────────────────
-     原来这里弹微信键盘让玩家**自由输入**名字，`NAMES[nameIdx] = v` 输什么存什么。
-     有人输了政治敏感词 → 平台判【UGC 模块存在政治敏感内容】、
-     限 **48 小时**整改（截止 2026-09-25 08:38），逾期封禁「被搜索 / 分享 / 分享到朋友圈」能力。
+  CV.on('name_roll', () => { nameDraft = ''; nameIdx = (nameIdx + 1) % NAMES.length; CV.render(); });
+  /* ================= V1.0.4 · V（2026-09-27 · 父亲大人：「自由命名可以接入 api 不……之前就是因为
+     命名没有限制被警告了才关的，现在开了云开发能接吗」）=================
+     当年那次（V1.0.1 · P0 事故，也发生在这一处）：名字框是自由输入，`NAMES[nameIdx] = v` 输什么存
+     什么；有人输了政治敏感词 → 平台判【UGC 模块存在政治敏感内容】、限 **48 小时**整改，
+     处置是**整段撤掉自由输入**（改成"从预设名单里换一个"＝白名单，可自证）。
 
-     **为什么上次没堵住**：V1.0.1 那次只改了 sc-last.js 的「新建主角」，
-     漏了**这一处开局起名** —— 而起名才是每个玩家必经的那一步。（这是康康的漏改，记在这儿。）
-
-     现在起名**只能从下面这份预设名单里选**：点名字 = 换一个，不再产生任何自由文本。
-     名单里也不含任何姓氏 + 名字的可组合结构（都是完整的固定词），从根上不可能拼出敏感词。
-
-     ⚠️ 别再把这里改回 showKeyboard：平台那条规范要的是「UGC 模块不得出现违规内容」，
-        而**去自由输入是唯一零成本且可自证的合规做法**（接内容安全 API 需要 access_token，
-        客户端直调不了，得养云函数 —— 单机游戏不值得）。 */
+     现在自由输入**开回来，但带审**（平台对 UGC 的硬要求就是"要么没有 UGC，要么有内容安全过滤"）：
+       敲字 → 本地筛（成本 0，见 js/sc-namecheck.js）→ 云函数 `checkname` 机审（微信内容安全）→
+       **过了才签发那张一次性凭据**，`Core.setPlayerName` 才落盘。
+     ⚠️ 三条不许破的：① 名单里的名字不花那次请求（可自证，断网也能起名）；
+       ② **没网 / 没云 → 自由输入这条路不可用**，让他用右边那颗 🎲 换名单里的（老路一个字没删）；
+       ③ **别绕过 `G.NameCheck` 把键盘里那串字直接塞进 Core** —— 那正是当年翻车的样子。 */
   CV.on('name_type', function () {
-    nameIdx = (nameIdx + 1) % NAMES.length;   // 点名字框 = 换一个（原来是弹键盘）
-    CV.render();
+    G.NameCheck.ask(nameDraft, function (text, err) {
+      if (err) { CV.toast(err); return; }
+      const l = G.NameCheck.local(text);
+      if (!l.ok) { CV.toast(l.msg); return; }     // 不合格的当场说，不用等云端那一秒
+      nameDraft = l.name;
+      CV.render();
+    });
   });
-  CV.on('name_ok', () => { Core.setPlayerName(NAMES[nameIdx]); CV.reset('bloodline'); });
+  CV.on('name_ok', function () {
+    if (nameBusy) return;
+    const nm = nameDraft || NAMES[nameIdx];
+    if (nameDraft) { nameBusy = true; CV.toast('正在审这个名字…'); }   // 名单那条路是同步的，不弹这句
+    G.NameCheck.submit(nm, function (r) {
+      nameBusy = false;
+      if (!r.ok) { CV.toast(r.msg); CV.render(); return; }
+      Core.setPlayerName(r.name || nm);
+      CV.reset('bloodline');
+    });
+  });
 
   /* ================= ③ 选血统（网页版 bloodlineModal 的"未选"分支） ================= */
   CV.register('bloodline', function () {
@@ -202,7 +225,8 @@
     CV.on('bl_pick:' + id, function () {
       U.confirm('确认命格', '选择「' + id + '」后不可更改，境界线将从「' + D.realmName(id, 0) + '」开始。确定吗？', function () {
         const r = Core.choosePlayerBloodline(id);
-        CV.toast(r.msg || '已觉醒');
+        /* F7 ②：选完命格整个界面切到主画面（看得见 → 删成功语）；失败（条件不满足）留。 */
+        if (!r.ok) CV.toast(r.msg || '觉不了');
         /* V1.0.5：选完命格先到**主画面**，由玩家自己点【进入残域】进首页
            （父亲大人："主画面可以在初次登陆选完血统出现"）。 */
         CV.reset('gate');
