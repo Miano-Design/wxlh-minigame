@@ -128,7 +128,6 @@
        放在 setup 里是因为它一定在 data.js 之后跑。 */
     try { CV.syncCurrencyColors(); } catch (e) {}
     CV.relayout(info || {});
-    try { G.CE_CANVAS = canvas; } catch (e) {}       // 开发期截图用
     return CV;
   };
 

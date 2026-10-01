@@ -444,19 +444,3 @@ setTimeout(flushBootModals, 900);
    里面每一条能力自带"没有这个 API 就静默跳过"，这一行外面再包一层 try：
    **新接的能力绝不许把开机弄崩**。 */
 try { if (G.CAP && G.CAP.install) G.CAP.install(); } catch (e) {}
-
-/* 开发期截图（devtools 里画布是 HTMLCanvasElement → 自己导出 PNG，康康好对比） */
-try {
-  const plat = (wx.getSystemInfoSync ? (wx.getSystemInfoSync().platform || '') : '');
-  if (plat === 'devtools' || !plat || /devtools/i.test(String(info.platform || ''))) {   // getWindowInfo 的 platform 在模拟器里可能不是 devtools，这里放宽
-    setTimeout(() => {
-      const canvas = globalThis.CE_CANVAS;
-      if (!canvas || !canvas.toDataURL) { console.log('[CE-SHOT-FAIL] 没有画布'); return; }
-      const b64 = String(canvas.toDataURL('image/png')).split(',')[1] || '';
-      const p = (wx.env && wx.env.USER_DATA_PATH ? wx.env.USER_DATA_PATH : '/tmp') + '/ce-shot.png';
-      const fs = wx.getFileSystemManager ? wx.getFileSystemManager() : null;
-      if (fs && fs.writeFileSync) { fs.writeFileSync(p, b64, 'base64'); console.log('[CE-SHOT] ' + p); }
-      else console.log('[CE-SHOT-FAIL] 不能写文件');
-    }, 2500);
-  }
-} catch (e) {}
