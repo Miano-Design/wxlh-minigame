@@ -915,8 +915,15 @@
   };
   CV.card = function (x, y, w, h, opt) {
     opt = opt || {};
+    /* ================= 2026-10-02（父亲大人：整体重构 · §十一/§二十七） =================
+       卡片从**完全不透明的 #111621** 改成**半透明深色面板（88%）**，边线也收淡一档。
+       为什么：正式场景图/主视觉上线之后，一屏纯实心面板＝"后台管理页"；
+       半透明让底图**隐约透出来**，卡片才像"浮在世界上的记录页"。
+       没有底图的页面（大多数二级页）下面是 `CV.C.bg`，合成结果与原来看不出差别 ——
+       所以这一改是**全局收益、零回归风险**（`inset/spacing/layout` 量的都是几何，不含颜色）。
+       ⚠️ 只改这两处默认值；页面自己要填色仍然传 `opt.fill`（命格卡那类照旧走 `opt.line`）。 */
     CV.round(x, y, w, h, opt.radius === undefined ? CV.RADIUS : opt.radius,
-      opt.fill || CV.C.panel, opt.line === null ? null : (opt.line || CV.C.line));
+      opt.fill || CV.a(CV.C.panel, .88), opt.line === null ? null : (opt.line || CV.a(CV.C.line, .92)));
     /* V9.6.10：网页版 .card 有一条 `inset 0 1px 0 #ffffff08` 的顶部高光 ——
        卡片"有厚度、不糊"的关键就是它；小游戏原来没画，所以整块看着是平的、笨的。 */
     if (opt.line !== null) {
@@ -1583,7 +1590,10 @@
     const ROW_H = 34, CHIP_H = 40, BAR_TOP = 2, BAR_BOTTOM = 10;
     const h = top + ROW_H + BAR_TOP + CHIP_H + BAR_BOTTOM;
     CV.TOP = h;
-    c.fillStyle = CV.a(CV.C.bg, .94);
+    /* 2026-10-02（§十一 场景驱动 UI）：顶栏压暗层从 .94 收到 .88 ——
+       首页那种"整屏底图"的页面上，让主视觉在最上面一栏也**隐约透一点点**，
+       整页才是一张画；数字与图标依旧压得住（它们本身是不透明的）。 */
+    c.fillStyle = CV.a(CV.C.bg, .88);
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -1632,7 +1642,10 @@
     const CHIP_W = (CV.W - PAD * 2 - CHIP_GAP * 3) / 4;   // 四等分（PAD = .curbar 左右 0.75rem）
     const chip = function (label, icon, color, dim, dashed) {
       const ww = CHIP_W;
-      CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.C.panel, dashed ? CV.C.line2 : CV.C.line);
+      /* 2026-10-02（§三十：顶栏别像"开发调试 HUD"）：胶囊改**半透明底 + 细边**，
+         四个货币之间本来就等宽 + gap，看着是"灯阁的资源状态栏"而不是四块实心方块。 */
+      CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.a(CV.C.panel, .78),
+        dashed ? CV.a(CV.C.line2, .9) : CV.a(CV.C.line, .85));
       const pad = 8 * CV.SCALE;                           // .cur-chip padding 左右 0.5rem
       /* 2026-10-01（§八.1）：货币图标**不再跟正文一个等级** —— 图标 22px、数字 12~13px，
          两者形成"图标为主、数字为辅"的一组。glyph 的 measure 就是它的 size，布局照旧。 */
@@ -1648,7 +1661,11 @@
         iw = CV.measure(icon, icoSize);
         room = ww - pad * 2 - iw - iGap;
       }
-      const numSize = CV.measure(label, CV.FS.md) <= room ? CV.FS.md : CV.FS.sm;
+      /* 数字字号（2026-10-02 父亲大人：「**不用更大的字**啊，字一大显得好笨重」）：
+         上一版提到 13px，实测确实笨重 —— 退回**原来的 12px 优先**（放不下才到 11）。
+         "顶栏不像 HUD"这件事交给**半透明底 + 更清晰的货币色**去做，不是靠放大字。
+         ⚠️ 仍然绝不让 `CV.fit` 把数值砍成 `99…`（page_text_audit 盯这一条）。 */
+      const numSize = CV.measure(label, CV.FS.md, true) <= room ? CV.FS.md : CV.FS.sm;
       const txt = CV.fit(label, room, numSize, true);
       /* 内容整块居中；格子再窄也至少留出左内边距，不会贴边 */
       let tx = x + Math.max(pad, (ww - (iw + iGap + CV.measure(txt, numSize, true))) / 2);

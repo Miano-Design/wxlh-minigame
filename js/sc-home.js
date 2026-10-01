@@ -499,9 +499,17 @@
   });
   CV.on('open_locked', function () { CV.push('locked'); });
 
-  CV.register('home', function () {
-    const S = Core.S;
-    U.begin();
+ CV.register('home', function () {
+   const S = Core.S;
+   U.begin();
+
+    /* ================= 第一层：主视觉（2026-10-02 · 父亲大人整体重构 §十二） =================
+       ⚠️ 第一版是"顶部一条 hero 带"——父亲大人当场否了：「**上方主 KV 占比太大了**，
+       或者你可以直接做成**底图压暗铺满背景**，然后内容直接叠在上面」。
+       所以现在走后半句：KV **整屏铺满 + 压暗**（见本文件末尾 `CV.veils.home`），
+       卡片直接浮在它上面（卡片这一版已经换成**半透明面板**，正好吃得住底图）。
+       好处：世界是"整屏的"，而不是"顶部一张图 + 下面一屏黑"；内容高度也一屏装得下。
+       ⚠️ 只改视觉层：**不动任何入口的个数与顺序**（`journey_audit ⑧a/⑧b` 在盯）。 */
 
     /* ① 主角卡 .card.text-rows：四行【标签】值，行间虚线；整块都能点进角色页 */
     const st = Core.realmState(), au = Core.authorityInfo(), sect = Core.sectInfo();
@@ -1022,6 +1030,40 @@
     if (!Core.isUnlocked('recruit')) { CV.toast('🔒 ' + Core.unlockTip('recruit'), 2400); return; }
     CV.push('recruit');
   });
+
+  /* ================= 首页整屏底图（2026-10-02 · §十一 场景驱动 UI） =================
+     父亲大人：「直接做成**底图压暗铺满背景**，然后内容直接叠在上面」。
+     正式 KV（`brand/kv-main.jpg`，主包）按 cover 铺满**整块画布**，再压一层暗
+     —— 于是这一页是"站在残域里看灯阁"，卡片是浮在世界上的记录页，不再是"顶部一张图 + 下面一屏黑"。
+     图没到位（或加载失败）走**程序化底**：天空渐变 + 那盏暖光，第一帧绝不空。
+     压暗的力度取 .72：卡片本身已经是半透明面板（88%），两层加起来仍读得清字，
+     底图的轮廓与那盏灯还看得出来。 */
+  CV.veils = CV.veils || {};
+  CV.veils.home = function (c) {
+    if (G.Story && G.Story.ensureKV) G.Story.ensureKV();
+    const img = (G.Story && G.Story.kvImage) ? G.Story.kvImage() : null;
+    if (img && img.width) {
+      const s = Math.max(CV.W / img.width, CV.H / img.height) * 1.03;   // cover + 3% 过扫
+      const dw = img.width * s, dh = img.height * s;
+      c.drawImage(img, (CV.W - dw) / 2, (CV.H - dh) * 0.42, dw, dh);
+    } else {
+      const sky = c.createLinearGradient(0, 0, 0, CV.H);
+      sky.addColorStop(0, CV.C.bg2); sky.addColorStop(1, CV.C.bg);
+      c.fillStyle = sky; c.fillRect(0, 0, CV.W, CV.H);
+      const rg = (typeof c.createRadialGradient === 'function')
+        ? c.createRadialGradient(CV.W * 0.5, CV.H * 0.66, 0, CV.W * 0.5, CV.H * 0.66, CV.W * 0.8) : null;
+      if (rg && rg.addColorStop) {
+        rg.addColorStop(0, CV.a(CV.C.goldBright, .34)); rg.addColorStop(1, CV.a(CV.C.gold, 0));
+        c.fillStyle = rg; c.fillRect(0, 0, CV.W, CV.H);
+      }
+    }
+    /* 压暗（顺着主视觉的构图：上方压得轻一点，把那片天留出来） */
+    const g = c.createLinearGradient(0, 0, 0, CV.H);
+    g.addColorStop(0, CV.a(CV.C.bg, .58));
+    g.addColorStop(0.45, CV.a(CV.C.bg, .74));
+    g.addColorStop(1, CV.a(CV.C.bg, .82));
+    c.fillStyle = g; c.fillRect(0, 0, CV.W, CV.H);
+  };
 
   /* 还没复刻的页面：给个明确提示，别点了没反应。
      ⚠ V9.5.99：这里**不能覆盖已经存在的真实处理器** —— CV.on 是同 id 后注册的赢，
