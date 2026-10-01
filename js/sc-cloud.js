@@ -718,6 +718,10 @@
     });
   }
 
+  /* ⚠️ **兑换码不走这里**（2026-10-01 · 父亲大人拍板「不要调用 mp 后台，直接写在游戏里」）：
+     码表在 `js/data.js` 的 `GIFT_CODES`，判据在 `Core.claimGift()`，界面在 `js/sc-last.js`——
+     **一次网络请求都不发**（这条链上客户端与服务端都没有它）。第一版曾做成云函数校验，
+     那支 `cloudfunctions/gift` 已整个删除；将来要发限时码 / 抽奖码再把它建回来。 */
   /* ---------- 手动两颗（**只有玩家自己点的那两下才说话**，自动那条路一个字都不弹） ---------- */
   /** 手动「从云端下载存档」（L1 点名要的那颗，六个月后救档用）：只读回云端**现在那条**，
       要不要覆盖由页面那一问决定（本机那份在覆盖时照旧先留档）。 */
@@ -875,6 +879,24 @@
     }
   }
 
+  /* ================= R1.2：dev probe 的**人手入口**（父亲大人 2026-10-01 选的"乙"）=================
+     云函数里那个 `{action:'probe'}` 能把写入链**一步一步**跑一遍（读 → set 一个探针字段 →
+     再读验证 → 清掉），但它之前**没有门**：只能靠调云函数触发，而"往开发者工具 console 里
+     敲一行"这条路我这边打不进去。现在挂上来，**一行就能查**：
+
+         GameGlobal.CloudSync.probe()
+
+     回来的是 `{ok, hasDoc, get, set, verify, clean, stage?, errCode?, errMsg?}` ——
+     哪一步炸、什么码，一眼可见（今天那个 `-502001` 就是靠它定的位）。
+     ⚠️ 只在**排查时**手动调：它会对**你自己那条云存档**做两次 `set`（探针前 / 探针后各一次），
+        别在"两台设备同时正在推档"的时候连着点。它不接入任何正式游戏逻辑。 */
+  function probeCloud() {
+    return saveFn('probe').then(function (r) {
+      try { if (typeof console !== 'undefined' && console.log) console.log('[probe]', JSON.stringify(r)); } catch (e) {}
+      return r;
+    });
+  }
+
   G.CloudSync = {
     ENV_ID: ENV_ID, COLL: COLL, CODE_FN: CODE_FN, SAVE_FN: SAVE_FN, PREF_KEY: PREF_KEY,
     boot: boot, triggerAuto: triggerAuto, noteProgress: noteProgress, sync: sync,
@@ -887,6 +909,8 @@
     applyCloudSave: applyCloudSave, info: info, toggle: toggle,
     /* F2 · 0930L：诊断（设置页那一行 ＋ 尺子读它）。口径一个字没改，只是把静默变可见。 */
     diag: diag, statusText: statusText,
+    /* 排查用的人手入口：console 里粘一行 `GameGlobal.CloudSync.probe()` 就能跑云函数那套体检 */
+    probe: probeCloud,
     /* V1.1.x（0927-P · 删档先留一手）：把"覆盖前留档"这一个口**正式开出来**给界面用 ——
        就是模块内部一直在用的 `keepLocalBackup`（写 `wxlh_save_v5_bak`，格式与 core 的
        `backupSave` 逐字相同 ⇒ 设置页「找回存档」里那份"本机备份"与
