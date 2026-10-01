@@ -50,7 +50,7 @@
        品牌从**两行活字**换成他的题字图（`U.brandTitle`，宽度按屏宽 86%、短屏再夹一道高度上限）。
        ⇒ 块高里那一条 `DISP.d3×0.7` 换成 `U.brandTitleH(brandW)`，其余项不变；
        「提灯入残域」作为副题**仍是活字**（图里只有那四个字，没有这句）。 */
-    const brandW = Math.min(CV.W * 0.86, 560 * S);
+    const brandW = Math.min(CV.W * 0.94, 620 * S);   // 2026-10-01 题字放大：0.86 → 0.94（父亲大人："不太突出"）
     const brandH = U.brandTitleH(brandW);
     const blockH = brandH + 6 * S + 30 * S + 12 * S + CV.SP[4] + U.BTN_H * S;
     /* 落位再收半步：**光学中心**——几何居中看着偏下，本室惯用比几何中心高一点（约 5% 屏高）；

@@ -48,9 +48,13 @@
        ④ 两张都不行 ⇒ 程序化"深色底 + 唯一那盏暖光"（下面 gate 那一支）。
      ⚠️ 加载期**不要再跳回老图**：中途露的是 ④ 那层深色底 + 题字，观感是"灯还没点亮"，
         不会出现"先出新图再闪回旧图"。 */
-  const SRC = ((G.STORYDATA && G.STORYDATA.KV_FILE) || 'story/kv/img_main_kv.jpg');
-  const LEGACY_SRC = 'icons/mv-main-lamp.jpg';
-  let img = null, imgOk = false, legacyTried = false;
+  /* 2026-10-02（父亲大人：「主画面和主题字要放在主包，该压就压……确保开机就能看到」）：
+     正式主视觉搬到 **`brand/kv-main.jpg`（主包）**，1080×1920 压到 **265KB**。
+     于是**不再需要**分包、不再有"加载期露底色"这一档 —— 开机第一帧就能铺满。
+     `icons/mv-main-lamp.jpg` 那份旧图**已被父亲大人删掉**（旧 icons 文件夹整个没了），
+     所以这一版**没有 legacy 兜底**：取图失败就是程序化"深色底 + 那盏暖光"。 */
+  const SRC = 'brand/kv-main.jpg';
+  let img = null, imgOk = false;
   function loadImg(src) {
     try {
       if (!G.wx || typeof G.wx.createImage !== 'function') return;
@@ -60,23 +64,21 @@
       img.onload = function () { imgOk = true; try { CV.render(); } catch (e) {} };
       img.onerror = function () {
         imgOk = false;
-        if (!legacyTried) { legacyTried = true; loadImg(LEGACY_SRC); }   // 极端兼容：退回老主视觉
       };
       img.src = src;
     } catch (e) { img = null; imgOk = false; }
   }
-  try {
-    if (G.wx && G.wx.loadSubpackage) {
-      /* 分包没配 / 拉不动都**不许影响开机**：失败就当作"正式 KV 拿不到"，走老图或程序化底 */
-      G.wx.loadSubpackage({ name: 'story', success: function () { loadImg(SRC); }, fail: function () { loadImg(SRC); } });
-    } else loadImg(SRC);
-  } catch (e) { loadImg(SRC); }
+  loadImg(SRC);
 
   /* cover 铺法：短边贴满、长边溢出裁掉（与网页版 `background-size: cover` 同一条口径）。
      底图的构图是"主体靠右、脚踩下三分之一"，所以**取中偏下**比取正中最经得起裁。 */
   function cover(c, alpha, yBias) {
     if (!imgOk || !img || !img.width || !img.height) return false;
-    const s = Math.max(CV.W / img.width, CV.H / img.height);
+    /* 2026-10-02（父亲大人：「按照屏幕大小等比放大铺满」）：
+       `Math.max` 就是 cover（短边贴满、长边溢出裁掉）——**本来就是铺满**。
+       再乘 1.03 的**过扫**：屏幕与图比例差一点点时（比如 9:16 vs 9:16±2%），
+       四舍五入会在边上留一条 1px 的底色缝，看着就像"上下有色块"。过扫 3% 把这条缝吃掉。 */
+    const s = Math.max(CV.W / img.width, CV.H / img.height) * 1.03;
     const w = img.width * s, h = img.height * s;
     const dy = (CV.H - h) * (yBias === undefined ? 0.5 : yBias);
     c.save();
@@ -133,12 +135,17 @@
     c.fillRect(0, 0, CV.W, CV.H);
     if (!cover(c, 1, 0.5)) {
       /* 图还没到：先把"唯一那处暖光"画出来 —— 提灯入残域，第一帧就该有那盏灯 */
-      const rg = c.createRadialGradient(CV.W * 0.48, CV.H * 0.68, 0, CV.W * 0.48, CV.H * 0.68, CV.W * 0.95);
-      rg.addColorStop(0, CV.a(CV.C.goldBright, 0.45));
-      rg.addColorStop(0.35, CV.a(CV.C.gold, 0.18));
-      rg.addColorStop(1, CV.a(CV.C.gold, 0));
-      c.fillStyle = rg;
-      c.fillRect(0, 0, CV.W, CV.H);
+      /* ⚠️ 径向渐变**判存在**：真机/开发工具都有，但几把尺子的假画布只桩了 `createLinearGradient`
+         —— 不判就会在开机那一帧抛 `addColorStop of undefined`，把整页渲染打断。 */
+      const rg = (typeof c.createRadialGradient === 'function')
+        ? c.createRadialGradient(CV.W * 0.48, CV.H * 0.68, 0, CV.W * 0.48, CV.H * 0.68, CV.W * 0.95) : null;
+      if (rg && rg.addColorStop) {
+        rg.addColorStop(0, CV.a(CV.C.goldBright, 0.45));
+        rg.addColorStop(0.35, CV.a(CV.C.gold, 0.18));
+        rg.addColorStop(1, CV.a(CV.C.gold, 0));
+        c.fillStyle = rg;
+        c.fillRect(0, 0, CV.W, CV.H);
+      }
     }
     scrim(c, 0.72, 0.28, 0.86);
 
@@ -147,7 +154,7 @@
        与主画面 gate 同一处出口 —— 不许在这里再写一份算式）。图没到位时它会**自动退回活字**
        「残域灯阁」，所以"第一帧不是黑的、也不空"这条仍然成立。 */
     const cx = CV.W / 2;
-    const brandW = Math.min(CV.W * 0.72, 460 * CV.SCALE);
+    const brandW = Math.min(CV.W * 0.80, 520 * CV.SCALE);   // 2026-10-01 题字放大：0.72 → 0.80
     const brandH = U.brandTitleH(brandW);
     U.brandTitle(cx - brandW / 2, CV.H * 0.42 - brandH / 2, brandW);
     const ty = CV.H * 0.42 + brandH / 2;
@@ -195,7 +202,12 @@
      正文对比度不吃背景的亏（尺子 visual_audit ⑩ 的对比度那条两端各钉一次）。 */
   function mainVeil(c) {
     cover(c, 1, 0.5);
-    scrim(c, 0.72, 0.28, 0.86);
+    /* 2026-10-02（父亲大人：「主画面我看着好像**上下有色块**」）：
+       那不是图的问题，是这层 scrim —— 原来上下各压 0.72 / 0.86 的黑，
+       在手机上看就是两条很实的暗带（"色块"）。现在收成**轻渐隐**：
+       上 0.42 / 中 0.16 / 下 0.62 —— 题字与按钮照样读得清（题字自己还带投影），
+       但主视觉的天空与地面能透出来，整屏是一张画而不是"上黑条 + 图 + 下黑条"。 */
+    scrim(c, 0.42, 0.16, 0.62);
   }
   CV.veilPage('gate', mainVeil);
 })();

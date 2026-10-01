@@ -177,7 +177,18 @@ function cp(from, toRel) {
 files.filter((f) => /^img_scene_.+\.jpg$/.test(f)).forEach((f) => cp(f, 'story/scene/' + f));
 files.filter((f) => /^img_boss_W\d\d\.png$/.test(f)).forEach((f) => cp(f, 'story/boss/' + f));
 /* 主视觉：现有 mv-main-lamp.jpg 留着当兜底，新图另存一个名字（页面自己挑） */
-if (files.indexOf('img_main_kv.jpg') >= 0) cp('img_main_kv.jpg', 'story/kv/img_main_kv.jpg');
+/* ================= 主视觉 + 题字（2026-10-02 · 父亲大人） =================
+   「主画面和主题字**要放在主包**，该压就压……确保开机就能看到」。
+   它们落在 `brand/`（主包），**不进 story 分包**：
+     · `brand/kv-main.jpg`    1080×1920 · JPEG q70 · **265KB**
+     · `brand/logo-title.png` 1000×475  · 256 色量化 PNG · **135KB**（透明无损）
+   两张合计 400KB，主包仍在 4MB 之内。
+   ⚠️ 本脚本**不直接覆盖**这两张 —— 它们是要压过才能进包的成品。
+      原图只放到 `story-inbox/kv-raw/`（那份目录被 packOptions.ignore 排除，永远不进包），
+      要重新压就照下面打印的两条命令跑一次。这样不会哪天一跑脚本把 4.89MB 的原图
+      直接铺进主包（那会把主包顶爆）。 */
+if (files.indexOf('img_main_kv.jpg') >= 0) cp('img_main_kv.jpg', 'story-inbox/kv-raw/img_main_kv.jpg');
+if (files.indexOf('logo-title.png') >= 0) cp('logo-title.png', 'story-inbox/kv-raw/logo-title.png');
 
 /* ---------- SVG：编译 ---------- */
 const table = {};
@@ -204,4 +215,7 @@ if (!copies.length) console.log('  （这个目录里没有图片 —— 只重�
 console.log('编译 SVG ' + Object.keys(table).length + ' 个'
   + '（世界 ' + worldSvg.length + ' · 全局 ' + globalSvg.length + '）');
 console.log('产物：js/assets-icons.js  ' + Math.round(fs.statSync(path.join(ROOT, 'js/assets-icons.js')).size / 1024) + ' KB');
+console.log('主视觉 / 题字的压缩命令（成品在 brand/，要重压时手动跑这两条）：');
+console.log('  sips -s format jpeg -s formatOptions 70 --resampleWidth 1080 story-inbox/kv-raw/img_main_kv.jpg --out brand/kv-main.jpg');
+console.log('  python3 -c "from PIL import Image; im=Image.open(\'story-inbox/kv-raw/logo-title.png\').convert(\'RGBA\'); im=im.resize((1000, round(im.height*1000/im.width)), Image.LANCZOS); im.quantize(colors=256).save(\'brand/logo-title.png\', optimize=True)"');
 if (warn.length) console.log('⚠️  ' + warn.join(' / '));

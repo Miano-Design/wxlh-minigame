@@ -219,8 +219,13 @@
        · **首帧绝不能空** → 图没到位（或加载失败）时**退回活字**「残域灯阁」，
          而且**两种情况下占的高度完全一样**（`brandTitleH` 就是那个槽高），所以按钮不会在图到位的那一帧跳一下。
      `U.brandTitleH(w)` 给槽高、`U.brandTitle(x, y, w)` 画并返回同一槽高 —— 一处算式，两处调用。 */
-  const BRAND_SRC = 'story/kv/logo-title.png';
-  const BRAND_ASPECT = 1000 / 469;                 // 落位资源就是 1000×469（宽高比与 2953×1385 一致）
+  /* 2026-10-02（父亲大人：「主画面和主题字要放在主包……原本的 icon 文件夹被我删了，
+     你重新开个文件夹把主画面和主题字放进去吧，确保开机就能看到」）：
+     题字搬到 **`brand/`（主包）** —— 开机第一帧就能取到，不再依赖剧情分包下载。
+     分辨率 1000×475、**256 色量化 PNG（135KB，透明无损）**：
+     原来那份 4.89MB 的原图在分包里，一开机根本来不及，而且会把分包顶到 26MB。 */
+  const BRAND_SRC = 'brand/logo-title.png';
+  const BRAND_ASPECT = 1000 / 475;                 // 落位资源就是 1000×475
   let _brandImg = null, _brandOk = false;
   try {
     if (G.wx && typeof G.wx.createImage === 'function') {
@@ -233,19 +238,56 @@
   } catch (e) { _brandImg = null; }
   U.brandTitleH = function (w) {
     const byW = (w || CV.W * 0.86) / BRAND_ASPECT;
-    return Math.min(byW, CV.H * 0.22, 132 * CV.SCALE);
+    /* 2026-10-01（父亲大人：「题字放大一点、加个投影，现在有点不太突出」）：
+       两道上限各抬一档（22% → 28% 屏高、132 → 176）—— 原来 132*SCALE 在 375 档
+       正好是**卡死的那一条**（实算：h=126.8），题字被压得比文字块还小，
+       所以"不够突出"的根因是这条夹子，不是美术本身。 */
+    return Math.min(byW, CV.H * 0.28, 176 * CV.SCALE);
   };
   U.brandTitle = function (x, y, w) {
     const h = U.brandTitleH(w);
     const dw = Math.min(w, h * BRAND_ASPECT);      // 被高度夹过就等比缩宽，不改比例
     const cx = x + w / 2;
+    const c = CV.ctx;
+    const dh = dw / BRAND_ASPECT;
+    const dy = y + (h - dh) / 2;
+    /* ---------- 先垫一层"极淡的暗背"，再画题字（+ 投影）----------
+       题字是**透明底的金石质感**，压在同样偏暗的主视觉上会糊在一起 —— 这就是"不突出"的来源。
+       两步解决，**都不加框**（§十：不许做成卡牌式标题）：
+         ① 题字后面一层**极低透明度的径向暗场**（中心 18% → 边缘 0），把背景压下去一点；
+         ② 画图时带一层 `shadowBlur` 的**深色投影**（偏移往下 5px），把字从背景里"抬起来"。
+       ⚠️ 兜底活字走**同一套投影参数**，图到位/没到位两版观感一致。 */
+    /* ⚠️ 径向渐变**判返回值**，不是判方法在不在 —— 几把尺子的假画布是个 Proxy，
+       对**任何**未知方法都返回一个空函数（所以 `typeof === 'function'` 为真），
+       可调用结果是 `undefined`，`.addColorStop` 当场抛错（实测：把 gate 整页打断）。
+       真机 / 开发工具的 canvas 两个都有，这一条只是让尺子/老基础库不炸。 */
+    const rg = (typeof c.createRadialGradient === 'function')
+      ? c.createRadialGradient(cx, dy + dh * 0.5, 0, cx, dy + dh * 0.5, Math.max(dw, dh) * 0.72) : null;
+    if (rg && rg.addColorStop) {
+      c.save();
+      rg.addColorStop(0, CV.a(CV.C.shade, .18));
+      rg.addColorStop(1, CV.a(CV.C.shade, 0));
+      c.fillStyle = rg;
+      c.fillRect(cx - dw * 0.75, dy - dh * 0.35, dw * 1.5, dh * 1.7);
+      c.restore();
+    }
     if (_brandOk && _brandImg && _brandImg.width) {
-      CV.ctx.drawImage(_brandImg, cx - dw / 2, y + (h - dw / BRAND_ASPECT) / 2, dw, dw / BRAND_ASPECT);
+      c.save();
+      c.shadowColor = CV.a(CV.C.shade, .92);
+      c.shadowBlur = 16 * CV.SCALE;
+      c.shadowOffsetY = 5 * CV.SCALE;
+      c.drawImage(_brandImg, cx - dw / 2, dy, dw, dh);
+      c.restore();
       return h;
     }
-    /* 兜底：活字（备案名一字不差），纵向落在同一个槽里 */
+    /* 兜底：活字（备案名一字不差），纵向落在同一个槽里，**投影与图那一版同一套参数** */
+    c.save();
+    c.shadowColor = CV.a(CV.C.shade, .92);
+    c.shadowBlur = 16 * CV.SCALE;
+    c.shadowOffsetY = 5 * CV.SCALE;
     CV.text('残域灯阁', cx, y + h * 0.5 + CV.DISP.d3 * 0.28,
       { size: CV.DISP.d3, bold: true, align: 'center', color: CV.C.gold, ls: 4 });
+    c.restore();
     return h;
   };
 
