@@ -1052,7 +1052,7 @@
       c.drawImage(img, (CV.W - dw) / 2, (CV.H - dh) * 0.42, dw, dh);
     } else {
       const sky = c.createLinearGradient(0, 0, 0, CV.H);
-      sky.addColorStop(0, CV.C.bg2); sky.addColorStop(1, CV.C.bg);
+      sky.addColorStop(0, CV.C.bg2); sky.addColorStop(1, CV.C.bg);   // OK:程序化底图
       c.fillStyle = sky; c.fillRect(0, 0, CV.W, CV.H);
       const rg = (typeof c.createRadialGradient === 'function')
         ? c.createRadialGradient(CV.W * 0.5, CV.H * 0.66, 0, CV.W * 0.5, CV.H * 0.66, CV.W * 0.8) : null;

@@ -128,9 +128,7 @@
     c.save();
     /* 底：天空渐变（**这一层保证第一帧不是黑的** —— 图还没 load 完也有东西可看） */
     const sky = c.createLinearGradient(0, 0, 0, CV.H);
-    sky.addColorStop(0, CV.C.bg);
-    sky.addColorStop(0.62, CV.C.bg2);
-    sky.addColorStop(1, CV.a(CV.C.panel, .50));
+    sky.addColorStop(0, CV.C.bg);            // OK:程序化底图（图没到位时它才是画面本体）    sky.addColorStop(0.62, CV.C.bg2);        // OK:程序化底图    sky.addColorStop(1, CV.a(CV.C.panel, .50));
     c.fillStyle = sky;
     c.fillRect(0, 0, CV.W, CV.H);
     if (!cover(c, 1, 0.5)) {

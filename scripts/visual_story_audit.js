@@ -354,4 +354,34 @@ function pngInfo(buf) {
   }
 }
 
+/* ==========================================================================
+   2026-10-02（父亲大人：「类似这些的也都还没半透明啊，**你有没有好好查一下**」）
+   —— 把"全站不许有不透明面"做成**尺子**。
+   教训：前两轮我按**令牌名**猜（先只扫 panel 三族、再只扫"已经包过 CV.a 的"），
+   于是弹窗（bg2）、结算层（overlay/shade）、二级页返回键那一栏（drawPageHead 的裸色渐变）
+   一路漏过去 —— 用户连着三次圈出来。**按名字猜就会漏，按"形状"扫才不会漏。**
+   这条扫**形状**：凡是把"面"色当填充、当渐变端点、当圆角底的，必须包在 `CV.a(...)` 里。
+   不在扫描范围内的（**有理由，不是漏**）：
+     · 动作按钮的语义色（gold / danger / accent）—— §二十九 要的；
+     · 程序化底图与整帧底色（画面最底、底图之下，本来就该实）。
+   ========================================================================== */
+{
+  const files = fs.readdirSync(path.join(ROOT, 'js')).filter((f) => /^sc-.*\.js$|^(cv|uiw)\.js$/.test(f));
+  const SURFACE = 'bg|bg2|panel|panel2|panel3|overlay';
+  const bad = [];
+  files.forEach((f) => {
+    fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').split('\n').forEach((ln, i) => {
+      const code = ln.replace(/\/\/.*$/, '');
+      const m1 = new RegExp('fillStyle\\s*=\\s*CV\\.C\\.(?:' + SURFACE + ')\\b').test(code);
+      const m2 = new RegExp('addColorStop\\([^,]+,\\s*CV\\.C\\.(?:' + SURFACE + ')\\b').test(code);
+      const m3 = new RegExp('CV\\.round\\([^;]*,\\s*CV\\.C\\.(?:' + SURFACE + ')\\s*[,)]').test(code);
+      if (ln.indexOf('OK:程序化底图') >= 0) return;   // 用**原始行**判（code 已经把注释剥掉了）   // 显式豁免：画面最底的那层程序化底图
+      if (m1 || m2 || m3) bad.push(f + ':' + (i + 1));
+    });
+  });
+  t('㉒ 全站**没有不透明的面**（bg / bg2 / panel* / overlay 当底时必须走 CV.a(...)）',
+    bad.length === 0, '0 处裸色填充',
+    bad.length ? bad.slice(0, 8).join(' ') : '干净');
+}
+
 R.finish();

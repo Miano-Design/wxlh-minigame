@@ -1581,7 +1581,7 @@
       /* 背景：与整帧那条竖向渐变**同一条**（只铺这块矩形；渐变对象在同一个 user space 里定义，
          所以这一块的颜色与整帧画出来的那块完全一致，接缝看不出来）。 */
       const bg = c.createLinearGradient(0, 0, 0, CV.H);
-      bg.addColorStop(0, CV.C.bg2); bg.addColorStop(1, CV.C.bg);
+      bg.addColorStop(0, CV.a(CV.C.bg2, .50)); bg.addColorStop(1, CV.a(CV.C.bg, .50));   // 与整帧那条**同一条**（含透明度）
       c.fillStyle = bg;
       c.fillRect(rect.x, rect.y, rect.w, rect.h);
       c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
@@ -1742,7 +1742,7 @@
        原来"设了再还"的两句之间夹着画底、画返回键、画标题 —— 已改成 try/finally 包住。 */
     try {
     const bgGrad = c.createLinearGradient(0, 0, 0, CV.H);
-    bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+    bgGrad.addColorStop(0, CV.a(CV.C.bg2, .50)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .50));   // 2026-10-02 父亲大人：二级页返回键那一栏也要半透明
     c.fillStyle = bgGrad;
     /* 连顶栏下那 8px 一起盖住，再往下多铺一条**呼吸带**（`CV.HEAD_GAP`）——
        F8 ②：正文滚上来时不该贴着返回键的下沿。正文起点也同步让位（uiw.js 的 `U.pageHead`）。 */

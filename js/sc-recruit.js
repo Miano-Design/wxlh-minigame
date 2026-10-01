@@ -250,7 +250,7 @@
       const c = CV.ctx, y = CV.H - CV.safeBottom - CV.NAV_H - barH;
       /* 和页面同一条渐变铺底，滚过去的内容不会透出来（也不会切出一条缝） */
       const g = c.createLinearGradient(0, 0, 0, CV.H);
-      g.addColorStop(0, CV.C.bg2); g.addColorStop(1, CV.C.bg);
+      g.addColorStop(0, CV.a(CV.C.bg2, .50)); g.addColorStop(1, CV.a(CV.C.bg, .50));   // 2026-10-02 父亲大人：底部固定条也半透明
       c.fillStyle = g; c.fillRect(0, y, CV.W, barH);
       CV.hitMode = 'screen';
       const keep = U.y, keepIn = U.inCard;
