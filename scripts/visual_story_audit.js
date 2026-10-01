@@ -29,7 +29,10 @@ function loadStoryData() {
 }
 /* 去注释：判断"代码里有没有那句话"必须去掉注释 —— 那段说明本身就要写这些词 */
 function stripComments(s) {
-  return String(s).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  /* 块注释换成同数量的空白、**保留换行**（否则行号会整体前移，报出来的位置全错） */
+  return String(s)
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
 }
 
 const SD = loadStoryData();

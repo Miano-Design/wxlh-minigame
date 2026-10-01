@@ -91,6 +91,10 @@
       },
       {
         "type": "folder",
+        "value": "story/icons-src"
+      },
+      {
+        "type": "folder",
         "value": "cloudfunctions"
       },
       {

@@ -1444,7 +1444,9 @@
          把实情写在面板上，免得下一个人以为是按钮坏了。 */
       const adLeft = (G.AD && G.AD.totalLeft) ? G.AD.totalLeft() : null;
       U.hint(adLeft === null ? '广告点位：本环境没有广告模块'
-        : ('广告点位今日还剩 ' + adLeft + ' / ' + ((G.AD && G.AD.totalCap) || 20) + '（配额表在 wx-adapter）'), 0);
+        : ((G.AD && G.AD.totalUnlimited)
+          ? '广告点位：全局总闸**不限次数**（各点位日配额表在 wx-adapter）'
+          : ('广告点位今日还剩 ' + adLeft + ' / ' + ((G.AD && G.AD.totalCap) || 20) + '（配额表在 wx-adapter）')), 0);
     });
   });
   CV.on('gm_max', function () {

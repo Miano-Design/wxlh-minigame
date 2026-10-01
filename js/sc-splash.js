@@ -38,18 +38,39 @@
      当时只做了合成仿真（见 岗位回单/AI视觉工程师-主视觉真图落地.md 第七节），没在模拟器里看过。
      网页版那边不受影响（CSS 走 HTTP，中文名正常），所以**两端文件名可以不同**，
      "两端同一张图"改由**字节一致（sha256）**来钉（尺子 visual_audit ⑦ / mv_audit ⑧）。 */
-  const SRC = 'icons/mv-main-lamp.jpg';
-  let img = null, imgOk = false;
-  try {
-    if (G.wx && typeof G.wx.createImage === 'function') {
+  /* ================= 2026-10-01（父亲大人 §三）· **正式主视觉上台** =================
+     正式 KV ＝ `story/kv/img_main_kv.jpg`（1080×1920，9:16，在 **story 分包**里）。
+     加载顺序（三段，缺一层才落下一层）：
+       ① 先 `wx.loadSubpackage({name:'story'})` 把分包拉下来（失败静默忽略）；
+       ② 取正式 KV —— 成功就是正式主视觉；
+       ③ 失败才退 **`icons/mv-main-lamp.jpg`**（896×1200，老图）——
+          它现在的定位是**极端兼容 fallback**，正常流程不会再主动显示它；
+       ④ 两张都不行 ⇒ 程序化"深色底 + 唯一那盏暖光"（下面 gate 那一支）。
+     ⚠️ 加载期**不要再跳回老图**：中途露的是 ④ 那层深色底 + 题字，观感是"灯还没点亮"，
+        不会出现"先出新图再闪回旧图"。 */
+  const SRC = ((G.STORYDATA && G.STORYDATA.KV_FILE) || 'story/kv/img_main_kv.jpg');
+  const LEGACY_SRC = 'icons/mv-main-lamp.jpg';
+  let img = null, imgOk = false, legacyTried = false;
+  function loadImg(src) {
+    try {
+      if (!G.wx || typeof G.wx.createImage !== 'function') return;
       img = G.wx.createImage();
       /* 图到位之后**补重画一帧**：主画面（gate）这一类页面不是每秒重画的（只有灯阁首页在跳秒），
          图晚到一步就会一直停在"只有底色"的那一帧上（实测：模拟器 2.5 秒截图里主视觉是空的）。 */
       img.onload = function () { imgOk = true; try { CV.render(); } catch (e) {} };
-      img.onerror = function () { imgOk = false; };
-      img.src = SRC;
-    }
-  } catch (e) { img = null; }
+      img.onerror = function () {
+        imgOk = false;
+        if (!legacyTried) { legacyTried = true; loadImg(LEGACY_SRC); }   // 极端兼容：退回老主视觉
+      };
+      img.src = src;
+    } catch (e) { img = null; imgOk = false; }
+  }
+  try {
+    if (G.wx && G.wx.loadSubpackage) {
+      /* 分包没配 / 拉不动都**不许影响开机**：失败就当作"正式 KV 拿不到"，走老图或程序化底 */
+      G.wx.loadSubpackage({ name: 'story', success: function () { loadImg(SRC); }, fail: function () { loadImg(SRC); } });
+    } else loadImg(SRC);
+  } catch (e) { loadImg(SRC); }
 
   /* cover 铺法：短边贴满、长边溢出裁掉（与网页版 `background-size: cover` 同一条口径）。
      底图的构图是"主体靠右、脚踩下三分之一"，所以**取中偏下**比取正中最经得起裁。 */
@@ -121,7 +142,7 @@
     }
     scrim(c, 0.72, 0.28, 0.86);
 
-    /* 品牌：**题字图**（父亲大人自制 `icons/logo-title.png`）＋ 副题 ＋ 加载条 ＋ 版本。
+    /* 品牌：**题字图**（父亲大人自制 `story/kv/logo-title.png`）＋ 副题 ＋ 加载条 ＋ 版本。
        V1.1.11：原来这两行都是活字；现在上面那行换成他的图（`U.brandTitle`，
        与主画面 gate 同一处出口 —— 不许在这里再写一份算式）。图没到位时它会**自动退回活字**
        「残域灯阁」，所以"第一帧不是黑的、也不空"这条仍然成立。 */

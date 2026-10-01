@@ -69,7 +69,9 @@
   function worldCard(icon, title, sub, tags, id, dim, bg, theme, state) {
     const top = U.y;                         // 网页版 .world-card 实测 82（图标 52 + 上下内边距 14）
     const x = U.pad(), w = U.cw();
-    const box = 52 * CV.SCALE;
+    /* 2026-10-01（§六）：图标格 52 → 60、图标 24 → 36 —— 让**图标成为世界卡的视觉锚点**
+       （`[大图标] [世界名/进度/难度] [箭头]`），而不是"一个小 icon + 一大段字"。 */
+    const box = 60 * CV.SCALE;
     const tx = x + 12 * CV.SCALE + box + 12 * CV.SCALE;   // 文字块左沿（图标格右边 12）
     const tw = CV.measure(title, CV.FS.f1, true);
     const tgs = tags || [];
@@ -93,8 +95,11 @@
     /* 未解锁的世界：整张卡压暗（网页版 .world-card 加了 opacity:.45），不只是标题变灰 */
     if (dim) CV.ctx.globalAlpha = 0.45;
     CV.card(x, top, w, h);
+    /* §五：**不再按世界主题铺卡片底色**（36 种彩底像"彩色地图按钮"，与正式场景图不搭）。
+       统一走中性表面色（深炭黑/冷灰黑），层级差只靠 `panel3` / `panel2` 那一档 ——
+       主题色只留给**图标、选中、重要节点**用。 */
     CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.C.panel3, CV.C.line);
-    worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.DISP.d2,
+    worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.AICO.world * CV.SCALE,
       CV.worldIconColor(theme, state || (dim ? 'locked' : 'idle')));
     /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
        顶点表与网页版同一份（D.FACTION_GLYPH），别在这儿另画一套形状。 */
@@ -178,7 +183,9 @@
       worldCard(icoOf(w), w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
         D.DIFFICULTY.map((d) => ({ t: d.name, on: diffAllCleared(w.id, d.id) })),
-        'w:' + w.id, false, D.worldTint(w.id), w.theme,
+        /* 底色：§五 —— 不再用 `D.worldTint(w.id)`（按主题生成的 36 种彩底），
+           统一中性表面；主题色只在图标与族形上出现。 */
+        'w:' + w.id, false, CV.C.panel3, w.theme,
         /* 世界图标的状态（§九）：这张图**普通档 12 关全通**＝已完成（低饱和暖灰），
            否则＝普通（偏冷灰白）。"选中/重要节点"这两档在世界详情页与 Boss 关用。 */
         diffAllCleared(w.id, 'normal') ? 'done' : 'idle');
@@ -212,10 +219,12 @@
          同一个世界在列表页和详情页必须看到**同一个色、同一个形** ——
          列表页上了色、点进去又变回纯文字，看着像两套界面。
          几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
-      const box = 40 * CV.SCALE, top = U.y, x = U.ix();
-      CV.round(x, top, box, box, CV.RADIUS,  D.worldTint(w.id), CV.C.line);
+      /* 详情页头同样中性底 + 更大的图标（§六：容器 40 → 50、图标 32） */
+      const box = 50 * CV.SCALE, top = U.y, x = U.ix();
+      CV.round(x, top, box, box, CV.RADIUS, CV.C.panel3, CV.C.line);
       /* 详情页这一格＝"你正在看的世界" ⇒ 状态 `current`（主题强调色） */
-      worldIco(icoOf(w), x + box / 2, top + box / 2, CV.DISP.d2, CV.worldIconColor(w.theme, 'current'));
+      worldIco(icoOf(w), x + box / 2, top + box / 2, CV.AICO.worldSm * CV.SCALE,
+        CV.worldIconColor(w.theme, 'current'));
       const gs = 11 * CV.SCALE;
       if (D.FACTION_GLYPH[w.theme]) {
         /* 角标亮度按**本格格底**现算（对本格底 ≥3:1 · V1.1.2）—— worldId 一定要传 */
@@ -344,14 +353,18 @@
          它不挤占"今日基础 10 次"，跨天清零 —— 否则"买来的次数用不掉"等于没给。 */
       const AD = G.AD;
       if (AD && AD.show) {
-        const adLeft = AD.left ? AD.left('sweep_plus') : 0;
+        /* ================= 2026-10-01（§十五/§十六）· 广告按钮**只读统一状态** =================
+           原来这里自己算 `AD.left('sweep_plus')`，于是出现过"点位还剩 1 次、全局 20 次已用完"
+           ⇒ UI 写「今日还剩 1 次」、点下去回「今天看广告的次数用完了」。
+           现在文案与禁用态**都来自 `AD.status('sweep_plus')`**（它同时看点位、总闸、弱网）。
+           （父亲大人本轮已把全局总闸改成不限次数，所以这条矛盾从根上没了；
+             但状态口留着 —— 以后任何一处配额变化，UI 都自动跟着变，不会再各算一套。） */
+        const adSt = AD.status ? AD.status('sweep_plus') : { ok: (AD.left ? AD.left('sweep_plus') : 0) > 0, text: '' };
+        const adTail = AD.quotaText ? AD.quotaText('sweep_plus') : '';
         U.space(CV.SP[1]);
         U.btnRow([{
-          /* V1.0.4 · R3（父亲大人 09-27：「弱网时那颗按钮写"网络不太好"」）：
-             文案走 `G.ADWEAK.label` 这一处判定（判定在 wx-adapter，别处不自己写一份）。 */
-          label: (G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 扫荡 +10 次（今日还剩 ' + adLeft + ' 次）')
-            : '📺 看广告 · 扫荡 +10 次（今日还剩 ' + adLeft + ' 次）'),
-          style: 'ghost', id: adLeft > 0 ? 'ad_sweep_plus' : '', dis: adLeft <= 0,
+          label: '📺 看广告 · 扫荡 +10 次' + adTail,
+          style: 'ghost', id: adSt.ok ? 'ad_sweep_plus' : '', dis: !adSt.ok,
         }]);
       }
     }

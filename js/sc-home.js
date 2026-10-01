@@ -815,13 +815,14 @@
          演练期（资质未下）点了**直接发奖**，按钮长相照旧（他要的是"按钮和位置先留出来"）。 */
       const AD = G.AD;
       if (AD && AD.show) {
-        const leftN = AD.left ? AD.left('idle_boost') : 0;
+        /* 2026-10-01（父亲大人 §十六）：文案与禁用态**统一读 `AD.status('idle_boost')`** ——
+           它同时看点位配额 / 全局总闸 / 弱网，所以不会出现"写着还剩 1 次、点下去说没了"。 */
+        const adSt = AD.status ? AD.status('idle_boost') : { ok: (AD.left ? AD.left('idle_boost') : 0) > 0, text: '' };
+        const adTail = AD.quotaText ? AD.quotaText('idle_boost') : '';
         U.space(CV.SP[1]);
         U.btnRow([{
-          /* V1.0.4 · R3（父亲大人 09-27 点单）：弱网时这颗变「网络不太好」（判定只在 G.ADWEAK 一处） */
-          label: (G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 加速 2 小时（今日还剩 ' + leftN + ' 次）')
-            : '📺 看广告 · 加速 2 小时（今日还剩 ' + leftN + ' 次）'),
-          style: 'ghost', id: leftN > 0 ? 'ad_idle_boost' : '', dis: leftN <= 0,
+          label: '📺 看广告 · 加速 2 小时' + adTail,
+          style: 'ghost', id: adSt.ok ? 'ad_idle_boost' : '', dis: !adSt.ok,
         }]);
         U.y = U.y;                       // btnRow 已经推进游标
       }

@@ -76,6 +76,17 @@
         comp（补偿）只在"广告**已经上线**了、但这一次拉不到"时用，上限 10/天；
         演练期（资质未下）点了**直接发奖**，既不占 comp、也照常记次数（不然"一天几次"的口径就假了）。 */
   const AD_TOTAL_CAP = 20;          // 资源点位总闸 / 天
+  /* ================= 2026-10-01（父亲大人拍板）· **全局总闸不限次数** =================
+     原话：「**全局广告总闸不限次数**」。
+     背景就是他实测到的那条 bug：扫荡那颗按钮显示"今日还剩 1 次"，点下去却回
+     「今天看广告的次数用完了」—— 因为**点位配额还有、全局 20 次已经用完**。
+     这一刀从根上解决：**全局不再设上限**（`totalLeft()` 恒为 Infinity，
+     `showRewarded` 不再查它）。于是"按钮上写几次"＝"真实还能看几次"，
+     UI 与判定不可能再对不上。
+     · `AD_TOTAL_CAP` 这个数**留着**（只作为统计/调试参考，`AD.totalCap` 仍可读）；
+     · 点位自己的每日配额（挂机 3 / 扫荡 3 / 高级池 10 / 签到 1 / 复活每场 1）**一个没动** ——
+       那是玩法节奏，不是防刷闸；时间权益类（离线翻倍 / 倍速 ×5）本来就不计总闸。 */
+  const AD_TOTAL_UNLIMITED = true;
   const AD_COMP_CAP = 10;           // 补偿上限 / 天（只在真广告拉不到时用）
   const FREE_SLOTS = ['offline_double', 'speed_x5'];   // 不计总闸、不限次数（时间权益 / 无资源）
   const LIMITS = {
@@ -167,7 +178,10 @@
     return ok;
   }
   function quotaLeft(slot) { const q = quotaLoad(); return Math.max(0, (LIMITS[slot] || 0) - (q.used[slot] || 0)); }
-  function totalLeft() { const q = quotaLoad(); return Math.max(0, AD_TOTAL_CAP - (q.total || 0)); }
+  function totalLeft() {
+    if (AD_TOTAL_UNLIMITED) return Infinity;
+    const q = quotaLoad(); return Math.max(0, AD_TOTAL_CAP - (q.total || 0));
+  }
   /* 记一次"用掉了"：日配额（复活按场记，不占日配额）＋ 总闸（时间权益两类不占） */
   function quotaUse(slot, perBattle) {
     const q = quotaLoad();
@@ -291,6 +305,7 @@
     const unlimited = FREE_SLOTS.indexOf(slot) >= 0;
     const req = new Promise(resolve => {
       if (!perBattle && !unlimited && quotaLeft(slot) <= 0) { resolve({ granted: false, reason: 'quota' }); return; }
+      /* 全局总闸：不限次数时（现在的口径）这一步永不拦人。留着分支是为了口径可回退。 */
       if (!unlimited && totalLeft() <= 0) { resolve({ granted: false, reason: 'total' }); return; }
       /* ① 演练期：直接发（父亲大人的口径："前期可以点了直接发奖励"） */
       if (!CAN_USE_AD) { quotaUse(slot, perBattle); resolve({ granted: true, reason: 'drill' }); return; }
@@ -388,8 +403,32 @@
     units: AD_UNITS,
     limits: LIMITS,
     left: quotaLeft,
+    /* ================= 2026-10-01（父亲大人 §十六）· **"能不能看"只此一处** =================
+       以前每个页面自己拼 `AD.left(slot) > 0`，于是"点位还有、全局没了"那种矛盾
+       就会变成「UI 说还有 1 次、点下去说用完了」。现在统一走 `AD.status(slot)`：
+       它一次看全 **点位配额 · 全局总闸 · 广告模块 · 弱网**，返回一个对象；
+       按钮的**文案与禁用态都从它来**，页面不许自己算。 */
+    status: function (slot, opts) {
+      const perBattle = !!(opts && opts.perBattle);
+      const unlimited = FREE_SLOTS.indexOf(slot) >= 0 || perBattle;
+      const quota = unlimited ? Infinity : quotaLeft(slot);
+      const total = totalLeft();
+      const weak = !!(G.ADWEAK && G.ADWEAK.block && G.ADWEAK.block());
+      if (quota <= 0) return { ok: false, reason: 'quota', quota: quota, total: total, weak: weak, text: '今日次数已用完' };
+      if (total <= 0) return { ok: false, reason: 'total', quota: quota, total: total, weak: weak, text: '今日广告额度已用完' };
+      return { ok: true, reason: '', quota: quota, total: total, weak: weak, text: '' };
+    },
+    /* 按钮上那句"（今日还剩 N 次）"——**唯一一处拼法**，页面直接拼在标签后面。 */
+    quotaText: function (slot, opts) {
+      const s = G.AD.status(slot, opts);
+      if (!s.ok) return '（' + s.text + '）';
+      if (s.weak) return '（网络不太好）';
+      if (s.quota === Infinity) return '';
+      return '（今日还剩 ' + s.quota + ' 次）';
+    },
     totalLeft: totalLeft,
     totalCap: AD_TOTAL_CAP,
+    totalUnlimited: AD_TOTAL_UNLIMITED,
     compCap: AD_COMP_CAP,
     compLeft: () => Math.max(0, AD_COMP_CAP - quotaLoad().comp),   // 调试/尺子用（补偿还剩几次）
     show: showRewarded,

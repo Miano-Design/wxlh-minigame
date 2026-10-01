@@ -24,8 +24,18 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
-const SRC = process.argv[2] || process.env.ASSETS ||
-  path.resolve(ROOT, '../游戏素材/RESYU_VISUAL_ASSETS');
+/* ================= 素材来源（2026-10-01 · 父亲大人 §三十一） =================
+   **优先读仓库里的 `story/icons-src/`**（60 个 SVG 源文件已经收进来了）——
+   这样 clone 仓库就能**直接重跑本脚本**重新生成 `js/assets-icons.js`，链路自洽。
+   开发机上那份 `游戏素材/RESYU_VISUAL_ASSETS/`（含 19 张图片）只作 **fallback**：
+   图片不在仓库里（22MB，且它们已经在 story/ 各就各位），要重跑图片那一段时才需要它。
+   ⚠️ `story/icons-src/` 在 `project.config.json` 的 `packOptions.ignore` 里 —— 它是**设计源**，
+     不进小游戏包（分包根目录里放什么都算分包内容，得显式排除）。 */
+const ARG = process.argv[2] || process.env.ASSETS || '';
+const SVG_DIR = path.resolve(ROOT, 'story/icons-src');
+const SRC = ARG || (fs.existsSync(SVG_DIR) && fs.readdirSync(SVG_DIR).some((f) => /\.svg$/i.test(f))
+  ? SVG_DIR
+  : path.resolve(ROOT, '../游戏素材/RESYU_VISUAL_ASSETS'));
 
 /* ===================== ① 路径解析（M/L/H/V/C/S/Q/T/Z，绝对+相对） ===================== */
 function tokenize(d) {
@@ -190,6 +200,7 @@ fs.writeFileSync(path.join(ROOT, 'js/assets-icons.js'), head + body);
 console.log('素材目录：' + SRC);
 console.log('复制图片 ' + copies.length + ' 个：');
 copies.forEach((c) => console.log('  ' + c));
+if (!copies.length) console.log('  （这个目录里没有图片 —— 只重建图标表；19 张图片已经在工程里了）');
 console.log('编译 SVG ' + Object.keys(table).length + ' 个'
   + '（世界 ' + worldSvg.length + ' · 全局 ' + globalSvg.length + '）');
 console.log('产物：js/assets-icons.js  ' + Math.round(fs.statSync(path.join(ROOT, 'js/assets-icons.js')).size / 1024) + ' KB');

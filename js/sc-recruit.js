@@ -160,13 +160,13 @@
            （`recruit` 页的整体入口就在解锁门后，见 sc-home 的 open_recruit）。
            抽卡走 `Core.adRecruitAdv()`（内部复用 `recruitOnce(noCost)`，与付费抽同一段出率/保底）。 */
         if (pid === 'advanced' && G.AD && G.AD.show) {
-          const adLeft = G.AD.left ? G.AD.left('recruit_adv') : 0;
+          /* 2026-10-01（§十六）：文案与禁用态统一读 `AD.status('recruit_adv')` */
+          const adLeft = G.AD.status ? G.AD.status('recruit_adv') : { ok: (G.AD.left ? G.AD.left('recruit_adv') : 0) > 0 };
+          const adTail = G.AD.quotaText ? G.AD.quotaText('recruit_adv') : '';
           U.space(CV.SP[1]);
           U.btnRow([{
-            /* V1.0.4 · R3：弱网时这颗也变「网络不太好」（判定只在 G.ADWEAK 一处） */
-            label: (G.ADWEAK ? G.ADWEAK.label('📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）')
-              : '📺 看广告 · 免费 1 抽（今日还剩 ' + adLeft + ' 次）'),
-            style: 'ghost', id: adLeft > 0 ? ('ad_pull1:' + pid) : '', dis: adLeft <= 0,
+            label: '📺 看广告 · 免费 1 抽' + adTail,
+            style: 'ghost', id: adLeft.ok ? ('ad_pull1:' + pid) : '', dis: !adLeft.ok,
           }]);
         }
       });

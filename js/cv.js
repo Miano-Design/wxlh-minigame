@@ -111,6 +111,12 @@
     /* 非文字元素（图标 / 展示数字）**不属于排版层级**，但也不能随手写 19、22、30 ——
        它们各有名字，改规格只改这里一处（type_scale_audit 会挡住裸数字）。 */
     ICO: 19,                                    // 行首图标（网页版 .list-row 的 1.1875rem）
+    /* ================= 2026-10-01（父亲大人 §十四）· **正式矢量的实际渲染尺寸** =================
+       所有正式 SVG 的 viewBox 都是 24×24，但**屏幕上的尺寸要按用途定** ——
+       "24×24 的 viewBox"不等于"只能画 19px"。这一组就是那张对照表的唯一真源
+       （导航 / 货币 / 世界 / 血统 / 五行 / 主题 / 普通列表）。
+       ⚠️ 热区与视觉尺寸继续分离：图标画 23px，热区仍然按 `minHitPx` 放大到 44。 */
+    AICO: { nav: 23, cur: 23, world: 36, worldSm: 32, blood: 28, element: 26, theme: 26, list: 21 },
     DISP: { d1: 20, d2: 24, d3: 30, d4: 40 },   // 展示数字：战力 20 / 关卡图标 24 / 胜负大字 30 / 深井层数 40
     FONT: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
     /* V1.0.6（父亲大人 2026-09-24：「现在底部导航栏不对吧」）：
@@ -1624,15 +1630,26 @@
       const ww = CHIP_W;
       CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.C.panel, dashed ? CV.C.line2 : CV.C.line);
       const pad = 8 * CV.SCALE;                           // .cur-chip padding 左右 0.5rem
-      const iw = icon ? CV.measure(icon, CV.FS.md) : 0;
+      /* 2026-10-01（§八.1）：货币图标**不再跟正文一个等级** —— 图标 22px、数字 12~13px，
+         两者形成"图标为主、数字为辅"的一组。glyph 的 measure 就是它的 size，布局照旧。 */
       const iGap = icon ? 5 * CV.SCALE : 0;               // .cur-chip gap 0.3125rem
-      const room = ww - pad * 2 - iw - iGap;
+      /* 图标先按 §八.1 的 22px 起，**数字放不下就先缩图标** ——
+         底线是"绝不把数值砍成 99…"（`page_text_audit` 盯这一条；实测过：
+         固定 22px 时 320 档四等分格子里 4 位数字会被省略号砍掉）。 */
+      let icoSize = CV.AICO.cur * CV.SCALE;
+      let iw = icon ? CV.measure(icon, icoSize) : 0;
+      let room = ww - pad * 2 - iw - iGap;
+      while (icon && icoSize > 15 * CV.SCALE && CV.measure(label, CV.FS.sm, true) > room) {
+        icoSize -= 2 * CV.SCALE;
+        iw = CV.measure(icon, icoSize);
+        room = ww - pad * 2 - iw - iGap;
+      }
       const numSize = CV.measure(label, CV.FS.md) <= room ? CV.FS.md : CV.FS.sm;
       const txt = CV.fit(label, room, numSize, true);
       /* 内容整块居中；格子再窄也至少留出左内边距，不会贴边 */
       let tx = x + Math.max(pad, (ww - (iw + iGap + CV.measure(txt, numSize, true))) / 2);
       /* V9.6.134：图标也用货币表里的**专属色**（以前统一是白字，四种币看着一模一样） */
-      if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: CV.FS.md, color: color || CV.C.text }); tx += iw + iGap; }
+      if (icon) { CV.text(icon, tx, cy + CHIP_H / 2, { size: icoSize, color: color || CV.C.text }); tx += iw + iGap; }
       CV.text(txt, tx, cy + CHIP_H / 2, { size: numSize, color: dim ? CV.C.dim : CV.C.text, bold: true });
       x += ww + CHIP_GAP;
       return ww;
@@ -1714,7 +1731,9 @@
       /* 2026-10-01（§十二）：底栏四格图标走**各自的语义色**（灯阁暖金 / 残域冷蓝灰 /
          执灯者青灰 / 背包旧铜）；未选中的仍然压到 `dim` —— 状态靠透明度表达，不另做一套图。
          老图标（fallback）也吃这个色，所以"选了没有 `ico_nav_*` 的格子"观感不变。 */
-      CV.drawIcon(CV.iconOps('nav', t.id), c, cx, y + 22 * CV.SCALE, CV.ICO,
+      /* 尺寸走 §十四 那张表（导航 22~24）—— 原来用 `CV.ICO`（19，行首图标那一档），
+         正式资产上线后按 19 画显得"小豆子"，与场景图不搭。 */
+      CV.drawIcon(CV.iconOps('nav', t.id), c, cx, y + 22 * CV.SCALE, CV.AICO.nav * CV.SCALE,
         active ? CV.navColor(t.id) : CV.C.dim);
       CV.text(t.name, cx, y + 42 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       /* V9.6.145（"再审一遍"抓到的两边不一致）：网页版底栏有**红点**（主页=挂机有待领、

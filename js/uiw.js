@@ -210,7 +210,7 @@
 
   /* ================= 品牌题字（V1.1.11 · 父亲大人自制）=================
      父亲大人 09-27：「这个是我做的主画面标题，你把它放到主画面上，**换掉电脑字**，记得适配不同手机的屏幕」。
-     资源：`icons/logo-title.png`（原图 2953×1385 RGBA，**背景真透明**；已压到 1000×469 / 702KB ——
+     资源：`story/kv/logo-title.png`（原图 2953×1385 RGBA，**背景真透明**；已压到 1000×469 / 702KB ——
            原图 5.3MB 直接进包会把主包顶爆，主包上限 4MB）。
      ⚠️ **文件名必须是 ASCII**：`wx.createImage()` 加载中文名的资源一律 onerror（V1.0.5 实测，见 sc-splash.js 顶部）。
 
@@ -219,7 +219,7 @@
        · **首帧绝不能空** → 图没到位（或加载失败）时**退回活字**「残域灯阁」，
          而且**两种情况下占的高度完全一样**（`brandTitleH` 就是那个槽高），所以按钮不会在图到位的那一帧跳一下。
      `U.brandTitleH(w)` 给槽高、`U.brandTitle(x, y, w)` 画并返回同一槽高 —— 一处算式，两处调用。 */
-  const BRAND_SRC = 'icons/logo-title.png';
+  const BRAND_SRC = 'story/kv/logo-title.png';
   const BRAND_ASPECT = 1000 / 469;                 // 落位资源就是 1000×469（宽高比与 2953×1385 一致）
   let _brandImg = null, _brandOk = false;
   try {
