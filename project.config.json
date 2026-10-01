@@ -59,6 +59,10 @@
       },
       {
         "type": "file",
+        "value": "ISSUES-待检查.md"
+      },
+      {
+        "type": "file",
         "value": "_preview.html"
       },
       {
