@@ -1515,6 +1515,11 @@
       /* 下沿同理：页面自报的**底部固定条**（招募那种"继续招募/返回"）也从可见区里让出去
          —— 条是半透明的，内容透过去就是"影响阅读"。`CV.bottomBarH` 由页面登记。 */
       const clipBot = CV.H - CV.safeBottom - CV.NAV_H - 8 - (CV.bottomBarH || 0);
+      /* 记下**这一帧真正用的**三个固定条高度：帧尾要和"页面这一帧声明的"对比。
+         （页面是在 draw 里登记的 ⇒ 本帧用的一定是**上一帧**的值。同一个页面里换标签
+           ——比如背包从装备切到道具——吸顶条会突然变矮，用旧值裁就会把内容顶上切掉一块，
+          看着就是"错位、滑一下才好"。这不是靠"清状态"能根治的：换标签不走 reset/push/pop。） */
+      CV._clipUsed = { sticky: CV.stickyH || 0, head: headH, bottom: CV.bottomBarH || 0 };
       c.beginPath(); c.rect(0, clipTop, CV.W, Math.max(0, clipBot - clipTop)); c.clip();
       c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
       CV.y = 0;
@@ -1585,6 +1590,17 @@
     }
     /* 收尾：解除重入闸；期间有人请求过重画就补一帧（**放在 finally 之后**，确保坐标系已还原） */
     CV.rendering = false;
+    /* 2026-10-02（父亲大人：「背包从装备页跳到道具页显示就不正常，上划一下就正常了」）：
+       页面这一帧声明的固定条，和**本帧裁切用的那份**对不上 ⇒ 立刻补一帧
+       （下一帧的裁切就与页面对上了）。不让"错位的那一帧"留在屏幕上等玩家去滑一下。
+       判据只在**真的变了**的时候触发，正常浏览时一次都不会多画。 */
+    {
+      const u = CV._clipUsed || {};
+      const headNow = (CV.pageHead && CV.pageHead.h) ? (CV.pageHead.h + 8 + (CV.HEAD_GAP || 0)) : 0;
+      if (Math.abs((CV.stickyH || 0) - (u.sticky || 0)) > 0.5
+        || Math.abs(headNow - (u.head || 0)) > 0.5
+        || Math.abs((CV.bottomBarH || 0) - (u.bottom || 0)) > 0.5) CV.renderPending = true;
+    }
     if (CV.renderPending) {
       CV.renderPending = false;
       const RAF2 = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : function (fn) { return setTimeout(fn, 16); };
