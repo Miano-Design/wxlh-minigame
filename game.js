@@ -39,6 +39,9 @@ require('./js/sc-bag.js');     // 背包（道具 / 材料 / 装备 + 装备详�
 require('./js/sc-protag.js');  // 主角详情（角色页）
 require('./js/sc-battle.js');   // 战斗页（副本 / 深井 / 斗法台共用）
 require('./js/sc-dungeon.js');  // 残域：世界列表 → 世界详情 → 关卡 → 扫荡
+/* B 批（2026-10-01）：剧情系统 —— 内容表要先于系统层加载（系统层启动时读 STORYDATA）。 */
+require('./js/sc-story-data.js'); // 剧情内容（36 世界四段 + Boss + 人物 + 装备 + 12 母版映射）
+require('./js/sc-story.js');      // 小说式播放器 + 卷宗 + 程序化场景（占位背景）
 
 const CV = globalThis.CV, Core = globalThis.Core, G = globalThis;
 /* ⚠️ V1.0.6（P0 · 提审驳回 · 真机「游戏卡在此界面无法进一步游戏」）——

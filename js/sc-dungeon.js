@@ -343,6 +343,34 @@
         }]);
       }
     }
+    /* ================= B 批（2026-10-01）· 本章剧情（**放页尾**） =================
+       父亲大人：「推进世界 → 推进剧情」。每张图四段（进入 / 战前 / 残响 / 战后），
+       卷末六张图另有一条 Boss 线（W06/W12/W18/W24/W30/W36）。
+       纪律：**剧情只读**——不发奖励、不影响战斗、不改数值；未读的段用 primary 标出来。
+       标签一律两个字（进入 / 战前 / Boss）：320 那一档三颗并排只有 ~92px，长标签会被挤出画面。
+       ⚠️ **必须排在页尾**：本页的主动线是"选难度 → 点关卡 → 开打"，
+         把剧情卡插在难度页签前面会把它和关卡格整片挤下首屏（eqdetail 上已实测过一次，
+         `uiw` 对屏外卡只量不画）。"多读一段"不该顶掉"现在就要打这一关"。 */
+    {
+      const St = G.Story;
+      if (St && St.hasStory && St.hasStory(w.id)) {
+        const SDw = (G.STORYDATA && G.STORYDATA.WORLDS && G.STORYDATA.WORLDS[w.id]) || {};
+        U.card(function () {
+          const un = St.unseen(w.id);
+          U.h3('本章剧情', un ? (un + ' 段未读') : '已读完');
+          U.note('《' + (SDw.title || '') + '》　场景：' + St.sceneName(St.sceneOf(w.id)));
+          U.space(CV.SP[1]);
+          const row = [];
+          if (St.part(w.id, 'in')) row.push({ label: '进入', style: St.seen(w.id, 'in') ? 'ghost' : 'primary', id: 'story_world:' + w.id });
+          if (St.part(w.id, 'pre')) row.push({ label: '战前', style: St.seen(w.id, 'pre') ? 'ghost' : 'primary', id: 'story_world_pre:' + w.id });
+          if (St.bossOf(w.id)) row.push({ label: 'Boss', style: St.seenBoss(w.id) ? 'ghost' : 'primary', id: 'story_boss:' + w.id });
+          if (row.length) U.btnRow(row);
+          U.space(CV.SP[1]);
+          U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '打开卷宗', 'ghost', 'story_archive');
+          U.y += U.BTN_SM * CV.SCALE;
+        });
+      }
+    }
   });
 
   /* ================= ③ 扫荡（选关卡 + 选次数，照网页版 sweepModal） ================= */
@@ -534,7 +562,20 @@
       if (firstEver) { S.celebratedFirst = true; Core.save(); }
       setTimeout(function () { CV.toast(firstEver ? '🎉 首通 —— 这一段路你走过去了' : '🎉 首通！'); }, 320);
     }
-    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''), rewards, acts, worldId: wid };
+    /* ================= B 批（2026-10-01）· 结算第 3 层：剧情线索 =================
+       父亲大人：「胜利 → 奖励 → **剧情线索** → 下一步，这四层要非常清楚」。
+       **守关那一场优先给 Boss 线**（六卷锚点才有），其余给这张图的「战后」那一段。
+       不给奖励、不改流程：这一行只是把玩家**领到剧情页**。 */
+    let lore = null, loreId = null;
+    if (G.Story && G.Story.hasStory && G.Story.hasStory(wid)) {
+      const bossLine = isBoss && G.Story.bossOf(wid);
+      const unread = bossLine ? !G.Story.seenBoss(wid) : !G.Story.seen(wid, 'post');
+      lore = unread
+        ? ('剧情线索 · ' + (bossLine ? (G.Story.bossOf(wid).name + ' 之后') : (G.Story.titleOf(wid) || '')))
+        : '剧情线索 · 这一段已经读过了';
+      loreId = bossLine ? ('story_boss_after:' + wid) : ('story_world_post:' + wid);
+    }
+    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''), rewards, acts, worldId: wid, lore: lore, loreId: loreId };
   }
 
   function fightWave() {

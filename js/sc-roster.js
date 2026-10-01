@@ -377,6 +377,29 @@
         ['闪避', ((st.eva || 0) * 100).toFixed(1) + '%'], ['技能伤害', ((st.skillMult || 1) * 100).toFixed(0) + '%']]
         .forEach((r) => U.kv(r[0], String(r[1])));
     });
+    /* ================= B 批（2026-10-01）· 人物故事（**放页尾**） =================
+       父亲大人：「获得角色 → 获得人物故事」——故事是**用事件表现人物**，不是百科简介。
+       只给 `sc-story-data.js` 里写过的人显示（那张表只收"推动过事件"的角色）。
+       三则绑定：故事01 首次获得 / 故事02 成长 / 故事03 世界进度·星级·特殊事件。
+       ⚠️ **必须排在页尾**：伙伴详情这一页的主动线是"升级 / 技能 / 装备 / 属性"，
+         故事卡插在前面会把它们整片挤下去（eqdetail 上实测过一次，`uiw` 对屏外卡只量不画）。 */
+    {
+      const St = G.Story, chs = St && St.charOf && St.charOf(id);
+      if (chs) {
+        U.card(function () {
+          U.h3('人物故事', chs.role);
+          U.note('三则之间是这个人一路上的变化，不是简历。');
+          U.space(CV.SP[1]);
+          const row = [1, 2, 3].map(function (n) {
+            const ok = St.seenChar(id, n);
+            /* 标签只写"故事N" —— 320 那一档三颗并排只有 ~92px，带"· 未读"会被挤出画面
+               （uiw.js 的 btnRow 按自然宽分配、不换行）；未读用 primary 底色区分即可。 */
+            return { label: '故事' + n, style: ok ? 'ghost' : 'primary', id: 'story_char:' + id + ':' + n };
+          });
+          U.btnRow(row);
+        });
+      }
+    }
   });
   CV.on('back', () => CV.pop());
   /* 队伍操作：无损换将（挑人，继承等级/装备）、下阵 */

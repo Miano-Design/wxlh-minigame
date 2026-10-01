@@ -552,6 +552,15 @@
       return { label: v.name + ' ' + v.owned + '/' + v.total, style: codexVol === v.id ? 'primary' : 'ghost', id: 'codexvol:' + v.id };
     }));
     U.space(CV.SP[1]);
+    /* ================= B 批（2026-10-01）· 卷宗入口 =================
+       父亲大人：「卷宗」＝剧情自己的记录本。放这里是因为**灯录就是"灯阁的记录册"**，
+       卷宗是它旁边那一本（只记你看过的：世界段落 / Boss / 人物 / 装备）。
+       一行按钮，不动本页既有的两卷结构与顺序。 */
+    if (G.Story) {
+      U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '卷宗 · 剧情记录', 'ghost', 'story_archive');
+      U.y += U.BTN_SM * CV.SCALE;
+      U.space(CV.SP[1]);
+    }
     const vol = cs.volumes.filter(function (v) { return v.id === codexVol; })[0] || cs.volumes[0];
     U.card(function () {
       U.h3(vol.name, '收集进度 ' + vol.owned + ' / ' + vol.total);

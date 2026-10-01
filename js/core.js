@@ -122,6 +122,17 @@ window.Core = (function () {
       // V9.6.134：货币 8 → 4（见 data.js 顶部的四层说明）
       cur:  getProxied({ points: 0, otherworld: 0, holy: 0, rp: 0 }),
       chars:  getProxied({}),            // id → {lv, exp, star, skillLv:[1,1,1], bloodlineLv}
+      /* ================= B 批（2026-10-01）· 剧情进度 =================
+         父亲大人：「A 是世界观圣经，B 是实现层」——剧情只看过没看过，**不参与任何数值**。
+           · `w[worldId][part]` 世界段落（in/pre/mid/post）四个标记
+           · `b[worldId]`        Boss 剧情（六卷锚点）
+           · `c[charId]['s1'..'s3']` 人物故事三则
+           · `i[key]`            装备故事（套装 / 神装 / 核心道具 / 本命）
+           · `choice`            W36 终局选择：0 未选 / 1 熄灭 / 2 继续点燃
+         **放在这里＝老档由 fillDefaults 自动补齐、云同步跟着存档走**（不要再单开一个
+         localStorage 键 —— 那样手机与电脑的剧情进度就不通了）。
+         只增不删：以后加字段照这个形状往里塞，别改结构（改了老档就认不出来）。 */
+      story:  getProxied({ w:  getProxied({}), b:  getProxied({}), c:  getProxied({}), i:  getProxied({}), choice: 0 }),
       /* V9.6.129：碎片改成**按稀有度的公共池**（抽到谁都进同一个池子，不再各攒各的）。
          V1.1.14（0927-F）：**新档**从今天起按"每人一份 ＋ 满星后才转通用"记账（见 addChar），
          `shardPoolMerged` 这个"老档一次性合并"的标记**只在 newGame 里落**（不能写进 defaultState ——

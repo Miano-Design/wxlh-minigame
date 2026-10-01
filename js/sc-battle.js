@@ -945,6 +945,8 @@
     const chipsH = rewards.length ? chipLayout(rewards).height : 0;
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
+    /* B 批（2026-10-01）：剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
+    if (p.lore) total += 40 * CV.SCALE;
     if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
@@ -975,6 +977,27 @@
     if (rewards.length) {
       drawChips(rewards, cx, y);
       y += chipsH + 10 * CV.SCALE;
+    }
+    /* ================= B 批（2026-10-01）· 结算的第 3 层「剧情线索」=================
+       父亲大人：「胜利 → 奖励 → **剧情线索** → 下一步，这四层要非常清楚」。
+       只在"这一张图有剧情"时出现（由调用方传 `p.lore` / `p.loreId`），
+       位置夹在奖励胶囊与动作按钮之间——**不抢按钮的位置、不加奖励、不改流程**。
+       点「去看」= 进剧情页读这一段（回来结算面板还在，栈没被换掉）。 */
+    if (p.lore) {
+      const lw = Math.min(320 * CV.SCALE, U.iw());
+      const lh = 30 * CV.SCALE;
+      const lx = cx - lw / 2;
+      CV.round(lx, y, lw, lh, CV.RADIUS_SM, CV.a(CV.C.panel2, .92), CV.C.line2);
+      const tw = lw - (p.loreId ? 78 * CV.SCALE : 20 * CV.SCALE);
+      CV.text(CV.fit(p.lore, tw, CV.FS.md), lx + 10 * CV.SCALE, y + lh / 2, { size: CV.FS.md, color: CV.C.text2 });
+      if (p.loreId) {
+        const bw2 = 62 * CV.SCALE, bh2 = 22 * CV.SCALE;
+        const bx = lx + lw - bw2 - 6 * CV.SCALE, by = y + (lh - bh2) / 2;
+        CV.round(bx, by, bw2, bh2, bh2 / 2, CV.a(CV.C.gold, .16), CV.C.gold);
+        CV.text('去看', bx + bw2 / 2, by + bh2 / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
+        CV.hit(p.loreId, bx, by, bw2, bh2);
+      }
+      y += lh + 10 * CV.SCALE;
     }
     /* V9.6.128（父亲大人："把继续下一关的按钮放上面，收下奖励并返回放下面，
        上下排列、长度一致不就好了"）：

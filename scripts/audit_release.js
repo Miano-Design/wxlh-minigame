@@ -11,7 +11,9 @@ const { makeReport } = require('./_report');
 const R = makeReport('audit_release');
 
 /* ---------- ① 前五支：真跑，拿它们的退出码与 RESULT 行 ---------- */
-const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'audit_data'];
+/* B 批（2026-10-01）新增 `audit_story`（剧情内容表）：内容"对不上"不会崩，
+   但会在玩家那边变成空白页 —— 所以它和另外五支一样进发布总闸。 */
+const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'audit_data', 'audit_story'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

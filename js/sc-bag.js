@@ -877,6 +877,37 @@
         U.btnRow([{ label: '卸下（从 ' + Core.charName(wearer) + ' 身上）', style: 'ghost', id: 'eq_unequip' }]);
       }
     });
+    /* ================= B 批（2026-10-01）· 装备背景（**放页尾**） =================
+       父亲大人：「重要装备：一句背景。世界套装：一段套装故事。专属装备：必须和角色历史有联系。」
+       文案一律从 `sc-story-data.js` 取（**不在这里再抄一份**），本页只决定"怎么摆"：
+         · 本命（专属）→ SIG_<charId>　· 命格神装 → GOD_<血统>
+         · 六卷锚点世界套装 → SET_<worldId>（一段，可点开读）
+         · 其余 30 套世界套装 → 只有一句，直接写在卡里
+       查询顺序"越专属越优先"：本命 > 神装 > 套装。
+       ⚠️ **必须排在页尾**：插在属性卡前面会把「命格神装」那张卡挤出首屏 ——
+          `uiw` 对屏外卡**只量不画**，`equip_render_audit` 会当场判"神装卡没画出来"（已实测）。
+          "多读一段"本来也不该顶掉"看属性和重铸"这条主动线。 */
+    {
+      const St = G.Story, SDd = G.STORYDATA;
+      if (St && SDd && SDd.ITEMS) {
+        const longKey = (eq.charId && SDd.ITEMS['SIG_' + eq.charId]) ? 'SIG_' + eq.charId
+          : (eq.godSet && SDd.ITEMS['GOD_' + eq.godSet]) ? 'GOD_' + eq.godSet
+            : (eq.set && SDd.ITEMS['SET_' + eq.set]) ? 'SET_' + eq.set : null;
+        const shortLine = (eq.set && SDd.SET_LINE && SDd.SET_LINE[eq.set]) || null;
+        if (longKey) {
+          U.card(function () {
+            U.h3('装备故事', '读完会记进卷宗');
+            U.space(CV.SP[1]);
+            const ok = St.seenItem(longKey);
+            U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE,
+              ok ? '重读（已记入卷宗）' : '读这一段', ok ? 'ghost' : 'primary', 'story_item:' + longKey);
+            U.y += U.BTN_SM * CV.SCALE;
+          });
+        } else if (shortLine) {
+          U.card(function () { U.h3('装备背景'); U.note(shortLine); });
+        }
+      }
+    }
   });
   CV.on('eq_enh', function () {
     const r = Core.enhance(eqUid);
