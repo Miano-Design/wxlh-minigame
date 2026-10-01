@@ -520,7 +520,7 @@
   /* ---------- 画一帧战斗 ---------- */
   /* opt（V1.1.15 · 短屏压缩档）：{ av：头像直径, compact：名字与血量% 并一行 }
      —— 不传就是原口径（头像 50 ＋ 名字/血条/百分比三行），390/430 一个像素不变。 */
-  function unitCard(x, y, w, u, small, opt) {
+  function unitCard(x, y, w, u, opt) {
     const dead = u.hp <= 0;
     const compact = !!(opt && opt.compact);
     /* V1.0.1（父亲大人："我方人员的大小也很敌方的不一样，统一做成敌方那样的大小标准"）：
@@ -544,7 +544,22 @@
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
     } else CV.ctx.fillStyle = CV.C.panel3;
     u._cx = cx; u._top = y; u._av = av;   // 飘字要用：记住这一张卡画在哪
-    CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: small ? CV.FS.f1 : CV.DISP.d1, bold: true, align: 'center' });   // 头像首字：跟着层级 token 走（原来是裸 16/18）
+    /* ================= 康康 2026-10-01 · 头像框首字：敌我两侧**同一个算法、同一个字号** =================
+       父亲大人：「现在小屏幕机型战斗时敌我阵营的**头像框字体大小是不一样的**」。
+       真根因：这个函数的第 5 个参数 `small`，在调用处传的是 **`row.ally`** ——
+       于是同一张卡两种字：**我方 `CV.FS.f1`(15px)、敌方 `CV.DISP.d1`(20px)**。
+       V1.0.1 那次"统一成敌方那样的大小标准"只统一了**头像直径**（42/50→50）与**卡片宽度**（24%/30%→30%），
+       **这一行漏了**（`git show fe8f9d7` 里两处都改了、就它没改）。
+       而且它**在小屏上最显眼**：头像直径跟着 `kv` 缩（320 上 ≈0.82，压缩档还会再收一档），
+       字号却是写死不缩的（`CV.FS` 的 k 恒为 1、`CV.DISP` 更是连 kv 都不乘）——
+       头像越小，20 与 15 的**相对**差越大。
+       现在改成**与头像直径同源**：一个系数、一处定义，谁把头像收小，字就跟着收 ——
+       两侧永远相等，也不会在小头像里撑满。0.4 就是敌方原来那一档（50 × 0.4 = 20）
+       ⇒ 390/430 标准档**敌方的观感一个像素不变**，我方跟上；压缩档（头像 34~44）首字跟着落到 14~18。
+       做坏试验：把 `AV_LETTER` 那句换回 `small ? CV.FS.f1 : CV.DISP.d1` 式的分支 →
+       `detail_audit` ⑥ 的「敌我同一个字号」当场红。 */
+    const AV_LETTER = 0.4;
+    CV.text(String(u.name || '?').slice(0, 1), cx, y + av / 2, { size: av * AV_LETTER, bold: true, align: 'center' });
     if (dead) CV.ctx.globalAlpha = 1;
     /* ---------- 短屏压缩档：名字与血量% 并成一行、血条紧跟其下 ----------
        每行省 8px，四行就是 32px —— 与"头像收一档、排距收一档"一起，才换来 320×568 上
@@ -614,7 +629,9 @@
       const x0 = U.pad() + (U.cw() - (cw * n + g * (n - 1))) / 2;
       /* 标准档传 av: 0 → unitCard 走它原来的 50（390/430 一个像素不动）；
          压缩档才把反算出来的 av 传下去（同时也把"名字与血量% 并一行"打开）。 */
-      list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u, row.ally,
+      /* ⚠️ 这里原来多传了一个 `row.ally` 当"small"（见 unitCard 顶部那段 —— 就是敌我字号不一致的根因）。
+         首字的字号现在**只由头像直径决定**，不按阵营分档，所以这个参数整个撤掉。 */
+      list.forEach((u, i) => unitCard(x0 + i * (cw + g), row.y, cw, u,
         { av: lay.av, compact: lay.compact }));
     });
     /* 伤害 / 回复飘字（V9.6.28）：上升 26px + 淡出，带深色描边保证在任何底色上都看得清。
