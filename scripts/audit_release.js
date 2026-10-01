@@ -23,7 +23,9 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   /* R1.6 叙事轮新增：剧情 × 战斗矩阵 + 11 项叙事完整度（真跑 Boss 战拿阶段帧）。 */
   'story_battle_matrix',
   /* R1.7 新增：36 世界"各有一件事"的连续性 + 视觉资源真实使用路径。 */
-  'story_continuity_audit', 'story_visual_path_audit'];
+  'story_continuity_audit', 'story_visual_path_audit',
+  /* R1.8 玩家旅程轮：把"开机→W01→战斗→结算→返回→成长"用真函数走一遍。 */
+  'player_journey_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

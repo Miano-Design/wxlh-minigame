@@ -138,6 +138,44 @@
   }
   Story.choice = function () { const t = state(); return (t && t.choice) || 0; };
   Story.setChoice = function (v) { const t = state(); if (!t) return; t.choice = v | 0; mark('终局选择'); };
+  /* ================= R1.8 · 剧情状态的**唯一读取入口**（§七） =================
+     父亲大人：「不要继续出现 `S.story.xxx[wid]` 到处散落判断」。
+     现状是**只有 `sc-story-battle.js` 一处直接读**（其余都走 `Story.seen()`），
+     但"只有一处"不代表"没有重复定义"——那边自己也拼了一遍七档；
+     现在统一搬到这里，**别的模块一律调 `Story.stateOf(wid)`**，谁也不再自己拼。
+     七档与存储的对应关系（**没有新增第二个字段**）：
+       · UNSEEN        上面全假
+       · INTRO_SEEN    `story.w[wid].in`
+       · BATTLE_SEEN   `story.e[wid]`   ← 战前出场序列放过一次（R1.6 新增的唯一键）
+       · BOSS_SEEN     `story.b[wid]`
+       · EPILOGUE_SEEN `story.w[wid].post`
+       · CLUE_FOUND    同上（线索就是 post 那一拍的关键物件）
+       · CLEARED       `worlds[wid].stages.normal[11] > 0`
+     `e` 懒补（老档没有也不迁移）。 */
+  Story.stateOf = function (worldId) {
+    const t = state();
+    const S = G.Core && G.Core.S;
+    const out = { unseen: true, introSeen: false, battleSeen: false, bossSeen: false,
+      cleared: false, clueFound: false, epilogueSeen: false };
+    if (!t || !worldId) return out;
+    const w = (t.w || {})[worldId] || {};
+    out.introSeen = !!w.in;
+    out.battleSeen = !!(t.e || {})[worldId];
+    out.bossSeen = !!(t.b || {})[worldId];
+    out.epilogueSeen = !!w.post;
+    out.clueFound = !!w.post;
+    const st = S && S.worlds && S.worlds[worldId];
+    out.cleared = !!(st && st.stages && st.stages.normal && st.stages.normal[11] > 0);
+    out.unseen = !(out.introSeen || out.battleSeen || out.bossSeen || out.cleared);
+    return out;
+  };
+  /* 唯一的"战前出场序列已放"写入口（`BattleStory` 只调这一个） */
+  Story.markBattleSeen = function (worldId) {
+    const t = state();
+    if (!t || !worldId) return;
+    if (!t.e) t.e = {};
+    t.e[worldId] = 1;
+  };
 
   /* 一个世界"还没读的段数"——世界卡上的小红点用它 */
   Story.unseen = function (worldId) {

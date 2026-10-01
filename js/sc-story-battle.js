@@ -161,31 +161,17 @@ window.BattleStory = (function () {
        · CLEARED       = `S.worlds[wid].stages.normal[11] > 0`
        · UNSEEN        = 上面全假
      `e` 用**懒补**（老档没有那个键也没关系，读的时候补一个空表），不进 `defaultState`。 */
-  function flags() {
-    const S = Core() && Core().S;
-    if (!S || !S.story) return null;
-    if (!S.story.e) S.story.e = {};
-    return S.story;
-  }
+  /* R1.8（§七）：七档状态的**唯一读取入口搬到 `Story.stateOf()`**，这里只做转发 ——
+     谁都不许再自己拼一遍"哪些键算什么状态"。 */
   function stageState(worldId) {
-    const t = flags();
-    const S = Core() && Core().S;
     const St = Story();
-    const out = { UNSEEN: true, INTRO_SEEN: false, BATTLE_SEEN: false, BOSS_SEEN: false,
-      CLEARED: false, CLUE_FOUND: false, EPILOGUE_SEEN: false };
-    if (!t || !worldId) return out;
-    const w = (t.w || {})[worldId] || {};
-    out.INTRO_SEEN = !!w.in;
-    out.BATTLE_SEEN = !!(t.e || {})[worldId];
-    out.BOSS_SEEN = !!(t.b || {})[worldId];
-    out.EPILOGUE_SEEN = !!w.post;
-    out.CLUE_FOUND = !!w.post;
-    const st = S && S.worlds && S.worlds[worldId];
-    out.CLEARED = !!(st && st.stages && st.stages.normal && st.stages.normal[11] > 0);
-    out.UNSEEN = !(out.INTRO_SEEN || out.BATTLE_SEEN || out.BOSS_SEEN || out.CLEARED);
-    return out;
+    if (St && St.stateOf) return St.stateOf(worldId);
+    return { UNSEEN: true };   // 拿不到剧情层（尺子单独加载）时的兜底：当成"没看过"
   }
-  function markBattleSeen(worldId) { const t = flags(); if (t && worldId) t.e[worldId] = 1; }
+  function markBattleSeen(worldId) {
+    const St = Story();
+    if (St && St.markBattleSeen) St.markBattleSeen(worldId);
+  }
 
   /* 返回 null ＝ 不放（不是 Boss / 已经见过 / 没有数据）。
      `start` 由调用方给（战斗页在真正开打那一刻调），本函数只产出内容。 */
@@ -195,16 +181,25 @@ window.BattleStory = (function () {
     /* §二十：**放过一次就不再放**（挂了重来也不放 —— 那是同一件事看第四遍）。
        判据用 BATTLE_SEEN，不是 BOSS_SEEN：Boss 战后剧情是"通关后"才记的，
        用它当闸门的话，打输一次就等于"这一场演出永远没放过"。 */
-    if (stageState(worldId).BATTLE_SEEN) return null;
+    if (stageState(worldId).battleSeen) return null;
     if (St.seenBoss && St.seenBoss(worldId)) return null;          // 已经通关看过 Boss 线，也不再演
     const boss = St.bossOf(worldId);
-    if (!boss) return null;
     const w = (D().WORLDS || []).find((x) => x.id === worldId) || {};
+    /* ================= R1.8（§四 / §二十三）：**36 个世界都要有出场** =================
+       原来这里 `if (!boss) return null;` —— 而 `BOSS` 表只有 6 个锚点，
+       于是**另外 30 个世界根本没有 Boss 出场**（走查尺子量出来的：entrance=false）。
+       现在退到 ARC：`bossRole`（它是什么/为什么挡在这里）+ `bossTrigger`（出场那一刻发生了什么），
+       与 `WORLDS[].boss` 的名字拼成同一段出场 —— 六锚点仍用 `BOSS` 表（信息更全），一个字没动。 */
+    const arc = (SD().ARC || {})[worldId] || {};
+    const name = (boss && boss.name) || w.boss || '';
+    const say = (boss && boss.say) || arc.bossTrigger || '';
+    const inner = (boss && boss.inner) || arc.bossRole || '';
+    if (!name && !say) return null;
     return {
       worldId,
-      name: boss.name || w.boss || '',
-      say: boss.say || '',                                          // Boss 台词（角色层）
-      inner: boss.inner || '',                                      // 它为什么挡在这里（身份/目的层）
+      name: name,
+      say: say,                                                     // Boss 台词 / 出场那一刻（角色层）
+      inner: inner,                                                 // 它为什么挡在这里（身份/目的层）
       mech: w.mechanic ? ('【残域机制】' + w.mechanic) : '',        // 系统层：本世界的规则
       ms: ENTRANCE_MS,
     };
