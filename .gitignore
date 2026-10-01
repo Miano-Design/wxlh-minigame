@@ -7,3 +7,10 @@ project.private.config.json
 
 # 浏览器预览页的临时产物（用 scripts/preview-build.js 现场生成）
 _preview_bundle.js
+
+# ================= 康康 2026-10-01：仓库公开后，把"跟游戏本身无关的"挡在门外 =================
+# ① Playwright CLI 的调试快照 / console 日志（09-27 排查浏览器那条路留下的临时产物）
+.playwright-cli/
+# ② 内部工作规则（写的是 ~/.codex 那套流程与本室口令，不是游戏的一部分）。
+#    **只从仓库退出，本地文件照旧保留** —— 退掉不代表删掉。
+AGENTS.md
