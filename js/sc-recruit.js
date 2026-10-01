@@ -246,6 +246,11 @@
       : [{ label: '返回', style: 'ghost', id: 'rec_back' }];
     const barH = U.BTN_H * CV.SCALE + 16 * CV.SCALE;
     U.y += barH;                       // 让出底部条的高度
+    /* 2026-10-02（父亲大人：「二级界面这些可以滑动的你都得考虑到类似背包的容器问题」）：
+       这条底部固定条是**半透明**的（他要的 50%），所以滚过去的内容会从它后面透出来 ——
+       和背包那条一样的毛病。把它报给 cv.js，让**内容层的下沿停在它上面**：
+       滚的内容到这条线上就被切掉，不会从半透明的条后面透出来影响阅读。 */
+    CV.bottomBarH = barH;
     CV.pageOverlay = function () {
       const c = CV.ctx, y = CV.H - CV.safeBottom - CV.NAV_H - barH;
       /* 和页面同一条渐变铺底，滚过去的内容不会透出来（也不会切出一条缝） */

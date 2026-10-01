@@ -1262,7 +1262,7 @@
      键换成栈深之后，每一层各记各的，"返回恢复"才真的对得上"离开时那一层"。 */
   CV.scrollMemo = {};
   CV.reset = function (name, opts) {
-    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.stickyH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
+    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.bottomBarH = 0; CV.stickyH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
     CV.scrollMemo = {};                      // 换标签＝从头看：整条栈的记忆一起清掉（键是栈深，清空才算干净）
     /* ================= F6 #2（抢修单 0928 · 底栏四格各记各的现场，原来**是死代码**）=================
      父亲大人 09-27 深夜（底栏切回来不丢位置）：「点下面的导航按钮又得重新进去界面重新找」。
@@ -1323,7 +1323,7 @@
       CV.stack = m.stack.map(function (lvl) { return { name: lvl.name, opts: lvl.opts || {} }; });
       CV.scrollMemo = Object.assign({}, m.scrollMemo);
       CV.scroll = m.scroll || 0;             // 超出新内容高的部分由 render 里那一夹收回来
-      CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
+      CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.bottomBarH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
       CV.render();
       return;
     }
@@ -1352,13 +1352,13 @@
        被不同内容复用时会跳到很远的地方（伙伴详情那一类：一进去就在最底下）。
        现在 push 一律归零；"恢复"只发生在 pop（退回上一页）那一条路。 */
     CV.scroll = 0;
-    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.bottomBarH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   CV.pop = function () {
     CV.scrollMemo[CV.stack.length - 1] = CV.scroll || 0;     // 离开这一层：记住它看到哪（键＝栈深）
     if (CV.stack.length > 1) CV.stack.pop();
     CV.scroll = CV.scrollMemo[CV.stack.length - 1] || 0;     // 回到上一层：**恢复它原来看到的位置**
-    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.bottomBarH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
      中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
@@ -1369,15 +1369,24 @@
     CV.stack = [{ name: 'home', opts: {} }, { name: name, opts: opts || {} }];
     CV.scrollMemo = {};                      // 直接跳页＝新的一条路：按 A7① 归零，别带旧记忆
     CV.tabMemo = {};                         // 同上：这是一条全新的路，四格的旧现场一并作废
-    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null;
+    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.bottomBarH = 0; CV.pageHead = null;
     CV.render();
   };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
 
   /* ---------- 渲染一帧 ---------- */
-  CV.render = function () {
+ CV.render = function () {
     const c = CV.ctx;
     if (!c) return;
+    /* ================= 2026-10-02 · **渲染重入闸** =================
+       背景：图片的 `onload` 里会补一次 `CV.render()`（不补的话，那些"不是每秒重画"的页面
+       会一直停在"图还没到"的那一帧）。可**加载是同步完成的时候**（尺子的假 wx 就是同步
+       onload），这一句会落在**当前这次 render 的肚子里** —— 嵌套渲染 =
+       同一帧把页面画两遍 ⇒ 热区登记两遍 ⇒ 世界列表直接量出 8 张卡（`world_list_audit` 当场报红）。
+       现在：`CV.rendering` 为真时**不当场重画**，改成下一个 tick 补一帧（真机上本来就是异步，
+       观感完全一样；尺子里也不会再重复登记）。 */
+    if (CV.rendering) { CV.renderPending = true; return; }
+    CV.rendering = true;
     /* ⚠️ V1.0.6（P0 · 提审驳回：真机"卡在此界面无法进一步游戏"）——渲染入口的最后一道闸。
        真机 console 的三条栈（`CV.splash` / `onShow → relayoutNow` / 又一次重排）**全部**落在这里：
        `CV.render → realmState → S.player`，而那时 `S` 还是 null
@@ -1503,7 +1512,10 @@
             内容本来就在条的下面，所以看不到任何跳变；`reset/push/pop` 会清零。 */
       const headH = (CV.pageHead && CV.pageHead.h) ? (CV.pageHead.h + 8 + (CV.HEAD_GAP || 0)) : 0;
       const clipTop = CV.TOP + 8 + Math.max(CV.stickyH || 0, headH);
-      c.beginPath(); c.rect(0, clipTop, CV.W, CV.H - clipTop - CV.NAV_H - CV.safeBottom - 8); c.clip();
+      /* 下沿同理：页面自报的**底部固定条**（招募那种"继续招募/返回"）也从可见区里让出去
+         —— 条是半透明的，内容透过去就是"影响阅读"。`CV.bottomBarH` 由页面登记。 */
+      const clipBot = CV.H - CV.safeBottom - CV.NAV_H - 8 - (CV.bottomBarH || 0);
+      c.beginPath(); c.rect(0, clipTop, CV.W, Math.max(0, clipBot - clipTop)); c.clip();
       c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
       CV.y = 0;
       /* 父亲大人 09-27 深夜：吸顶顶栏**每一帧由当前这一页自己登记** ——
@@ -1570,6 +1582,13 @@
     } finally {
       /* 外层的还原也必须无条件执行（顶栏 / 吸顶条 / 覆盖层任何一处抛错都不能把坐标系留给下一帧） */
       c.restore();
+    }
+    /* 收尾：解除重入闸；期间有人请求过重画就补一帧（**放在 finally 之后**，确保坐标系已还原） */
+    CV.rendering = false;
+    if (CV.renderPending) {
+      CV.renderPending = false;
+      const RAF2 = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : function (fn) { return setTimeout(fn, 16); };
+      try { RAF2(function () { CV.render(); }); } catch (e) {}
     }
   };
 
