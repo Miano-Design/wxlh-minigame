@@ -313,6 +313,9 @@
     return (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || D.BATTLE_GEOM.floatMs); })
       || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
       || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; })
+      /* 残响也得算"还有活着的动效" —— 不然它刚淡到一半，帧循环就因为"没动效了"停下，
+         那一行会**僵在屏幕上不消失**（这是这类"借别人的循环"最容易漏的一条腿）。 */
+      || !!B.echo
       || (B.shakeUntil || 0) > now;
   }
   /* 动效帧画哪儿：能局部就局部，不能就退回整页（**绝不半块半块地画**）：
@@ -362,6 +365,52 @@
   function hitFx(uid) { if (uid) { B.hitAt[uid] = Date.now(); ensureFx(); } }
   function atkFx(uid) { if (uid) { B.atkAt[uid] = Date.now(); ensureFx(); } }
 
+  /* ================= 「残响」（mid）：**战斗内非阻塞**（2026-10-01 · 父亲大人二轮） =================
+     他原话：「`mid` 必须从`手动剧情页面`改为`战斗内非阻塞残响`……不 push 页面、不暂停战斗、
+     不要求玩家点击、不改变战斗结果。只显示【残响】+ 一句极短文字，持续约 1～2 秒然后淡出。
+     同一段只在首次满足条件时播放一次。」
+
+     触发点选 **这一场第一次打到 Boss**（`case 'damage'` 里目标单位带 `isBoss`）：
+       · 它**一定发生** —— 比"血量阈值"稳（Boss 被秒也照样触发），也比 `phase` 稳
+         （`phase` 只有部分 Boss 有，且要打到 70%/40%）；
+       · 它天然就是"战斗里的一个瞬间"（第一次交手），不是人为插的一个播报点。
+     两次保证：① 一进来先 `markSeen`（同一帧被调两次也不会播两遍）；
+               ② 借战斗自己那条帧循环淡出（**不新起定时器**，离场即停，不会留着烧电）。
+     不产生任何副作用：不改 B.res、不发奖、不动回合、不登记热区（**点不到，也挡不住操作**）。 */
+  const ECHO_MS = 1800;
+  function maybeEcho(uid) {
+    if (B.echo) return;
+    const u = B.units[uid];
+    if (!u || !u.isBoss) return;
+    const wid = (B.cfg && B.cfg.worldId) || '';
+    const St = G.Story;
+    if (!wid || !St || !St.hasStory || !St.hasStory(wid)) return;
+    if (St.seen(wid, 'mid') || !St.part(wid, 'mid')) return;
+    const line = St.midLine ? St.midLine(wid) : '';
+    if (!line) return;
+    St.markSeen(wid, 'mid');
+    B.echo = { text: line, at: Date.now() };
+    ensureFx();
+  }
+  /* 残响那一行：画在**战场上沿居中**（不盖阵容、不盖日志、不登记热区）。
+     淡入 0.25s → 停留 → 淡出，整段 1.8s。 */
+  function drawEcho() {
+    if (!B.echo) return;
+    const el = Date.now() - B.echo.at;
+    if (el > ECHO_MS) { B.echo = null; return; }
+    const k = Math.max(0, Math.min(1, el < 250 ? el / 250 : (ECHO_MS - el) / 450));
+    const c = CV.ctx;
+    const bw = Math.min(CV.W - U.pad() * 2, 340 * CV.SCALE);
+    const bh = 52 * CV.SCALE;
+    const bx = (CV.W - bw) / 2, by = CV.TOP + 20 * CV.SCALE;
+    c.save(); c.globalAlpha = k;
+    CV.round(bx, by, bw, bh, CV.RADIUS_SM, CV.a(CV.C.shade, .58), CV.a(CV.C.gold, .45));
+    CV.text('【残响】', bx + bw / 2, by + 15 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: CV.C.gold, ls: 1 });
+    CV.text(CV.fit(B.echo.text, bw - 20 * CV.SCALE, CV.FS.lg), bx + bw / 2, by + 34 * CV.SCALE,
+      { size: CV.FS.lg, align: 'center', color: CV.C.text2 });
+    c.restore();
+  }
+
   /* F6（R6 #11）：把引擎帧里的能量读成 0~100 的显示值；帧里没有那一项时返回 null
      （null ＝"这一帧没告诉我"，调用方退回界面自己的记账，见 applyFrame 里三处的用法）。 */
   function eFrom(v) { return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(100, v)) : null; }
@@ -391,6 +440,8 @@
       case 'damage': {
         const u = B.units[f.target];
         hitFx(f.target); atkFx(f.source || f.actor);      // 受击闪红 + 出手前冲
+        /* 残响（mid）的触发点就在这一行后面 —— 详见下面 `maybeEcho` 那段注释 */
+        maybeEcho(f.target);
         /* V9.6.68（资料 §8/§9）：轻击一点点震、暴击明显一点 + 一下 hitstop（见 step）；
            平时不震，免得整场都在抖（原文："如果普通攻击都在震屏，玩家很快就烦"。） */
         B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
@@ -836,6 +887,9 @@
         rect: fieldRect(FIELD_TOP, FIELD_BOTTOM_UNITS) };
       drawField(B.field);
     } else B.field = null;   // 波次卡那一段不画战场 → 动效帧也退回整页（见 fxPaint）
+    /* 残响层：画在战场上沿（`drawField` 之后 ⇒ 在人头上），但**不登记热区**：
+       点它没有反应，它也挡不住任何操作 —— 父亲大人要的"不打断、不要求点击"。 */
+    drawEcho();
 
     /* 右下角三颗按钮：撤离 / N×速度 / ×5
        标准档：单独一行，压在日志卡上面（V9.6.8 父亲大人定的站位）；
@@ -945,8 +999,8 @@
     const chipsH = rewards.length ? chipLayout(rewards).height : 0;
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
-    /* B 批（2026-10-01）：剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
-    if (p.lore) total += 40 * CV.SCALE;
+    /* 剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
+    if (p.lore) total += 44 * CV.SCALE;
     if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
@@ -978,23 +1032,30 @@
       drawChips(rewards, cx, y);
       y += chipsH + 10 * CV.SCALE;
     }
-    /* ================= B 批（2026-10-01）· 结算的第 3 层「剧情线索」=================
-       父亲大人：「胜利 → 奖励 → **剧情线索** → 下一步，这四层要非常清楚」。
-       只在"这一张图有剧情"时出现（由调用方传 `p.lore` / `p.loreId`），
-       位置夹在奖励胶囊与动作按钮之间——**不抢按钮的位置、不加奖励、不改流程**。
-       点「去看」= 进剧情页读这一段（回来结算面板还在，栈没被换掉）。 */
+    /* ================= 结算第 3 层：**「发现：一句线索」**（2026-10-01 二轮重做） =================
+       父亲大人原话：「『剧情线索』不要做成普通业务提示卡。改成 `发现：一句线索 [查看]`，
+       让它更像**战斗结束后玩家发现了一件东西**」。
+       所以这里不再是"一段剧情的入口"，而是**一行发现**：
+         · `发现` 做成小标签（不是标题行）；
+         · 正文是**那句话本身**（由调用方从战后那一拍的关键物件里取，见 `Story.clueOf`）；
+         · 右侧一颗「查看」—— 想看全段才点它（不点也不影响任何流程）。
+       位置仍夹在奖励胶囊与动作按钮之间：不抢按钮、不加奖励、不改流程。 */
     if (p.lore) {
       const lw = Math.min(320 * CV.SCALE, U.iw());
-      const lh = 30 * CV.SCALE;
+      const lh = 34 * CV.SCALE;
       const lx = cx - lw / 2;
       CV.round(lx, y, lw, lh, CV.RADIUS_SM, CV.a(CV.C.panel2, .92), CV.C.line2);
-      const tw = lw - (p.loreId ? 78 * CV.SCALE : 20 * CV.SCALE);
-      CV.text(CV.fit(p.lore, tw, CV.FS.md), lx + 10 * CV.SCALE, y + lh / 2, { size: CV.FS.md, color: CV.C.text2 });
+      const tagW = CV.measure('发现', CV.FS.sm) + 14 * CV.SCALE, tagH = 18 * CV.SCALE;
+      const tagX = lx + 8 * CV.SCALE, tagY = y + (lh - tagH) / 2;
+      CV.round(tagX, tagY, tagW, tagH, tagH / 2, CV.a(CV.C.gold, .16), CV.C.gold);
+      CV.text('发现', tagX + tagW / 2, tagY + tagH / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
+      const tw = lw - tagW - (p.loreId ? 74 * CV.SCALE : 16 * CV.SCALE) - 16 * CV.SCALE;
+      CV.text(CV.fit(p.lore, tw, CV.FS.md), tagX + tagW + 8 * CV.SCALE, y + lh / 2, { size: CV.FS.md, color: CV.C.text2 });
       if (p.loreId) {
-        const bw2 = 62 * CV.SCALE, bh2 = 22 * CV.SCALE;
+        const bw2 = 58 * CV.SCALE, bh2 = 22 * CV.SCALE;
         const bx = lx + lw - bw2 - 6 * CV.SCALE, by = y + (lh - bh2) / 2;
         CV.round(bx, by, bw2, bh2, bh2 / 2, CV.a(CV.C.gold, .16), CV.C.gold);
-        CV.text('去看', bx + bw2 / 2, by + bh2 / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
+        CV.text('查看', bx + bw2 / 2, by + bh2 / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
         CV.hit(p.loreId, bx, by, bw2, bh2);
       }
       y += lh + 10 * CV.SCALE;

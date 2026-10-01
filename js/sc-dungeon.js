@@ -343,32 +343,30 @@
         }]);
       }
     }
-    /* ================= B 批（2026-10-01）· 本章剧情（**放页尾**） =================
-       父亲大人：「推进世界 → 推进剧情」。每张图四段（进入 / 战前 / 残响 / 战后），
-       卷末六张图另有一条 Boss 线（W06/W12/W18/W24/W30/W36）。
-       纪律：**剧情只读**——不发奖励、不影响战斗、不改数值；未读的段用 primary 标出来。
-       标签一律两个字（进入 / 战前 / Boss）：320 那一档三颗并排只有 ~92px，长标签会被挤出画面。
-       ⚠️ **必须排在页尾**：本页的主动线是"选难度 → 点关卡 → 开打"，
-         把剧情卡插在难度页签前面会把它和关卡格整片挤下首屏（eqdetail 上已实测过一次，
-         `uiw` 对屏外卡只量不画）。"多读一段"不该顶掉"现在就要打这一关"。 */
+    /* ================= 本章剧情 · **主叙事入口**（2026-10-01 二轮重做） =================
+       父亲大人原话：「世界页现在把剧情当功能菜单……[进入][战前][残响][Boss] 这种四颗平铺按钮
+       会让玩家觉得"我要选择看哪一段剧情"，而不是"我正在经历一个事件"」，要求换成**一个主入口**，
+       并按下头三档动态显示：全部没看→「发现新线索」／看了一部分→「继续故事 · 还差 N 段」／
+       全看完→「重读本章」。
+       · 四颗平铺按钮**已删**（`visual_story_audit` 会盯着这条）；
+       · 「残响」**不再有入口** —— 它已经改成战斗内自动播（见 sc-battle 的残响层）；
+       · `in` / `pre` 也都不靠这里：分别在"第一次进世界"和"Boss/精英开打前"自动触发（见下面两处）。
+         所以这颗按钮的真实职责是"补看 + 重读"，不再承担"开剧情"这件事。
+       ⚠️ 仍必须排在**页尾**：本页主动线是"选难度 → 点关卡 → 开打"，
+         插在前面会把难度页签和关卡格整片挤下首屏（`uiw` 对屏外卡只量不画，eqdetail 上实测过）。 */
     {
       const St = G.Story;
       if (St && St.hasStory && St.hasStory(w.id)) {
         const SDw = (G.STORYDATA && G.STORYDATA.WORLDS && G.STORYDATA.WORLDS[w.id]) || {};
         U.card(function () {
-          const un = St.unseen(w.id);
-          U.h3('本章剧情', un ? (un + ' 段未读') : '已读完');
-          U.note('《' + (SDw.title || '') + '》　场景：' + St.sceneName(St.sceneOf(w.id)));
+          const un = St.unreadEntries(w.id);
+          U.h3('本章', '《' + (SDw.title || '') + '》');
+          U.note('场景：' + St.sceneName(St.sceneOf(w.id)));
           U.space(CV.SP[1]);
-          const row = [];
-          /* 四段都要有入口 —— 原来只挂了 进入 / 战前 / Boss，**「残响」（战斗中）根本点不到**
-             （这一段只在策划稿里存在，玩家一辈子看不到）。现在四颗一颗不少。
-             标签一律两个字，320 那一档四颗并排每颗约 69px，正好放得下。 */
-          if (St.part(w.id, 'in')) row.push({ label: '进入', style: St.seen(w.id, 'in') ? 'ghost' : 'primary', id: 'story_world:' + w.id });
-          if (St.part(w.id, 'pre')) row.push({ label: '战前', style: St.seen(w.id, 'pre') ? 'ghost' : 'primary', id: 'story_world_pre:' + w.id });
-          if (St.part(w.id, 'mid')) row.push({ label: '残响', style: St.seen(w.id, 'mid') ? 'ghost' : 'primary', id: 'story_world_mid:' + w.id });
-          if (St.bossOf(w.id)) row.push({ label: 'Boss', style: St.seenBoss(w.id) ? 'ghost' : 'primary', id: 'story_boss:' + w.id });
-          if (row.length) U.btnRow(row);
+          U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, St.entryLabel(w.id),
+            un > 0 ? 'primary' : 'ghost', 'story_main:' + w.id);
+          U.y += U.BTN_H * CV.SCALE;
+          U.hint('故事会自己发生：进图、开打、打完，都不用先来这里点。', 6 * CV.SCALE);
           U.space(CV.SP[1]);
           U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '打开卷宗', 'ghost', 'story_archive');
           U.y += U.BTN_SM * CV.SCALE;
@@ -458,6 +456,14 @@
   function startStage(worldId, diff, stageIdx) {
     const S = Core.S;
     const stage = stageIdx + 1;
+    /* ================= 开打前：把**压在世界页上面的剧情层**收掉 =================
+       战斗页的"由来路还原"记的是**入口那一刻的整条栈**（`B.back.stack`）。如果入口时
+       世界页上面还压着一层剧情（`in` 是"第一次进世界自动播"、`pre` 是"Boss 战前自动播"），
+       打完返回就会落回**剧情页**而不是世界页 —— audit_routes 的 ①②⑥ 当场四条报红（实测）。
+       正常操作走不到这里（剧情页盖着时点不到关卡格），但"直接派发 stage:*"这一类路径会；
+       两条路必须落到同一个结果上，所以在这里收口。
+       ⚠️ 只收 `story` 这一层：其它页面（世界页本身 / 残域列表）一律不许动。 */
+    while (CV.stack.length > 1 && CV.top().name === 'story') CV.stack.pop();
     run = {
       worldId, diff, stage, stageIdx,
       /* F6（R6 #10）：**worldId 必须传** —— `wavePlan(stage, worldId)` 按世界定波数
@@ -566,18 +572,17 @@
       if (firstEver) { S.celebratedFirst = true; Core.save(); }
       setTimeout(function () { CV.toast(firstEver ? '🎉 首通 —— 这一段路你走过去了' : '🎉 首通！'); }, 320);
     }
-    /* ================= B 批（2026-10-01）· 结算第 3 层：剧情线索 =================
-       父亲大人：「胜利 → 奖励 → **剧情线索** → 下一步，这四层要非常清楚」。
-       **守关那一场优先给 Boss 线**（六卷锚点才有），其余给这张图的「战后」那一段。
-       不给奖励、不改流程：这一行只是把玩家**领到剧情页**。 */
+    /* ================= 结算第 3 层：**「发现：一句线索」**（2026-10-01 二轮重做） =================
+       父亲大人原话：「『剧情线索』不要做成普通业务提示卡。改成 `发现：一句线索 [查看]`，
+       让它更像战斗结束后玩家发现了一件东西」。
+       所以这一层给的**不是段标题，是那句话本身**（`Story.clueOf` 取战后那一拍的**关键物件**：
+       "轨道图上亮起 36 个点。"）—— 玩家读到的是"我发现了什么"，不是"这里有一段剧情"。
+       不给奖励、不改流程；点「查看」才进剧情页。 */
     let lore = null, loreId = null;
     if (G.Story && G.Story.hasStory && G.Story.hasStory(wid)) {
-      const bossLine = isBoss && G.Story.bossOf(wid);
-      const unread = bossLine ? !G.Story.seenBoss(wid) : !G.Story.seen(wid, 'post');
-      lore = unread
-        ? ('剧情线索 · ' + (bossLine ? (G.Story.bossOf(wid).name + ' 之后') : (G.Story.titleOf(wid) || '')))
-        : '剧情线索 · 这一段已经读过了';
-      loreId = bossLine ? ('story_boss_after:' + wid) : ('story_world_post:' + wid);
+      const unread = !G.Story.seen(wid, 'post');
+      if (unread) { lore = G.Story.clueOf(wid, 'post'); loreId = 'story_world_post:' + wid; }
+      else { lore = '这一段已经看过了'; loreId = 'story_world_post:' + wid; }
     }
     return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''), rewards, acts, worldId: wid, lore: lore, loreId: loreId };
   }
@@ -685,6 +690,15 @@
       }
       view.worldId = w.id; view.diff = 'normal';
       CV.push('world');
+      /* ================= 剧情「自己发生」之一：**第一次进这个世界** =================
+         父亲大人 2026-10-01 二轮：「`in`——第一次进入世界时**自动进入**。玩家确认继续后
+         进入世界页/关卡。**不要要求玩家先去剧情菜单**」。
+         做法：先把世界页压上去，再把剧情压在世界页之上 —— 播完 pop 回来就是世界页，
+         返回键与滚动位置都还是对的（没有新开一条栈）。看过就不再打断。 */
+      const St = G.Story;
+      if (St && St.autoOn && St.autoOn() && St.hasStory && St.hasStory(w.id) && !St.seen(w.id, 'in')) {
+        St.openWorld(w.id, 'in');
+      }
     });
   });
   CV.on('dun_back', function () { CV.pop(); });
@@ -697,6 +711,22 @@
   for (let i = 0; i < 12; i++) {
     CV.on('stage:' + i, function () {
       if (!Core.stageUnlocked(view.worldId, view.diff, i)) { CV.toast('先通关前面的关卡'); return; }
+      /* ================= 剧情「自己发生」之二：**重要战斗/Boss 战前** =================
+         父亲大人 2026-10-01 二轮：「`pre`——重要战斗 / Boss 战前**自动触发**。不需要玩家手动点」。
+         判据只有一条：这一关是不是**守关 Boss（第 12 关）或精英关** —— 与关卡格里那两枚
+         ⚔/🔱 角标同一份数据（`Dun.wavePlan`），不另立一套"重要"标准。
+         每一张图**只打断一次**（`pre` 一旦读过就不再插）；剧情页右上角有「跳过」，
+         所以"自动"不会变成"逼着看"。播完 `onDone` 里接着开打 —— 玩家少点一次，流程一步不少。 */
+      const St = G.Story;
+      const isBoss = i === 11;
+      const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
+      if (St && St.hasStory && St.hasStory(view.worldId) && (isBoss || isElite)
+        && St.autoOn && St.autoOn()
+        && St.part(view.worldId, 'pre') && !St.seen(view.worldId, 'pre')) {
+        const wid = view.worldId, df = view.diff;
+        St.openWorld(wid, 'pre', { onDone: function () { startStage(wid, df, i); } });
+        return;
+      }
       startStage(view.worldId, view.diff, i);
     });
   }

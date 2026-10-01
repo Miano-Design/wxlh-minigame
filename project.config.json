@@ -87,6 +87,10 @@
       },
       {
         "type": "folder",
+        "value": "story-inbox"
+      },
+      {
+        "type": "folder",
         "value": "cloudfunctions"
       },
       {

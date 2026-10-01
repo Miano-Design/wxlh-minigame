@@ -49,6 +49,17 @@ async function waitPanel(maxMs) {
   return null;
 }
 /** 一个场景 = 摆好来源页与滚动 → 开打 → 结算 → 点返回 → 逐条比对 */
+/* ================= 2026-10-01（B 批二轮）：把"自动播的剧情层"关掉 =================
+   进世界第一次会**自动播一段剧情**（`in`，父亲大人二轮 §四），于是 `CV.dispatch('w:W01')`
+   之后栈顶是 `story`。真实玩家会读它 / 点跳过，然后才去点关卡 —— 本尺子的场景要照这个
+   顺序搭，否则量的是"玩家在读剧情时点了关卡格"这种**游戏里根本到不了的姿势**。
+   ⚠️ 这里**没有放宽任何断言**：① 仍然要求"打完回 world"、⑥ 仍然要求"‹ 回 dungeon"；
+      只是把"进世界之后那一步"补上（`sc-dungeon` 的 `startStage` 里也有同一层收口，
+      两条路必须落到同一个结果 —— 那一条是产品侧兜底，这一条是场景侧还原）。 */
+function closeAutoStory() {
+  while (CV.stack.length > 1 && CV.top().name === 'story') CV.pop();
+}
+
 async function scenario(opt) {
   fresh();
   G.Battle.run = function () { return opt.lose ? LOSE : WIN; };
@@ -82,14 +93,14 @@ async function scenario(opt) {
   /* ① 残域 → 世界 → 关卡 → 战斗 → 返回 */
   await scenario({
     name: '① 残域→世界→关卡→战斗→「收下奖励并返回」→ 回世界',
-    enter() { CV.reset('dungeon'); CV.dispatch('w:W01'); },
+    enter() { CV.reset('dungeon'); CV.dispatch('w:W01'); closeAutoStory(); },
     expect: 'world',
     start() { CV.dispatch('stage:0'); },
   });
   /* ② 同上，但**连打两场**（下一关）—— 任务书 §四"连续战斗" */
   await scenario({
     name: '② 残域→世界→关卡→战斗→再打一关→返回 → 仍回世界',
-    enter() { CV.reset('dungeon'); CV.dispatch('w:W01'); },
+    enter() { CV.reset('dungeon'); CV.dispatch('w:W01'); closeAutoStory(); },
     expect: 'world',
     start() { CV.dispatch('stage:0'); },
   });

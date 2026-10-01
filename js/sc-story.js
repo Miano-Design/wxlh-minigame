@@ -42,6 +42,18 @@
   }
   const Story = {};
   G.Story = Story;
+  /* ================= 自动播的开关（**只给尺子用**，2026-10-01 二轮） =================
+     线上默认就是**自动播**（`in` 进世界自动演、`pre` 守关前自动演）—— 这是父亲大人二轮 §四
+     要的那个手感。但工程里有四把"走全流程"的尺子（journey / guide_walk / quest_play /
+     battle_flow），它们量的是**自己那条流程**（能不能走到某个页面、引导会不会串台、27 步主线
+     能不能连贯），不是"剧情会不会自动弹出来"。
+     所以给它们一个开关：置 false ＝ 把那一层先收掉，跑它自己那条流程。
+     ⚠️ 这与既有的 `G.coachFor = noop`（尺子摘掉引导模态）是**同一条做法**，不是产品后门：
+        · 线上没有任何 UI / 存档 / 网络入口能把它改成 false；
+        · "剧情会自动播"这件事由 `visual_story_audit` ⑮（行为验证）与 `audit_routes` ①②
+          （剧情层之上开打、打完回世界）**单独钉住**，不会因为这条开关而没人测。 */
+  Story.autoPlay = true;
+  Story.autoOn = function () { return Story.autoPlay !== false; };
   Story.state = state;
   Story.part = function (worldId, part) {
     const w = WORLDS[worldId];
@@ -51,6 +63,48 @@
   Story.titleOf = function (worldId) { return (WORLDS[worldId] && WORLDS[worldId].title) || ''; };
   Story.sceneOf = function (worldId) { return SCENE[worldId] || 'god_hall'; };
   Story.sceneName = function (id) { return (SCENE_INFO[id] && SCENE_INFO[id].name) || '残域'; };
+  /* ================= 人物 / 装备的**场景归属**（2026-10-01 二轮） =================
+     父亲大人：「人物故事不能全部使用 ghost_house」「装备故事不能全部使用 tech_base」
+     —— 全挤在一个场景里，十几段故事看起来像同一张壁纸。
+     规则（按优先级，一处收口）：
+       ① 有"首次出现世界"的角色 → 用**那个世界自己的场景**（最准，也最省事）；
+       ② 否则按阵营方向兜底（他给的那张方向表）；
+       ③ 装备：世界套装→对应世界；专属→它主人的场景；神装→该血统的场景；核心道具→来源世界。
+     ⚠️ 场景 id 只能用 `SCENE_INFO` 里那 12 个（父亲大人：**不得自行创造新的 sceneId**）。 */
+  const FAC_SCENE = {
+    灰原: ['bio_swamp', 'tech_waste'],
+    雾乡: ['ghost_town', 'ghost_wall', 'mystic_ruins'],
+    锈港: ['tech_base', 'tech_waste'],
+    幽都: ['ghost_house', 'ghost_env', 'ghost_wall'],
+  };
+  /* 血统 → 场景（神装那条线） */
+  const BL_SCENE = {
+    狼人: 'bio_swamp', 泰坦: 'tech_base', 修真: 'mystic_ruins',
+    念动力: 'ghost_house', 绯红: 'ghost_wall', 科技: 'tech_waste',
+  };
+  /* 核心道具 → 来源世界（只列有明确出处的四条；其余留空 → 回落到灯阁大厅） */
+  const MAT_SCENE = {
+    MAT_铭魂砂: 'mystic_ruins', MAT_血髓晶: 'bio_swamp',
+    MAT_灯阁残片: 'god_hall', MAT_转生点: 'god_hall',
+  };
+  function charScene(id, ch) {
+    ch = ch || CHARS[id] || {};
+    if (ch.fw && SCENE[ch.fw]) return SCENE[ch.fw];            // ① 首次出现世界
+    const list = FAC_SCENE[ch.fac];                             // ② 阵营方向
+    if (list && list.length) return list[0];
+    return 'god_hall';
+  }
+  Story.charScene = charScene;
+  function itemScene(key) {
+    if (!key) return 'god_hall';
+    const s = String(key);
+    if (/^SET_(W\d\d)$/.test(s)) return Story.sceneOf(RegExp.$1);        // 世界套装 → 那个世界
+    if (/^SIG_(C\d{3})$/.test(s)) return charScene(RegExp.$1);           // 专属 → 主人的场景
+    if (/^GOD_(.+)$/.test(s)) return BL_SCENE[RegExp.$1] || 'god_hall';  // 神装 → 该血统
+    if (MAT_SCENE[s]) return MAT_SCENE[s];                              // 核心道具 → 来源世界
+    return 'god_hall';
+  }
+  Story.itemScene = itemScene;
   Story.bossOf = function (worldId) { return BOSS[worldId] || null; };
   Story.charOf = function (id) { return CHARS[id] || null; };
   Story.itemOf = function (k) { return ITEMS[k] || null; };
@@ -248,13 +302,64 @@
     c.restore();
   }
   /* 整屏底图（挂到 CV.veilPage）：背景 + 结构 + 氛围，带一点"镜头推移" */
+  /* ================= 正式场景图接入（2026-10-01 二轮） =================
+     父亲大人：「程序化背景只作为开发占位，不能继续作为最终视觉」「正式素材独立分包」
+     「素材审核通过后才接入」。
+     所以这里是一条**可插拔**的管线，图没到位时行为与今天完全一样：
+       ① 第一次进剧情 → 试着 `wx.loadSubpackage({name:'story'})`（分包没配 / 失败都**静默忽略**）；
+       ② 取 `STORYDATA.SCENE_FILE[sceneId]` 的那张图（默认 `story/scene/<id>.jpg`）；
+       ③ 加载成功 → cover 铺满 + 原有的雾/光/尘/压暗（**层不变，只换底**）；
+       ④ 加载失败 / 文件不在 / 平台没有 createImage → **回落程序化占位**（永不黑屏、永不抛错）。
+     换图 = 往 `story/scene/` 丢 12 张同名文件；**不改任何剧情代码**。 */
+  const IMG = {};                 // sceneId → {ok:true,img} | {fail:true} | {loading:true}
+  let subpkgTried = false;
+  function sceneFile(id) { return ((SD.SCENE_FILE || {})[id]) || null; }
+  function trySubpackage() {
+    if (subpkgTried) return;
+    subpkgTried = true;
+    try {
+      if (typeof wx === 'undefined' || !wx.loadSubpackage) return;
+      wx.loadSubpackage({
+        name: 'story',
+        success: function () { Object.keys(IMG).forEach(function (k) { delete IMG[k]; }); try { CV.render(); } catch (e) {} },
+        fail: function () { /* 没有这个分包：正在用主包/占位，什么都不做 */ },
+      });
+    } catch (e) { /* 老基础库没有这个 API：一样什么都不做 */ }
+  }
+  function ensureScene(id, onReady) {
+    const rec = IMG[id];
+    if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
+    const file = sceneFile(id);
+    if (!file || typeof wx === 'undefined' || !wx.createImage) { IMG[id] = { fail: true }; return false; }
+    try {
+      const img = wx.createImage();
+      IMG[id] = { loading: true };
+      img.onload = function () { IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
+      img.onerror = function () { IMG[id] = { fail: true }; };
+      img.src = file;
+    } catch (e) { IMG[id] = { fail: true }; }
+    return false;
+  }
+  Story.sceneReady = function (id) { const r = IMG[id]; return !!(r && r.ok); };
+  /* 一张场景图 cover 铺满（等比放大到恰好盖住，居中） */
+  function drawSceneCover(c, img, w, h) {
+    const iw = img.width || 1080, ih = img.height || 1920;
+    const k = Math.max(w / iw, h / ih);
+    const dw = iw * k, dh = ih * k;
+    c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
   Story.bg = function (c, sceneId, w, h, t) {
     const zoom = 1 + 0.012 * Math.sin(t * 0.05);         // 极缓的推近
     const ox = Math.sin(t * 0.037) * w * 0.008;          // 极缓的横移
     c.save();
     c.translate(w / 2 + ox, h / 2); c.scale(zoom, zoom); c.translate(-w / 2, -h / 2);
-    bgBase(c, sceneId, w, h);
-    bgStructure(c, sceneId, w, h, t);
+    /* 底：有正式图就用图，没有就程序化（**其余几层一字不变**） */
+    if (ensureScene(sceneId) && IMG[sceneId] && IMG[sceneId].img) {
+      try { drawSceneCover(c, IMG[sceneId].img, w, h); } catch (e) { bgBase(c, sceneId, w, h); }
+    } else {
+      bgBase(c, sceneId, w, h);
+      bgStructure(c, sceneId, w, h, t);
+    }
     bgAir(c, w, h, t, sceneId);
     c.restore();
     /* 上下压暗（给标题与台词留安全区；母版规格：上 22% / 下 26%） */
@@ -281,6 +386,7 @@
       actor: o.actor || null,               // 说话人 charId（画剪影）
       obj: o.obj || '',                     // 关键物件名（物件层）
       chapter: o.chapter || null,           // 章节转场（卷首第一次进入才带）
+      onDone: o.onDone || null,             // 播完要做的事（"自动播完接着开打"那条路用）
       kind: o.kind || 'world', meta: o.meta || {},
     };
     CV.push('story', { title: o.title || '剧情' });
@@ -288,33 +394,36 @@
     return true;
   };
   /* 一个世界的一段 */
-  Story.openWorld = function (worldId, part) {
+  Story.openWorld = function (worldId, part, opts) {
     const w = WORLDS[worldId]; if (!w) return false;
     part = part || 'in';
     const beats = Story.part(worldId, part); if (!beats) return false;
+    opts = opts || {};
     const idx = WORLDLIST.findIndex(function (x) { return x.id === worldId; }) + 1;
     const chNo = 'W' + String(idx);
     /* 章节转场：**卷首那一图、且这一卷是第一次进**才出卷名卡（看过就不再打断阅读）。
        判据用"这一段有没有读过"，不新增状态字段 —— 存档里那四个标记已经够用了。 */
     const vol = VOLS.filter(function (v) { return v.from === idx; })[0] || null;
-    const chapter = (vol && !Story.seen(worldId, 'in')) ? vol : null;
+    const chapter = (!opts.kind && vol && !Story.seen(worldId, 'in')) ? vol : null;
     return Story.play({
       beats: beats, title: w.title, chNo: chNo, scene: Story.sceneOf(worldId),
-      obj: w.obj, chapter: chapter, kind: 'world', meta: { worldId: worldId, part: part },
+      obj: w.obj, chapter: chapter, actor: opts.actor || null,
+      kind: opts.kind || 'world', onDone: opts.onDone || null,
+      meta: { worldId: worldId, part: part },
     });
   };
   /* Boss 两段（战前 / 战后）+ 内核 */
   Story.openBoss = function (worldId, which) {
-    const b = BOSS[worldId]; if (!b) return false;
-    const w = WORLDS[worldId] || {};
-    const beats = (which === 'after')
-      ? [{ k: 'd', who: b.name, s: b.after }, { k: 'n', s: '他留下的话：' + b.inner }, { k: 'n', s: '留下的谜团：' + b.mystery }]
-      : [{ k: 'd', who: b.name, s: b.say }, { k: 'n', s: '他的内核：' + b.inner }];
-    return Story.play({
-      beats: beats, title: b.name + ' · ' + (which === 'after' ? '战后' : '战前'),
-      chNo: worldId, scene: Story.sceneOf(worldId), obj: w.obj || 'Boss',
-      kind: 'boss', meta: { worldId: worldId, which: which || 'before' },
-    });
+    /* ================= 2026-10-01（父亲大人 · 二轮）：**删掉作者解释腔** =================
+       他原话：「`他的内核：` / `他留下的话：` / `留下的谜团：` 这些全部取消……禁止玩家看到
+       他的内核 / 人物核心 / 留下的谜团 / 世界观解释 / 作者总结」。
+       所以 Boss 线**不再是另一套文案**，而是直接播**这个世界的那一段**：
+         · 战前 → 世界的 `pre`（里面本来就只有 Boss 那句台词）
+         · 战后 → 世界的 `post`（最后一句话 → 关键物件 → 一个仍然没有答案的事实）
+       那句"内核"仍然留在 `STORYDATA.BOSS` 里当**设计备注**（`inner` / `mystery`），
+       **一个字都不许送进播放器** —— 玩家要自己得出那个结论。 */
+    const b = BOSS[worldId]; if (!b || !WORLDS[worldId]) return false;
+    return Story.openWorld(worldId, which === 'after' ? 'post' : 'pre', { kind: 'boss', actor: '@boss_' + worldId });
   };
   /* 人物故事（s1/s2/s3） */
   Story.openChar = function (id, n) {
@@ -323,7 +432,7 @@
     const beats = ch['s' + n]; if (!beats) return false;
     return Story.play({
       beats: beats, title: ch.name + ' · 故事 0' + n, chNo: ch.bl + ' · ' + ch.fac,
-      scene: 'ghost_house', actor: id, obj: ch.role, kind: 'char', meta: { id: id, n: n },
+      scene: charScene(id, ch), actor: id, obj: ch.role, kind: 'char', meta: { id: id, n: n },
     });
   };
   /* 装备故事（一条文字 → 两拍：物件 + 旁白） */
@@ -331,7 +440,7 @@
     const txt = ITEMS[key]; if (!txt) return false;
     return Story.play({
       beats: [{ k: 'n', s: txt }], title: title || '装备故事', chNo: '装备',
-      scene: 'tech_base', kind: 'item', meta: { key: key },
+      scene: itemScene(key), kind: 'item', meta: { key: key },
     });
   };
   /* 当前这一拍 */
@@ -421,6 +530,7 @@
   function finish() {
     if (!cur) return;
     const m = cur.meta || {};
+    const after = cur.onDone;
     if (cur.kind === 'world' && m.worldId) Story.markSeen(m.worldId, m.part);
     else if (cur.kind === 'boss' && m.worldId) Story.markBoss(m.worldId);
     else if (cur.kind === 'char') Story.markChar(m.id, m.n);
@@ -428,6 +538,9 @@
     cur = null;
     loop.stop();
     CV.pop();
+    /* 播完要做的事（"先看剧情、看完自动开打"那条路）—— 放在 pop **之后**：
+       先退回上一页（世界页），再启动战斗，栈才是对的。 */
+    if (typeof after === 'function') { try { after(); } catch (e) {} }
   }
   Story.skip = function () { finish(); };
 
@@ -535,7 +648,7 @@
           { size: CV.FS.sm, align: 'center', color: C.gold, ls: 3 });
         CV.text('《' + vol.name + '》', CV.W / 2, midY,
           { size: CV.FS.f2, bold: true, align: 'center', color: C.text, ls: 2 });
-        CV.text(vol.theme || '', CV.W / 2, midY + 24 * CV.SCALE,
+        CV.text(vol.line || '', CV.W / 2, midY + 24 * CV.SCALE,
           { size: CV.FS.sm, align: 'center', color: C.dim });
         c.restore();
         CV.hit('story_next', 0, top, CV.W, bottom - top);      // 点一下＝跳过转场
@@ -580,6 +693,22 @@
        不让它把整块文字顶到画面外面去 —— 从顶部起画，超出部分由内容层的裁剪收掉。
        正常文案永远走不到这里（现在最长的一拍在 320 档上只用掉不到两成高度）。 */
     if (y < top + 8 * CV.SCALE) y = top + 8 * CV.SCALE;
+    /* ================= 文字层：**不要"巨大黑色矩形对话框"**（2026-10-01 二轮） =================
+       父亲大人要的是「底部半透明暗色渐隐 + 文字 + 很轻的顶部细线」—— 让文字像出现在场景里。
+       画法：① 文字块背后一层**从透明渐到暗**的软底（不是实心圆角框）；
+             ② 上沿一条极细的低对比线（把文字区从场景里"提"出来，但不切一刀）。 */
+    {
+      const padY = 16 * CV.SCALE;
+      const gTop = Math.max(top, y - nameH - padY);
+      const g = c.createLinearGradient(0, gTop - 26 * CV.SCALE, 0, bottom);
+      g.addColorStop(0, CV.a(CV.C.shade, 0));
+      g.addColorStop(0.45, CV.a(CV.C.shade, .42));
+      g.addColorStop(1, CV.a(CV.C.shade, .72));
+      c.fillStyle = g;
+      c.fillRect(0, gTop - 26 * CV.SCALE, CV.W, bottom - gTop + 26 * CV.SCALE);
+      c.fillStyle = CV.a(C.text, .12);
+      c.fillRect(U.pad(), gTop - 14 * CV.SCALE, CV.W - U.pad() * 2, Math.max(1, CV.SCALE * 0.6));
+    }
     /* 关键物件层（⑥）：物件名做成一颗标签，挂在台词框上沿 */
     if (cur.obj && (b.k === 'o')) {
       const ow = CV.measure(cur.obj, CV.FS.sm) + 18 * CV.SCALE, oh = 20 * CV.SCALE;
@@ -739,11 +868,71 @@
   });
   Story.openArchive = function () { CV.push('story_archive', {}); };
 
+  /* ================= 世界页的**主叙事入口**（2026-10-01 二轮） =================
+     父亲大人：「删掉 [进入][战前][残响][Boss] 这种四颗平铺按钮作为主入口……
+     替换成一个主叙事入口」，并按状态动态显示：
+       全部没看 → 「发现新线索」／看了一部分 → 「继续故事 · 还差 N 段」／全看完 → 「重读本章」。
+     ⚠️ `mid`（残响）**不在这条入口的候选里** —— 它已经改成战斗内自动播（见 sc-battle），
+        在世界页给它留一颗按钮就等于"残响还是世界页的一个功能"，正是这一轮要拆掉的东西。
+        所以：候选只有 `in` → `pre` → `post`，`mid` 由战斗那边自己标。 */
+  const ENTRY_ORDER = ['in', 'pre', 'post'];
+  Story.nextEntry = function (worldId) {
+    const w = WORLDS[worldId]; if (!w) return null;
+    for (let i = 0; i < ENTRY_ORDER.length; i++) {
+      const p = ENTRY_ORDER[i];
+      if (w[p] && w[p].length && !Story.seen(worldId, p)) return p;
+    }
+    return ENTRY_ORDER.filter(function (p) { return w[p] && w[p].length; })[0] || null;
+  };
+  /* 这一段还没读的**入口段**有几段（只看 in/pre/post —— mid 在战斗里，不参与这里的计数） */
+  Story.unreadEntries = function (worldId) {
+    const w = WORLDS[worldId]; if (!w) return 0;
+    return ENTRY_ORDER.filter(function (p) { return w[p] && w[p].length && !Story.seen(worldId, p); }).length;
+  };
+  Story.entryLabel = function (worldId) {
+    const w = WORLDS[worldId]; if (!w) return '';
+    const total = ENTRY_ORDER.filter(function (p) { return w[p] && w[p].length; }).length;
+    const un = Story.unreadEntries(worldId);
+    if (un >= total) return '发现新线索';                 // 一段都没看
+    if (un > 0) return '继续故事 · 还差 ' + un + ' 段';   // 看了一部分
+    return '重读本章';                                    // 全看完
+  };
+  /* 从世界页按主入口进：opts.onDone 由调用方给（"看完接着开打"那条路） */
+  Story.openMain = function (worldId, opts) {
+    const p = Story.nextEntry(worldId);
+    if (!p) return false;
+    return Story.openWorld(worldId, p, opts || {});
+  };
+  /* 结算那一层要的"一句线索"：**优先进关键物件那一拍**（`o`），没有才退第一拍。
+     为什么这么挑：`o` 那一拍本来就是"玩家看到的东西"（轨道图上亮起 36 个点），
+     而 `n` 那一拍常常是判断句。线索要能当"发现"用，不能当结论用。 */
+  Story.clueOf = function (worldId, part) {
+    const list = Story.part(worldId, part || 'post');
+    if (!list) return '';
+    const o = list.filter(function (b) { return b.k === 'o' && b.s; })[0];
+    return withName((o || list[0]).s);
+  };
+  /* 战斗里那一条「残响」用哪句：**优先关键物件那一拍**（`o` 本来就是"你听见/看见的东西"），
+     没有才退第一拍。只取一句 —— 父亲大人要的是"一句极短文字"，不是把 mid 整段搬进去。 */
+  Story.midLine = function (worldId) {
+    const list = Story.part(worldId, 'mid');
+    if (!list) return '';
+    const o = list.filter(function (b) { return b.k === 'o' && b.s; })[0];
+    return withName((o || list[0]).s);
+  };
+
   /* ===================== 六、外部入口（页面上的按钮挂到这几个上） ===================== */
   CV.on('story_world:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'in'); });
   CV.on('story_world_pre:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'pre'); });
-  CV.on('story_world_mid:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'mid'); });
+  /* ⚠️ **这里没有 `story_world_mid`** —— 「残响」已经改成战斗内自动播（见 sc-battle 的残响层），
+     再在世界页留一颗手动入口就等于"残响仍是世界页的一个功能"，与这一轮的目地相冲。
+     `visual_story_audit` 会盯着这一条（世界页不许出现四段平铺按钮、不许有 mid 手动入口）。 */
   CV.on('story_boss:*', function (id) { Story.openBoss(String(id || '').slice(0, 3), 'before'); });
+  /* 世界页唯一的主叙事入口 */
+  CV.on('story_main:*', function (id) {
+    const wid = String(id || '').slice(0, 3);
+    Story.openMain(wid, { kind: 'world' });
+  });
   /* 结算页那两行「去看」：战后那一段 / Boss 战后那一段 */
   CV.on('story_world_post:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'post'); });
   CV.on('story_boss_after:*', function (id) { Story.openBoss(String(id || '').slice(0, 3), 'after'); });
