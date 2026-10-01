@@ -3741,6 +3741,41 @@ window.DATA = (function () {
   /* V1.1.4（A12 材料包 · 中品的来源）：《收口2》§3.2 = **周常 / 深井 / 异界商店**。 */
   /* V1.1.13（0927-E · 总监 §5.3 来源③）：周常全清 ＋**3 颗重铸石**（摊薄 0.43 颗/天，量小但每周都摸得到）。 */
   const WEEKLY_ALL_REWARD = { holy: 300, otherworld: 800, item: ['exp_xl', 'ticket_lim', 'matpack_mid', 'reforge_stone', 'reforge_stone', 'reforge_stone'] };
+  /* ================= 兑换码 / 新手礼包（2026-10-01 · 父亲大人点单）=================
+     父亲大人两步口径：
+       ·「不要调用 mp 后台，直接写在游戏里就行了，就当新手礼包让用户直接领了，
+          以后用户达标要做成 mp 后台的礼包码再改」
+       ·「每个码每个玩家只能领取一次哦」
+
+     为什么不能走官方那套（后台实测，不是推测）：微信「小游戏礼包」要先接**消息推送**回调，
+       而且**新建礼包要 累计注册用户 > 1000**（我们现在 9 个）。所以这一版整张表就放在客户端：
+       **不联网、不走云函数、不碰 mp 后台**，开机就能领。
+
+     ⚠️ 两条已知取舍（父亲大人认可过的口径，写在这儿免得以后有人当 bug 报）：
+       ① **码是公开的** —— 写在包里＝谁扒包都能看见。这一批本来就是"发在游戏圈给大家领的
+          新手礼包"，没有"先到先得"的意思，公开不是问题。**将来要发限时码 / 抽奖码，
+          必须搬去服务端**（那一轮再建云函数），那时候这里只留一句指针。
+       ② **"一人一次"是本地记账**（`S.gifts`，进存档 ＋ 跟着云同步走）：挡得住重复点、
+          挡得住换设备重复领，**挡不住改档的人**。同样是"这批码不心疼"才成立。
+
+     额度口径（2026-10-01 父亲大人点头的那一版）：**九个码全领 ≈ 一天的日常产出**
+       （每日全清 = ◉5000 · ◆50 · ✦20）。码是"关注礼"，不是"送一周进度"——
+       漏出去也不至于把前期曲线压扁。**要改额度＝只改这张表**：界面、发奖（`Core.claimGift`）、
+       尺子（`gift_audit`）都读这一份，谁也不许抄第二份。 */
+  const GIFT_CODES = {
+    /* 尝鲜档 —— 新玩家 / 游戏圈引流 */
+    CYDG666: { points: 1500 },
+    CYDG777: { points: 1500, item: ['ticket_normal'] },
+    CYDG888: { points: 2500, item: ['ticket_normal'] },
+    /* 进阶档 —— 玩过一阵、正缺养成料的人 */
+    VIP666: { otherworld: 50 },
+    VIP777: { otherworld: 50, item: ['ticket_adv'] },
+    VIP888: { otherworld: 80, item: ['ticket_adv'] },
+    /* 高阶档 —— 拉群 / 答谢 / 抽奖 */
+    SVIP666: { holy: 15 },
+    SVIP777: { holy: 15, item: ['ticket_lim'] },
+    SVIP888: { holy: 25, item: ['ticket_lim'] },
+  };
   // 成就：长线目标，覆盖战斗 / 养成 / 收集 / 挑战四条线
   const ACHIEVEMENTS = [
     { id: 'a_battle100', cat: '战斗', name: '百战之躯', desc: '累计战斗 100 场', check: S => S.stats.battles >= 100, reward: { points: 8000 } },
@@ -4352,6 +4387,7 @@ window.DATA = (function () {
     BEAST_EGG_ITEM, BEAST_EGG_COST, BEAST_MAX_LV, BEAST_SOUL_PER_LV, BEAST_LV_PCT,
     SHOPS, DAILY_TASKS, DAILY_ALL_REWARD, LOGIN_REWARDS, LOGIN_REWARDS_R2, LOGIN_ROUNDS, loginTableOf,
     STARTER, RETIRED_ITEMS, EARLY_GUARANTEE, earlyGuarantee,
+    GIFT_CODES,                                   // 兑换码 / 新手礼包（V1.0.5）：码与额度**唯一真源**
     HOME_GROUPS,                                  // V1.1.5（A2）：主页两块顺序（唯一真相，两端渲染读它）
     WEEKLY_TASKS, WEEKLY_ALL_REWARD, ACHIEVEMENTS,
     TALENTS, TALENT_COSTS, talentEffect, talentTexts,

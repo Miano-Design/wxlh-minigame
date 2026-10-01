@@ -158,6 +158,15 @@ window.Core = (function () {
       recruit:  getProxied({ pity:  getProxied({ advanced:  getProxied({ ssr: 0, ur: 0, up: 0 }), limited:  getProxied({ ssr: 0, ur: 0, up: 0 }) }), lastFree: '',
         free:  getProxied({ date: '', normal:  getProxied({ used: 0, at: 0 }), advanced:  getProxied({ used: 0, at: 0 }) }) }),   // V9.5.51 每日免费抽
       shop:  getProxied({ dailyDate: '', dailyItems:  getProxied([]), bought:  getProxied({}) }),
+      /* ================= V1.0.5 · 兑换码 / 新手礼包（2026-10-01 · 父亲大人点单）=================
+         `gifts` ＝ 这个账号已经领过的码：`{ 码: 领取时刻(ms) }`。
+         · 进**存档**（不是 localStorage）：换设备也能靠云同步带走 ⇒ "每个码每个玩家只能领一次"
+           在两台设备上同样成立；
+         · 老档没有这一段 → `fillDefaults` 自动补成空表、从"一个都没领过"起；
+         · 码表在 `js/data.js` 的 `GIFT_CODES`（**唯一真源**），这里只存"领过没"。
+         ⚠️ 已知取舍：本机记的账挡得住重复点，**挡不住改档的人** —— 这一批码本来就是公开送的
+            新手礼包，所以接受（见 data.js 那张表上的两条说明）；将来发限时码要搬去服务端。 */
+      gifts:  getProxied({}),
       // bonus：额外扫荡额度（由玩法自行发放的临时加次数；网页版不发，恒为 0，跨天清零）
       /* V1.1.8（B6）：`bonus` ＝ 灯阁权限的额外额度；`adBonus` ＝ 广告买来的额度（两本账分开记） */
       sweep:  getProxied({ date: '', count: 0, bonus: 0, adBonus: 0 }),
@@ -4004,6 +4013,29 @@ window.Core = (function () {
   }
   function curMeta(id) { return D.CURRENCIES.find(c => c.id === id) ||  getProxied({ name: id, icon: '' }); }
 
+  /* ================= V1.0.5 · 兑换码 / 新手礼包（2026-10-01 · 父亲大人点单）=================
+     父亲大人：「不要调用 mp 后台，直接写在游戏里就行了，就当新手礼包让用户直接领了」
+             「每个码每个玩家只能领取一次哦」。
+     全项目**唯一**的兑换出口（界面只把玩家敲的那串字符原样递进来，判据一条都不许留在界面里）：
+       · 归一化：大写 ＋ 只留 0-9 A-Z —— 大小写、空格、横杠都不影响玩家照着抄；
+       · 码表读 `D.GIFT_CODES`（数据层**唯一真源**，界面里一串码都不许写、额度也不许抄）；
+       · "一人一次"读 `S.gifts`（进存档 ＋ 跟着云同步走 ⇒ 换设备也照样只领一次）；
+       · 发奖走 `applyRewardObj`（全项目唯一的发奖入口：货币入账 / 道具进包 / 背包满了进待领箱）。
+     ⚠️ 顺序是**先记账再发奖**：万一发奖中途抛错，重进也不会把这个码算成"还能再领"。
+        反过来的话，坏的那一半是"东西没到手、码也废了"，比这更糟。 */
+  function claimGift(code) {
+    const c = String(code == null ? '' : code).toUpperCase().replace(/[^0-9A-Z]/g, '');
+    if (!c) return  getProxied({ ok: false, why: 'empty' });
+    const goods = D.GIFT_CODES[c];
+    if (!goods) return  getProxied({ ok: false, why: 'bad' });      // "码写错"与"码不存在"**同一条**
+    if (!S.gifts) S.gifts =  getProxied({});
+    if (S.gifts[c]) return  getProxied({ ok: false, why: 'used', code: c });
+    S.gifts[c] = Date.now();
+    const got = applyRewardObj(goods);
+    save();
+    return  getProxied({ ok: true, code: c, goods: goods, stashed: (got && got.stashed) ||  getProxied([]) });
+  }
+
   /* ================= 药园（对标《道友修仙》洞府里的"药园"） ================= */
   // 种下去等时间，回来收材料——给"点数"开一个稳定出口，也给强化材料一条不用刷副本的路。
   function gardenState() {
@@ -5498,6 +5530,8 @@ window.Core = (function () {
     /* V1.1.20（F1-5）：读档失败/更高版本 → **救援态**（禁写）＋ 玩家显式"继续新档"才解闸 */
     rescueInfo, rescueConfirmNewGame,
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
+    /* V1.0.5：兑换码 / 新手礼包 —— 全项目唯一的兑换出口（码表在 data.js 的 GIFT_CODES） */
+    claimGift,
     shardPoolOf, addShardPool, addShardsToPool, shardsOf, starInfo,
     setNoticeListener, stashItem, stashCount, stashList, stashNeedCells, claimStash,
     /* V1.1.15：装备待领箱（满格时掉的/开出来的装备先存这儿，扩容后领回） */

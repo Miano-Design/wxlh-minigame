@@ -772,6 +772,30 @@
         setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
       });
     });
+    /* ================= 兑换码（2026-10-01 · 父亲大人点单）=================
+       父亲大人：「就在设置界面里加一个兑换码的按钮，然后玩家输入对应的兑换码就可以领取奖励」
+              「每个码每个玩家只能领取一次哦」。
+
+       摆位：**插在「自动分解」与「游戏圈」之间**，其余各块的位置与顺序一个字没动
+         （这一屏的顺序＝主角列表 → 通用 → 自动分解 → **兑换码** → 游戏圈 → 三颗一排 → 红边框删档）。
+       为什么放这儿：上面三块是"单机内的设置"，下面两块是"对外的"（社区、删档）；
+         兑换码和下面那两块一样是**和运营/官方打交道的入口**，挨着放最讲得通。
+
+       ⚠️ **这一屏一行网络代码都没有**（父亲大人：「不要调用 mp 后台，直接写在游戏里就行了」）：
+         这里只画一颗按钮 + 递字符串给 `Core.claimGift()` —— 码表在 `js/data.js` 的
+         `GIFT_CODES`（唯一真源）、"一人一码一次"在 `S.gifts`（进存档、跟着云同步走）。
+         **别往这里接云函数**：第一版就是联网校验的，父亲大人当场看见一串 `trace: …` 乱码，
+         那一版连同它那支没部署的 `cloudfunctions/gift` 已经整个删掉了。
+       ⚠️ **额度也不在这里**：界面一句数都不写死 —— 发什么全看 `GIFT_CODES` 里那张表，
+         改额度＝改那一处，客户端界面一个字都不用动。
+       画布兜底那颗按钮与上面几块的风格同档（`U.btn` 的小按钮档），**不新增样式**。 */
+    U.card(function () {
+      U.h3('兑换码');
+      U.hint('拿到兑换码在这里输入领取。每个码每个账号只能领一次，领到的奖励直接进背包。', CV.SP[1]);
+      U.space(CV.SP[1]);
+      U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '🎁 输入兑换码', null, 'gift_open');
+      U.y += U.BTN_SM * CV.SCALE;
+    });
     /* ================= ④ 游戏圈（原样那一块 —— 见 P3）=================
        2026-09-26（流量主「条件二」）：游戏圈入口。微信只给**原生按钮**这一条路 ——
        位置在这里登记，由 js/sc-gameclub.js 逐帧摆上去（那份注释写了为什么不能画个 canvas 按钮了事）。
@@ -1242,6 +1266,98 @@
       /* `fail` / `catch` 这两条真机上也会偶发（键盘正被别的输入口占着…）——
        不是"设备没键盘"，所以另有说法（同 `sc-namecheck.js` 的 `MSG_KBFAIL`）。 */
       W.showKeyboard({ type: 'number', defaultValue: wipeTyped, maxLength: 4, success: function () {}, fail: function () { CV.toast('没能打开输入框：再点一次试试'); } });
+    } catch (e) { CV.toast('没能打开输入框：再点一次试试'); }
+  });
+
+  /* ================= 兑换码的输入与领取（2026-10-01 · 父亲大人点单）=================
+     「在设置界面里加一个兑换码的按钮，玩家输入对应的兑换码就可以领取奖励」
+     「每个码每个玩家只能领取一次哦」
+     「**不要调用 mp 后台**，直接写在游戏里就行了，就当新手礼包让用户直接领了」。
+
+     输入这一套**照搬已经跑熟的那两处**（本文件的删档输入格 ＋ `js/sc-grow.js` 的购买数量），
+     **不新写一套**：小游戏的键盘事件是**全局**的 —— 不先注销上一个，上一次的处理器还挂着。
+     ⚠️ 与删档那套有一处**故意不同**（是这件事本身的性质决定的，不是抄漏）：
+       ① 删档输的是**数字**（`type:'number'`）；兑换码是**字母＋数字** ⇒ 不传 type，用默认全键盘；
+       ② **这一屏一行网络代码都没有**：码表与"一人一次"全在本地 ——
+          码表在 `js/data.js` 的 `GIFT_CODES`，判据在 `Core.claimGift()`，界面只负责递字符串。
+          （踩过一次：第一版做成了联网校验，父亲大人当场看见屏幕上刷出一串 `trace: …` 乱码——
+            那一版已整个拆掉，连带那支没部署的云函数一起删了。**别再往这里接网络**。）
+     判据一条都不放宽：
+       · 键盘接口拿不到（老基础库 / 这个版本没这接口）→ 明说"用不了"，**不假装能输**；
+       · 太短（<3 位）当场拦下；
+       · `used` → **如实说"已经领过了"**（不说的话玩家会一直重敲同一串码、以为是自己抄错）；
+       · `bad` → 只说"码不对"（与"码不存在"**同一句话**，不给可被摸的信息）；
+       · **失败文案一句人话、不带任何技术词**（`errMsg` / `trace` / 错误码一律不许出现在 toast 里）。 */
+  let giftDraft = '';
+  /* 失败文案：**只在这个界面这一层**（判据在 Core，文案是呈现）。
+     一条技术词都不许有 —— 这是"乱码那次"立的规矩。 */
+  const giftFail = function (why) {
+    const w = String(why || '');
+    if (w === 'used') return '这个兑换码你已经领过了（每个码每个账号只能领一次）';
+    if (w === 'bad' || w === 'empty') return '兑换码不对，再看看是不是抄错了';
+    return '没换成，再点一次试试';
+  };
+  const giftKeyOk = function () {
+    const W = G.wx;
+    return !!(W && W.showKeyboard && W.onKeyboardConfirm);
+  };
+  function giftDialog() {
+    /* 单按钮形态（`cancel:false`）：只有一颗「关闭」—— 没有"确认兑换"那颗，
+       一致性只在键盘那一下判（与删档同一个做法：多一颗按钮就多一次可误触的地方）。
+       ⚠️ 2026-10-01（父亲大人）：「**这个输入窗口的小字提示都不要**」——
+       底下那行 `note` 小字**整行撤掉**，不再挂。
+       口径跟"设置页声音那张卡的小字不要"是同一条：控件本身自解释，就不要第二行说明。
+       （该说的话由**成功 / 失败那一下的 toast 与结果弹窗**去说，不靠事前的小字预防。） */
+    U.confirm('输入兑换码', '输入你拿到的兑换码，领到的奖励直接进背包。\n每个兑换码每个账号只能领一次。',
+      null,
+      {
+        inputBox: { value: giftDraft, placeholder: '点这里输入兑换码' },
+        inputId: 'gift_input',
+        cancel: false, okLabel: '关闭', okStyle: 'ghost',
+      });
+  }
+  CV.on('gift_open', function () {
+    if (!giftKeyOk()) { CV.toast('这个版本暂时用不了手动输入，兑换码没开'); return; }
+    giftDraft = '';
+    giftDialog();
+  });
+  CV.on('gift_input', function () {
+    const W = G.wx;
+    if (!giftKeyOk()) { CV.toast('这个版本暂时用不了手动输入'); return; }
+    try {
+      /* 与 `js/sc-grow.js` 的 `buynum` **逐句同源**：先注销上一个全局处理器，再挂这一个。 */
+      if (W.offKeyboardConfirm) W.offKeyboardConfirm();
+      if (W.offKeyboardComplete) W.offKeyboardComplete();
+      if (W.onKeyboardComplete) W.onKeyboardComplete(function () { CV.kbActive = false; });
+      CV.kbActive = true;
+      W.onKeyboardConfirm(function (res) {
+        CV.kbActive = false;
+        if (!U.overlay) return;                        // 弹窗已经关掉了（关掉之后敲键盘不算数）
+        const raw = String((res && (res.value !== undefined ? res.value : res.data)) || '');
+        const code = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 16);
+        giftDraft = code;
+        if (code.length < 3) { giftDialog(); CV.toast('兑换码是字母和数字，抄全一点', 2600); return; }
+        /* **同步、纯本地**：一次调用就把"归一化 → 查码表 → 查领过没 → 记账 → 发奖"全做完
+           （`Core.claimGift` 是全项目唯一的兑换出口，码表在 data.js 的 GIFT_CODES）。 */
+        const r = Core.claimGift(code);
+        if (!r.ok) {
+          if (U.overlay) giftDialog();                 // 弹窗留着（把刚敲的那串重新显示出来）
+          CV.toast(giftFail(r.why), 3000);
+          return;
+        }
+        const txt = Core.rewardTextOf(r.goods);
+        if (U.overlay) {
+          U.overlay = null;
+          U.confirm('兑换成功　' + r.code,
+            '已经领到了：\n' + txt
+            + (r.stashed && r.stashed.length ? '\n（有几件背包满了，先收进了待领箱）' : ''),
+            null, { cancel: false, okLabel: '好', okStyle: 'primary' });
+        }
+        CV.toast('兑换成功：' + txt, 3000);
+        CV.render();
+      });
+      /* `type` 不传 ＝ 默认全键盘（兑换码是字母＋数字；删档那边才是 `type:'number'`）。 */
+      W.showKeyboard({ defaultValue: giftDraft, maxLength: 16, success: function () {}, fail: function () { CV.toast('没能打开输入框：再点一次试试'); } });
     } catch (e) { CV.toast('没能打开输入框：再点一次试试'); }
   });
 
