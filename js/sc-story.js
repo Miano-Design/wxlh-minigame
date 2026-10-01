@@ -812,6 +812,22 @@
     const t = Date.now() / 1000;
     Story.bg(c, (cur && cur.scene) || 'god_hall', CV.W, CV.H, t);
   };
+  /* ================= 副本战斗的背景（2026-10-02 · 父亲大人：「现在副本战斗的背景也没改啊」） =================
+     战斗页是整屏接管（chromeless），之前被我一刀排除在铺底之外 —— 别处是一张画，一进战斗就纯黑。
+     现在它也有 veil：**这一场打的是哪个世界，就用那个世界的正式场景图**（`CV.battleWorld`
+     由 sc-battle 在开打时写）。底下压 62% 的暗，战场上的头像/血条/日志照样读得清。
+     图没到位 / 深井那种没有世界号的战斗 ⇒ 回落程序化底（sky + 那盏暖光），不黑屏。 */
+  CV.veils.battle = function (c) {
+    const wid = CV.battleWorld || '';
+    const scene = wid && SCENE[wid] ? SCENE[wid] : null;
+    if (scene && ensureScene(scene) && IMG[scene] && IMG[scene].img) {
+      try { drawSceneCover(c, IMG[scene].img, CV.W, CV.H); } catch (e) { bgBase(c, scene, CV.W, CV.H); }
+    } else {
+      bgBase(c, scene || 'tech_base', CV.W, CV.H);
+    }
+    c.fillStyle = CV.a(CV.C.shade, .62);
+    c.fillRect(0, 0, CV.W, CV.H);
+  };
   CV.on('story_next', function () { advance(); CV.render(); });
   CV.on('story_skip', function () { Story.skip(); });
 

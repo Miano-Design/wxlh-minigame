@@ -124,6 +124,12 @@
     const onBattlePage = CV.stack.length === 1 && CV.stack[0] && CV.stack[0].name === 'battle';
     if (!onBattlePage || !B.back) B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
     B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
+    /* 2026-10-02（父亲大人：「现在副本战斗的背景也没改啊」）：
+       战斗页是**整屏接管**（chromeless），之前我一刀把它排除在铺底之外了 ——
+       于是别处是一张画、进战斗就变回纯黑。
+       现在把"这一场打的是哪个世界"报给 cv.js（`CV.battleWorld`），
+       由 `CV.veils.battle` 拉那个世界的**正式场景图**当背景（压暗 62%，战场照样读得清）。 */
+    CV.battleWorld = (cfg && cfg.worldId) || '';
     /* V1.1.8（丙组 B9）：开打时的档位读**唯一口径** `Core.effSpeed()` ——
        免费只有 1×/2×；广告窗口内才是 5。老档里存的 3× 会在那里被回落成 2×。 */
     B.speed = Core.effSpeed ? Core.effSpeed() : ((Core.S.settings && Core.S.settings.speed) || 1);
@@ -984,7 +990,7 @@
   }
   function drawSettle(res, p) {
     const c = CV.ctx;
-    c.fillStyle = CV.a(CV.C.shade, .62);
+    c.fillStyle = CV.a(CV.C.shade, .85);   // 2026-10-02 父亲大人：结算层压暗 = 85
     c.fillRect(0, 0, CV.W, CV.H);
     CV.hitMode = 'screen';                 // 这一层画在屏幕坐标里，命中区也要按屏幕坐标登记
     const prevOverlay = CV.pageOverlay;
@@ -1121,7 +1127,7 @@
   CV.battleHead = function (title) {
     const c = CV.ctx;
     const y = CV.safeTop;
-    c.fillStyle = CV.a(CV.C.overlay, .50);
+    c.fillStyle = CV.a(CV.C.overlay, .85);   // 2026-10-02 父亲大人：结算页顶栏底 = 85
     c.fillRect(0, y, CV.W, 44 * CV.SCALE);
     /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）：
        ① 这一条画在**屏幕坐标**里（在内容裁剪之前），命中区也必须按屏幕坐标登记 ——

@@ -1491,7 +1491,18 @@
          页面用 `CV.stickyH` 报出那条吸顶条的高度（屏幕坐标），这里把内容层的上沿让出去。
          `CV.stickyH` 是跨帧状态：进页那一帧还没有值（那时 scroll=0、内容本来就在条下面），
          下一页帧起就生效；`CV.reset/push/pop` 会把它清零，别的页面不受影响。 */
-      const clipTop = CV.TOP + 8 + (CV.stickyH || 0);
+      /* 2026-10-02（父亲大人：「**二级界面这些可以滑动的你都得考虑到类似背包的容器问题啊**，
+         不能一滑动内容就跑到标签下面，影响阅读」）：
+         上次我只给背包的吸顶条做了裁切，别的二级页照样穿 —— 现在收成**通法**：
+         凡是"固定条"（二级页返回键栏 / 页面自己的吸顶条），内容一律裁在它下沿以下。
+         · `CV.pageHead` 是 cv.js 自己记的（`U.pageHead` 那一趟登记），高度 = h + 8 + 呼吸带，
+           正好是 `CV.drawPageHead` 铺底的那一条；
+         · `CV.stickyH` 是页面自报的（背包分类条那种）；
+         两者取**大的那个**当前沿，所以一个页面同时有两种条也不会漏。
+         ⚠️ 这两个都是**跨帧状态**（页面在 draw 里登记、下一帧起生效）—— 进页那一帧 scroll=0、
+            内容本来就在条的下面，所以看不到任何跳变；`reset/push/pop` 会清零。 */
+      const headH = (CV.pageHead && CV.pageHead.h) ? (CV.pageHead.h + 8 + (CV.HEAD_GAP || 0)) : 0;
+      const clipTop = CV.TOP + 8 + Math.max(CV.stickyH || 0, headH);
       c.beginPath(); c.rect(0, clipTop, CV.W, CV.H - clipTop - CV.NAV_H - CV.safeBottom - 8); c.clip();
       c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
       CV.y = 0;
