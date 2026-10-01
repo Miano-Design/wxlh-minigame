@@ -1039,7 +1039,11 @@
      压暗的力度取 .72：卡片本身已经是半透明面板（88%），两层加起来仍读得清字，
      底图的轮廓与那盏灯还看得出来。 */
   CV.veils = CV.veils || {};
-  CV.veils.home = function (c) {
+  /* 全站默认底图：**所有没有自己底图的页面都铺它**（父亲大人 2026-10-02：
+     「应用到所有界面，包括顶部信息栏和底部导航栏都铺满」）。
+     一张画铺满整屏 + 一道压暗；卡片（70%）、顶栏（78%）、底栏（78%）都是压在上面的半透明层，
+     所以整局游戏是一张世界，而不是"首页有画、进去全黑"。 */
+  CV.defaultVeil = function (c) {
     if (G.Story && G.Story.ensureKV) G.Story.ensureKV();
     const img = (G.Story && G.Story.kvImage) ? G.Story.kvImage() : null;
     if (img && img.width) {
@@ -1062,11 +1066,12 @@
        现在收到 .34~.56：世界清清楚楚地在那儿，卡片是浮在它上面的半透明面板。
        文字照样读得清 —— 卡片本身还有 70% 的深色底（两层加起来才是不透明的那部分）。 */
     const g = c.createLinearGradient(0, 0, 0, CV.H);
-    g.addColorStop(0, CV.a(CV.C.bg, .34));
-    g.addColorStop(0.45, CV.a(CV.C.bg, .46));
-    g.addColorStop(1, CV.a(CV.C.bg, .56));
+    g.addColorStop(0, CV.a(CV.C.bg, .48));
+    g.addColorStop(0.45, CV.a(CV.C.bg, .60));
+    g.addColorStop(1, CV.a(CV.C.bg, .70));
     c.fillStyle = g; c.fillRect(0, 0, CV.W, CV.H);
   };
+  CV.veils.home = CV.defaultVeil;      // 首页就是这张（同一处算式，不许各写一份）
 
   /* 还没复刻的页面：给个明确提示，别点了没反应。
      ⚠ V9.5.99：这里**不能覆盖已经存在的真实处理器** —— CV.on 是同 id 后注册的赢，

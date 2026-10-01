@@ -505,7 +505,7 @@
     const contentH = Math.max(leftH, btnH);
     const rowH = PAD * 2 + contentH;
     const top = U.y;
-    CV.round(U.ix(), top, U.iw(), rowH, CV.RADIUS, CV.C.panel);   // 参数：圆角 10 / 底色 panel（少一个参数会整块没底）
+    CV.round(U.ix(), top, U.iw(), rowH, CV.RADIUS, CV.a(CV.C.panel, .70));   // 参数：圆角 10 / 底色 panel（少一个参数会整块没底）
     const cy = top + PAD + contentH / 2;
     const leftTop = cy - leftH / 2;              // 左边整块的顶（整块绕 cy 居中）
     CV.ctx.save();
@@ -562,7 +562,7 @@
     const h = pad * 2 + out.length * lh;
     const top = U.y + (gapIn || 0);
     draw(() => {
-      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS, CV.C.panel);
+      CV.round(U.ix(), top, U.iw(), h, CV.RADIUS, CV.a(CV.C.panel, .70));
       out.forEach((o, i) => {
         if (!o.t) return;
         const x0 = U.ix() + pad, cy = top + pad + lh * (i + 0.5);
@@ -613,7 +613,7 @@
          V9.5.68（父亲大人）：主页格子里**只留功能名**；"有东西可领"改用红点表达。 */
       const dot = t[4];
       draw(() => {
-        CV.round(x, y, cellW, th, CV.RADIUS_CHIP,  CV.C.panel, CV.C.line2);
+        CV.round(x, y, cellW, th, CV.RADIUS_CHIP, CV.a(CV.C.panel, .70), CV.C.line2);
         const inner = cellW - 12 * CV.SCALE;
         const hasSub = !!(t[2]);
         const cy = hasSub ? y + th / 2 - 7 * CV.SCALE : y + th / 2;
@@ -719,7 +719,7 @@
        gold 深金配奶白字（**上端只有 2.76**）。字色一动底色就得跟着压深（「改颜色不许只改颜色」）：
        白字对渐变上下两端 4.85 / 6.91，两段都过 AA。 */
     if (goldBtn2) { g.addColorStop(0, CV.C.goldBtn); g.addColorStop(1, CV.C.goldBtnDeep); }
-    const fill = g || (style === 'ghost' || danger ? null : CV.C.panel2);
+    const fill = g || (style === 'ghost' || danger ? null : CV.a(CV.C.panel2, .55));
     /* V9.6.90：颜色一律 rgba()，**不许用 8 位 hex**（#RRGGBBAA）——
        微信画布对这个格式"部分支持/不稳定"，赋值失败时画布会**保持上一次的填充色**，
        表现就是"黑底黑字"（父亲大人最早报的那个毛病）。见 canvas_audit 的同名规则。 */
@@ -858,8 +858,8 @@
      `done` 与 `future` 的区别不只靠颜色（✓ 是硬标记 ＋ 低一档的对比度），这是"两档必须能分开"的兜底。 */
   const BLK_TONE = {
     today: { fill: CV.C.sel, line: CV.C.gold, text: CV.C.gold, mark: '今天', markCol: CV.C.goldBright, alpha: 1, bold: true, lw: 2 },
-    done: { fill: CV.C.panel2, line: CV.C.line2, text: CV.C.text2, mark: '✓', markCol: CV.C.text2, alpha: 1, bold: false, lw: 1 },
-    future: { fill: CV.C.panel, line: CV.C.line, text: CV.C.dim, mark: '', markCol: CV.C.dim, alpha: .62, bold: false, lw: 1 },
+    done: { fill: CV.a(CV.C.panel2, .55), line: CV.C.line2, text: CV.C.text2, mark: '✓', markCol: CV.C.text2, alpha: 1, bold: false, lw: 1 },
+    future: { fill: CV.a(CV.C.panel, .55), line: CV.C.line, text: CV.C.dim, mark: '', markCol: CV.C.dim, alpha: .62, bold: false, lw: 1 },
   };
   /* 只读出口：尺子（overlay_audit / retention_audit / boot_audit）拿它当"三档互不相同"的判据 */
   U.blkTone = function (state) { return BLK_TONE[state] || BLK_TONE.future; };
@@ -1687,7 +1687,7 @@
     const tw = CV.W - 40 * CV.SCALE;
     const tx = 20 * CV.SCALE;
     const ty = r ? Math.min(CV.H - th - 40 * CV.SCALE, r.y + r.h + 16 * CV.SCALE) : (CV.H - th) / 2;
-    CV.round(tx, ty, tw, th, CV.RADIUS,  CV.C.panel, CV.C.gold);
+    CV.round(tx, ty, tw, th, CV.RADIUS,  CV.a(CV.C.panel, .55), CV.C.gold);
     lines.forEach(function (ln, i) {
       CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
     });
@@ -1766,7 +1766,7 @@
       const total = row.reduce((s, c) => s + c.w, 0) + CHIP_GAP * (row.length - 1);
       let cx = o.x + (o.w - total) / 2;
       row.forEach(function (c) {
-        CV.round(cx, cy - CHIP_H / 2, c.w, CHIP_H, CV.PILL,  CV.C.panel2, CV.C.line);
+        CV.round(cx, cy - CHIP_H / 2, c.w, CHIP_H, CV.PILL,  CV.a(CV.C.panel2, .55), CV.C.line);
         CV.text(c.t, cx + c.w / 2, cy, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
         cx += c.w + CHIP_GAP;
       });
@@ -1779,7 +1779,7 @@
        没有内容时显示灰底提示语（别留一块空白的、看不出要干什么的方框）。 */
     if (o.input) {
       const iy = o.y + o.input.y;
-      CV.round(o.x + PAD, iy, o.w - PAD * 2, o.input.h, CV.RADIUS_SM, CV.C.panel2, CV.C.line2);
+      CV.round(o.x + PAD, iy, o.w - PAD * 2, o.input.h, CV.RADIUS_SM, CV.a(CV.C.panel2, .55), CV.C.line2);
       const shown = o.input.value || o.input.placeholder;
       CV.text(shown, o.x + o.w / 2, iy + o.input.h / 2, {
         size: o.input.value ? CV.FS.f2 : CV.FS.md, bold: !!o.input.value, align: 'center',

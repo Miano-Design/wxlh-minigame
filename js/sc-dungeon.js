@@ -98,7 +98,7 @@
     /* §五：**不再按世界主题铺卡片底色**（36 种彩底像"彩色地图按钮"，与正式场景图不搭）。
        统一走中性表面色（深炭黑/冷灰黑），层级差只靠 `panel3` / `panel2` 那一档 ——
        主题色只留给**图标、选中、重要节点**用。 */
-    CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.C.panel3, CV.C.line);
+    CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.a(CV.C.panel3, .55), CV.C.line);
     worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.AICO.world * CV.SCALE,
       CV.worldIconColor(theme, state || (dim ? 'locked' : 'idle')));
     /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
@@ -185,7 +185,7 @@
         D.DIFFICULTY.map((d) => ({ t: d.name, on: diffAllCleared(w.id, d.id) })),
         /* 底色：§五 —— 不再用 `D.worldTint(w.id)`（按主题生成的 36 种彩底），
            统一中性表面；主题色只在图标与族形上出现。 */
-        'w:' + w.id, false, CV.C.panel3, w.theme,
+        'w:' + w.id, false, CV.a(CV.C.panel3, .55), w.theme,
         /* 世界图标的状态（§九）：这张图**普通档 12 关全通**＝已完成（低饱和暖灰），
            否则＝普通（偏冷灰白）。"选中/重要节点"这两档在世界详情页与 Boss 关用。 */
         diffAllCleared(w.id, 'normal') ? 'done' : 'idle');
@@ -221,7 +221,7 @@
          几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
       /* 详情页头同样中性底 + 更大的图标（§六：容器 40 → 50、图标 32） */
       const box = 50 * CV.SCALE, top = U.y, x = U.ix();
-      CV.round(x, top, box, box, CV.RADIUS, CV.C.panel3, CV.C.line);
+      CV.round(x, top, box, box, CV.RADIUS, CV.a(CV.C.panel3, .55), CV.C.line);
       /* 详情页这一格＝"你正在看的世界" ⇒ 状态 `current`（主题强调色） */
       worldIco(icoOf(w), x + box / 2, top + box / 2, CV.AICO.worldSm * CV.SCALE,
         CV.worldIconColor(w.theme, 'current'));
@@ -274,11 +274,11 @@
         if (t.disabled) {
           CV.ctx.save();
           CV.ctx.globalAlpha = 0.34;                      // .btn[disabled] opacity:.34
-          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.C.panel2, CV.C.line2);
+          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.a(CV.C.panel2, .55), CV.C.line2);
           CV.text(label, x + cw / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: CV.C.text });
           CV.ctx.restore();
         } else if (on) {
-          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.C.panel3, CV.C.gold);
+          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.a(CV.C.panel3, .55), CV.C.gold);
           CV.text(label, x + cw / 2, top + h / 2, { size: CV.FS.md, align: 'center', color: CV.C.gold });
           CV.hit(t.id, x, top, cw, h);
         } else {
@@ -319,7 +319,7 @@
           : y + cw / 2 - (stars ? 7 * CV.SCALE : 0);                              // 宽格：原口径
         const starCy = narrowCell ? numCy + 18.5 * CV.SCALE : y + cw - 14 * CV.SCALE;
         CV.ctx.globalAlpha = unlocked ? 1 : 0.3;
-        CV.round(x, y, cw, cw, CV.RADIUS,  done ? CV.C.doneBg : CV.C.panel2,
+        CV.round(x, y, cw, cw, CV.RADIUS,  done ? CV.C.doneBg : CV.a(CV.C.panel2, .55),
           done ? CV.C.doneLine : (isBoss ? CV.C.accent : CV.C.line));
         CV.text(isBoss ? '🔱' : String(i + 1), x + cw / 2, numCy,
           { size: CV.FS.f1, bold: true, align: 'center', color: isBoss ? CV.C.accent : CV.C.text });
@@ -457,7 +457,7 @@
         const bx = U.pad() + c * (cw + gap), by = top + r * (cw + gap);
         const sel = x.i === sweepSel;
         CV.ctx.globalAlpha = 1;
-        CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? CV.C.doneBg : CV.C.panel2, sel ? CV.C.gold : CV.C.line);
+        CV.round(bx, by, cw, cw, CV.RADIUS,  sel ? CV.C.doneBg : CV.a(CV.C.panel2, .55), sel ? CV.C.gold : CV.C.line);
         CV.text(String(x.i + 1), bx + cw / 2, by + cw / 2 - 6 * CV.SCALE, { size: CV.FS.f1, bold: true, align: 'center', color: sel ? CV.C.gold : CV.C.text });
         /* 扫荡页用的也是网页版的 .stage-cell（星级 .st 是**五级 11px**）——
            和世界详情页同一处漂移，只是复审表格里没列到这一屏。 */

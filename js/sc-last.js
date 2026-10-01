@@ -448,7 +448,7 @@
     TASK_TABS.forEach(function (tt, i) {
       const x = U.pad() + i * (tabW + tgap);
       const on = taskTab === tt[0];
-      CV.round(x, tabTop, tabW, pillH, CV.PILL, on ? CV.a(CV.C.danger, .16) : CV.C.panel, on ? CV.C.accent : CV.C.line);
+      CV.round(x, tabTop, tabW, pillH, CV.PILL, on ? CV.a(CV.C.danger, .16) : CV.a(CV.C.panel, .55), on ? CV.C.accent : CV.C.line);
       CV.text(tt[1], x + tabW / 2, tabTop + pillH / 2, { size: CV.FS.md, align: 'center', color: on ? CV.C.text : CV.C.dim });
       if (pend[tt[0]] > 0) {   // 红点＝"这一页有能领的"（与底栏那颗 .dot 同一套写法）
         CV.ctx.beginPath();
@@ -1666,9 +1666,9 @@
          没派领队 = 没激活 → 边框虚线、标题/产出压灰；派了领队 = 激活 → 边框与文字一律金色。 */
       if (h > 4) {
         if (led) {
-          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, CV.a(CV.C.gold, .4));
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.a(CV.C.panel, .55), CV.a(CV.C.gold, .4));
         } else {
-          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.C.panel, null);
+          CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, CV.a(CV.C.panel, .55), null);
           CV.ctx.save();
           CV.ctx.setLineDash([5, 4]); CV.ctx.lineWidth = 1;
           CV.round(U.pad(), top, U.cw(), h, CV.RADIUS, null, CV.C.line);
@@ -1721,7 +1721,7 @@
         const ah = 40 * CV.SCALE, bh = U.BTN_SM * CV.SCALE, bw = 62 * CV.SCALE;
         U.h3('当前领队', '加成 +' + Math.round((row.bonus || 0) * 100) + '%', { color: CV.C.gold, subColor: CV.C.gold });
         const top = U.y;
-        CV.round(U.ix(), top, ah, ah, CV.PILL,  CV.C.panel2, CV.C.line);
+        CV.round(U.ix(), top, ah, ah, CV.PILL,  CV.a(CV.C.panel2, .55), CV.C.line);
         CV.text(CV.fit(Core.charName(cur), ah - 6, CV.FS.sm), U.ix() + ah / 2, top + ah / 2, { size: CV.FS.sm, align: 'center', bold: true });
         const tx = U.ix() + ah + 8 * CV.SCALE;
         CV.text(CV.fit(Core.charName(cur), U.iw() - ah - bw - 16 * CV.SCALE, CV.FS.f1, true), tx, top + ah / 2 - 8 * CV.SCALE, { size: CV.FS.f1, bold: true });

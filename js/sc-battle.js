@@ -588,12 +588,12 @@
     if (dead) CV.ctx.globalAlpha = 0.25;
     CV.ctx.beginPath();
     if (u.side === 'enemy') CV.ctx.arc(cx, y + av / 2, av / 2, 0, Math.PI * 2);
-    else CV.round(cx - av / 2, y, av, av, CV.RADIUS,  CV.C.panel3, u.isBoss ? CV.C.accent : CV.C.line, u.isBoss ? 2 : 1.5);
+    else CV.round(cx - av / 2, y, av, av, CV.RADIUS,  CV.a(CV.C.panel3, .55), u.isBoss ? CV.C.accent : CV.C.line, u.isBoss ? 2 : 1.5);
     if (u.side === 'enemy') {
       CV.ctx.fillStyle = CV.C.enemy;
       CV.ctx.fill();
       CV.ctx.strokeStyle = u.isBoss ? CV.C.accent : CV.C.line; CV.ctx.lineWidth = u.isBoss ? 2 : 1.5; CV.ctx.stroke();
-    } else CV.ctx.fillStyle = CV.C.panel3;
+    } else CV.ctx.fillStyle = CV.a(CV.C.panel3, .55);
     u._cx = cx; u._top = y; u._av = av;   // 飘字要用：记住这一张卡画在哪
     /* ================= 康康 2026-10-01 · 头像框首字：敌我两侧**同一个算法、同一个字号** =================
        父亲大人：「现在小屏幕机型战斗时敌我阵营的**头像框字体大小是不一样的**」。
@@ -974,7 +974,7 @@
       const total = idx.reduce((a, i) => a + widths[i], 0) + gap * (idx.length - 1);
       let x = cx - total / 2;
       idx.forEach((i) => {
-        CV.round(x, yy, widths[i], h, h / 2, CV.C.panel2, CV.C.line);
+        CV.round(x, yy, widths[i], h, h / 2, CV.a(CV.C.panel2, .55), CV.C.line);
         CV.text(list[i], x + widths[i] / 2, yy + h / 2, { size: CV.FS.md, align: 'center' });
         x += widths[i] + gap;
       });

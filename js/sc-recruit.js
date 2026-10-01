@@ -48,7 +48,7 @@
       const ibx = rx, iby = y0 + (h - ibox) / 2;
       const prevMode = CV.hitMode;                 // 框架整段就是 screen 模式：这里只许还回去
       CV.hitMode = 'screen';
-      CV.round(ibx + (ibox - icir) / 2, iby + (ibox - icir) / 2, icir, icir, icir / 2, CV.C.panel2, CV.C.line2);
+      CV.round(ibx + (ibox - icir) / 2, iby + (ibox - icir) / 2, icir, icir, icir / 2, CV.a(CV.C.panel2, .55), CV.C.line2);
       CV.text('i', ibx + ibox / 2, iby + ibox / 2, { size: CV.FS.md, align: 'center', color: CV.C.dim });
       CV.hit('rec_rates', ibx, iby, ibox, ibox);
       CV.hitMode = prevMode;
@@ -220,7 +220,7 @@
       }
       const acx = x + cw / 2, acTop = y + PAD;
       CV.ctx.beginPath(); CV.ctx.arc(acx, acTop + AV / 2, AV / 2 - CV.SCALE, 0, Math.PI * 2);
-      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.a(CV.C.panel3, .55); CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(r.name || '?').slice(0, 1), acx, acTop + AV / 2, { size: AV * 0.44, bold: true, align: 'center', color: col });
       const nameCy = acTop + AV + AVGAP + NAME_H / 2;
@@ -434,7 +434,7 @@
       CV.qframe(x, y, cw, ch, c.rarity, 12 * CV.SCALE, SSBAND);
       const asz = 46 * CV.SCALE, acx = x + cw / 2;
       CV.ctx.beginPath(); CV.ctx.arc(acx, y + 10 * CV.SCALE + asz / 2, asz / 2, 0, Math.PI * 2);
-      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.a(CV.C.panel3, .55); CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = col; CV.ctx.stroke();
       CV.text(String(c.name || '?').slice(0, 1), acx, y + 10 * CV.SCALE + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: col });
       CV.text(CV.fit(c.name, cw - 10 * CV.SCALE, CV.FS.lg, true), acx, y + 10 * CV.SCALE + asz + 12 * CV.SCALE, { size: CV.FS.lg, bold: true, align: 'center' });

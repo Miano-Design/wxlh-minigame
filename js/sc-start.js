@@ -133,7 +133,7 @@
       const h = 44 * CV.SCALE, gap = 8 * CV.SCALE;
       const bw = 52 * CV.SCALE;
       const top = U.y;
-      CV.round(U.ix(), top, U.iw() - bw - gap, h, CV.RADIUS_SM, CV.C.panel, CV.C.line);
+      CV.round(U.ix(), top, U.iw() - bw - gap, h, CV.RADIUS_SM, CV.a(CV.C.panel, .55), CV.C.line);
       /* F7 ①：字号**不许**再乘 CV.SCALE（那是观感系数）—— 一乘就把二级字缩到 12.3px、破了五级阶梯 */
       CV.text(CV.fit(nameDraft || NAMES[nameIdx], U.iw() - bw - gap - 24 * CV.SCALE, CV.FS.f1),
         U.ix() + 12 * CV.SCALE, top + h / 2, { size: CV.FS.f1 });

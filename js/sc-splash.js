@@ -130,7 +130,7 @@
     const sky = c.createLinearGradient(0, 0, 0, CV.H);
     sky.addColorStop(0, CV.C.bg);
     sky.addColorStop(0.62, CV.C.bg2);
-    sky.addColorStop(1, CV.C.panel);
+    sky.addColorStop(1, CV.a(CV.C.panel, .55));
     c.fillStyle = sky;
     c.fillRect(0, 0, CV.W, CV.H);
     if (!cover(c, 1, 0.5)) {
@@ -198,7 +198,7 @@
      `#boot::before`（同一张真图 cover）＋ `#boot::after`（0.72 / 0.28@42% / 0.86 的竖向渐隐）。
      画布这端照同一条画（same 图、same 档位），两端才是同一个观感。
      V1.0.6：原来 `copyright` 那页也挂这层背影，整页已按父亲大人的话删掉（著作权不要），
-     所以这里只剩 `gate` 一次登记。忠告卡是**实底**（U.card → CV.C.panel），
+     所以这里只剩 `gate` 一次登记。忠告卡是**实底**（U.card → CV.a(CV.C.panel, .55)），
      正文对比度不吃背景的亏（尺子 visual_audit ⑩ 的对比度那条两端各钉一次）。 */
   function mainVeil(c) {
     cover(c, 1, 0.5);

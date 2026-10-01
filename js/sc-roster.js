@@ -118,7 +118,7 @@
       let ly = cy + PAD;                                  // 内容区顶部
       const avCy = ly + AV / 2;
       CV.ctx.beginPath(); CV.ctx.arc(acx, avCy, AV / 2, 0, Math.PI * 2);
-      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill();
+      CV.ctx.fillStyle = CV.a(CV.C.panel3, .55); CV.ctx.fill();
       CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = rarColor(ch0.rarity); CV.ctx.stroke();
       CV.text(nm(id).slice(0, 1), acx, avCy, { size: AV * 0.44, bold: true, align: 'center', color: rarColor(ch0.rarity) });
       ly += AV + AV_GAP;
@@ -167,7 +167,7 @@
       const asz = 56 * CV.SCALE;
       const cx = U.ix() + asz / 2;
       CV.ctx.beginPath(); CV.ctx.arc(cx, top + asz / 2, asz / 2, 0, Math.PI * 2);
-      CV.ctx.fillStyle = CV.C.panel3; CV.ctx.fill(); CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = rarColor(ch.rarity); CV.ctx.stroke();
+      CV.ctx.fillStyle = CV.a(CV.C.panel3, .55); CV.ctx.fill(); CV.ctx.lineWidth = 2; CV.ctx.strokeStyle = rarColor(ch.rarity); CV.ctx.stroke();
       CV.text(nm(id).slice(0, 1), cx, top + asz / 2, { size: asz * 0.44, bold: true, align: 'center', color: rarColor(ch.rarity) });
       const tx = U.ix() + asz + 12 * CV.SCALE;
       CV.text(ch.rarity, tx, top + 16 * CV.SCALE, { size: CV.FS.f1, bold: true, color: rarColor(ch.rarity) });
@@ -347,7 +347,7 @@
       slots.forEach(function (slot, i) {
         const e = eq[slot] && S.equips[eq[slot]];
         const x = U.ix() + (i % cols) * (tw + gap), y = y0 + Math.floor(i / cols) * (th + gap);
-        CV.round(x, y, tw, th, CV.RADIUS_CHIP,  CV.C.panel, e ? CV.C.line2 : CV.C.line);
+        CV.round(x, y, tw, th, CV.RADIUS_CHIP,  CV.a(CV.C.panel, .55), e ? CV.C.line2 : CV.C.line);
         CV.text(D.EQUIP_SLOTS[slot], x + 8 * CV.SCALE, y + 14 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim });
         if (e) {
           CV.text(CV.fit(e.name + ' +' + e.enhance, tw - 16 * CV.SCALE, CV.FS.md, true), x + tw / 2, y + th / 2 + 6 * CV.SCALE,

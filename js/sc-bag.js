@@ -73,7 +73,7 @@
       ws.forEach(function (w) {
         const t = list[idx++];
         const on = cur === t[0];
-        CV.round(x, y, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.C.panel, on ? CV.C.accent : CV.C.line);
+        CV.round(x, y, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.a(CV.C.panel, .55), on ? CV.C.accent : CV.C.line);
         CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.xs, align: 'center', color: on ? CV.C.white : CV.C.dim });
         CV.hit(prefix + t[0], x, y, w, h);
         x += w + gap;
@@ -371,9 +371,9 @@
         /* V1.0.1（P2 第三步，AI 视觉工程师："道具/材料 43 件走**品质底框＋图形族**，不精绘 43 张"）：
            有品质的道具（箱子、装备类）按品质色描边 —— 一眼看出档次，
            而不用给每一件单独画图标（43 张图既做不完也没必要）。材料没有品质，保持原样。 */
-        CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, rarColor(c.rarity), 2 * CV.SCALE);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .55), rarColor(c.rarity), 2 * CV.SCALE);
       } else {
-        CV.round(x, y, cw, cw, CV.RADIUS, CV.C.panel2, CV.C.line);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .55), CV.C.line);
       }
       /* 名字：13px 粗体，最多两行，居中在"数量以上"那块区域（网页版 .bg-name）。
          V1.1.11（窄屏）：320 宽的屏上 5 列只有 ~55pt 宽，按 13px ＋ 左右各 7pt 内边距

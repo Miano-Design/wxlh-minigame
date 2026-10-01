@@ -714,7 +714,7 @@
     const spec = D.avatarSpec(id, info);
     const r = size / 2, ink = CV.a(spec.tint, .55);
     c.save();
-    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = CV.C.panel3; c.fill();
+    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = CV.a(CV.C.panel3, .55); c.fill();
     c.lineWidth = 2; c.strokeStyle = ring || CV.C.line2; c.stroke();
     c.beginPath(); c.arc(cx, cy, r - 1, 0, Math.PI * 2); c.clip();       // 剪影不许出圆盘
     D.avatarParts(id, info).forEach(function (p) {
@@ -951,7 +951,7 @@
     const myth = (rar === 'MYTH');
     const bh = bandH === undefined ? Math.max(14 * CV.SCALE, Math.round(Math.min(w, h) * 0.24)) : bandH;
     const by = y + h - bh, br = Math.min(r, bh / 2, w / 2);
-    CV.round(x, y, w, h, r, CV.C.panel2, col);                                  /* 画面 + 档色环 */
+    CV.round(x, y, w, h, r, CV.a(CV.C.panel2, .55), col);                                  /* 画面 + 档色环 */
     if (myth) CV.round(x + 3, y + 3, w - 6, h - 6, Math.max(0, r - 3), null, CV.C.gold);
     const c = CV.ctx;                                                           /* 铭牌：上缘切平 */
     c.beginPath();
@@ -1466,7 +1466,12 @@
        页面自己用 CV.veilPage('页面名', 画法) 登记一次，渲染时按当前页名取。 */
     {
       const veil = CV.veils && CV.veils[CV.top().name];
+      /* 2026-10-02（父亲大人：「**应用到所有界面**，包括顶部信息栏和底部导航栏都铺满」）：
+         页面自己登记的底图优先；**没登记的页面走 `CV.defaultVeil`**（同一张主视觉、同一道压暗）。
+         于是全站（除战斗/开局那几个整屏接管的页）都是一张画，顶栏底栏也压在它上面。
+         ⚠️ 战斗页是 chromeless（整屏自绘战场），不铺底图 —— 那是刻意的，不是漏。 */
       if (veil) { try { veil(c); } catch (e) {} }
+      else if (!chromeless && CV.defaultVeil) { try { CV.defaultVeil(c); } catch (e) {} }
     }
     c.translate(Math.round((CV.pxW - CV.W) / 2), 0);
     c.beginPath(); c.rect(0, 0, CV.W, CV.H); c.clip();
@@ -1597,7 +1602,7 @@
     /* 2026-10-02（§十一 场景驱动 UI）：顶栏压暗层从 .94 收到 .88 ——
        首页那种"整屏底图"的页面上，让主视觉在最上面一栏也**隐约透一点点**，
        整页才是一张画；数字与图标依旧压得住（它们本身是不透明的）。 */
-    c.fillStyle = CV.a(CV.C.bg, .88);
+    c.fillStyle = CV.a(CV.C.bg, .78);
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -1743,7 +1748,7 @@
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
     const y = CV.H - h;
-    c.fillStyle = CV.a(CV.C.bg2, .98);
+    c.fillStyle = CV.a(CV.C.bg2, .78);   // 2026-10-02 父亲大人：底栏半透明，底图铺到它下面
     c.fillRect(0, y, CV.W, h);
     const tabW = CV.W / CV.NAV_TABS.length;
     CV.NAV_TABS.forEach((t, i) => {

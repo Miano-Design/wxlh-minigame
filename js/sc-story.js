@@ -849,7 +849,7 @@
       tabs.forEach(function (t, i) {
         const x = U.pad() + i * (cw + gap);
         if (arcTab === t[0]) {
-          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.C.panel3, CV.C.gold);
+          CV.round(x, top, cw, h, CV.RADIUS_SM, CV.a(CV.C.panel3, .55), CV.C.gold);
           CV.text(CV.fit(t[1], cw - 12 * CV.SCALE, CV.FS.md), x + cw / 2, top + h / 2,
             { size: CV.FS.md, align: 'center', color: CV.C.gold });
         } else {

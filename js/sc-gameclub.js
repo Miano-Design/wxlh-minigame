@@ -56,7 +56,7 @@
            滑动时"停稳换成原生"那一下，按钮从"空心"变"实心"，来回换手就是频闪）。
        ② `canvasRect`：原生那颗的位置是 `Math.round` 过的**整数屏幕像素**；画布那颗原来按内容坐标
           原样画 ⇒ 差半个像素，换手时描边/文字会跳一下。两处必须落在**同一个整数框**里。 */
-    N.look = cfg.look || { fill: CV.C.panel2, line: CV.C.line2, color: CV.C.text };
+    N.look = cfg.look || { fill: CV.a(CV.C.panel2, .55), line: CV.C.line2, color: CV.C.text };
     N.available = () => !!(WX && cfg.has() && !N.failed);
     function kill() {
       if (N.btn) { try { N.btn.destroy(); } catch (e) {} }
@@ -230,7 +230,7 @@
 
   /* ---------- ① 游戏圈（GC · 基础库 2.0.3 起）---------- */
   /* F3 · 0930L：原生那颗的"脸"**只在这里定义一次**，画布兜底那颗照它画（见文件头的 ① / ②）。 */
-  const LOOK = { fill: CV.C.panel2, line: CV.C.line2, color: CV.C.text };
+  const LOOK = { fill: CV.a(CV.C.panel2, .55), line: CV.C.line2, color: CV.C.text };
   const GC = makeNative({
     name: 'gameclub',
     look: LOOK,
