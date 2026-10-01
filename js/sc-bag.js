@@ -447,8 +447,9 @@
            （`CV.HEAD_GAP`）—— 正文从它下面滚上来时不贴在最后一行的下沿
            （F8 ② 那条 R3-a1，inset_audit 盯着）。 */
         const h = 32 * CV.SCALE;    // 标签行高（和 drawTabCards / 占位一致）
+        /* 2026-10-02：同 CV.drawPageHead —— 吸顶条改**半透明**，底图透得出来（父亲大人：实色块）*/
         const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
-        bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+        bgGrad.addColorStop(0, CV.a(CV.C.bg2, .74)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .80));
         CV.ctx.fillStyle = bgGrad;
         CV.ctx.fillRect(0, CV.TOP, CV.W,
           TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + (CV.HEAD_GAP || 0));

@@ -1457,8 +1457,11 @@
     /* V9.6.10（父亲大人："整体画面笨重、没网页版精致"自审）：
        网页版 #app 是 `linear-gradient(180deg, --bg2, --bg)`（上略亮、下压暗），
        小游戏原来是一块平色 —— 平色在手机上会显得糊、重。照网页版铺一层竖向渐变。 */
+    /* 2026-10-02（父亲大人："避免这种实色块，包括顶部和底部的"）：这一条原来用**不透明**的
+       页面同色渐变铺底，把整屏底图盖死了 —— 二级页的吸顶头在实机上就是一块实色板。
+       现在给同一道渐变**加透明度**（.74/.80）：底图透得出来，滚上来的内容照样被挡住。 */
     const bgGrad = c.createLinearGradient(0, 0, 0, CV.H);
-    bgGrad.addColorStop(0, CV.C.bg2); bgGrad.addColorStop(1, CV.C.bg);
+    bgGrad.addColorStop(0, CV.a(CV.C.bg2, .74)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .80));
     c.fillStyle = bgGrad;
     c.fillRect(0, 0, CV.W, CV.H);
     /* 页面底图（V1.1.3）：有些页要一张**整屏的底**（现在只有"选命格"＝主视觉的背影）。
@@ -1602,7 +1605,7 @@
     /* 2026-10-02（§十一 场景驱动 UI）：顶栏压暗层从 .94 收到 .88 ——
        首页那种"整屏底图"的页面上，让主视觉在最上面一栏也**隐约透一点点**，
        整页才是一张画；数字与图标依旧压得住（它们本身是不透明的）。 */
-    c.fillStyle = CV.a(CV.C.bg, .78);
+    c.fillStyle = CV.a(CV.C.bg, .62);
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -1748,7 +1751,7 @@
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
     const y = CV.H - h;
-    c.fillStyle = CV.a(CV.C.bg2, .78);   // 2026-10-02 父亲大人：底栏半透明，底图铺到它下面
+    c.fillStyle = CV.a(CV.C.bg2, .62);   // 2026-10-02 父亲大人：底栏半透明（.62：底图透得出来）
     c.fillRect(0, y, CV.W, h);
     const tabW = CV.W / CV.NAV_TABS.length;
     CV.NAV_TABS.forEach((t, i) => {
