@@ -7,7 +7,9 @@
      ① **图片**（12 场景 / 6 Boss / 1 主视觉）——把素材按正式文件名复制进工程：
           · 12 场景  → `story/scene/`（剧情**独立分包**，主包不涨）
           · 6 Boss   → `story/boss/`
-          · 主视觉   → `icons/`（现有 `mv-main-lamp.jpg` 留着当兜底，不覆盖）
+          · 主视觉/题字 → **不进本脚本**：成品是 `brand/kv-main.jpg`（主包，压过再进），
+                         原图只落 `story-inbox/kv-raw/`；旧的 `icons/` 已归档到
+                         `story-inbox/legacy-icons/`，**正常路径不再引用**
      ② **SVG 图标**（36 世界 + 24 全局）——编译成 `js/assets-icons.js`：
         小游戏 Canvas **不能可靠地直接画 SVG 文件**（`createImage` 不带 SVG 解码器，
         iOS/Android 表现还不一致）。而这个项目本来就有一套"矢量 op + 运行时着色"的图标体系

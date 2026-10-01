@@ -71,7 +71,7 @@ for (let i = 1; i < gen.length; i++) {
       file: 'js/dungeon.js', line: lineOf('js/dungeon.js', 'EASE_LATE'),
       expected: '相邻世界倍率 ≤ ' + WARN_JUMP + 'x',
       actual: 'HP ' + rh.toFixed(3) + 'x · ATK ' + ra.toFixed(3) + 'x',
-      reason: '**设计级异常候选，不自动判定为程序 Bug**（见 AUDIT-R1.3-阶段一.md）',
+      reason: '**设计级异常候选，不自动判定为程序 Bug**（见 docs/archive/AUDIT-R1.3-阶段一.md）',
     });
   }
   /* ================= 父亲大人 2026-10-01 裁定【甲】=================

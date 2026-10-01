@@ -253,6 +253,8 @@
         "js/sc-splash.js",
         "js/sc-story-data.js",
         "js/sc-home.js",
+        "js/sc-splash.js",
+        "js/sc-story-data.js",
         "js/sc-story.js"
       ],
       "worlds": 0,

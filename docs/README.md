@@ -8,8 +8,16 @@
 
 ## 一、最近四轮的报告（倒序，最新在最上）
 
+> ⚠️ **先看这份**：最终整合版（2.1.0）的交接与账目 ——
+> [CODEX-HANDOFF-FINAL.md](CODEX-HANDOFF-FINAL.md) · [FINAL-CHANGELOG.md](FINAL-CHANGELOG.md) ·
+> [FINAL-TEST-REPORT.md](FINAL-TEST-REPORT.md) · [ASSET-MAP.md](ASSET-MAP.md)
+
 | 轮次 | 文档 | 一句话 |
 |---|---|---|
+| **R1.9** 最终整合 | [docs/FINAL-CHANGELOG.md](FINAL-CHANGELOG.md) | **2.0(UX/经济/战斗反馈) × 2.1(36世界连续叙事) 熔成单版本 `2.1.0`**；逐项账目 + 没合并的东西与理由 |
+| R1.9 交接 | [docs/CODEX-HANDOFF-FINAL.md](CODEX-HANDOFF-FINAL.md) | 工程结构 / 三条纪律 / 怎么验 |
+| R1.9 测试 | [docs/FINAL-TEST-REPORT.md](FINAL-TEST-REPORT.md) | 27 PASS / 0 WARN / 0 FAIL + 数值实测对比 + 待真机项 |
+| R1.9 资源 | [docs/ASSET-MAP.md](ASSET-MAP.md) | 主包 / 分包 / 图标 / 三态加载 / 缺图降级 |
 | **R1.8** 玩家旅程总审 | [docs/audit/R1.8-玩家旅程总审.md](audit/R1.8-玩家旅程总审.md) | 以"第一次打开游戏的人"视角走查；割裂点 10 处（7 SEAMLESS / 3 NOTICEABLE / 0 BROKEN）；P0×3 已修 |
 | R1.8 基线 | [docs/audit/player-journey-baseline.md](audit/player-journey-baseline.md) | 动手**之前**的 10 项真实基线（页面/入口/返回链/剧情/战斗/结算/存档/视觉路径/数值/WARN） |
 | **R1.7** 36 世界叙事重构 | [docs/story/R1.7-36世界叙事重构.md](story/R1.7-36世界叙事重构.md) | 每世界"一件事"（ARC 11 字段 + ≥3 战斗剧情节点）；闪屏根因修复 |
@@ -48,14 +56,18 @@
 | [docs/story/母版提示词-第一期.md](story/母版提示词-第一期.md) | 12 张场景母版的生图提示词 |
 | [docs/story/母版提示词-第二期视觉优化.md](story/母版提示词-第二期视觉优化.md) | 第二期视觉优化提示词 |
 
-## 五、仓库根目录的审计报告（早期，保留）
+## 五、历史归档（`docs/archive/`，**结论已被后续轮次取代，别当现状读**）
 
-| 文件 | 内容 |
-|---|---|
-| [AUDIT-R1.3-阶段一.md](../AUDIT-R1.3-阶段一.md) | 全局审计第一阶段（数值/批量分解/返回链） |
-| [AUDIT-R1.3-阶段二-②.md](../AUDIT-R1.3-阶段二-②.md) | 第二阶段执行记录 |
-| [AUDIT-R1.3-阶段二-②-BASELINE.md](../AUDIT-R1.3-阶段二-②-BASELINE.md) | W01~W36 全表实测基线 |
-| [ISSUES-待检查.md](../ISSUES-待检查.md) | 待检查问题列表 |
+> R1.9 整合时把这四份从仓库根目录移进 `docs/archive/`：它们写的是 **1.0.5 时代**的状态，
+> 留在根目录会被误当成"当前结论"。内容一字未删（含"已解决·请勿改回去"那几条知识），
+> 只是**不再代表现在**。
+
+| 文件 | 内容 | 现在看它要注意 |
+|---|---|---|
+| [archive/AUDIT-R1.3-阶段一.md](archive/AUDIT-R1.3-阶段一.md) | 全局审计第一阶段（数值/批量分解/返回链） | 里面的数值结论已被 R1.4 数值终审取代 |
+| [archive/AUDIT-R1.3-阶段二-②.md](archive/AUDIT-R1.3-阶段二-②.md) | 第二阶段执行记录 | 同上 |
+| [archive/AUDIT-R1.3-阶段二-②-BASELINE.md](archive/AUDIT-R1.3-阶段二-②-BASELINE.md) | W01~W36 全表实测基线 | 读数来自旧 EASE 表；现在的曲线见 R1.9 的 `dungeon.js` |
+| [archive/ISSUES-待检查.md](archive/ISSUES-待检查.md) | 问题单 | 第一节"已解决·请勿改回去"**仍然有效**（是知识）；第二节的"未决"里，版本号口径已在 2.1.0 定案 |
 
 ---
 
@@ -81,4 +93,3 @@ node scripts/economy_sim.js             # 真跑一天：货币与材料收支
    （与"W13 起要满配才过"同源），属**数值层**，不是叙事层能修的。
 3. `ux_audit`：3 条（招募一卡一颗主按钮 / 带价格按钮字数 >8 / 引导锚点清单），逐条给了"保持原样"的理由。
 4. `progression_audit`：4 条（前期 TTK 偏短、后期 Boss TTK 43~100 回合等），已在数值报告里列成"没改的清单"。
-

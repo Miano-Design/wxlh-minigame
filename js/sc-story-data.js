@@ -78,9 +78,10 @@
     W18: 'story/boss/img_boss_W18.png', W24: 'story/boss/img_boss_W24.png',
     W30: 'story/boss/img_boss_W30.png', W36: 'story/boss/img_boss_W36.png',
   };
-  /* 主视觉（1080×1920）：放**剧情分包**里（主包只剩 0.78MB 余量，塞不下这张 792KB 的图）。
-     用途按 §三 给的第二种：**灯阁首页的大面积背景**（首页是二级页，懒加载不影响首屏）；
-     启动页（gate）继续用工程的 `icons/mv-main-lamp.jpg`（3:4，与 gate 的裁切配套）。 */
+  /* 主视觉（1080×1920）：**在主包 `brand/`**（R1.9 起；更早的一版放剧情分包，已作废）。
+     用途：**启动页（gate）+ 灯阁首页**的大面积背景（`Story.kvImage()` 一个取图口）。
+     ⚠️ 旧的 `icons/mv-main-lamp.jpg` 已移进 `story-inbox/legacy-icons/` 归档、**正常路径不再引用**；
+        取图失败就回落程序化底色（见 sc-splash.js 顶部那段"当前真相"）。 */
   const KV_FILE = 'brand/kv-main.jpg';   // 2026-10-02：主视觉搬进**主包** brand/（开机即得，不再依赖分包）
 
   /* ==========================================================================
