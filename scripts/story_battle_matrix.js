@@ -73,7 +73,11 @@ function bossFight(worldId) {
     if (!allies || !allies.length) continue;
     const res = Battle.run({ allies, enemies, worldId, maxRounds: 60 });
     const phases = (res.frames || []).filter((f) => f && f.type === 'phase').length;
-    const rec = { hasBoss, phases, rounds: res.rounds || 0, win: !!res.win, mul: MULS[i] };
+    /* R1.7：「机制是否真的发生」＝这一场里有没有**机制类帧**（状态/规则/护盾/召唤/濒死/阶段）。
+       真跑出来才算，不看代码里写没写。 */
+    const MECH_FRAMES = ['status', 'rule', 'shield', 'summon', 'nearDeath', 'phase', 'revive'];
+    const mech = (res.frames || []).filter((f) => f && MECH_FRAMES.indexOf(f.type) >= 0).length;
+    const rec = { hasBoss, phases, mech, rounds: res.rounds || 0, win: !!res.win, mul: MULS[i] };
     if (!best || rec.phases > best.phases) best = rec;
     if (rec.phases > 0 && rec.win) return rec;      // 既跑到了阶段、又打赢了 → 就是它
   }
@@ -104,18 +108,25 @@ rows.forEach((r) => {
    六卷锚点（W06/12/18/24/30/36）必须有 `inner`（它为什么挡在这里）＋`say`（战前一句）；
    其余 30 个世界的守关 Boss 只要求**有名字**（§十六 的身份层级：只有六卷锚点是"角色级"Boss）。 */
 const ANCHOR_BOSS = ['W06', 'W12', 'W18', 'W24', 'W30', 'W36'];
+const ARC = (G.STORYDATA && G.STORYDATA.ARC) || {};
+const EV = BS.EVENTS || [];
+/* §二十六 的 **12 项**：每一条都读真数据（ARC / 引擎 / 真跑出来的帧），不读策划表。 */
 const CHECK = [
-  ['为什么来到这里', (r) => r.parts.in > 0 || r.parts.pre > 0],
-  ['这里发生什么', (r) => !!r.conflict],
-  ['为什么必须战斗', (r) => r.parts.pre > 0 || !!r.bossSay],
-  ['敌人为什么阻止玩家', (r) => !!r.bossInner || !!r.boss],
-  ['战斗机制是否来自世界设定', (r) => !!r.mechanic && !!r.engine],
-  ['Boss 是否具有身份', (r) => (ANCHOR_BOSS.indexOf(r.id) >= 0 ? (!!r.boss && !!r.bossInner && !!r.bossSay) : !!r.boss)],
-  ['Boss 战是否有阶段变化（**真跑出来的帧**）', (r) => r.fight.hasBoss && r.fight.phases > 0],
-  ['战斗中是否有至少一个叙事反馈', (r) => r.echoEvents.length > 0],
-  ['战斗胜利是否改变了什么', (r) => r.parts.post > 0],
-  ['是否产生新线索', (r) => !!r.clue],
-  ['下一步是否自然（有下一个世界）', (r) => !!r.next || r.id === 'W36'],
+  ['① 为什么进入这个世界', (r) => !!(ARC[r.id] && ARC[r.id].premise)],
+  ['② 发现什么（异常）', (r) => !!(ARC[r.id] && ARC[r.id].anomaly)],
+  ['③ 为什么必须战斗', (r) => !!(ARC[r.id] && ARC[r.id].conflict)],
+  ['④ 敌人为什么阻挡玩家', (r) => !!(ARC[r.id] && ARC[r.id].enemyPurpose)],
+  ['⑤ 世界机制是什么', (r) => !!(ARC[r.id] && ARC[r.id].battleMechanic) && !!r.mechanic],
+  ['⑥ 机制是否**真的发生**（真跑出机制帧）', (r) => !!r.engine && r.fight.mech > 0],
+  ['⑦ Boss 是谁', (r) => !!(ARC[r.id] && ARC[r.id].bossRole) && !!r.boss],
+  ['⑧ Boss 为什么存在', (r) => (ANCHOR_BOSS.indexOf(r.id) >= 0 ? !!r.bossInner : !!(ARC[r.id] && ARC[r.id].enemyPurpose))],
+  ['⑨ 战斗中发生了什么（≥3 个真·剧情节点）', (r) => {
+    const ev = (ARC[r.id] || {}).battleEvents || [];
+    return ev.length >= 3 && ev.every((e) => EV.indexOf(e.trigger) >= 0);
+  }],
+  ['⑩ 战斗结果改变了什么', (r) => !!(ARC[r.id] && ARC[r.id].environmentChange) || !!r.after],
+  ['⑪ 得到了什么新线索', (r) => !!(ARC[r.id] && ARC[r.id].clue) || !!r.clue],
+  ['⑫ 下一世界为什么成立', (r) => !!(ARC[r.id] && ARC[r.id].transition) && (!!r.next || r.id === 'W36')],
 ];
 const zeros = [];
 const score = {};
@@ -127,16 +138,16 @@ rows.forEach((r) => {
 R.note('');
 R.note('叙事完整度（11 项 · 36 世界逐项真判）：');
 CHECK.forEach(([name]) => R.note('  ' + name + '：' + (score[name] || 0) + '/36'));
-const bad = zeros.filter((z) => z.miss.length >= 3);
+const bad = zeros.filter((z) => z.miss.length >= 2);
 if (bad.length) {
-  R.fail('有世界在 11 项里缺 3 项以上（＝"剧情让我关心一件事、战斗却完全无关"的候选）', {
-    file: 'js/sc-story-data.js', expected: '每世界 ≥9/11',
+  R.fail('有世界在 12 项里缺 2 项以上（＝"剧情让我关心一件事、战斗却完全无关"的候选）', {
+    file: 'js/sc-story-data.js', expected: '每世界 ≥11/12',
     actual: bad.slice(0, 8).map((z) => z.r.id + '（缺 ' + z.miss.length + '：' + z.miss.slice(0, 3).join('/') + '…）').join(' ; '),
   });
 } else {
   const partial = zeros.map((z) => z.r.id + '(' + z.miss.join('/') + ')');
-  (partial.length ? R.warn : R.pass)('每个世界都在 11 项里达标 ≥9（缺 1~2 项的列出来）', {
-    file: 'js/sc-story-data.js', expected: '36 个世界都完整',
+  (partial.length ? R.warn : R.pass)('每个世界都在 12 项里达标 ≥11（只缺 1 项的列出来）', {
+    file: 'js/sc-story-data.js', expected: '36 个世界都完整（12/12）',
     actual: partial.length ? partial.slice(0, 10).join(' ; ') : '36/36 全达标',
   });
 }
@@ -161,4 +172,32 @@ if (bad.length) {
 
 R.note('');
 R.note('口径：剧情读 STORYDATA/BOSS，战斗**真跑**（Dungeon.makeEnemies + Battle.run），残响读 BattleStory.tableOf。');
+/* ================= 《36 世界连续体验报告》（§三十六 要求的逐世界一行） =================
+   五列口径（每列 PASS/WARN/FAIL，不看"功能有没有"，只看"这一环成不成立"）：
+     · 进入是否自然     ：ARC.premise 存在，且上一世界 transition 被它接住（`story_continuity_audit` 同口径）
+     · 战斗是否由剧情产生：ARC.conflict/enemyPurpose 存在（"为什么必须打"有答案）
+     · 战斗是否讲故事   ：ARC 的 ≥3 个战斗节点全部挂在我支持的真事件上
+     · 战后是否改变     ：ARC.environmentChange 存在（或锚点 Boss 有 after）
+     · 是否推动下一世界 ：ARC.clue + transition 存在，且不是最后一个世界时有下一个世界 */
+R.note('');
+R.note('《36 世界连续体验报告》 世界 | 进入是否自然 | 战斗是否由剧情产生 | 战斗是否讲故事 | 战后是否改变 | 是否推动下一世界');
+{
+  const AR = (G.STORYDATA && G.STORYDATA.ARC) || {};
+  const V = (ok, soft) => (ok ? 'PASS' : (soft ? 'WARN' : 'FAIL'));
+  const key2 = (s) => { const o = {}; const t = String(s || ''); for (let i = 0; i < t.length - 1; i++) { const w = t.slice(i, i + 2); if (!/[\s，。、」「：；？！…·—]/.test(w)) o[w] = 1; } return Object.keys(o); };
+  const share = (a, b) => { const A = key2(a); const B = key2(b); return A.some((k) => B.indexOf(k) >= 0); };
+  rows.forEach((r, i) => {
+    const a = AR[r.id] || {};
+    const prev = i ? AR[rows[i - 1].id] : null;
+    const enterOk = !prev || share(prev.transition, (a.premise || '') + (a.anomaly || ''));
+    const col = [
+      V(!!a.premise && enterOk, !!a.premise),
+      V(!!a.conflict && !!a.enemyPurpose),
+      V((a.battleEvents || []).length >= 3 && (a.battleEvents || []).every((e) => (BS.EVENTS || []).indexOf(e.trigger) >= 0)),
+      V(!!a.environmentChange || !!r.after),
+      V(!!a.clue && !!a.transition && (!!r.next || r.id === 'W36')),
+    ];
+    R.note('  ' + r.id + ' | ' + col.join(' | '));
+  });
+}
 R.finish();

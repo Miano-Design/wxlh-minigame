@@ -1,0 +1,264 @@
+{
+  "generatedFor": "R1.7",
+  "sceneCount": 12,
+  "bossCount": 6,
+  "kv": "brand/kv-main.jpg",
+  "rows": [
+    {
+      "asset": "story/scene/img_scene_bio_lab.jpg",
+      "kind": "scene",
+      "id": "bio_lab",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 3,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_bio_swamp.jpg",
+      "kind": "scene",
+      "id": "bio_swamp",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 4,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_bio_sea.jpg",
+      "kind": "scene",
+      "id": "bio_sea",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_ghost_house.jpg",
+      "kind": "scene",
+      "id": "ghost_house",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 3,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_ghost_town.jpg",
+      "kind": "scene",
+      "id": "ghost_town",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_ghost_env.jpg",
+      "kind": "scene",
+      "id": "ghost_env",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 3,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_ghost_wall.jpg",
+      "kind": "scene",
+      "id": "ghost_wall",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 2,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_tech_waste.jpg",
+      "kind": "scene",
+      "id": "tech_waste",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 2,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_tech_base.jpg",
+      "kind": "scene",
+      "id": "tech_base",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 5,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_mystic_ruins.jpg",
+      "kind": "scene",
+      "id": "mystic_ruins",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 5,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_mystic_throne.jpg",
+      "kind": "scene",
+      "id": "mystic_throne",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 2,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/scene/img_scene_god_hall.jpg",
+      "kind": "scene",
+      "id": "god_hall",
+      "references": [
+        "js/sc-story-data.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 5,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W06.png",
+      "kind": "boss",
+      "id": "W06",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W12.png",
+      "kind": "boss",
+      "id": "W12",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W18.png",
+      "kind": "boss",
+      "id": "W18",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W24.png",
+      "kind": "boss",
+      "id": "W24",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W30.png",
+      "kind": "boss",
+      "id": "W30",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W36.png",
+      "kind": "boss",
+      "id": "W36",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "brand/kv-main.jpg",
+      "kind": "kv",
+      "id": "main",
+      "references": [
+        "js/sc-home.js",
+        "js/sc-splash.js",
+        "js/sc-story-data.js",
+        "js/sc-home.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 0,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    }
+  ]
+}

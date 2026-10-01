@@ -807,9 +807,297 @@
     W34: '钟塔工人的衣。所有扣子都指着同一个时刻。',
     W35: '船工的斗篷。下摆湿着，但它从没下过船。',
   };
+  /* ==========================================================================
+     R1.7《36 世界完整叙事战斗体验》· **每世界一件事**
+     ------------------------------------------------------------------------------
+     父亲大人的目标（原话）：「不是"剧情和战斗融合"，而是**战斗本身就是剧情**」。
+     所以每个世界必须能回答一条因果链：
+        发现异常 → 进现场 → 事情发生 → 敌人出现 → 我亲手解决 → 战场改变 → 得到线索 → 继续深入
+
+     ⚠️ **这不是第三套平行数据库**（§四 明令）。它就是 `STORYDATA` 的一张表：
+        · `WORLDS[wid]` 仍是四拍台词（in/pre/mid/post）——**一个字没改**；
+        · `BOSS[wid]` 仍是六个锚点 Boss 的 say/inner/after/mystery —— **一个字没改**；
+        · 这张 `ARC` 只补三样现有两处都没有的东西：
+            ① **普通世界也要有"事件"**（不是只有 6 个锚点有）；
+            ② **每场战斗至少 3 个真·剧情节点**（挂在我支持的那 17 个战斗事件上）；
+            ③ **战后环境变化 + 线索**（普通世界也要有，原来只有 Boss 锚点有）。
+        显示层读它的是 `js/sc-story-battle.js`（`BattleStory`）——**没有新增引擎**。
+
+     ⚠️ 写法纪律（§十三 / §二十九）：
+        · 一行一个事件，尽量 ≤ 30 字；能用"看到"表达的不写成长句；
+        · 36 个世界**各不相同**（机制来自这个世界、敌人动机来自这个世界、变化只在这里发生）；
+        · 不提前泄底：`clue` 只给"事实 + 一个不该存在的细节"，不给解释。
+     ========================================================================== */
+  const ARC = {
+    /* ---------- 第一卷《灯下之地》：这个世界不正常 ---------- */
+    W01: { premise: '灯阁记录里出现了不该有的感染读数', anomaly: '地面黏液在缓慢向灯阁方向爬', conflict: '感染体挡在唯一通路上', playerGoal: '找到感染源', enemyPurpose: '它们只是照着扩散的本能在动', battleMechanic: '感染：被击中会挂中毒', bossRole: '巢母——它不是源头，是最后一个还在扩散的节点', bossTrigger: '玩家踏入巢室深处，孢子浓度骤升',
+      battleEvents: [
+        { trigger: 'first_hit', type: 'narrative', line: '它的血是黑的，闻起来像灯油。' },
+        { trigger: 'boss_hp50', type: 'mechanic', line: '孢子浓度上升——呼吸开始变得困难。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '黏液停止流动，路面第一次露出石头。' },
+      ],
+      environmentChange: '感染扩散停了一瞬', clue: '感染不是自然形成的', transition: '往黏液来的方向走' },
+    W02: { premise: '顺着黏液来的方向走，尽头是一个洞窟', anomaly: '洞窟里没有敌人，但攻击从看不见的地方来', conflict: '第一击落在背上，看不到是谁', playerGoal: '找出攻击者', enemyPurpose: '它在试你的反应，不是在杀你', battleMechanic: '突袭：敌人更快，会挂裂伤', bossRole: '潜影之王——它认出了玩家的打法', bossTrigger: '玩家躲开第三次突袭',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '第一刀是从背后来的。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '它停了一下——像在确认什么。' },
+        { trigger: 'battle_win', type: 'narrative', line: '它退进黑暗前说：你还是这样打。' },
+      ],
+      environmentChange: '洞壁上的抓痕里出现了新的刻字', clue: '有人认识玩家', transition: '刻字指向旧宅' },
+    W03: { premise: '刻字把玩家带到一栋旧宅', anomaly: '屋里有人在说话，但房间里没有人', conflict: '声音开始对玩家的名字做出反应', playerGoal: '找出说话的是谁', enemyPurpose: '它们借玩家的记忆显形', battleMechanic: '恐惧：被击中会挂虚弱与诅咒', bossRole: '旧宅的主声——玩家的恐惧借它的形', bossTrigger: '玩家经过镜子，镜里多了一个人',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '有人在叫你的名字，声音是从墙里来的。' },
+        { trigger: 'boss_debuff', type: 'mechanic', line: '恐惧压上来——手在抖。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '说话声停了。屋子安静得不像死过人的地方。' },
+      ],
+      environmentChange: '旧宅的声音停了一次', clue: '它们叫的名字，玩家没告诉过任何人', transition: '宅后有一道封着的门' },
+    W04: { premise: '旧宅后院那道封门底下是台阶', anomaly: '这里是一座古代封存设施，机关仍在运转', conflict: '设施把玩家当成了入侵记录', playerGoal: '穿过设施', enemyPurpose: '封存体只是执行封存指令', battleMechanic: '机关：随机眩晕；封存体会借机关复位', bossRole: '守门者——它守着的东西还在下面', bossTrigger: '玩家踩到第一块压力砖',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'mechanic', line: '脚下的砖沉下去了——有东西开始转。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '它又站着，和刚才一模一样。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '机关停了，通往下一层的门自己打开。' },
+      ],
+      environmentChange: '封存设施开了下一层', clue: '封存记录里有一行编号是空的', transition: '下一层传来水声' },
+    W05: { premise: '下一层的水声尽头，是一个不该有水的船坞', anomaly: '旅客名单上全是没能下船的人', conflict: '船员还在执行一百年前的班次', playerGoal: '下船', enemyPurpose: '它们只是还没被通知可以停', battleMechanic: '濒死：每场一次，把玩家打到剩 1 点血', bossRole: '终结舵手——他还在等靠岸的指令', bossTrigger: '玩家走到驾驶舱门口',
+      battleEvents: [
+        { trigger: 'player_low_hp', type: 'narrative', line: '你没有倒下。不——这具身体本来应该倒下。' },
+        { trigger: 'boss_hp50', type: 'narrative', line: '舵手：班次还没结束。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '船身第一次不再摇晃。' },
+      ],
+      environmentChange: '客轮停在了它一百年前就该停的地方', clue: '名单最后一页写着一个和玩家一样的名字', transition: '远处的轨道亮了一下' },
+    W06: { premise: '名单上的编号指向一条废弃轨道', anomaly: '轨道在没有列车的情况下重新通电', conflict: '系统把玩家标记为未授权通行', playerGoal: '穿过轨道带', enemyPurpose: '主控只是在执行一条没人解除的旧命令', battleMechanic: '护盾：开场获得护盾；远程炮击', bossRole: '轨道主控——它不是主动攻击，是在禁止通行', bossTrigger: '炮塔转向玩家的那一刻',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '轨道亮了。没有人来，也没有车。' },
+        { trigger: 'boss_buff', type: 'mechanic', line: '护盾展开——炮塔开始充能。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '主控：识别失败。权限……不存在。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '轨道恢复运行，道路第一次打开。' },
+      ],
+      environmentChange: '轨道重新运行', clue: '一列没有编号的列车停在尽头', transition: '列车门是开着的' },
+    W07: { premise: '列车把玩家带进一片睡着的区域', anomaly: '走这里的人会在半路失去方向', conflict: '睡意开始在战斗中出现', playerGoal: '保持清醒走完', enemyPurpose: '它们靠睡眠里的人定位', battleMechanic: '睡眠：概率无法行动；幻觉', bossRole: '潜睡者——它靠别人的梦存在', bossTrigger: '玩家第一次在战斗中站住不动',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '刚才那一下，你分不清是梦里还是现在。' },
+        { trigger: 'boss_debuff', type: 'mechanic', line: '视野边缘开始发白。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '雾退了一步——这是这一路第一次退。' },
+      ],
+      environmentChange: '睡意退开了一段', clue: '梦里出现过玩家自己走路的背影', transition: '雾的后面有个镇子' },
+    W08: { premise: '镇子就在雾后面', anomaly: '所有人都知道玩家来了，但没有人说话', conflict: '雾吞掉声音，也吞掉准头', playerGoal: '找到还在说话的人', enemyPurpose: '雾里的东西不想被看见', battleMechanic: '浓雾：命中下降', bossRole: '镇中之声——它把整个镇子的沉默拢在一起', bossTrigger: '玩家在雾里击中了一个不该在那里的东西',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '你看不见它，只看得见攻击的轨迹。' },
+        { trigger: 'world_rule', type: 'mechanic', line: '雾又厚了一层。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '雾散开一条缝——里面是一张熟悉的脸。' },
+      ],
+      environmentChange: '雾短暂散开', clue: '雾里那张脸是玩家自己', transition: '雾散的方向是海上' },
+    W09: { premise: '雾散的方向是一片海，海上有一座不该存在的岛', anomaly: '岛在呼吸——它是一头巨兽', conflict: '巨兽把玩家当成入侵者', playerGoal: '从它身上走过去', enemyPurpose: '它不是猎食，它是在护着什么', battleMechanic: '撕裂：裂伤；群体攻击', bossRole: '巨兽——它背上是上一批人的营地', bossTrigger: '玩家踩上它的背',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '你不是猎人。你是站到它背上的那个人。' },
+        { trigger: 'boss_skill', type: 'mechanic', line: '整座岛晃了一下。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '巨兽沉下去，背上露出一个旧营地。' },
+      ],
+      environmentChange: '巨兽沉入海面', clue: '营地里有玩家自己的旧装备', transition: '营地指向内陆沼泽' },
+    W10: { premise: '内陆是一片瘴气沼泽', anomaly: '瘴气在主动往玩家身上聚', conflict: '环境本身在吞人', playerGoal: '走到对岸', enemyPurpose: '沼泽里的东西靠腐化活着', battleMechanic: '中毒：持续掉血；缠绕', bossRole: '沼泽之肺——它把整片瘴气吸在一起', bossTrigger: '玩家第一次被藤蔓缠住脚踝',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'mechanic', line: '空气里有一股甜味——那是坏东西的味。' },
+        { trigger: 'player_low_hp', type: 'narrative', line: '这一次不是伤，是被吃掉。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '瘴气沉下去，第一次能看清对岸。' },
+      ],
+      environmentChange: '瘴气沉降', clue: '对岸停着一排旧船', transition: '船坞在雾里' },
+    W11: { premise: '雾里的船坞就在瘴气对岸', anomaly: '船上的水手还在做一百年前的活', conflict: '他们不让任何人开走最后一条船', playerGoal: '借一条船出海', enemyPurpose: '他们只是在执行没被取消的任务', battleMechanic: '召唤：叫出旧船员；汲取', bossRole: '老船主——他还在等出航的命令', bossTrigger: '玩家碰到舵轮',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '他们不看你的脸，只看你手里的活。' },
+        { trigger: 'boss_skill', type: 'mechanic', line: '甲板下有人开始往上爬。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '水手们停了，一起看向海面。' },
+      ],
+      environmentChange: '船坞的任务停了', clue: '海图上有一圈被划掉的岛', transition: '被划掉的就是蚀环' },
+    W12: { premise: '海图把玩家带到蚀环远征', anomaly: '有人在有意破坏灯阁的循环', conflict: '蚀冠之王挡在环上', playerGoal: '走到环心', enemyPurpose: '他不是守关的，他是不肯被删掉的人', battleMechanic: '腐化：降低防御；群体增益', bossRole: '蚀冠之王——他知道玩家上一次没走到这里', bossTrigger: '玩家踏上环的第一圈',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '环在转，但没有人推它。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '蚀冠之王：你来过这儿。上一次，你没走到这儿。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '环停了一瞬，露出中间那块空地。' },
+      ],
+      environmentChange: '蚀环停了半圈', clue: '环心刻着一串和第 5 世界一样的名字', transition: '环心下面还有一层' },
+
+    /* ---------- 第二卷《雾中的人》：有人认识你 ---------- */
+    W13: { premise: '环心下面的台阶通到一片结冰的王座', anomaly: '冰在冻住时间，也在冻住记忆', conflict: '寒冠女王在等一个称呼', playerGoal: '走上王座', enemyPurpose: '她认出了玩家，但不确定是不是同一个', battleMechanic: '冰冻：无法行动；王权强化', bossRole: '寒冠女王——她记得上一次的王座不是空着的', bossTrigger: '玩家踏上王座台阶的第一级',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '冰面下面有个人影，和你一样高。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '寒冠女王：……还是你。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '王座裂了一道缝，冰开始化。' },
+      ],
+      environmentChange: '王座破裂', clue: '冰里冻着一盏没有点过的灯', transition: '灯的方向是灯阁试炼场' },
+    W14: { premise: '灯阁把玩家叫进了自己的试炼场', anomaly: '规则每几回合就换一次', conflict: '灯阁不回答问题，只出题', playerGoal: '通过试炼', enemyPurpose: '代行者只是替灯阁看着你怎么应对', battleMechanic: '随机规则：每回合变化', bossRole: '试炼裁决者——它按灯阁的记录判分', bossTrigger: '玩家赢下试炼的第一轮',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '场地在变，规则也在变——它在看你怎么选。' },
+        { trigger: 'world_rule', type: 'mechanic', line: '规则又换了。这次换得更快。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '试炼场停手，地上留下一行评分。' },
+      ],
+      environmentChange: '试炼结束并留档', clue: '评分记录里有一条是上一次的', transition: '留档指向绯月旧堡' },
+    W15: { premise: '旧堡的红月还挂在原处', anomaly: '他们吸血不是为了杀人，是为了取样', conflict: '堡里的人想确认玩家是不是"那个人"', playerGoal: '穿过旧堡', enemyPurpose: '他们在做确认，不是猎食', battleMechanic: '汲取：敌人攻击回复自身；绯月强化', bossRole: '绯月堡主——他手里有上一次的样本', bossTrigger: '玩家进入堡内血池旁',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '他们不着急杀你，像是在量你。' },
+        { trigger: 'boss_buff', type: 'mechanic', line: '绯月升高——他们的伤在合。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '血池退下去，露出池底的刻痕。' },
+      ],
+      environmentChange: '血池退去', clue: '池底刻的编号和玩家的一模一样', transition: '编号的下一条记录在沉海' },
+    W16: { premise: '记录把玩家带到一片沉在海里的废墟', anomaly: '废墟下面还有结构，比上面更古老', conflict: '水压与触手把路封住', playerGoal: '潜到最下面一层', enemyPurpose: '下面的东西不想被看见', battleMechanic: '水压：每回合全队掉血；触手缠绕', bossRole: '沉海之主——它守着更下面那层', bossTrigger: '玩家下潜到没有光的地方',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'mechanic', line: '耳朵在响——水压开始压人。' },
+        { trigger: 'player_low_hp', type: 'narrative', line: '下面还有东西。它在等你下来。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '水退了一阵，露出更下面那层门。' },
+      ],
+      environmentChange: '水退，露出下一层', clue: '门上的锁是灯阁的纹样', transition: '门联网在蜂群主控' },
+    W17: { premise: '门后面是一套还在运行的主控系统', anomaly: '系统的字段里多出一个不该存在的编号', conflict: '无人机群把玩家当成未登记进程', playerGoal: '拿到系统底档', enemyPurpose: '它按白名单杀人，没有恶意', battleMechanic: '无人机群：群体攻击；电磁干扰', bossRole: '蜂群主控——第一次真正和"系统"对话', bossTrigger: '玩家读到那一行异常编号',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '屏幕上一行字跳了一下——那是你的编号。' },
+        { trigger: 'boss_debuff', type: 'mechanic', line: '电磁干扰——技能开始失灵。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '主控降速，底档第一次可读。' },
+      ],
+      environmentChange: '主控降速，底档可读', clue: '底档里玩家是"第 8 个登记对象"', transition: '登记记录的下一站是疗养院' },
+    W18: { premise: '登记记录指向一栋白墙疗养院', anomaly: '病历上写满了玩家的名字，编号却没有 08', conflict: '院长认为玩家不该醒来', playerGoal: '读完病历', enemyPurpose: '他想把玩家写回记录里', battleMechanic: '幻觉：概率攻击队友；死亡复活', bossRole: '白衣院长——他做过这件事，不止一次', bossTrigger: '玩家翻开 07 号病历',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '欢迎回来。病历已经翻到第几页了？' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '院长：你本来就不应该醒来。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '疗养院的灯全灭了，只有三楼还亮着一盏。' },
+      ],
+      environmentChange: '疗养院断电，三楼留一盏', clue: '病历里没有 08——但 07 的字迹和玩家一样', transition: '星骸遗址的坐标在病历背面' },
+    /* ---------- 第三卷《第二次醒来》：你以前来过 ---------- */
+    W19: { premise: '病历背面写着一个坐标', anomaly: '残域不是自然形成的——它有结构', conflict: '遗址的护盾把玩家挡在外面', playerGoal: '进到遗址中心', enemyPurpose: '这里的守卫在防止结构被读出来', battleMechanic: '星骸护盾；轨道扫射', bossRole: '遗址守层者——它守的是一张图', bossTrigger: '玩家第一次击穿外层护盾',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '这不是废墟。这是排布过的。' },
+        { trigger: 'boss_buff', type: 'mechanic', line: '护盾重启——扫射又来了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '护盾灭了，整片遗址第一次露出全貌。' },
+      ],
+      environmentChange: '遗址露出全貌', clue: '整片残域是一张排布过的图', transition: '图的中心是灯阁回廊' },
+    W20: { premise: '图的中心是一条回廊', anomaly: '回廊深处是灯阁真正的结构', conflict: '规则在这里被改写', playerGoal: '走到回廊尽头', enemyPurpose: '回廊在阻挡任何靠近核心的人', battleMechanic: '规则改写：每 3 回合变换；全场压制', bossRole: '回廊守层——它按灯阁的规矩拦人', bossTrigger: '玩家走进第三条回廊',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '这里的路会自己换——灯阁不想让人走完。' },
+        { trigger: 'world_rule', type: 'mechanic', line: '规则被改了。这次改的是你。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '回廊停止变化，尽头露出一扇门。' },
+      ],
+      environmentChange: '回廊定形', clue: '门上刻着一段被演过的往事', transition: '往事在一座戏院里' },
+    W21: { premise: '门后面是一座还在演出的戏院', anomaly: '台上演的是玩家没经历过的过去', conflict: '演员不让戏停', playerGoal: '看完这一段', enemyPurpose: '戏一停，那段事就真的没了', battleMechanic: '静默：攻击附带恐惧；护幕', bossRole: '无声主演——它演的是给玩家看的那一版', bossTrigger: '玩家坐上第一排',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '台上那个人的动作，和你一模一样。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '戏里的你回过头，看向台下的你。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '幕布落下，台上留了一样东西。' },
+      ],
+      environmentChange: '戏演完，台上留下物件', clue: '台下的座位牌上有玩家的名字', transition: '物件来自一艘方舟' },
+    W22: { premise: '戏院的道具是一块方舟残片', anomaly: '有东西曾经试图离开残域', conflict: '方舟的锈壳不让任何人上去', playerGoal: '找到离港记录', enemyPurpose: '锈壳护盾是当年最后一道命令', battleMechanic: '锈壳护盾；电磁干扰', bossRole: '方舟主梁——它还记着那次没走成的离港', bossTrigger: '玩家读到最后一次离港时间',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '有人造过一艘船想走。船还在。' },
+        { trigger: 'boss_buff', type: 'mechanic', line: '锈壳合上了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '船腹打开，离港记录第一次完整。' },
+      ],
+      environmentChange: '方舟开舱', clue: '离港名单上有一栏写着"未登船：08"', transition: '孵化间的记录接着往下写' },
+    W23: { premise: '孵化间的记录接着往下写：货舱里全是封着的卵', anomaly: '感染源不是最初的源头——它有上一代', conflict: '幼体在货舱里孵化', playerGoal: '找到第一代记录', enemyPurpose: '巢母只是在护卵', battleMechanic: '感染：攻击附带中毒；召唤幼体', bossRole: '巢母——它也是被做出来的', bossTrigger: '玩家踩裂第一枚卵',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '这些卵不是自己长出来的。' },
+        { trigger: 'boss_skill', type: 'mechanic', line: '又有东西破壳了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '巢室安静下来，剩下的卵不再动。' },
+      ],
+      environmentChange: '巢室静默', clue: '第一代感染源是"保存"的产物', transition: '保存的痕迹在灰烬圣所' },
+    W24: { premise: '卵壳上刻着圣所的记号', anomaly: '圣所里全是保存与献祭的记录', conflict: '祭司不让人读那本册子', playerGoal: '读到册子', enemyPurpose: '他知道代价，还要守着', battleMechanic: '腐化：降低防御；焚香灼烧', bossRole: '灰袍祭司——他知道代价，还替他守门', bossTrigger: '玩家翻开记录册的最后一页',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '香灰底下压着名字。你踩过去了。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '祭司：留住是要还的。他从来没说。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '香灰散开，册子上露出一行被涂掉的字。' },
+      ],
+      environmentChange: '圣所的香火熄了一次', clue: '被涂掉的那行是"第八个已经还过"', transition: '镜界法庭就在册子背面' },
+
+    /* ---------- 第四卷《没有归途的文明》：灯阁保存了什么 ---------- */
+    W25: { premise: '册子背面是一行坐标', anomaly: '法庭里的镜面会复制玩家', conflict: '镜子里的玩家动作和你不一样', playerGoal: '上庭', enemyPurpose: '它按规则审判，规则是灯阁定的', battleMechanic: '规则轮转：每 4 回合换一条；镜面幻觉', bossRole: '镜界审判者——它审的是"你是不是本人"', bossTrigger: '玩家第一次看见镜子里的自己先动了',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '镜子里那个，比你早动了半秒。' },
+        { trigger: 'world_rule', type: 'mechanic', line: '法则换了。这次换的是镜子的那一侧。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '镜面裂开，倒影里的人第一次和玩家同步。' },
+      ],
+      environmentChange: '镜面碎裂', clue: '倒影比玩家多一道旧伤', transition: '零号实验舱的编号跟着裂痕出现' },
+    W26: { premise: '裂痕后面是一间编号 0 的舱室', anomaly: '舱里的记录在玩家出生之前就写好了', conflict: '培养舱把玩家当成待回收样本', playerGoal: '读实验记录', enemyPurpose: '它只是在执行回收', battleMechanic: '培养护盾；轨道扫射', bossRole: '零号培养体——玩家可能和它是同一批', bossTrigger: '玩家靠近写着 0 的舱体',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '舱体上的 0，比你的编号还早。' },
+        { trigger: 'boss_hp50', type: 'mechanic', line: '培养液开始往下走。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '实验记录第一次全部解锁。' },
+      ],
+      environmentChange: '零号舱排空', clue: '实验记录里玩家是"重载版"', transition: '长明夜行的灯就是为这个点的' },
+    W27: { premise: '长明夜行的灯就是为这个点的——记录上写着"等他回来"', anomaly: '有人一直在这里等', conflict: '夜色里的影子用玩家的习惯出手', playerGoal: '见到等他的人', enemyPurpose: '影子只是在守着夜', battleMechanic: '召唤夜影；汲取', bossRole: '提灯之主——他留了一盏灯给下一个', bossTrigger: '玩家走到那盏灯下',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '灯一直亮着。像是知道有人要来。' },
+        { trigger: 'boss_skill', type: 'mechanic', line: '影子从灯影里走出来。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '灯座翻过来，底下刻着一个空位。' },
+      ],
+      environmentChange: '一盏灯交到玩家手上', clue: '第八个位置不是空的', transition: '空位指向活体森林' },
+    W28: { premise: '空位上写着"林"字', anomaly: '森林会记得每一个来过的人', conflict: '树不让玩家走出去', playerGoal: '走到林子中心', enemyPurpose: '它把玩家当成记忆的一部分', battleMechanic: '中毒：持续掉血；藤蔓缠绕', bossRole: '林心——它把玩家记在里面', bossTrigger: '玩家在树皮上看到自己的名字',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '树会呼吸，也记得你砍过谁。' },
+        { trigger: 'boss_debuff', type: 'mechanic', line: '藤蔓缠上来了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '林子让开一条路，直通碑庭。' },
+      ],
+      environmentChange: '森林让路', clue: '年轮里刻着玩家没经历过的年份', transition: '碑庭就在路尽头' },
+    W29: { premise: '路尽头是第九碑庭', anomaly: '九块碑，八个名字，还有一个空位', conflict: '守誓者不让任何人碰第八块', playerGoal: '读到第八块', enemyPurpose: '他在守着"空位不该被填"', battleMechanic: '诅咒：降低防御；碑纹苏醒', bossRole: '碑庭守誓者——他守的是那个空位', bossTrigger: '玩家把手放到第八块碑上',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '你径直走向第八块，像走过很多次。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '守誓者：你不该摸它。' },
+        { trigger: 'battle_win', type: 'narrative', line: '第八块碑上，浮出一个刚刚刻上去的名字。' },
+      ],
+      environmentChange: '第八块碑显出名字', clue: '那个名字就是玩家', transition: '名字下面刻着熔芯之炉' },
+    W30: { premise: '碑上刻着熔芯之炉', anomaly: '炉火不能停，停了它就会醒', conflict: '核心在阻止任何人关炉', playerGoal: '看清炉里烧的是什么', enemyPurpose: '它知道后果，才不让关', battleMechanic: '灼烧：持续掉血；炉温强化', bossRole: '熔芯核心——它不是有立场，是有后果', bossTrigger: '玩家伸手去够炉门',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '炉壁上有很多被凿掉的字。' },
+        { trigger: 'boss_skill', type: 'mechanic', line: '炉温又升高了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '炉芯停了，整片区域的灯暗了一档。' },
+      ],
+      environmentChange: '炉芯停止，区域变暗', clue: '炉壁被凿掉的那行是"他们还活着"', transition: '回音之墙就在炉后面' },
+
+    /* ---------- 第五卷《第八个名字》→ 第六卷《最后一盏灯》 ---------- */
+    W31: { premise: '炉后面是一堵会回话的墙', anomaly: '你喊什么它就把什么还给你', conflict: '墙把玩家过去的声音一句句放出来', playerGoal: '走到墙尽头', enemyPurpose: '回音在把过去留在这里', battleMechanic: '幻觉：概率攻击队友；诅咒', bossRole: '回音之主——它是玩家留下的声音', bossTrigger: '玩家对着墙喊了一句',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '墙把你的声音还回来了——但那不是你刚才说的。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '回音：回来就好。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '墙面安静下来，只剩一层薄薄的灰。' },
+      ],
+      environmentChange: '回音停止', clue: '那层薄灰里混着灯油', transition: '万灯之座就在前面' },
+    W32: { premise: '回音的灰尽头，就是万灯之座', anomaly: '每一个灯座都刻着一位执灯者', conflict: '灯影在压制任何靠近的人', playerGoal: '找到第八个灯座', enemyPurpose: '它们只是还亮着的那些记忆', battleMechanic: '规则改写：每 3 回合变换；灯影压制', bossRole: '座前禁卫——它守着最后一个空座', bossTrigger: '玩家找到那个空着的灯座',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '每一个座上都刻着名字。只有一个还空着。' },
+        { trigger: 'world_rule', type: 'mechanic', line: '灯影压下来了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '空座上亮起一盏很小的灯。' },
+      ],
+      environmentChange: '空座点亮', clue: '点灯的人一直没有出现', transition: '吞噬环带正在吞掉这些灯' },
+    W33: { premise: '有东西正在吞掉这一排灯', anomaly: '残域本身开始崩坏', conflict: '环带把整片灯座往里吸', playerGoal: '穿过环带', enemyPurpose: '它只是在完成吞噬', battleMechanic: '撕裂：裂伤；吞噬护盾', bossRole: '环带核心——世界本身出的问题', bossTrigger: '玩家感觉脚下的地少了一块',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '有块地刚刚不见了。不是塌，是不见了。' },
+        { trigger: 'boss_buff', type: 'mechanic', line: '吞噬护盾展开了。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '吞噬停住，露出一条被吃剩的路。' },
+      ],
+      environmentChange: '崩坏暂停', clue: '被吃掉的路后面是时间的废墟', transition: '时序废墟在路的另一端' },
+    W34: { premise: '路尽头是时序废墟', anomaly: '这里的顺序不是从前往后', conflict: '时间把同一件事重放了一遍', playerGoal: '走出废墟', enemyPurpose: '守门者只是站在时间里等', battleMechanic: '冰冻：无法行动；时序加速', bossRole: '时间守门者——它必须守着这条线', bossTrigger: '玩家第二次看到同一个瞬间发生',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '这一击你刚才看过。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '守门者：顺序不能乱。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '时间退回正序，废墟第一次安静。' },
+      ],
+      environmentChange: '时间恢复正序', clue: '正序之后露出九幽渡口', transition: '渡口在时间之外' },
+    W35: { premise: '渡口就在前面', anomaly: '过去这里不能回头', conflict: '摆渡的要看玩家还敢不敢上船', playerGoal: '决定上不上船', enemyPurpose: '渡者只负责摆渡，不负责劝', battleMechanic: '汲取：敌人攻击回复自身；摆渡', bossRole: '渡者——他见过每一个走过去的人', bossTrigger: '玩家把脚踏上船板',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '上船以后，就别再假装不知道了。' },
+        { trigger: 'boss_hp50', type: 'narrative', line: '渡者：前面的人也是这么上去的。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '船靠岸。岸上是灯阁的台阶。' },
+      ],
+      environmentChange: '船靠上灯阁的岸', clue: '台阶上已经有脚印', transition: '脚印通向灯阁王座' },
+    W36: { premise: '脚印一直通到王座前', anomaly: '王座上坐着的，是点灯的人', conflict: '他不肯承认该放手了', playerGoal: '问出为什么', enemyPurpose: '他只是在留住所有人——包括你', battleMechanic: '规则改写：每 3 回合变换；全场压制', bossRole: '终焉·灯主——灯是他点的，你也是', bossTrigger: '玩家走上最后一级台阶',
+      battleEvents: [
+        { trigger: 'battle_start', type: 'narrative', line: '灯是他点的。你也是。' },
+        { trigger: 'boss_phase_2', type: 'narrative', line: '他：只要灯还亮着，就没有真的不见。' },
+        { trigger: 'boss_phase_3', type: 'narrative', line: '你终于看清：他不是坏人，他只是不肯放手。' },
+        { trigger: 'battle_win', type: 'environment_change', line: '王座暗下去，殿里只剩一盏灯还亮着。' },
+      ],
+      environmentChange: '灯阁只剩一盏灯', clue: '第九个名字——依然空着', transition: '他问：你愿不愿意让灯熄灭？' },
+  };
+
   G.STORYDATA = {
     SCENE: SCENE, SCENE_INFO: SCENE_INFO, WORLDS: WORLDS,
     BOSS: BOSS, CHARS: CHARS, ITEMS: ITEMS, SET_LINE: SET_LINE, VOLS: VOLS,
+    /* R1.7：每世界"一件事"（premise/anomaly/conflict/…/clue/transition + 3 个战斗剧情节点） */
+    ARC: ARC,
     /* 说话人 → 角色 id 的**别名表**：`who` 里写的是屏幕上该显示的名字，
        而 `data.js` 的角色名更长（例如「代行」在角色表里叫「灯阁代行者」）。
        对不上的只有这一个 —— 其余几个（山吹时雨 / 楚衍 / 黑田宗一 / 苍岚零）名字与角色表逐字相同，

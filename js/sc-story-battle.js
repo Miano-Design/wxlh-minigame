@@ -27,6 +27,10 @@ window.BattleStory = (function () {
        ① 战斗页照着它调 `trigger`；② 尺子 `story_battle_matrix` 照着它查"这一场有没有叙事反馈"。 */
   const EVENTS = [
     'battle_start', 'first_hit', 'player_low_hp', 'boss_low_hp',
+    /* R1.7：血量阈值按**三个**分开报（战斗页就是这么调的）——
+       原来只登记了一个笼统的 `boss_low_hp`，于是 ARC 里写 `boss_hp50` 的世界
+       会被尺子判成"用了不存在的事件"。事件表以**实际实现**为准。 */
+    'boss_hp75', 'boss_hp50', 'boss_hp25',
     'boss_phase_2', 'boss_phase_3', 'boss_skill', 'boss_buff', 'boss_debuff',
     'player_break', 'player_death', 'player_revive', 'element_counter',
     'world_rule', 'battle_win', 'battle_fail',
@@ -59,11 +63,32 @@ window.BattleStory = (function () {
   };
   /* 世界 → 事件 → 一句残响。**唯一一份映射**，战斗页与尺子都读它。 */
   function tableOf(worldId) {
+    /* ================= R1.7：优先读 `ARC.battleEvents` =================
+       老路子是"把 `mid` 那一拍的节拍按顺序派给事件"——可 36 个世界的 `mid` 各只有 1 拍，
+       于是每场只有 1 条残响，而且**它和战斗里真实发生的事没关系**。
+       现在每个世界的 ARC 明确写了 ≥3 个节点，每个节点自带 `trigger`（战斗事件名）、
+       `type`（narrative / mechanic / environment_change）与一句 `line` ——
+       这一份才是"战斗事件 → 剧情事件"的真映射。`mid` 那一路退成**兜底**（ARC 缺了才用）。 */
+    const arc = (SD().ARC || {})[worldId];
+    if (arc && arc.battleEvents && arc.battleEvents.length) {
+      const out = {};
+      arc.battleEvents.forEach((e) => {
+        if (!e || !e.trigger || !e.line) return;
+        if (out[e.trigger]) return;                       // 同一个事件只留第一条
+        out[e.trigger] = e.line;
+        VOICE[e.trigger] = (e.type === 'mechanic' || e.type === 'environment_change') ? 'system' : 'story';
+      });
+      return out;
+    }
     const bs = beatsOf(worldId, 'mid') || [];
     const out = {};
     bs.forEach((b, i) => { const ev = DISPATCH[i]; if (ev && !out[ev]) out[ev] = lineOf(b); });
     return out;
   }
+  /* 事件 → 由谁来说（§二十四：系统层与角色层不许混）。
+     ARC 里 `type: 'mechanic' / 'environment_change'` 的节点＝**系统层**（走【残域机制】那种口吻），
+     其余＝角色/旁白层。这份表由 `tableOf` 顺便填，`trigger` 时用它决定前缀。 */
+  const VOICE = {};
 
   /* ---------- 一场开始 ---------- */
   function begin(cfg) {
@@ -102,7 +127,9 @@ window.BattleStory = (function () {
     const line = cur.table[key];
     if (line) {
       cur.fired[key] = 1;
-      cur.queue.push({ ev: key, text: line, at: Date.now(), voice: 'story' });
+      /* ARC 标的 `type` 决定谁在说话：机制/环境那两类走**系统层**（前缀也是这么来的） */
+      const v = VOICE[key] || 'story';
+      cur.queue.push({ ev: key, text: v === 'system' ? ('【残域机制】' + line) : line, at: Date.now(), voice: v });
       return true;
     }
     /* 剧情那一拍没有对应句子 → 退到**系统层**（只给机制类事件，且世界真的有机制说明） */
@@ -190,10 +217,13 @@ window.BattleStory = (function () {
     const St = Story();
     if (!worldId || !St || !St.bossOf) return null;
     const boss = St.bossOf(worldId);
-    if (!boss) return null;
-    const clue = (St.clueOf && St.clueOf(worldId, 'post')) || '';
-    if (!boss.after && !clue) return null;
-    return { after: boss.after || '', clue: clue, mystery: boss.mystery || '' };
+    /* R1.7：**普通世界也要有"战斗改变了什么"**。六个锚点用 `BOSS.after`（原有），
+       其余 30 个世界用 ARC 的 `environmentChange` —— 两处都是已经写好的数据，不新造字段。 */
+    const arc = (SD().ARC || {})[worldId] || {};
+    const clue = arc.clue || (St.clueOf && St.clueOf(worldId, 'post')) || '';
+    const after = (boss && boss.after) || arc.environmentChange || '';
+    if (!after && !clue) return null;
+    return { after: after, clue: clue, mystery: (boss && boss.mystery) || arc.transition || '' };
   }
 
   /* ---------- 尺子用的只读投影（不参与运行） ---------- */

@@ -84,6 +84,17 @@ if (hadSave) {
 /* V1.1.20（F1-5）：这一句是**开机兜底**（不是玩家选择）—— 读不出来进救援态时，
    `keepRescue: true` 让它"只建内存档、不覆盖主键"（主键那份读不出来的原文要留着）。 */
 if (!hadSave) { Core.newGame({ keepRescue: true }); Core.ensureDaily && Core.ensureDaily(); }
+/* R1.7（闪屏 P0）：**开机就把当前这一段路的场景图挂上** ——
+   玩家点进残域的那一刻图已经在缓存里，剧情页/战斗页第一帧就是真图，不会先闪一层"主题平底"。
+   放在建档之后（这时才有 `S`），失败/没有 Story 都不影响开机。 */
+try {
+  if (globalThis.Story && globalThis.Story.preloadWorld) {
+    const S = Core.S;
+    let wid = 'W01';
+    (globalThis.DATA.WORLDS || []).forEach((w) => { if (S && S.worlds && S.worlds[w.id] && S.worlds[w.id].unlocked) wid = w.id; });
+    globalThis.Story.preloadWorld(wid);
+  }
+} catch (e) {}
 /* ⚠️ 心跳计时器也必须在**事件注册之前**就位（V1.0.6 · P0 的第二颗雷）：
    `onShow` 处理器里除了 `relayoutNow` 还调 `catchUp()`，而 `catchUp` 读 `lastTick` ——
    `let/const` 有 TDZ：真机上 onShow 一注册就回调时，这两行还没执行到，

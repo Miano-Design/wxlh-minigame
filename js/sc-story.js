@@ -389,17 +389,65 @@
     const dw = iw * k, dh = ih * k;
     c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
+  /* ================= R1.7 · **闪屏真相与修法** =================
+     父亲大人这次把"闪屏"列为 P0。真因就在下面这个函数：
+       `Story.bg` 原来只有两条路 —— **有图就画图、没图就画程序化**。
+       而"没图"其实分两种，它把两种混成了一种：
+         · **还在加载**（normal path，图一会儿就到）→ 画程序化 → 图到了 onload 补一帧 →
+           **玩家看到"旧画 →（一闪）→ 新画"**。这就是闪屏。
+         · **加载失败**（真 fallback）→ 画程序化是对的（不许黑屏）。
+     修法（三句话）：
+       ① 三种状态分清楚：`ready`（有图）/ `loading`（在飞）/ `failed`（废了）；
+       ② **loading 期间不许画程序化场景** —— 只铺一层"本场景主题色的平底"（`bgFlat`，无几何、无暖灯），
+          图到了是一次**淡入**，不是换一张画；
+       ③ 程序化那两层（`bgBase` + `bgStructure`）**只在 failed 时**才画 —— 它是保险，不是表现路径。
+     配套：`Story.preloadWorld()` 在**进世界页 / 开打前**就把图挂上（见 dungeon 的调用点），
+     让"loading"这段尽量发生在玩家还没看到这一页的时候。 */
+  Story.sceneState = function (sceneId) {
+    if (!sceneId) return 'failed';
+    ensureScene(sceneId);
+    const r = IMG[sceneId];
+    if (r && r.ok) return 'ready';
+    if (r && r.fail) return 'failed';
+    return 'loading';
+  };
+  /* 进世界 / 开打前预热：把这一张图（和它的 Boss 图）先挂上去 —— 不阻塞、不返回 Promise。 */
+  Story.preloadWorld = function (worldId) {
+    if (!worldId) return;
+    const sc = SCENE[worldId];
+    if (sc) ensureScene(sc);
+    const bf = bossFile(worldId);
+    if (bf) ensureBoss(worldId);
+  };
+  /* 主题平底（loading 期间用）：只取本场景的底色 + 一点垂直明暗，**没有任何几何与光源** ——
+     它看起来就是"画还没显影"，而不是"另一张画"。 */
+  function bgFlat(c, sceneId, w, h) {
+    const info = SCENE_INFO[sceneId] || {};
+    const tint = (CV.THEME_TINT && CV.THEME_TINT[info.theme]) || CV.C.bg2;
+    c.fillStyle = CV.a(tint, .55);
+    c.fillRect(0, 0, w, h);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, CV.a(CV.C.shade, .55));
+    g.addColorStop(.45, CV.a(CV.C.shade, .18));
+    g.addColorStop(1, CV.a(CV.C.shade, .72));
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  }
   Story.bg = function (c, sceneId, w, h, t) {
     const zoom = 1 + 0.012 * Math.sin(t * 0.05);         // 极缓的推近
     const ox = Math.sin(t * 0.037) * w * 0.008;          // 极缓的横移
     c.save();
     c.translate(w / 2 + ox, h / 2); c.scale(zoom, zoom); c.translate(-w / 2, -h / 2);
-    /* 底：有正式图就用图，没有就程序化（**其余几层一字不变**） */
-    if (ensureScene(sceneId) && IMG[sceneId] && IMG[sceneId].img) {
-      try { drawSceneCover(c, IMG[sceneId].img, w, h); } catch (e) { bgBase(c, sceneId, w, h); }
-    } else {
+    /* 底：ready → 正式图；loading → 主题平底（**不画旧场景**）；failed → 才走程序化保险 */
+    const st = Story.sceneState(sceneId);
+    if (st === 'ready') {
+      try { drawSceneCover(c, IMG[sceneId].img, w, h); }
+      catch (e) { bgFlat(c, sceneId, w, h); }
+    } else if (st === 'failed') {
       bgBase(c, sceneId, w, h);
       bgStructure(c, sceneId, w, h, t);
+    } else {
+      bgFlat(c, sceneId, w, h);
     }
     bgAir(c, w, h, t, sceneId);
     c.restore();
@@ -824,10 +872,15 @@
   CV.veils.battle = function (c) {
     const wid = CV.battleWorld || '';
     const scene = wid && SCENE[wid] ? SCENE[wid] : null;
-    if (scene && ensureScene(scene) && IMG[scene] && IMG[scene].img) {
-      try { drawSceneCover(c, IMG[scene].img, CV.W, CV.H); } catch (e) { bgBase(c, scene, CV.W, CV.H); }
-    } else {
+    /* R1.7 闪屏修法（与 `Story.bg` 同一份口径，**一处判断不许各写一份**）：
+       ready → 正式场景图；loading → 主题平底；failed → 才回落程序化。 */
+    const st = Story.sceneState(scene);
+    if (st === 'ready') {
+      try { drawSceneCover(c, IMG[scene].img, CV.W, CV.H); } catch (e) { bgFlat(c, scene, CV.W, CV.H); }
+    } else if (st === 'failed') {
       bgBase(c, scene || 'tech_base', CV.W, CV.H);
+    } else {
+      bgFlat(c, scene, CV.W, CV.H);
     }
     c.fillStyle = CV.a(CV.C.shade, .62);
     c.fillRect(0, 0, CV.W, CV.H);

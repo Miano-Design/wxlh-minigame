@@ -481,6 +481,8 @@
   function startStage(worldId, diff, stageIdx) {
     const S = Core.S;
     const stage = stageIdx + 1;
+    /* R1.7：开打前**再预热一次**这一场的场景（世界页那次可能还没好，或者玩家是从别处进来的） */
+    if (G.Story && G.Story.preloadWorld) G.Story.preloadWorld(worldId);
     /* ================= 开打前：把**压在世界页上面的剧情层**收掉 =================
        战斗页的"由来路还原"记的是**入口那一刻的整条栈**（`B.back.stack`）。如果入口时
        世界页上面还压着一层剧情（`in` 是"第一次进世界自动播"、`pre` 是"Boss 战前自动播"），
@@ -615,7 +617,11 @@
        不新造条件）：一句战场变化（`BOSS[wid].after`）+ 已有的那条线索。
        为什么只给首通：§二十 明写"第二次快速进入战斗"——重刷不该再看一遍演出。 */
     let changed = null;
-    if (firstClear && stage === 12 && G.BattleStory && G.BattleStory.changeOf) {
+    /* R1.7（§三 的 ⑧⑨ 要每世界都成立）：**守关 Boss 首通**给完整的一行；
+       另外**每张图第 1 关首通**也给一次「战场变化」——那是"你第一次动了这个地方"。
+       中间那些关不给（§三十二：普通战斗就是"战斗→奖励"，别让结算页每关都长一截）。
+       判据仍用现成的 `firstClear`，不新造条件。 */
+    if (firstClear && (stage === 12 || stage === 1) && G.BattleStory && G.BattleStory.changeOf) {
       const ch = G.BattleStory.changeOf(wid);
       if (ch && ch.after) changed = ch.after;
     }
@@ -725,6 +731,10 @@
         return;
       }
       view.worldId = w.id; view.diff = 'normal';
+      /* R1.7：**进世界就把这一张场景图（和它的 Boss 立绘）挂上**——
+         等玩家点关卡再加载，就会在战斗第一帧闪一下"主题平底"。
+         这里预热只是把请求发出去，不阻塞、失败了也不影响（保险交给 bgFlat）。 */
+      if (G.Story && G.Story.preloadWorld) G.Story.preloadWorld(w.id);
       CV.push('world');
       /* ================= 剧情「自己发生」之一：**第一次进这个世界** =================
          父亲大人 2026-10-01 二轮：「`in`——第一次进入世界时**自动进入**。玩家确认继续后

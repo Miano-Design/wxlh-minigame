@@ -21,7 +21,9 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   /* R1.5 UX 轮新增：真渲染 58 个页面，查返回链 / 滚动 / 热区 / 按钮主次 / 文案 / 四档屏宽。 */
   'ux_audit',
   /* R1.6 叙事轮新增：剧情 × 战斗矩阵 + 11 项叙事完整度（真跑 Boss 战拿阶段帧）。 */
-  'story_battle_matrix'];
+  'story_battle_matrix',
+  /* R1.7 新增：36 世界"各有一件事"的连续性 + 视觉资源真实使用路径。 */
+  'story_continuity_audit', 'story_visual_path_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }
