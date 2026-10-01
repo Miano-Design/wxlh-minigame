@@ -136,41 +136,88 @@
     let gain = 0;
     batchSel.forEach(function (uid) {
       const e = Core.S.equips[uid];
-      if (e) gain += (D.DECOMPOSE_GAIN[e.rarity] || 0) + Math.floor((e.enhance || 0) * 3);
+      /* 锁定的不参与（`Core.decomposeMany` 也是这么跳过的）—— 预估与真发奖必须同一条判据，
+         否则确认页会报出一个玩家拿不到的 ◆。 */
+      if (e && !e.lock) gain += (D.DECOMPOSE_GAIN[e.rarity] || 0) + Math.floor((e.enhance || 0) * 3);
     });
     return gain;
   }
+  /* ================= 装备页"**现在看得见的那批**" —— 一处定义 =================
+     列表画出来的、批量快选/全选能选中的，必须是**同一批**：
+       没穿在身上的 → 当前分类（全部/世界/血统/神装/本命）→ 当前部位 → 前 `bag.eqCap` 格（超出的格子不画）。
+     以前"快选"自己又写了一遍判据（而且**没带分类/部位筛选**、也没算 cap），
+     于是"快选选中的"与"你在屏幕上看得见的"可以不是一批 —— 现在两边都读这一个函数。 */
+  function filtEquips() {
+    const S = Core.S;
+    const worn = new Set();
+    Object.keys(S.equipped).forEach(function (cid) {
+      Object.values(S.equipped[cid] || {}).forEach(function (u) { if (u) worn.add(u); });
+    });
+    /* 排序规则在 `core.sortEquips` 一处（强化 → 品质 → 部位 → 名称） */
+    let list = Core.sortEquips(Object.values(S.equips).filter(function (e) { return !worn.has(e.uid); }));
+    if (eqSlot !== 'all') list = list.filter(function (e) { return e.slot === eqSlot; });
+    if (eqCat === 'world') list = list.filter(function (e) { return !!e.set; });
+    else if (eqCat === 'blood') list = list.filter(function (e) { return !!e.bloodSet; });
+    else if (eqCat === 'god') list = list.filter(function (e) { return !!e.godSet; });
+    else if (eqCat === 'sig') list = list.filter(function (e) { return !!e.charId; });
+    return list;
+  }
+  /** 画在屏幕上的那几格（＝列表真正铺出来的那批）。快选与全选都读它。 */
+  function visibleEquips() { return filtEquips().slice(0, Core.S.bag.eqCap); }
   /* 底栏画成"页面级覆盖层"（CV.pageOverlay）：不跟着内容滚动、也不被顶栏/底栏裁掉 */
+  /* 快选的六档（**顺序就是稀有度从低到高**，颜色直接取现成的 `rarColor`） */
+  const RARITY_PICK = ['N', 'R', 'SR', 'SSR', 'UR', 'MYTH'];
   function batchBar() {
     if (!batchMode) return;
-    const pad = U.pad(), h = 106 * CV.SCALE;
-    const y = CV.H - CV.NAV_H - CV.safeBottom - h - 8 * CV.SCALE;
+    const pad = U.pad();
     const bh = U.BTN_SM * CV.SCALE;
+    const gap = 6 * CV.SCALE, lineGap = 8 * CV.SCALE, innerPad = 12 * CV.SCALE;
+    /* ================= 先量再排（短屏要求）=================
+       六档稀有度 ＋「全选」「清空」在 320 上**放不进一行**（实测：46/54 宽的八颗 ＋ 标签 ≈ 460 > 296）。
+       所以这里**先按可用宽度算出行数**，底栏高度跟着行数长；不许硬塞、不许把字缩到看不清、
+       更不许让最右边那颗被挤出屏幕。 */
+    const items = RARITY_PICK.map(function (r) { return { label: r, id: 'bselr:' + r, w: 46 * CV.SCALE, rare: r }; })
+      .concat([{ label: '全选', id: 'ball', w: 54 * CV.SCALE }, { label: '清空', id: 'bclear', w: 54 * CV.SCALE }]);
+    const avail = CV.W - pad * 2 - innerPad * 2;
+    const lead = CV.measure('快选：', CV.FS.sm) + gap;
+    const rows = [];
+    let row = [], usedW = lead;
+    items.forEach(function (it) {
+      if (row.length && usedW + it.w > avail) { rows.push(row); row = []; usedW = 0; }
+      row.push(it); usedW += it.w + gap;
+    });
+    if (row.length) rows.push(row);
+    const pickH = rows.length * bh + (rows.length - 1) * lineGap;
+    const h = innerPad + pickH + lineGap + bh + innerPad;
+    const y = CV.H - CV.NAV_H - CV.safeBottom - h - 8 * CV.SCALE;
     CV.hitMode = 'screen';
     /* 和网页版 .batch-bar 一样带一层上投影（原来贴死的平色块，看着很"重"） */
     CV.ctx.save();
     CV.ctx.shadowColor = CV.a(CV.C.shade, .45); CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
     CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  CV.a(CV.C.panel, .97), CV.C.line);
     CV.ctx.restore();
-    /* 第一行：快选 N / R / SR + 清空 */
-    let x = pad + 12 * CV.SCALE;
-    const ry = y + 12 * CV.SCALE;
-    CV.text('快选：', x, ry + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
-    x += CV.measure('快选：', CV.FS.sm) + 6 * CV.SCALE;
-    ['N', 'R', 'SR'].forEach(function (r) {
-      const bw = 46 * CV.SCALE;
-      U.btn(x, ry, bw, bh, r, 'ghost', 'bselr:' + r);
-      x += bw + 6 * CV.SCALE;
+    /* 快选各档：按钮用现成的 ghost 形，字用**现成的稀有度色**（不另造一套颜色）。
+       「已选 N 件 · 预计 ◆ X」那一句在顶部吸顶条（eqBarRow）上，这里不重复。 */
+    let ry = y + innerPad;
+    rows.forEach(function (r, ri) {
+      let x = pad + innerPad;
+      if (ri === 0) {
+        CV.text('快选：', x, ry + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
+        x += lead;
+      }
+      r.forEach(function (it) {
+        U.btn(x, ry, it.w, bh, '', 'ghost', it.id);
+        CV.text(it.label, x + it.w / 2, ry + bh / 2,
+          { size: CV.FS.sm, align: 'center', color: it.rare ? rarColor(it.rare) : CV.C.text, bold: true });
+        x += it.w + gap;
+      });
+      ry += bh + lineGap;
     });
-    U.btn(x, ry, 54 * CV.SCALE, bh, '清空', 'ghost', 'bclear');
-    /* 第二行：分解 / 取消。
-       F9 ①：「已选 N 件 · 预计 ◆ X」这一句搬去了**顶部吸顶那一条**（eqBarRow）——
-         同一屏里写两遍就是"同一件事写两份"，而且父亲大人要的正是"滚到中间也看得见已选几件"。 */
-    const ry2 = ry + bh + 8 * CV.SCALE;
-    CV.text('点格子挑选', pad + 12 * CV.SCALE, ry2 + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
+    /* 最后一行：说明 ＋ 分解 / 取消 */
+    CV.text('点格子挑选', pad + innerPad, ry + bh / 2, { size: CV.FS.sm, color: CV.C.dim });
     const b2 = 76 * CV.SCALE, g2 = 8 * CV.SCALE;
-    U.btn(CV.W - pad - b2 * 2 - g2 - 12 * CV.SCALE, ry2, b2, bh, '⚡ 分解', 'primary', 'bgo');
-    U.btn(CV.W - pad - b2 - 12 * CV.SCALE, ry2, b2, bh, '取消', 'ghost', 'bclose');
+    U.btn(CV.W - pad - b2 * 2 - g2 - innerPad, ry, b2, bh, '⚡ 分解', 'primary', 'bgo');
+    U.btn(CV.W - pad - b2 - innerPad, ry, b2, bh, '取消', 'ghost', 'bclose');
     CV.hitMode = 'content';
   }
 
@@ -429,17 +476,7 @@
     let used = 0;
     if (view === 'equip') {
       /* 格子里只放**没穿在身上的**装备（网页版同口径：穿身上的不占格） */
-      const worn = new Set();
-      Object.keys(S.equipped).forEach((cid) => Object.values(S.equipped[cid] || {}).forEach((u) => { if (u) worn.add(u); }));
-      /* V9.6.123（父亲大人："装备的排序方式要像伙伴那样"）：排序规则在 core.sortEquips 一处
-         （强化 → 品质 → 部位 → 名称），网页版同一条。 */
-      let list = Core.sortEquips(Object.values(S.equips).filter((e) => !worn.has(e.uid)));
-      /* 两行分类的筛选（网页版 bagEquipList 同款规则） */
-      if (eqSlot !== 'all') list = list.filter((e) => e.slot === eqSlot);
-      if (eqCat === 'world') list = list.filter((e) => !!e.set);
-      else if (eqCat === 'blood') list = list.filter((e) => !!e.bloodSet);
-      else if (eqCat === 'god') list = list.filter((e) => !!e.godSet);
-      else if (eqCat === 'sig') list = list.filter((e) => !!e.charId);
+      const list = filtEquips();
       used = list.length;
       list.slice(0, cap).forEach((e) => {
         /* V9.6.7：批量分解模式下，点格子 = 选中/取消（不再进详情页）——网页版同一口径 */
@@ -991,25 +1028,37 @@
     CV.render();
   });
   CV.on('bclear', function () { batchSel.clear(); CV.render(); });
-  /* 快选：把该稀有度里**没穿身上、没锁**的一键选上；再点一次取消 */
-  CV.on('bselr:*', function (rarity) {
-    const worn = new Set();
-    Object.keys(Core.S.equipped).forEach(function (cid) {
-      Object.values(Core.S.equipped[cid] || {}).forEach(function (u) { if (u) worn.add(u); });
-    });
-    const uids = Core.inventoryEquips()
-      .filter(function (e) { return e.rarity === rarity && !worn.has(e.uid) && !e.lock; })
+  /* ================= 批量选择：快选（六档）＋ 全选可分解 =================
+     两条规则**一处收口**（`toggleMany`）：
+       · 候选池 = `visibleEquips()` ＝ **你现在看得见的那批格子**（同一份判据，见上面）；
+       · 已锁定的一律不进候选（`Core.decomposeMany` 本来就跳过它们，选择这一步也要一致）；
+       · **再点一次同一条 = 取消这一条选中的那些**；手动点选的其它装备**不受影响**。 */
+  function toggleMany(pick) {
+    const uids = visibleEquips()
+      .filter(function (e) { return !e.lock && pick(e); })
       .map(function (e) { return e.uid; });
-    const allIn = uids.length > 0 && uids.every(function (u) { return batchSel.has(u); });
+    if (!uids.length) { CV.toast('这里现在没有可以分解的装备'); CV.render(); return; }
+    const allIn = uids.every(function (u) { return batchSel.has(u); });
     uids.forEach(function (u) { if (allIn) batchSel.delete(u); else batchSel.add(u); });
     CV.render();
-  });
+  }
+  CV.on('bselr:*', function (rarity) { toggleMany(function (e) { return e.rarity === rarity; }); });
+  CV.on('ball', function () { toggleMany(function () { return true; }); });     // 全选可分解（再点一次＝全取消）
   CV.on('bgo', function () {
-    if (!batchSel.size) { CV.toast('请先点选要分解的装备'); return; }
-    const n = batchSel.size, gain = batchGain();
-    U.confirm('批量分解', '确定分解选中的 ' + n + ' 件装备？将获得 ◆ ' + fmt(gain) + '（异界结晶）', function () {
+    if (!batchSel.size) { CV.toast('先点选要分解的装备'); CV.render(); return; }
+    /* 真正的候选 = 选中里**还存在且没锁**的那些（`batchGain` 用的是同一条判据）——
+       确认页报的数与真发奖必须对得上，不许出现"说 18 件、实际 15 件"。 */
+    const real = Array.from(batchSel).filter(function (u) { const e = Core.S.equips[u]; return e && !e.lock; });
+    if (!real.length) { CV.toast('选中的这些现在都不能分解（已锁定的不参与）'); CV.render(); return; }
+    const n = real.length, gain = batchGain();
+    U.confirm('批量分解', '确定分解 ' + n + ' 件装备？\n预计获得 ◆ ' + fmt(gain) + '（异界结晶）', function () {
       const r = Core.decomposeMany(Array.from(batchSel));
-      CV.toast(r.count ? ('分解 ' + r.count + ' 件 · ◆ +' + fmt(r.gain)) : '没有可分解的装备');
+      /* 成功提示一律用**真实返回值**：分解了几件、到手多少 ◆；
+         万一中途有装备状态变了（被穿上 / 被锁），如实把那几件报出来，不假装全成功。 */
+      const miss = n - (r.count || 0);
+      CV.toast(r.count
+        ? ('分解 ' + r.count + ' 件 · ◆ +' + fmt(r.gain) + (miss > 0 ? '（' + miss + ' 件状态变了，没分解）' : ''))
+        : '没有可分解的装备');
       batchMode = false; batchSel.clear();
       CV.render();
     });
