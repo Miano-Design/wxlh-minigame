@@ -1736,7 +1736,7 @@
        弹窗底从**不透明的 bg2** 收到 **88%**：仍是"压在场景上的一块板"，
        但背后的世界透得出来一点，不是一块纯色。88% 是给**法规原文**留的余量 ——
        那四句必须读得清（视觉底线的对比度尺子在盯）。 */
-    CV.round(o.x, o.y, o.w, o.h, CV.RADIUS, CV.a(CV.C.bg2, .88), CV.a(CV.C.line, .9));
+    CV.round(o.x, o.y, o.w, o.h, CV.RADIUS, CV.a(CV.C.bg2, .50), CV.a(CV.C.line, .9));
     c.restore();
     /* 所有 y 都由 U.confirm 排好版（o.titleY / o.lineY / o.chipY / o.noteY / o.btnY），
        这里只负责照着画 —— V9.6.94 起不再各算各的。 */

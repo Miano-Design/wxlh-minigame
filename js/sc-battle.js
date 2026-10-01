@@ -984,7 +984,7 @@
   }
   function drawSettle(res, p) {
     const c = CV.ctx;
-    c.fillStyle = CV.a(CV.C.shade, .9);
+    c.fillStyle = CV.a(CV.C.shade, .62);
     c.fillRect(0, 0, CV.W, CV.H);
     CV.hitMode = 'screen';                 // 这一层画在屏幕坐标里，命中区也要按屏幕坐标登记
     const prevOverlay = CV.pageOverlay;
@@ -1121,7 +1121,7 @@
   CV.battleHead = function (title) {
     const c = CV.ctx;
     const y = CV.safeTop;
-    c.fillStyle = CV.a(CV.C.overlay, .98);
+    c.fillStyle = CV.a(CV.C.overlay, .50);
     c.fillRect(0, y, CV.W, 44 * CV.SCALE);
     /* V9.6.2（父亲大人："真机也按不了 / 被遮挡"）：
        ① 这一条画在**屏幕坐标**里（在内容裁剪之前），命中区也必须按屏幕坐标登记 ——
