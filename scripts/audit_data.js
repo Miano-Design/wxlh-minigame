@@ -104,4 +104,36 @@ SHOP_LIST.forEach((sh) => (sh.items || []).forEach((it) => {
 (badNum.length ? R.fail : R.pass)('商店价格没有非法数（负数 / NaN / 非数字）', {
   file: 'js/data.js', expected: '全部 ≥0 的有限数', actual: badNum.length ? badNum.slice(0, 6).join(',') : '干净',
 });
+
+/* ⑥ 阶梯成本必须**单调递增**（R1.4 数值轮新增；起因＝父亲大人 §十 抓到的
+      「铭刻 5 阶 131250 → 6 阶 10500，高阶突然便宜 92%」）。
+   这条按"类型"判，不按个例判：凡"第 N 阶 / 第 N 级"的**单步成本**，一律不许后一阶比前一阶便宜。
+   早期允许有明显台阶（所以用"≥ 前一阶"，不是要求等差/等比）。 */
+{
+  const lines = [];
+  const push = (name, arr, pick) => {
+    const vs = (arr || []).map(pick).map((v) => (typeof v === 'number' ? v : null));
+    if (vs.length >= 2 && vs.every((v) => v !== null)) lines.push({ name, vs });
+  };
+  push('铭刻 ◆', D.GENE_LOCKS, (g) => g.cost && g.cost.otherworld);
+  push('铭刻 铭魂砂', D.GENE_LOCKS, (g) => g.matN);
+  push('灯阁权限 ✦', Array.from({ length: D.AUTHORITY_MAX || 0 }, (_, lv) => (D.authorityCost ? (D.authorityCost(lv) || {}).holy : null)), (v) => v);
+  push('命格 ◆（0→50）', Array.from({ length: D.BLOODLINE_MAX || 0 }, (_, lv) => (D.bloodlineCost ? D.bloodlineCost(lv).otherworld : null)), (v) => v);
+  push('坐骑喂养 ◉', Array.from({ length: (D.MOUNT_MAX_LV || 0) }, (_, lv) => (D.mountFeedCost && D.MOUNTS && D.MOUNTS[0] ? D.mountFeedCost(D.MOUNTS[0], lv) : null)), (v) => v);
+  push('法宝祭炼', Array.from({ length: (D.FABAO_MAX_LV || 0) }, (_, lv) => (D.fabaoRefineCost && D.FABAO && D.FABAO[0] ? D.fabaoRefineCost(D.FABAO[0], lv) : null)), (v) => (typeof v === 'object' ? v.otherworld : v));
+  const broken = [];
+  lines.forEach((L) => {
+    for (let i = 1; i < L.vs.length; i++) {
+      if (L.vs[i] < L.vs[i - 1]) {
+        broken.push(L.name + ' 第 ' + (i + 1) + ' 档 ' + L.vs[i] + ' < 上一档 ' + L.vs[i - 1]);
+        break;
+      }
+    }
+  });
+  (broken.length ? R.fail : R.pass)('阶梯成本单调递增（单步成本不许越往后越便宜）', {
+    file: 'js/data.js', expected: '每档 ≥ 上一档',
+    actual: broken.length ? broken.join(' ; ') : lines.map((L) => L.name + '(' + L.vs.length + '档)').join(' · '),
+  });
+}
+
 R.finish();

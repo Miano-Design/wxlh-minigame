@@ -13,8 +13,11 @@ const R = makeReport('audit_release');
 /* ---------- ① 前五支：真跑，拿它们的退出码与 RESULT 行 ---------- */
 /* B 批（2026-10-01）新增 `audit_story`（剧情内容表）：内容"对不上"不会崩，
    但会在玩家那边变成空白页 —— 所以它和另外五支一样进发布总闸。 */
+/* R1.4 数值轮新增五把（§五十 点名）：成长推进 / 经济模拟 / 掉落经济 / 命名世界观 / 揭示节奏。
+   它们和前面几支一样进总闸 —— 数值轮改完必须整条链一起绿。 */
 const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'audit_data',
-  'audit_story', 'visual_story_audit', 'lore_timeline_audit', 'ad_text_audit'];
+  'audit_story', 'visual_story_audit', 'lore_timeline_audit', 'ad_text_audit',
+  'progression_audit', 'economy_sim', 'drop_economy_audit', 'naming_lore_audit', 'lore_reveal_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }
