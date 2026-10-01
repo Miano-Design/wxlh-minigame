@@ -466,6 +466,44 @@
     WX.onShareTimeline(() => ({ title: SHARE_TITLE }));
   }
 
+  /* ================= 康康 2026-10-01 · **自然分享的统一入口**（R1.3 阶段④）=================
+     父亲大人划的边界（原话）：「不做分享一次领奖 / 分享三次领奖 / 分享返资源 / 邀请返利 /
+     助力 / 砍价 / 强制分享后才能继续 / 高频自动弹出」—— **分享与奖励彻底解绑**。
+     所以这一层只做三件事：
+       · 按**场景**（`context.type`）挑一句**用真实数据拼的**文案（不伪造排行榜 / 战力 / 好友成绩）；
+       · 带一个**轻量 query**（`shareType=…`）告诉别人"这分享从哪来"，**不做邀请返利那套**；
+       · **所有异常都吞掉**：没有分享 API / 玩家取消 / 调用失败 —— 一律回一句人话，
+         绝不把 `wx.shareAppMessage fail` 这类技术错误丢给玩家，也绝不影响主流程。
+     ⚠️ 页面**不许**自己调 `wx.shareAppMessage` —— 一律走 `G.shareGame(...)`（一处收口）。 */
+  const SHARE_TYPES = {
+    settings: () => '残域里亮着的那盏灯，是我点的。',
+    battle: (c) => '刚在《残域》【' + (c.world || '残域') + '】打赢了第 ' + (c.stage || '?') + ' 关。',
+    first: (c) => '《残域》【' + (c.world || '残域') + '】第一次通关，下一层更难。',
+    character: (c) => '我在《残域》觉醒了【' + (c.name || '一位执灯者') + '】。',
+    equip: (c) => '刚在《残域》拿到一件【' + (c.rarity || '神话') + '】装备。',
+    world: (c) => '《残域》已经走到【' + (c.world || '残域') + '】了。',
+  };
+  function shareGame(context) {
+    const c = context || {};
+    const mk = SHARE_TYPES[c.type] || SHARE_TYPES.settings;
+    let title = SHARE_TITLE;
+    try { title = String(mk(c) || '') || SHARE_TITLE; } catch (e) {}
+    const opt = { title: title, query: 'shareType=' + encodeURIComponent(String(c.type || 'settings')) };
+    if (c.imageUrl) opt.imageUrl = c.imageUrl;
+    if (!WX || typeof WX.shareAppMessage !== 'function') {
+      return { ok: false, msg: '这个版本还不支持分享，下次更新就能用了' };
+    }
+    try {
+      WX.shareAppMessage(opt);
+      try { const L = G.LOG; if (L) L.info('share', { type: String(c.type || 'settings') }); } catch (e) {}
+      return { ok: true };
+    } catch (e) {
+      /* 玩家取消也算"这一趟结束了"：不报错、不惩罚、不阻断 */
+      return { ok: false, msg: '暂时没能打开分享，请再试一次' };
+    }
+  }
+  G.shareGame = shareGame;
+
   /* ================= V1.0.4 · ⑥ 线上实时日志 ＋ 事件上报（R1 / R9 · 父亲大人 09-27 点单）======
      为什么要它：真机白屏、丢档、广告拉不到这类问题，以前只能靠"猜 ＋ 让玩家描述"。
      `wx.getRealtimeLogManager`（基础库 **2.14.4** 起）把分级日志**上报到 MP 后台**，
