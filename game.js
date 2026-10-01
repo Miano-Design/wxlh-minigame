@@ -9,6 +9,11 @@ require('./js/wx-adapter.js');   // window / localStorage 垫片 + 广告封装
    放在 wx-adapter 之后：那一步才把 window / localStorage 这些全局垫好。 */
 require('./js/mem-guard.js');
 require('./js/data.js');
+/* 2026-10-01：正式视觉资产（36 世界 + 24 全局图标）—— 由 `scripts/build-visual-assets.js`
+   从 RESYU_VISUAL_ASSETS 的 SVG 编译成路径 op。**必须紧跟 data.js**：
+   `D.iconOpsOf` 会在取图标时先查这张表（查不到才落回老表）。
+   它是**生成物**，不要手改；换素材就重跑那个脚本。 */
+require('./js/assets-icons.js');
 require('./js/core.js');
 require('./js/battle.js');
 require('./js/dungeon.js');

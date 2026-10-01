@@ -55,20 +55,33 @@
      ⚠️ 文件名一律 ASCII 小写 + 下划线，**不许中文名**（音频尺子有一条"包内不许中文文件名"）。
      ⚠️ 尺寸 1080×1920（9:16）；720 版只作真机性能降级备用，不默认使用。
      ========================================================================== */
+  /* ⚠️ 2026-10-01：正式素材到位，文件名就是**投递时的原名**（契约 = 文件名，不改名）。
+     `scripts/build-visual-assets.js` 按这些名字把图从 RESYU_VISUAL_ASSETS 复制进 `story/scene/`。 */
   const SCENE_FILE = {
-    bio_lab:       'story/scene/bio_lab.jpg',
-    bio_swamp:     'story/scene/bio_swamp.jpg',
-    bio_sea:       'story/scene/bio_sea.jpg',
-    ghost_house:   'story/scene/ghost_house.jpg',
-    ghost_town:    'story/scene/ghost_town.jpg',
-    ghost_env:     'story/scene/ghost_env.jpg',
-    ghost_wall:    'story/scene/ghost_wall.jpg',
-    tech_waste:    'story/scene/tech_waste.jpg',
-    tech_base:     'story/scene/tech_base.jpg',
-    mystic_ruins:  'story/scene/mystic_ruins.jpg',
-    mystic_throne: 'story/scene/mystic_throne.jpg',
-    god_hall:      'story/scene/god_hall.jpg',
+    bio_lab:       'story/scene/img_scene_bio_lab.jpg',
+    bio_swamp:     'story/scene/img_scene_bio_swamp.jpg',
+    bio_sea:       'story/scene/img_scene_bio_sea.jpg',
+    ghost_house:   'story/scene/img_scene_ghost_house.jpg',
+    ghost_town:    'story/scene/img_scene_ghost_town.jpg',
+    ghost_env:     'story/scene/img_scene_ghost_env.jpg',
+    ghost_wall:    'story/scene/img_scene_ghost_wall.jpg',
+    tech_waste:    'story/scene/img_scene_tech_waste.jpg',
+    tech_base:     'story/scene/img_scene_tech_base.jpg',
+    mystic_ruins:  'story/scene/img_scene_mystic_ruins.jpg',
+    mystic_throne: 'story/scene/img_scene_mystic_throne.jpg',
+    god_hall:      'story/scene/img_scene_god_hall.jpg',
   };
+  /* 六个核心 Boss 立绘（1080×1920 · **真透明 RGBA** ⇒ 当"人物前景层"用，不当背景贴）。
+     也是按投递原名（`img_boss_W06.png` …）。 */
+  const BOSS_FILE = {
+    W06: 'story/boss/img_boss_W06.png', W12: 'story/boss/img_boss_W12.png',
+    W18: 'story/boss/img_boss_W18.png', W24: 'story/boss/img_boss_W24.png',
+    W30: 'story/boss/img_boss_W30.png', W36: 'story/boss/img_boss_W36.png',
+  };
+  /* 主视觉（1080×1920）：放**剧情分包**里（主包只剩 0.78MB 余量，塞不下这张 792KB 的图）。
+     用途按 §三 给的第二种：**灯阁首页的大面积背景**（首页是二级页，懒加载不影响首屏）；
+     启动页（gate）继续用工程的 `icons/mv-main-lamp.jpg`（3:4，与 gate 的裁切配套）。 */
+  const KV_FILE = 'story/kv/img_main_kv.jpg';
 
   /* ==========================================================================
      六卷（章节转场用）：卷名与边界取自 `docs/lore/chapters.md` —— **两边必须同一份**。
@@ -793,7 +806,7 @@
        对不上的只有这一个 —— 其余几个（山吹时雨 / 楚衍 / 黑田宗一 / 苍岚零）名字与角色表逐字相同，
        sc-story.js 直接按名字反查 id。**加新说话人时先看这里要不要补一条。** */
     WHO_ALIAS: { '代行': 'C120' },
-    /* 正式场景图清单（sceneId → 分包内路径）：见上头那段注释 */
-    SCENE_FILE: SCENE_FILE,
+    /* 正式资产清单（sceneId / Boss 世界号 → 分包内路径）：见上头那段注释 */
+    SCENE_FILE: SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
   };
 })();

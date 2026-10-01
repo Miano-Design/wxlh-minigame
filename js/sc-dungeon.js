@@ -23,10 +23,12 @@
      没进表的退回这个世界自己的 emoji（`w.ico`）。V1.1.15 · 派单 I 第 2 条。
      颜色用默认字色（= #e9edf6）：格底是各族 tint，浅色描边在三档格底上都过对比度；
      族形角标那枚另有"按格底现算亮度"的取色（D.worldGlyphColor），两者分工不同、不要合并。 */
-  function worldIco(ico, cx, cy, size) {
-    if (ico && typeof ico === 'object') { CV.drawIcon(ico, CV.ctx, cx, cy, size, CV.C.text); return; }
-    CV.text(ico, cx, cy, { size: size, align: 'center' });
-  }
+   /* 颜色由调用方按**状态**给（§九：普通＝偏冷灰白 / 选中与重要节点＝主题强调色 /
+      已完成＝低饱和暖灰 / 锁定＝低亮度灰）。不传就退回正文色，老的观感不变。 */
+   function worldIco(ico, cx, cy, size, color) {
+     if (ico && typeof ico === 'object') { CV.drawIcon(ico, CV.ctx, cx, cy, size, color || CV.C.text); return; }
+     CV.text(ico, cx, cy, { size: size, align: 'center', color: color || CV.C.text });
+   }
   /* 一个世界该画什么：先问 WORLD_ICONS，没有才用它的 emoji / 主题兜底 */
   const icoOf = (w) => D.iconOpsOf('world', w.id) || w.ico || ICON[w.theme] || '⚔';
 
@@ -62,7 +64,9 @@
   /* bg：格底色。V1.0.1 起由数据层的 D.worldTint(世界id) 给（五族色相 × 族内明度阶梯），
      网页版同一串颜色内联到 .world-ico 上；不传就退回旧底色（转生门那张、以及 ♾ 深井格）。 */
   /* tags：`[{ t: '普通', on: true }, …]`（不传 / 空数组＝这张卡没有标签，深井与转生门就是） */
-  function worldCard(icon, title, sub, tags, id, dim, bg, theme) {
+  /* `state`：世界图标的**状态档**（2026-10-01 §九）——idle / current / done / locked。
+     不传就按 `dim` 推（锁定 vs 普通），保证老调用点观感不变。 */
+  function worldCard(icon, title, sub, tags, id, dim, bg, theme, state) {
     const top = U.y;                         // 网页版 .world-card 实测 82（图标 52 + 上下内边距 14）
     const x = U.pad(), w = U.cw();
     const box = 52 * CV.SCALE;
@@ -90,12 +94,16 @@
     if (dim) CV.ctx.globalAlpha = 0.45;
     CV.card(x, top, w, h);
     CV.round(x + 12 * CV.SCALE, top + (h - box) / 2, box, box, CV.RADIUS,  bg || CV.C.panel3, CV.C.line);
-    worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.DISP.d2);
+    worldIco(icon, x + 12 * CV.SCALE + box / 2, top + h / 2, CV.DISP.d2,
+      CV.worldIconColor(theme, state || (dim ? 'locked' : 'idle')));
     /* 右上角的族形（五族形状语言）：与格底色相构成"色 + 形"双重编码。
        顶点表与网页版同一份（D.FACTION_GLYPH），别在这儿另画一套形状。 */
     const gs = 12 * CV.SCALE;
     if (theme && D.FACTION_GLYPH[theme]) {
-      CV.poly(D.FACTION_GLYPH[theme],
+      /* 形状换成正式资产（`CV.themeGlyph` 优先 `ico_theme_*`，缺图回落老顶点表）；
+         **颜色仍走 `D.worldGlyphColor`** —— 那是"按当前格底现算亮度"的对比度色，
+         是功能性的（V1.1.2 定的：对本格底 ≥3:1），不能拿主题色顶掉它。 */
+      CV.themeGlyph(theme,
         x + 12 * CV.SCALE + box - 3 * CV.SCALE - gs, top + (h - box) / 2 + 3 * CV.SCALE,
         gs, D.worldGlyphColor(theme));
     }
@@ -170,7 +178,10 @@
       worldCard(icoOf(w), w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
         unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
         D.DIFFICULTY.map((d) => ({ t: d.name, on: diffAllCleared(w.id, d.id) })),
-        'w:' + w.id, false, D.worldTint(w.id), w.theme);
+        'w:' + w.id, false, D.worldTint(w.id), w.theme,
+        /* 世界图标的状态（§九）：这张图**普通档 12 关全通**＝已完成（低饱和暖灰），
+           否则＝普通（偏冷灰白）。"选中/重要节点"这两档在世界详情页与 Boss 关用。 */
+        diffAllCleared(w.id, 'normal') ? 'done' : 'idle');
     });
     /* 转生门：门后那一张要显示出来（跟网页版同一口径）。
        "没解锁的不显示"说的是**还没走到**的世界；转生门是"走到了、过不去"，
@@ -203,11 +214,12 @@
          几何与 worldCard() 里那段一致（52 的格子在这里缩到 40，因为详情页头部比列表矮一档）。 */
       const box = 40 * CV.SCALE, top = U.y, x = U.ix();
       CV.round(x, top, box, box, CV.RADIUS,  D.worldTint(w.id), CV.C.line);
-      worldIco(icoOf(w), x + box / 2, top + box / 2, CV.DISP.d2);
+      /* 详情页这一格＝"你正在看的世界" ⇒ 状态 `current`（主题强调色） */
+      worldIco(icoOf(w), x + box / 2, top + box / 2, CV.DISP.d2, CV.worldIconColor(w.theme, 'current'));
       const gs = 11 * CV.SCALE;
       if (D.FACTION_GLYPH[w.theme]) {
         /* 角标亮度按**本格格底**现算（对本格底 ≥3:1 · V1.1.2）—— worldId 一定要传 */
-        CV.poly(D.FACTION_GLYPH[w.theme], x + box - 3 * CV.SCALE - gs, top + 3 * CV.SCALE,
+        CV.themeGlyph(w.theme, x + box - 3 * CV.SCALE - gs, top + 3 * CV.SCALE,
           gs, D.worldGlyphColor(w.theme, w.id));
       }
       CV.text(CV.fit(w.name, U.iw() - box - 12 * CV.SCALE, CV.FS.f1, true),

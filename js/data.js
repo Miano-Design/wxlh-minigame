@@ -172,10 +172,13 @@ window.DATA = (function () {
      并且都不等于当时实测（90 天实测：◉ 145,989 · ◆ 6,944 · ✦ 187）。
      数字随版本漂、结论不漂 —— 所以**留结论、删数字**，以后要口径就去跑 longrun_sim。 */
   const CURRENCIES = [
-    { id: 'points',     name: '点数',     icon: '◉ ', color: '#ffd76a' },
-    { id: 'otherworld', name: '异界结晶', icon: '◆ ', color: '#6ec6ff' },
-    { id: 'holy',       name: '圣洁晶石', icon: '✦ ', color: '#ff9ecb' },
-    { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#7ee0a3' },
+    /* 2026-10-01（父亲大人 §十二）：四种货币改用**正式语义色**（旧铜金 / 异界冷紫 /
+       圣洁冷白金 / 循环青金）—— 要求"必须有明确差异，但不要高饱和游戏货币风"。
+       这张表仍然是货币色的唯一真源（顶栏、价钱、兑换、结算胶囊都读它）。 */
+    { id: 'points',     name: '点数',     icon: '◉ ', color: '#B58B4C' },
+    { id: 'otherworld', name: '异界结晶', icon: '◆ ', color: '#8D82A8' },
+    { id: 'holy',       name: '圣洁晶石', icon: '✦ ', color: '#C8C0A6' },
+    { id: 'rp',         name: '转生点',   icon: '♾ ', color: '#718F91' },
   ];
 
   /* ================= 图标形状（V1.0.6 · **一处定义，两端各渲染一次**） =================
@@ -352,6 +355,21 @@ window.DATA = (function () {
     两端都只调这一个口，省得各自去猜结构（V1.0.6 就踩过一次：画布端按 {ops} 取货币，
     取到 undefined，"找不到就不画"如实生效 → 顶栏四颗货币图标**当场消失**，是截图看出来的）。 */
   const iconOpsOf = (kind, id) => {
+    /* ================= 2026-10-01 · **正式 SVG 资产优先** =================
+     `js/assets-icons.js`（由 `scripts/build-visual-assets.js` 从 RESYU_VISUAL_ASSETS 编译）
+     里的表比老表**先查**：命中就用正式资产，命不中才落回老表。
+     ⚠️ 老表（NAV_ICONS / CUR_ICONS / WORLD_ICONS）一个字都没删 —— 它们现在就是 fallback
+        （某个 SVG 缺了 / 加载不到 / 映射对不上，图标照样画得出来，不会变成空白格）。
+     ⚠️ 正式资产是**路径 op**（['M',x,y] / ['C',…] / ['R',…] / ['E',…]），
+        渲染走 `CV.drawAsset`；老表是**线框 op**（['line',…] / ['poly',…]），走老那一段。
+        `CV.drawIcon` 按**第一个 op 的指令字母**自动分流（大写单字母 vs 小写单词）。 */
+    const A = (typeof window !== 'undefined') && window.ICON_ASSETS;
+    if (A) {
+      const key = kind === 'world' ? ('ico_world_' + id)
+        : kind === 'cur' ? ('ico_currency_' + id)
+          : ('ico_nav_' + id);
+      if (A[key] && A[key].length) return A[key];
+    }
     const t = (kind === 'cur') ? CUR_ICONS : (kind === 'world') ? WORLD_ICONS : NAV_ICONS;
     const e = t && t[id];
     return e ? ((kind === 'nav') ? e.ops : e) : null;
@@ -3551,7 +3569,12 @@ window.DATA = (function () {
   // 五行相克：金克木、木克土、土克水、水克火、火克金。
   // 每个残域有自己的属性，伴生体带属性 —— 带对了克制的伴生体进本，全队伤害 +15%，带反了 -8%。
   const ELEMENTS = ['金', '木', '水', '火', '土'];
-  const ELEMENT_ICON = { 金: '⚔️', 木: '🌿', 水: '💧', 火: '🔥', 土: '⛰️' };
+  /* 2026-10-01（父亲大人 §二十四）：五行**不许再用 emoji**（⚔️🌿💧🔥⛰️），
+     改用正式资产 `ico_element_*.svg`。这里放的是**私有区码位**（U+E010~U+E014）——
+     它们由 cv.js 的 `CV.GLYPHS` 按矢量字形画（和货币 ◉◆✦♾ 同一条路），
+     所以：可改色、无 emoji、跨平台同形，而且**四处调用点一个字都不用改**
+     （它们拼的就是字符串）。正文里永远不会出现这几个码位，不会误伤正常文案。 */
+  const ELEMENT_ICON = { 金: '\uE010', 木: '\uE011', 水: '\uE012', 火: '\uE013', 土: '\uE014' };
   const ELEMENT_COUNTER = { 金: '木', 木: '土', 土: '水', 水: '火', 火: '金' };
   const ELEMENT_BONUS = 0.15;
   const ELEMENT_PENALTY = 0.08;

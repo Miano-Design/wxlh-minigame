@@ -341,6 +341,43 @@
     return false;
   }
   Story.sceneReady = function (id) { const r = IMG[id]; return !!(r && r.ok); };
+  /* ================= Boss 立绘（人物前景层 · 懒加载） =================
+     §六：Boss 图是**竖屏剧情视觉资产**，不是头像 —— 保持完整纵向构图、不拉伸、不裁头、
+     不被对白区截断。这 6 张是**真透明 RGBA**（构建时逐张验过），所以按"人物前景层"叠在
+     场景图之上；透明加载失败就回落程序剪影（原来那套，一个字没删）。 */
+  const BOSS_IMG = {};
+  function bossFile(id) { return ((SD.BOSS_FILE || {})[id]) || null; }
+  function ensureBoss(id, onReady) {
+    const rec = BOSS_IMG[id];
+    if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
+    const file = bossFile(id);
+    if (!file || typeof wx === 'undefined' || !wx.createImage) { BOSS_IMG[id] = { fail: true }; return false; }
+    try {
+      const img = wx.createImage();
+      BOSS_IMG[id] = { loading: true };
+      img.onload = function () { BOSS_IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
+      img.onerror = function () { BOSS_IMG[id] = { fail: true }; };
+      img.src = file;
+    } catch (e) { BOSS_IMG[id] = { fail: true }; }
+    return false;
+  }
+  Story.bossReady = function (id) { const r = BOSS_IMG[id]; return !!(r && r.ok); };
+  /* 主视觉（首页大面积背景）：同一套懒加载 */
+  let KV_IMG = null;
+  Story.ensureKV = function () {
+    if (KV_IMG) return !!KV_IMG.ok;
+    const file = SD.KV_FILE;
+    if (!file || typeof wx === 'undefined' || !wx.createImage) { KV_IMG = { fail: true }; return false; }
+    try {
+      const img = wx.createImage();
+      KV_IMG = { loading: true };
+      img.onload = function () { KV_IMG = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
+      img.onerror = function () { KV_IMG = { fail: true }; };
+      img.src = file;
+    } catch (e) { KV_IMG = { fail: true }; }
+    return false;
+  };
+  Story.kvImage = function () { return (KV_IMG && KV_IMG.ok) ? KV_IMG.img : null; };
   /* 一张场景图 cover 铺满（等比放大到恰好盖住，居中） */
   function drawSceneCover(c, img, w, h) {
     const iw = img.width || 1080, ih = img.height || 1920;
@@ -380,6 +417,9 @@
 
   Story.play = function (o) {
     if (!o || !o.beats || !o.beats.length) return false;
+    /* 第一次真的要看剧情时才去拉"剧情分包"（12 场景 + 6 Boss + 主视觉都在里面）。
+       没有这个分包 / 拉失败都**静默忽略** —— 场景与 Boss 会各自回落程序化占位。 */
+    trySubpackage();
     cur = {
       beats: o.beats, i: 0, reveal: 0, t0: Date.now() / 1000, ts: Date.now() / 1000,
       scene: o.scene || 'god_hall', title: o.title || '', chNo: o.chNo || '',
@@ -532,7 +572,13 @@
     const m = cur.meta || {};
     const after = cur.onDone;
     if (cur.kind === 'world' && m.worldId) Story.markSeen(m.worldId, m.part);
-    else if (cur.kind === 'boss' && m.worldId) Story.markBoss(m.worldId);
+    /* Boss 线播的**就是**这一张图的 `pre` / `post`（见 openBoss），所以两边都要记：
+       只记 `b[worldId]` 的话，世界页会把这一段当成没读过 → 守关前**反复自动播**。
+       这正是"同一段只播一次"那条要求最容易漏的一处。 */
+    else if (cur.kind === 'boss' && m.worldId) {
+      if (m.part) Story.markSeen(m.worldId, m.part);
+      Story.markBoss(m.worldId);
+    }
     else if (cur.kind === 'char') Story.markChar(m.id, m.n);
     else if (cur.kind === 'item') Story.markItem(m.key);
     cur = null;
@@ -662,8 +708,23 @@
       cur.chapter = null;                  // 放完就卸掉，后面几拍不再走这条路
     }
     /* ③ 角色剪影层：说话人有 charId 就画他的程序剪影，站在画布右侧 1/3 */
+    /* ③ 角色层：**正式 Boss 立绘优先**，没有才回落程序剪影。
+       Boss 图的规格是"人物在画面右 1/3、上半身到大腿、左侧留白"（§六），
+       所以整张按**高度 contain**（绝不拉伸、绝不裁头）后靠右贴底 ——
+       人物自然落在屏幕右侧，左边那块透明区正好留给标题。 */
+    const bossId = (cur.kind === 'boss' && cur.meta && cur.meta.worldId) ? cur.meta.worldId : null;
     const act = cur.actor || actorOf(b);
-    if (act) {
+    if (bossId && ensureBoss(bossId)) {
+      const img = BOSS_IMG[bossId].img;
+      const iw = img.width || 1080, ih = img.height || 1920;
+      let dh = bottom * 0.94, dw = dh * (iw / ih);
+      const maxW = CV.W * 0.96;
+      if (dw > maxW) { dw = maxW; dh = dw * (ih / iw); }
+      c.save();
+      c.globalAlpha = 0.98;
+      c.drawImage(img, CV.W - dw, bottom - dh, dw, dh);
+      c.restore();
+    } else if (act) {
       /* 站位照母版规格：人物站画布**右 1/3**、脚踩在地平线附近（62% 高）；
          别顶到台词区（下 26% 是安全区）。 */
       const size = Math.min(CV.W * 0.62, bottom * 0.52);
@@ -901,7 +962,11 @@
   Story.openMain = function (worldId, opts) {
     const p = Story.nextEntry(worldId);
     if (!p) return false;
-    return Story.openWorld(worldId, p, opts || {});
+    const o = opts || {};
+    /* 六卷锚点世界的 `pre`/`post` **就是 Boss 场**（§二十一B：立绘 → Boss 名 → 一句对白 → 战斗），
+       所以从这里进也给 `kind:'boss'` —— 否则"从世界页重读 Boss 那一段"会看不到立绘。 */
+    if (!o.kind && BOSS[worldId] && (p === 'pre' || p === 'post')) o.kind = 'boss';
+    return Story.openWorld(worldId, p, o);
   };
   /* 结算那一层要的"一句线索"：**优先进关键物件那一拍**（`o`），没有才退第一拍。
      为什么这么挑：`o` 那一拍本来就是"玩家看到的东西"（轨道图上亮起 36 个点），
@@ -931,10 +996,17 @@
   /* 世界页唯一的主叙事入口 */
   CV.on('story_main:*', function (id) {
     const wid = String(id || '').slice(0, 3);
-    Story.openMain(wid, { kind: 'world' });
+    /* ⚠️ **不要在这里硬给 `kind`** —— 六卷锚点世界的 `pre`/`post` 就是 Boss 场，
+       `Story.openMain` 会自己把它标成 `kind:'boss'`。第一版这里写死 `{kind:'world'}`，
+       结果"从世界页重读 Boss 那一段"**永远看不到 Boss 立绘**（实机上量出来的）。 */
+    Story.openMain(wid);
   });
   /* 结算页那两行「去看」：战后那一段 / Boss 战后那一段 */
-  CV.on('story_world_post:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'post'); });
+  CV.on('story_world_post:*', function (id) {
+    const wid = String(id || '').slice(0, 3);
+    /* 结算那条「发现」也照同一条规矩：Boss 世界的战后就是 Boss 场（立绘要出来）。 */
+    Story.openWorld(wid, 'post', BOSS[wid] ? { kind: 'boss' } : null);
+  });
   CV.on('story_boss_after:*', function (id) { Story.openBoss(String(id || '').slice(0, 3), 'after'); });
   CV.on('story_char:*', function (p) {
     const s = String(p || '').split(':');

@@ -107,28 +107,30 @@ function pngInfo(buf) {
     R.fail('⑤ 已接入的场景图必须合规格（9:16）',
       { expected: '1080×1920（9:16）', actual: sceneBad.join(' ') });
   } else if (sceneMissing.length) {
-    R.warn('⑤ 正式场景图接入状态：' + sceneOk.length + ' / 12 已接入',
-      { expected: '12 张（story/scene/<id>.jpg，1080×1920）',
-        actual: '未接入 ' + sceneMissing.length + ' 张（' + sceneMissing.slice(0, 4).join(' ') +
-          '…）—— 现在跑的是程序化占位回落，不阻塞发布' });
+    /* 2026-10-01：正式素材已交付 ⇒ 缺一张就是**真的没接好**，按 FAIL 报（不再 WARN 放过）。 */
+    R.fail('⑤ 12 张正式场景图必须全部就位',
+      { expected: '12 张 story/scene/img_scene_<sceneId>.jpg（1080×1920）',
+        actual: '缺 ' + sceneMissing.length + ' 张：' + sceneMissing.join(' ') });
   } else {
     R.pass('⑤ 正式场景图 12 / 12 已接入且合规格', { expected: '12 张 9:16', actual: '全部就位' });
   }
 
-  const bossMissing = BOSS_IDS.filter((id) => !fs.existsSync(path.join(ROOT, 'story/boss/' + id + '.png')));
+  /* Boss：**规格 2026-10-01 改为 1080×1920 / PNG（不再 1024×1536）**，且必须真透明 */
+  const bossMissing = BOSS_IDS.filter((id) => !fs.existsSync(path.join(ROOT, 'story/boss/img_boss_' + id + '.png')));
   if (bossMissing.length) {
-    R.warn('⑥ 六个核心 Boss 立绘接入状态：' + (6 - bossMissing.length) + ' / 6 已接入',
-      { expected: 'story/boss/<W##>.png（1024×1536 · 透明 PNG）',
-        actual: '未接入 ' + bossMissing.join(' ') + ' —— 现在跑的是程序化剪影回落' });
+    R.fail('⑥ 六个核心 Boss 立绘必须全部就位',
+      { expected: '6 张 story/boss/img_boss_<W##>.png（1080×1920 · 透明 PNG）',
+        actual: '缺 ' + bossMissing.join(' ') });
   } else {
     const bad = [];
     BOSS_IDS.forEach((id) => {
-      const info = pngInfo(fs.readFileSync(path.join(ROOT, 'story/boss/' + id + '.png')));
+      const info = pngInfo(fs.readFileSync(path.join(ROOT, 'story/boss/img_boss_' + id + '.png')));
       if (!info) { bad.push(id + '(不是 PNG)'); return; }
       if (info.colorType !== 6 && info.colorType !== 4) bad.push(id + '(没有 alpha 通道)');
+      if (info.w !== 1080 || info.h !== 1920) bad.push(id + '(' + info.w + 'x' + info.h + ' ≠ 1080x1920)');
     });
-    t('⑥ 六个核心 Boss 立绘都合规格（透明 PNG）', bad.length === 0,
-      '1024×1536 · colorType 6/4', bad.length ? bad.join(' ') : '6/6');
+    t('⑥ 六个核心 Boss 立绘都合规格（1080×1920 · 透明 PNG）', bad.length === 0,
+      '1080×1920 · colorType 6/4', bad.length ? bad.join(' ') : '6/6');
   }
 }
 
@@ -265,6 +267,87 @@ function pngInfo(buf) {
     t('⑯ 剧情页「点一下继续」真的推进（story_next 不是死键）',
       nextChanged, '派发 story_next 后画面文字发生变化',
       nextChanged ? '有反应' : '无变化（那就是死键）');
+  }
+}
+
+/* ==========================================================================
+   2026-10-01（父亲大人「视觉资产正式接入」§二十三 / §二十四）
+   图标与配色这一段：36 世界 + 24 全局 SVG 是否全部接入、SVG 本身合不合法、
+   配色是不是"统一语义"（而不是 36 色随机 / 也不是全白）、有没有残留 emoji 兜底。
+   ========================================================================== */
+{
+  const ASSET_DIR = path.resolve(ROOT, '../游戏素材/RESYU_VISUAL_ASSETS');
+  const TABLE = (() => {
+    try { const g = {}; new Function('GameGlobal', read('js/assets-icons.js'))(g); return g.ICON_ASSETS || {}; }
+    catch (e) { return {}; }
+  })();
+  const K = Object.keys(TABLE);
+  /* ---------- ⑰ 36 个世界图标 ---------- */
+  {
+    const want = [];
+    for (let i = 1; i <= 36; i++) want.push('ico_world_W' + String(i).padStart(2, '0'));
+    const miss = want.filter((k) => !TABLE[k] || !TABLE[k].length);
+    t('⑰ 36 个世界图标全部接入（编译进资产表）', miss.length === 0,
+      'ico_world_W01 … ico_world_W36', miss.length ? ('缺 ' + miss.join(' ')) : '36/36');
+  }
+  /* ---------- ⑱ 24 个全局图标 ---------- */
+  {
+    const want = ['ico_nav_home', 'ico_nav_dungeon', 'ico_nav_roster', 'ico_nav_bag',
+      'ico_currency_points', 'ico_currency_otherworld', 'ico_currency_holy', 'ico_currency_rp',
+      'ico_blood_wolf', 'ico_blood_xiuzhen', 'ico_blood_crimson', 'ico_blood_tech',
+      'ico_blood_psionic', 'ico_blood_titan',
+      'ico_theme_bio', 'ico_theme_ghost', 'ico_theme_mystic', 'ico_theme_tech', 'ico_theme_god',
+      'ico_element_metal', 'ico_element_wood', 'ico_element_water', 'ico_element_fire', 'ico_element_earth'];
+    const miss = want.filter((k) => !TABLE[k] || !TABLE[k].length);
+    t('⑱ 24 个全局图标全部接入（导航 4 · 货币 4 · 血统 6 · 主题 5 · 五行 5）', miss.length === 0,
+      '24 条', miss.length ? ('缺 ' + miss.join(' ')) : '24/24');
+  }
+  /* ---------- ⑲ SVG 技术合法性（逐张查源文件） ---------- */
+  {
+    const bad = [];
+    let n = 0;
+    if (fs.existsSync(ASSET_DIR)) {
+      fs.readdirSync(ASSET_DIR).filter((f) => /\.svg$/i.test(f)).forEach((f) => {
+        n++;
+        const s = fs.readFileSync(path.join(ASSET_DIR, f), 'utf8');
+        if (!/<svg[\s>]/.test(s)) bad.push(f + '(不是 SVG)');
+        else {
+          if (!/viewBox\s*=/.test(s)) bad.push(f + '(缺 viewBox)');
+          if (/<image\b|base64,/i.test(s)) bad.push(f + '(嵌了位图)');
+          if (/<text\b|font-family/i.test(s)) bad.push(f + '(依赖字体)');
+          if (/xlink:href|href\s*=\s*"(https?:)?\/\//i.test(s)) bad.push(f + '(外部引用)');
+          if (/<script\b/i.test(s)) bad.push(f + '(带脚本)');
+        }
+      });
+    } else bad.push('（素材目录不在，无法逐张验）');
+    t('⑲ SVG 源文件逐张合法（有 viewBox · 无位图 · 无字体 · 无外链 · 无脚本）',
+      bad.length === 0, n + ' 张全部合规', bad.length ? bad.slice(0, 6).join(' ') : n + ' 张全部合规');
+  }
+  /* ---------- ⑳ 配色：统一语义，不是 36 色随机、也不是全白 ---------- */
+  {
+    /* 资产表里**不含颜色**（色一律由运行时给）—— 所以这里查的是"语义色表在不在、够不够分散"。 */
+    const src = read('js/cv.js');
+    const need = ['theme', 'navA', 'bloodAsset', 'elemAsset', 'icoIdle', 'icoDone', 'icoLock'];
+    const miss = need.filter((k) => src.indexOf(k) < 0);
+    const css = (src.match(/CV\.C\.theme\s*=\s*\{[^}]*\}/) || [''])[0] || src;
+    const hexes = (src.match(/theme:\s*\{[^}]*\}/) || [''])[0].match(/#[0-9a-fA-F]{6}/g) || [];
+    t('⑳ 统一语义配色表齐（主题 / 导航 / 血统 / 五行 / 图标四态）', miss.length === 0,
+      '7 组', miss.length ? ('缺 ' + miss.join(' ')) : '7/7 齐');
+    t('⑳-b 主题色是**克制的一组**（5 个主题色各不相同，且不是 36 色随机）',
+      hexes.length === 5 && (new Set(hexes.map((h) => h.toLowerCase()))).size === 5,
+      '5 个互不相同的主题色', hexes.length + ' 个：' + hexes.join(' '));
+  }
+  /* ---------- ㉑ 不许再有 emoji 兜底（点名五行） ---------- */
+  {
+    const dataSrc = stripComments(read('js/data.js'));
+    const emojiInElement = /const ELEMENT_ICON[^;]*[\u{1F300}-\u{1FAFF}\u2694\u26F0\u{1F335}\u{1F4A7}\u{1F525}]/u.test(dataSrc);
+    t('㉑ 五行图标不再用 emoji（⚔️🌿💧🔥⛰️ → ico_element_*）', !emojiInElement,
+      'ELEMENT_ICON 里 0 个 emoji', emojiInElement ? '还能在 ELEMENT_ICON 里看到 emoji' : '已切到矢量资产');
+    /* 世界图标：`WORLD_ICONS` 那批老线框表**不许再被优先使用** ——
+       但要保留成 fallback（§二十一"不要删除 fallback"），所以这里只查"有没有走新表"。 */
+    t('㉑-b `iconOpsOf` 先查正式资产表、再落回老表（fallback 保留）',
+      /window\.ICON_ASSETS/.test(dataSrc) && /NAV_ICONS/.test(dataSrc) && /WORLD_ICONS/.test(dataSrc),
+      'ICON_ASSETS 优先 + 老表保留', '查表顺序与 fallback 都在');
   }
 }
 

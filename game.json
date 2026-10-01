@@ -1,6 +1,12 @@
 {
   "deviceOrientation": "portrait",
   "showStatusBar": false,
+  "subpackages": [
+    {
+      "name": "story",
+      "root": "story"
+    }
+  ],
   "networkTimeout": {
     "request": 10000,
     "connectSocket": 10000,

@@ -70,6 +70,18 @@
         tech: ['#0d1519', '#16303c', '#6fb6d6'],
         god: ['#1b1608', '#3a2f14', '#e6b64c'],
       },
+      /* ================= 正式资产的**统一语义配色**（2026-10-01 · 父亲大人 §九~§十四）=================
+         这四个表是那四条配色的**唯一真源**：画布端一律经下面的解析器取色，
+         别处不许再手写（`visual_audit` ②-1 只认 CV.C 与本文件里的色板）。
+         规矩他写死了：**不要 36 个图标 36 种颜色，也不要全部一个白** ——
+         走"统一基础色 + 主题强调色"，且**变化克制**（不要变成彩色手游图标）。 */
+      theme: { bio: '#6E8B68', ghost: '#7A7890', mystic: '#9A8060', tech: '#687D8C', god: '#B39A62' },
+      navA: { home: '#B39A62', dungeon: '#718595', roster: '#708C88', bag: '#9B8668' },
+      bloodAsset: { '狼人': '#875B52', '修真': '#668A82', '绯红': '#9A5B60', '科技': '#657D8D', '念动力': '#81788F', '泰坦': '#817566' },
+      elemAsset: { '金': '#B7A66E', '木': '#6D8B67', '水': '#64869A', '火': '#A85F4F', '土': '#897866' },
+      /* 世界图标的**状态档**（§九）：普通偏冷灰白 / 选中与重要节点＝主题强调色 /
+         已完成低饱和暖灰 / 锁定低亮度灰。 */
+      icoIdle: '#C2CAD6', icoDone: '#9C9384', icoLock: '#4A4F5A',
       shade: '#000000', white: '#ffffff',
     },
     /* 下面这几组数值在 setup() 里按网页版的根字号等比缩放：
@@ -227,6 +239,15 @@
      ⚠️ 本函数里**不许出现任何具体形状**（写了就等于又开一套），只认 data.js 那几个 op。 */
   CV.drawIcon = function (ops, c, cx, cy, size, color) {
     if (!ops || !ops.length) return;
+    /* ================= 2026-10-01 · 正式 SVG 资产走**另一条渲染** =================
+       正式资产（`js/assets-icons.js`，由 SVG 编译）是**路径 op**：['M',x,y] / ['L',…] /
+       ['C',x1,y1,x2,y2,x,y] / ['Q',…] / ['Z'] / ['R',x,y,w,h] / ['E',cx,cy,rx,ry]。
+       老表是**线框 op**：['line',…] / ['rect',…] / ['poly',…]（小写单词）。
+       判据只看**第一个 op 的指令是不是单个大写字母** —— 两条渲染互不干扰，
+       老图标（fallback）一个像素都不变。 */
+    if (typeof ops[0][0] === 'string' && ops[0][0].length === 1 && ops[0][0] >= 'A' && ops[0][0] <= 'Z') {
+      return CV.drawAsset(ops, c, cx, cy, size, color);
+    }
     const k = size / 24;
     const sw = ((G.DATA && G.DATA.ICON_STROKE) || 1.9) * k;
     const P = (x, y) => [cx + (x - 12) * k, cy + (y - 12) * k];
@@ -569,6 +590,39 @@
     for (const k in CV.GLYPHS) if (t.indexOf(k) >= 0) return true;
     return false;
   };
+  /* ================= 语义配色的**解析器**（唯一出口 · 2026-10-01） =================
+     全部读 `CV.C`（色板），调用点传"语义"（主题 / 血统 / 元素 / 状态），不传色值。 */
+  CV.themeColor = function (theme) { return (CV.C.theme && CV.C.theme[theme]) || CV.C.text; };
+  CV.navColor = function (id) { return (CV.C.navA && CV.C.navA[id]) || CV.C.text; };
+  CV.bloodColor = function (bl) { return (CV.C.bloodAsset && CV.C.bloodAsset[bl]) || CV.C.text; };
+  CV.elementColor = function (el) { return (CV.C.elemAsset && CV.C.elemAsset[el]) || CV.C.text; };
+  /* 世界图标的状态色：`state` ∈ idle / current / done / locked；Boss 世界按 current 那一档 */
+  CV.worldIconColor = function (theme, state) {
+    if (state === 'current' || state === 'boss') return CV.themeColor(theme);
+    if (state === 'done') return CV.C.icoDone || CV.C.dim;
+    if (state === 'locked') return CV.C.icoLock || CV.C.dim;
+    return CV.C.icoIdle || CV.C.text;
+  };
+  /* ================= 五行：正式 SVG 资产接进「文字内矢量字形」这条路 =================
+     2026-10-01（父亲大人 §二十四）：**不许再用 ⚔️🌿💧🔥⛰️**，必须走 `ico_element_*`。
+     做法：`CV.text` 本来就能把某些字符**按字形画**（`CV.GLYPHS`，货币 ◉◆✦♾ 就是这么来的），
+     所以这里把五个元素注册成字形 —— 数据层的 `ELEMENT_ICON` 只要改成这五个码位，
+     **四处调用点一个字都不用动**（它们拼的是字符串），而且宽度/折行也自动跟着走。
+     码位用**私有区 U+E010~U+E014**：正文里永远不可能出现这几个字，
+     所以不会像直接拿"金/木"当记号那样误伤正常文案。 */
+  (function () {
+    const A = G.ICON_ASSETS;
+    if (!A) return;
+    [['metal', '\uE010'], ['wood', '\uE011'], ['water', '\uE012'],
+      ['fire', '\uE013'], ['earth', '\uE014']].forEach(function (k) {
+      const ops = A['ico_element_' + k[0]];
+      if (ops && ops.length) {
+        /* 色：按 §十四 走**元素自己的识别色**（不要跟随正文色 —— 五行的"金木水火土"一眼要分得开）。 */
+        const el = ['金', '木', '水', '火', '土'][['metal', 'wood', 'water', 'fire', 'earth'].indexOf(k[0])];
+        CV.GLYPHS[k[1]] = function (c, cx, cy, size) { CV.drawAsset(ops, c, cx, cy, size, CV.elementColor(el)); };
+      }
+    });
+  })();
   /* ---------- 命格主题（V1.1 · 2026-09-23）----------
      六套锚色 / 六形印记 / 九级灯梯**全部从数据层取**（D.BLOOD_THEME / BLOOD_GLYPH / BLOOD_LAMP）——
      画布这端不许再写一套 hex，否则又是"改一边忘一边"。与网页版同一份表、同一套规则。
@@ -587,7 +641,23 @@
      与网页版 js/ui.js:blGlyph 的 `<polygon fill-opacity>` 是**同一套调子**（这里走 CV.a()）。
      顶点表只有一份（D.BLOOD_GLYPH），两端谁都不许自己写第二套形状。 */
   const BL_TONE = [1, .55, .30];
+  /* 血统名 → 正式资产后缀（`ico_blood_wolf` …）。只做映射，不改数据结构。 */
+  const BL_KEY = { '狼人': 'wolf', '修真': 'xiuzhen', '绯红': 'crimson', '科技': 'tech', '念动力': 'psionic', '泰坦': 'titan' };
   CV.blGlyph = function (bl, cx, cy, s, color) {
+    /* 2026-10-01：**正式 SVG 资产优先**（`ico_blood_*`）；没接上才落回老的六形印记表。
+       色仍然由调用方给（`CV.drawAsset` 的 color 就是唯一色源）—— 所以它照样可改色。 */
+    const A0 = G.ICON_ASSETS;
+    if (A0) {
+      const key = BL_KEY[bl];
+      const ops0 = key && A0['ico_blood_' + key];
+      /* 色：2026-10-01 §十三 —— 血统色是**识别色**，所以正式印记一律走
+         `CV.C.bloodAsset` 那一套（狼人暗赤褐 / 修真青玉 / 绯红深绯 / 科技冷钢蓝 /
+         念动力幽紫灰 / 泰坦岩石赭）。
+         ⚠️ 这只改**印记**：`CV.blLamp`（命格灯色梯队）一个字没动 ——
+            那一套是更早一轮**拍板锁死**的（锚色锁在相对亮度 Y=0.26、相邻色相间隔不许动），
+            两套并存、各管一段。这一条已记进 `docs/lore/待裁决设定.md` 等您确认。 */
+      if (ops0 && ops0.length) { CV.drawAsset(ops0, CV.ctx, cx, cy, s, CV.bloodColor(bl)); return s; }
+    }
     const g = (G.DATA && G.DATA.BLOOD_GLYPH) ? G.DATA.BLOOD_GLYPH[bl] : null;
     if (!g || !g.parts || !g.parts.length) return 0;
     const c = CV.ctx, base = color || CV.C.text;
@@ -606,8 +676,21 @@
     c.restore();
     return s;
   };
+  /* ================= 五族族形：正式资产优先（`ico_theme_*`） =================
+    参数与 `CV.poly(points, x, y, size, color)` **同一个口径**（x/y 是左上角），
+    所以调用点替换成这个名字即可，不用换算坐标。
+     ⚠️ 老表 `D.FACTION_GLYPH` 保留成 fallback（缺图时照样画得出族形）。 */
+  CV.themeGlyph = function (theme, x, y, size, color) {
+    const A = G.ICON_ASSETS;
+    const ops = A && A['ico_theme_' + theme];
+    if (ops && ops.length) { CV.drawAsset(ops, CV.ctx, x + size / 2, y + size / 2, size, color || CV.C.text); return size; }
+    const g = (G.DATA && G.DATA.FACTION_GLYPH) ? G.DATA.FACTION_GLYPH[theme] : null;
+    if (!g) return 0;
+    CV.poly(g, x, y, size, color || CV.C.text);
+    return size;
+  };
   /* ---------- 头像（V1.1.2 · 基准 §4.4）----------
-     与网页版**同一份配方**（数据层 D.avatarSpec / D.avatarParts）：
+    与网页版**同一份配方**（数据层 D.avatarSpec / D.avatarParts）：
      圆盘（panel3）＋ 剪影（阵营色 55%）＋ 头饰（阵营色本人）＋ 阵营纹。
      旧版是"圆框 + 名字首字"——44px 下只有字、没有形；现在一个人一张形，两端同一个形。
      18 个部件 × 组合的完整表在 data.js（6 剪影 × 6 头饰 × 4 阵营纹 × 2 体型 ＝ 288 组合）。 */
@@ -1628,7 +1711,11 @@
          （NAV_ICONS）—— 自绘矢量、颜色由我们给，所以不需要 emoji 那套降饱和补丁：
          选中金 / 未选 dim，与网页版 `.nav-item{color:--dim} .active{color:--gold}` 同一条规则。
          版式照旧（图标在上、标签在下），热区/台阶/红点一行没动。 */
-      CV.drawIcon(CV.iconOps('nav', t.id), c, cx, y + 22 * CV.SCALE, CV.ICO, active ? CV.C.gold : CV.C.dim);
+      /* 2026-10-01（§十二）：底栏四格图标走**各自的语义色**（灯阁暖金 / 残域冷蓝灰 /
+         执灯者青灰 / 背包旧铜）；未选中的仍然压到 `dim` —— 状态靠透明度表达，不另做一套图。
+         老图标（fallback）也吃这个色，所以"选了没有 `ico_nav_*` 的格子"观感不变。 */
+      CV.drawIcon(CV.iconOps('nav', t.id), c, cx, y + 22 * CV.SCALE, CV.ICO,
+        active ? CV.navColor(t.id) : CV.C.dim);
       CV.text(t.name, cx, y + 42 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: active ? CV.C.gold : CV.C.dim });
       /* V9.6.145（"再审一遍"抓到的两边不一致）：网页版底栏有**红点**（主页=挂机有待领、
          背包=待领箱里有东西），小游戏这边**一个点都没画** —— 玩家在小游戏里看不出
@@ -2035,3 +2122,41 @@
 
   G.CV = CV;
 })();
+  /* ================= 正式矢量资产渲染器（路径 op → ctx，**填充**） =================
+     为什么是编译 + 重放，而不是"把 SVG 当图片贴"：小游戏 Canvas 没有可靠的 SVG 解码器
+     （`createImage` 带 svg 在各平台表现不一致），而这个项目本来就有"矢量 + 运行时着色"的图标体系。
+     编译进来以后：可改色（color 参数就是唯一色源）、无位图、不吃字体、不吃包体、平台无关。
+     一次 `beginPath` + 一次 `fill()`：**多子路径用 nonzero 填充**，
+     与 Illustrator 导出的绕向一致（外轮廓顺时针、镂空逆时针 ⇒ 洞就是洞）。 */
+  const KAPPA = 0.5522847498307936;
+  CV.drawAsset = function (ops, c, cx, cy, size, color) {
+    if (!ops || !ops.length) return;
+    c = c || CV.ctx;
+    const k = size / 24;
+    const X = (x) => cx - size / 2 + x * k, Y = (y) => cy - size / 2 + y * k;
+    c.save();
+    c.beginPath();
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i], t = op[0];
+      if (t === 'M') c.moveTo(X(op[1]), Y(op[2]));
+      else if (t === 'L') c.lineTo(X(op[1]), Y(op[2]));
+      else if (t === 'C') c.bezierCurveTo(X(op[1]), Y(op[2]), X(op[3]), Y(op[4]), X(op[5]), Y(op[6]));
+      else if (t === 'Q') c.quadraticCurveTo(X(op[1]), Y(op[2]), X(op[3]), Y(op[4]));
+      else if (t === 'Z') c.closePath();
+      else if (t === 'R') c.rect(X(op[1]), Y(op[2]), op[3] * k, op[4] * k);
+      else if (t === 'E') {
+        const rx = op[3] * k, ry = op[4] * k, ex = X(op[1]), ey = Y(op[2]);
+        if (c.ellipse) c.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
+        else {   /* 老基础库没有 ellipse：用四段三次曲线拼一个（误差 < 0.03%） */
+          c.moveTo(ex + rx, ey);
+          c.bezierCurveTo(ex + rx, ey + ry * KAPPA, ex + rx * KAPPA, ey + ry, ex, ey + ry);
+          c.bezierCurveTo(ex - rx * KAPPA, ey + ry, ex - rx, ey + ry * KAPPA, ex - rx, ey);
+          c.bezierCurveTo(ex - rx, ey - ry * KAPPA, ex - rx * KAPPA, ey - ry, ex, ey - ry);
+          c.bezierCurveTo(ex + rx * KAPPA, ey - ry, ex + rx, ey - ry * KAPPA, ex + rx, ey);
+        }
+      }
+    }
+    c.fillStyle = color || CV.C.text;
+    c.fill();
+    c.restore();
+  };
