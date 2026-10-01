@@ -664,7 +664,10 @@
             CV.text(ok ? '已读 · 轻点重读' : '未读', U.ix() + U.iw(), row + 8 * CV.SCALE,
               { size: CV.FS.sm, align: 'right', color: ok ? C.gain : C.dim });
             U.space(18 * CV.SCALE);
-            CV.hit('arcopen:' + w.id + ':' + p[0], U.ix(), row, U.iw(), 18 * CV.SCALE);
+            /* **只有已读的那一段登记热区**（卷宗自己的标题就是"只记你看过的"，
+               右边那行也写着"已读 · 轻点重读"）—— 未读段从这里点开，
+               等于把"读没读过"这件事绕过去了；要读新段落请回世界页。 */
+            if (ok) CV.hit('arcopen:' + w.id + ':' + p[0], U.ix(), row, U.iw(), 18 * CV.SCALE);
           });
         });
       });
@@ -722,6 +725,7 @@
   /* ===================== 六、外部入口（页面上的按钮挂到这几个上） ===================== */
   CV.on('story_world:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'in'); });
   CV.on('story_world_pre:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'pre'); });
+  CV.on('story_world_mid:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'mid'); });
   CV.on('story_boss:*', function (id) { Story.openBoss(String(id || '').slice(0, 3), 'before'); });
   /* 结算页那两行「去看」：战后那一段 / Boss 战后那一段 */
   CV.on('story_world_post:*', function (id) { Story.openWorld(String(id || '').slice(0, 3), 'post'); });

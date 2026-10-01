@@ -361,8 +361,12 @@
           U.note('《' + (SDw.title || '') + '》　场景：' + St.sceneName(St.sceneOf(w.id)));
           U.space(CV.SP[1]);
           const row = [];
+          /* 四段都要有入口 —— 原来只挂了 进入 / 战前 / Boss，**「残响」（战斗中）根本点不到**
+             （这一段只在策划稿里存在，玩家一辈子看不到）。现在四颗一颗不少。
+             标签一律两个字，320 那一档四颗并排每颗约 69px，正好放得下。 */
           if (St.part(w.id, 'in')) row.push({ label: '进入', style: St.seen(w.id, 'in') ? 'ghost' : 'primary', id: 'story_world:' + w.id });
           if (St.part(w.id, 'pre')) row.push({ label: '战前', style: St.seen(w.id, 'pre') ? 'ghost' : 'primary', id: 'story_world_pre:' + w.id });
+          if (St.part(w.id, 'mid')) row.push({ label: '残响', style: St.seen(w.id, 'mid') ? 'ghost' : 'primary', id: 'story_world_mid:' + w.id });
           if (St.bossOf(w.id)) row.push({ label: 'Boss', style: St.seenBoss(w.id) ? 'ghost' : 'primary', id: 'story_boss:' + w.id });
           if (row.length) U.btnRow(row);
           U.space(CV.SP[1]);
