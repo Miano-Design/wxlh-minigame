@@ -49,6 +49,14 @@
      返回的 N 就是重构前 GC 的那个结构（`scripts/gameclub_audit.js` 逐帧读的那些字段）。 */
   function makeNative(cfg) {
     const N = { want: null, last: null, pending: null, label: '', btn: null, key: '', timer: null, failed: false, lastScroll: null };
+    /* ================= F3 · 0930L（父亲大人 2026-09-30：「两个按钮还是会闪屏，改了几版了」）===
+       **两层必须是同一张脸、同一个整数像素框** —— 这就是这一段的全部内容。
+       ① `look`：原生那颗的底色 / 描边 / 字色**只在这一处定义**，画布兜底那颗读同一份
+          （原来 意见反馈 是"原生填底 #161d2a ＋ 画布只描边"两颗长得不一样 ⇒
+           滑动时"停稳换成原生"那一下，按钮从"空心"变"实心"，来回换手就是频闪）。
+       ② `canvasRect`：原生那颗的位置是 `Math.round` 过的**整数屏幕像素**；画布那颗原来按内容坐标
+          原样画 ⇒ 差半个像素，换手时描边/文字会跳一下。两处必须落在**同一个整数框**里。 */
+    N.look = cfg.look || { fill: CV.C.panel2, line: CV.C.line2, color: CV.C.text };
     N.available = () => !!(WX && cfg.has() && !N.failed);
     function kill() {
       if (N.btn) { try { N.btn.destroy(); } catch (e) {} }
@@ -77,15 +85,32 @@
 
     /* 页面画这一行时调一次：传**内容坐标**（就是 U.ix()/U.y 那套）。
        返回 true ＝ 原生按钮会盖在这里（页面别再画按钮了）；false ＝ 让页面自己画兜底。 */
+    /* 原生那颗**在屏幕上的整数框** —— `tick` 摆位与 `canvasRect` 共用这一份算法（不许写第二份）。 */
+    function screenBox(x, y, w, h) {
+      return {
+        x: Math.round((CV.pxW - CV.W) / 2 + x),
+        y: Math.round(y - (CV.scroll || 0) + CV.TOP + 8),
+        w: Math.round(w), h: Math.round(h),
+      };
+    }
+    /* ================= F3 · 0930L：画布兜底那颗回哪个矩形 =================
+       原生那颗靠 `Math.round` 落在**整数屏幕像素**上；画布那颗原来按内容坐标原样画 ⇒
+       两层换手时描边与文字差半个像素（真机上就是"闪一下"）。
+       这里把同一份换算**反着用**：画布那颗也落在同一个整数框里。
+       页面用法：`const r = GC.canvasRect(bx,by,bw,bh); U.btn(r.x,r.y,r.w,r.h,…)`。 */
+    N.canvasRect = function (x, y, w, h) {
+      const b = screenBox(x, y, w, h);
+      return { x: b.x - (CV.pxW - CV.W) / 2, y: b.y + (CV.scroll || 0) - (CV.TOP + 8), w: b.w, h: b.h };
+    };
     N.placeContent = function (x, y, w, h, label) {
       if (label) N.label = label;
-      const sx = (CV.pxW - CV.W) / 2 + x;
-      const sy = y - (CV.scroll || 0) + CV.TOP + 8;
+      const box = screenBox(x, y, w, h);
+      const sx = box.x, sy = box.y;
       const top = CV.TOP + 8;
       const bot = CV.H - (CV.NAV_H || 0) - (CV.safeBottom || 0);
       /* 原生组件不会被 canvas 裁掉 —— 只有整行都在可视区里才摆它，否则它会飘在顶栏/底栏上 */
       if (sy < top - 0.5 || sy + h > bot + 0.5) { N.want = null; return false; }
-      N.want = { x: Math.round(sx), y: Math.round(sy), w: Math.round(w), h: Math.round(h) };
+      N.want = box;
       N.last = N.want;                       // 记一份：兜底那颗被点到时要用它立刻催重建
       /* ================= V1.1.6（乙组 B-2 · 父亲大人：「设置里面我现在滑动页面，进入游戏圈的按钮会一闪一闪的」）=================
          返回 true 的**唯一条件**：原生那颗**此刻真的在屏上、而且就在这个位置**。
@@ -95,11 +120,38 @@
            · 两头都空 → 玩家看到按钮"没了"，等 160ms 又冒出来 → **一闪一闪**。
          （`scripts/gameclub_audit.js` 把这 20 帧逐帧量出来过：改之前有 6 帧"整行在可视区里、
            却一颗都看不见"；这个函数就是那 6 帧的根因。）
-         现在改成"**原生在位才交给它，不在位就由画布那颗顶上**"：
+        现在改成"**原生在位才交给它，不在位就由画布那颗顶上**"：
            · 滑动中 → 画布那颗一直画着（位置跟内容走，玩家看得见）；
            · 停稳 160ms → 原生重建在同一位置、同底色/同描边/同圆角/同字号 → 正好盖住画布那颗；
            · 下一帧 placeContent 返回 true → 画布那颗不再画 → **永远只有一颗可见**（不会重影）。 */
-      return N.available() && !!(N.btn && N.key === keyOf(N.want));
+      /* ================= F3 · 0930L（父亲大人 2026-09-30：「两个按钮还是会闪屏，改了几版了」）===
+         **这里就是"闪"的最后一条根因**（`scripts/gameclub_audit.js` ⑧ 段逐帧量出来的）：
+         "原生在不在屏上"这件事，**画这一侧**（本函数）和**摆那一侧**（`N.tick`）原来用的是
+         **两个不同的判据** ——
+           · `tick`：`CV.dragging`（手指还按着）或**有覆盖层**开着 → 一律 `hide`；
+           · 本函数：只看"建出来了 ＋ 位置对不对"。
+         于是**手指按着、而这一帧画面又没动**（刚按下 / 拖到一半停一下）的那些帧：
+           `tick` 把原生收走了，本函数却还回 true ⇒ 页面不画画布那颗 ⇒
+           **这一帧两颗都不在屏上 = 按钮凭空消失**，下一帧手指一动又冒出来 ＝ 父亲大人说的"一闪一闪"。
+         （⑧ 段实测：42 帧里有 21 帧是这种空洞；⑥ 段当年没抓到，是因为它每一帧都在改滚动量，
+           位置一变 key 就对不上、于是兜底那颗照样画出来 —— 探针自己把洞填掉了。）
+         现在**收口成一件事**：`hidden` 这一条与 `tick` 里的 hide 条件**逐字同源**。
+         ⚠️ 以后要改"什么时候收起原生"，改这一处，`tick` 与 `placeContent` 同时生效。 */
+      const hidden = !!CV.dragging
+        || !!(G.U && G.U.overlay) || !!CV.pageOverlay;      // 与 N.tick 里那两个 hide 条件同一份
+      /* ================= 康康 2026-10-01 · **彻底取消换手**（父亲大人：「两个按钮滑动屏幕还是会闪」）=====
+         前三轮（V1.1.6 / A3 / F3）修的都是"**两层长得像不像**"（底色 / 描边 / 字色 / 圆角 / 字号、
+         以及 `Math.round` 到同一个整数框）。可"闪"的根因不在像不像，在**换不换手**：
+         这个返回值决定"**这一帧画布那颗画不画**"——
+           · 手指一动 → `tick` 把原生收起 → 这里回 false → 画布那颗顶上；
+           · 停稳 160ms → 原生重建 → 这里回 true → 画布那颗撤下。
+         于是**每换一次手就有一个可见的变化点**；手指顿一下能来回换好几轮，看着就是"一闪一闪"。
+         现在：**取消换手** —— 画布那颗**永远画**（当永久底），原生那颗由 `tick()` 照旧按位置建/收，
+         盖在 F3 已经对齐好的同一个整数框上 ⇒ 无论原生在不在，玩家看到的都是同一张脸，**没有切换点**。
+         ⚠️ 前提：两层的底色 / 描边 / 字色 / 圆角 / 字号必须始终一致（`N.look` 一处定义）；
+            否则会露出"双层边"。`gameclub_audit` 的逐帧段 + `visual_audit` 一起盯这条。
+         ⚠️ 返回 false 不等于"原生没建"：`tick()` 仍负责建/收原生（有覆盖层时收起来，弹窗关了一帧后重建）。 */
+      return false;
     };
 
     /* CV.render 每帧末尾调一次（见 js/cv.js 的钩子）。 */
@@ -167,8 +219,11 @@
   }
 
   /* ---------- ① 游戏圈（GC · 基础库 2.0.3 起）---------- */
+  /* F3 · 0930L：原生那颗的"脸"**只在这里定义一次**，画布兜底那颗照它画（见文件头的 ① / ②）。 */
+  const LOOK = { fill: CV.C.panel2, line: CV.C.line2, color: CV.C.text };
   const GC = makeNative({
     name: 'gameclub',
+    look: LOOK,
     has: () => typeof WX.createGameClubButton === 'function',
     make: (r, label) => WX.createGameClubButton({
       type: 'text',
@@ -177,8 +232,8 @@
       openlink: OPENLINK || undefined,
       style: {
         left: r.x, top: r.y, width: r.w, height: r.h,
-        backgroundColor: CV.C.panel2, borderColor: CV.C.line2, borderWidth: 1,
-        borderRadius: Math.round(CV.RADIUS_SM), color: CV.C.text,
+        backgroundColor: LOOK.fill, borderColor: LOOK.line, borderWidth: 1,
+        borderRadius: Math.round(CV.RADIUS_SM), color: LOOK.color,
         /* 字号/圆角/底色都跟 U.btn 的"小按钮"那套对齐 ——
            滚动中先露画布兜底那颗、停稳后换成原生这颗，两边必须长得一样才不会跳。 */
         textAlign: 'center', fontSize: Math.round(CV.FS.md), lineHeight: Math.round(r.h),
@@ -219,16 +274,18 @@
      兜底：原生按钮建不出来（开发者工具 / 老基础库）→ 画布那颗顶上，点了给一句人话。 */
   const FB = makeNative({
     name: 'feedback',
+    look: LOOK,
     has: () => typeof WX.createFeedbackButton === 'function',
     make: (r, label) => WX.createFeedbackButton({
       type: 'text',
       text: label || '意见反馈',
       style: {
         left: r.x, top: r.y, width: r.w, height: r.h,
-        /* 与 GC 那颗、以及画布兜底的 U.btn 小按钮**逐项对齐** ——
-           滚动中先露画布那颗、停稳换成原生那颗，两边一样才不会跳（同 gameclub 的理由）。 */
-        backgroundColor: CV.C.panel2, borderColor: CV.C.line2, borderWidth: 1,
-        borderRadius: Math.round(CV.RADIUS_SM), color: CV.C.text,
+        /* 与 GC 那颗、以及画布兜底的 U.btn **逐项对齐**（同一份 `LOOK`）——
+           ⚠️ F3 · 0930L：原来这里是"原生填底、画布只描边"两颗长得不一样，
+              滑动停稳那一下按钮会从空心变实心 ⇒ 正是父亲大人说的那种"一闪一闪"。 */
+        backgroundColor: LOOK.fill, borderColor: LOOK.line, borderWidth: 1,
+        borderRadius: Math.round(CV.RADIUS_SM), color: LOOK.color,
         textAlign: 'center', fontSize: Math.round(CV.FS.md), lineHeight: Math.round(r.h),
       },
     }),

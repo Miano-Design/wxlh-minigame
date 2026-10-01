@@ -33,8 +33,13 @@
      出问题的时候"玩家没看到任何提示"就等于"我们也没有任何线索"。
      所以这一条链上只补日志（**口径一个字不改**）：推送成功/失败、取回（带上字节数与时间戳）、
      以及"谁新听谁的"那一刻的取值。只报字节数/时间戳这类短字段，**两份存档内容都不上报**。 */
-  const LOG = G.LOG || null;
-  function clog(action, data) { try { if (LOG) LOG.info('cloud', action, data || {}); } catch (e) {} }
+  /* ⚠️ F2 · 0930L：**每次现取** `G.LOG`，不在模块加载时捕获一份。
+     理由：`G.LOG` 是 `js/wx-adapter.js` 建的，而那个模块在某些链路里会被重新加载
+     （换一份新的 `G.LOG`）—— 旧写法会一直往**已经没人读的那个实例**里写，
+     真机排查时"日志里什么都没有"，正是这一类。 */
+  function clog(action, data) {
+    try { const L = G.LOG; if (L) L.info('cloud', action, data || {}); } catch (e) {}
+  }
 
   /* ---------- 环境与集合（**环境 ID 只有这一处**） ---------- */
   const ENV_ID = 'cloudbase-d0gk9s3sv8a797189';
@@ -46,6 +51,9 @@
   const PUSH_CAP_PER_DAY = 20;               // 每天推送记账上限（防异常刷）
   const MERGE_MS = 60 * 1000;                // 打关/结算后的推送：同一分钟内合并成一次
   const RETRY_WAIT = [30 * 1000, 2 * 60 * 1000, 5 * 60 * 1000];
+  /* 双端单活：另一台设备的租约**多久不算数**。超过这个时长没动静 = 那台已经走了，
+     本机照常上线（不然一次网络抖动没占上位，这台就永远只读了）。 */
+  const LEASE_TTL_MS = 15 * 60 * 1000;
 
   const DEFAULTS = function () {
     return {
@@ -61,6 +69,31 @@
   };
 
   let cache = null;
+  /* ================= 康康 2026-10-01 · **双端单活**：本机设备标识 =================
+     父亲大人：「你可以设置双端只有一端能在线，避免双端打架，就是手机登陆的时候，
+               电脑端如果也登陆着，则电脑端下线，就**以晚登陆的为主**」。
+     ⚠️ `deviceId()` **必须是模块作用域的** —— 它一开始被我写进 `prefs()` 里，而 `actBlock()`
+        是在外面调它的 ⇒ 每次都是一次 `ReferenceError`，被 `actBlock()` 自己的 try/catch
+        **静默吃掉** ⇒ "功能在、租约一个字都写不上去"（最阴的那种失效）。现在提到模块级。
+     标识**留在本机**（localStorage 单独一个键）：存档要能跨端搬，设备身份不能跟着存档走。 */
+  const DEV_KEY = 'wxlh_dev_v1';
+  let devId = '';
+  function deviceId() {
+    if (devId) return devId;
+    try {
+      devId = String(localStorage.getItem(DEV_KEY) || '');
+      if (!devId) { devId = 'd' + Math.random().toString(36).slice(2, 10); localStorage.setItem(DEV_KEY, devId); }
+    } catch (e) { devId = 'd0'; }
+    return devId;
+  }
+  /* 本机最近一次"占位"（写进云上 `act.sess.ts` 的那个数）＋"被另一台设备顶下线"的旗标。
+     被顶下线期间这条链**只读不写**：云端更新照样换下来（双端内容保持一致），但一个字都不写回去。 */
+  /* `noticeAt` 与 `NOTICE_HOLD_MS`：被顶下线那条提示**不是只讲一次就再也回不来** ——
+     玩家点了「知道了」之后如果还在这台玩（一直在推不上去），隔一段时间再提醒一次；
+     不然他就被**永久困在只读态**、连"重新登录"的入口都找不到了。 */
+  let leaseTs = 0, superseded = false, noticeShown = false, noticeAt = 0;
+  const NOTICE_HOLD_MS = 3 * 60 * 1000;
+
   /** 偏好/账本：读出来一律**补齐默认值**（老版本写的对象里缺字段、或整段不存在，都按默认值走）。 */
   function prefs() {
     if (cache) return cache;
@@ -159,28 +192,72 @@
        没搬上去**（`actSnapshot()` 里有、`act` 里没有）—— 结果是"整条链一次都不会发"，
        而且**静默**：云函数扫不到候选、日志里连一行都没有。这三行就是那处接线。
        ⚠️ 三个数全部来自 `Core.actSnapshot()` 的同一个出口（判据不在这儿重算第二份）。 */
-  function actBlock() {
+  function actBlock(tsOverride) {
     const C0 = G.Core;
     if (!C0 || typeof C0.actSnapshot !== 'function') return null;
     try {
       const s = C0.actSnapshot() || {};
       const n = (v) => Math.max(0, Math.floor(Number(v) || 0));
+      /* 占位时间戳**由调用方给**（推档那次用它写字，占位那次也用同一个数）——
+         这样"写上去的 `sess.ts`"与"本机记的 `leaseTs`"永远是同一次，不会各写各的。 */
+      const leaseStamp = Number(tsOverride) || Date.now();
       return {
         loginDays: n(s.loginDays), playMinutes: n(s.playMinutes), clears: n(s.clears),
         /* V1.0.4 · X（订阅消息）：云端 `notify` 判据只认这几个 —— 全是数字、不含身份信息。
            `bankSec` 是"银行里攒了多久"（推给玩家那句「挂机时长」用它，不是"满了之后过了多久"）。 */
         subMsg: n(s.subMsg), bankFullAt: n(s.bankFullAt), bankAmount: n(s.bankAmount), bankSec: n(s.bankSec),
         at: Date.now(),
+        /* ================= 康康 2026-10-01 · **双端单活租约**（父亲大人 10-01）=================
+           原话：「你可以设置双端只有一端能在线，避免双端打架，就是手机登陆的时候，电脑端如果也登陆着，
+                   则电脑端下线，就**以晚登陆的为主**」。
+           做法：每次推档都把"**本机在场证明**"一起写进云上那份 `act`——
+             · `sess.id` ＝ 本机设备标识（`deviceId()`，只存在本机）；
+             · `sess.ts` ＝ 这一刻的毫秒时间戳 ⇒ **谁后登录，谁的 ts 更新**。
+           另一端拉到这份 `act` 时比对：`sess.id ≠ 自己` 且 `ts` 比自己的新 ⇒ 判定"我被顶下线"，
+           立刻**停止写档**（防止两端互相覆盖）并提示「已在另一台设备登录，本机已下线」。
+           ⚠️ 只多一个字段，`notify` 云函数读的还是那几个数字，不受影响。 */
+        sess: { id: deviceId(), ts: leaseStamp },
       };
     } catch (e) { return null; }
   }
 
   /* ---------- 云开发（客户端 SDK；没有云能力就是"这台设备同步不了"，不影响本机存档） ---------- */
-  let inited = false;
+  /* ================= F2 · 0930L（父亲大人 2026-09-30：「存档也是啊，同一个微信，都能上微信了，
+     怎么可能没网络」）=================================================================
+     真问题不是"没网络"，而是**这条链全程静默**：电脑端到底有没有 `wx.cloud`、`init` 成没成功、
+     云函数到底报了什么 —— 一处都看不见，于是"电脑端进度不动"只能靠猜。
+     现在这一条链上的**每一个失败点都落账**（进 `G.LOG` 的 ring，能被 `LOG.recent()` 读到）
+     并把最近一次失败记在 `lastErr` 里 —— 设置页那行诊断（`statusText()`）就是读它。
+     ⚠️ 只记**错误码与短原因**，存档内容、openid 一个字都不进（与 `G.LOG` 的字段白名单同一条纪律）。 */
+  let inited = false, initErr = '', lastErr = null;
+  function noteErr(why, err) {
+    lastErr = { at: Date.now(), why: String(why || '?'), err: String(err == null ? '' : err).slice(0, 60) };
+    clog('fail', { why: lastErr.why, reason: lastErr.err });     // 'why' / 'reason' 都在 G.LOG 的白名单里
+    return lastErr;
+  }
+  function cloudAbsent() {
+    if (!WX) return 'no_wx';
+    if (!WX.cloud) return 'no_cloud';
+    return '';
+  }
+  /* "这台设备没有云能力"这一次会话只落一条账（不然每次同步都写一条，把别的日志淹了） */
+  let absentLogged = false;
+  function logAbsent(why) {
+    if (absentLogged) return;
+    absentLogged = true;
+    clog('absent', { why: why || cloudAbsent() || 'no_cloud' });
+  }
   function cloud() {
-    if (!WX || !WX.cloud) return null;
+    const miss = cloudAbsent();
+    if (miss) return null;
     if (!inited) {
-      try { WX.cloud.init({ env: ENV_ID, traceUser: true }); } catch (e) { return null; }
+      try { WX.cloud.init({ env: ENV_ID, traceUser: true }); }
+      catch (e) {
+        /* init 就抛错：以前这里是**静默 return null**（正是"电脑端没参与同步"最可疑的那一处） */
+        initErr = String((e && (e.errMsg || e.message)) || 'init').slice(0, 60);
+        noteErr('init', initErr);
+        return null;
+      }
       inited = true;
     }
     return WX.cloud;
@@ -195,11 +272,16 @@
     return new Promise(function (resolve) {
       let req = null;
       try { req = make(); }
-      catch (e) { resolve({ ok: false, why: 'sdk', err: (e && e.message) || '调用失败' }); return; }
+      catch (e) {
+        noteErr('sdk', (e && e.message) || '调用失败');
+        resolve({ ok: false, why: 'sdk', err: (e && e.message) || '调用失败' }); return;
+      }
       Promise.resolve(req).then(function (res) {
         resolve({ ok: true, list: (res && res.data) || [] });
       }).catch(function (e) {
-        resolve({ ok: false, why: 'net', err: (e && (e.errMsg || e.message)) || '未知错误' });
+        const em = (e && (e.errMsg || e.message)) || '未知错误';
+        noteErr('read', em);                  // ← 电脑端"读不到云端"就落在这儿（以前静默）
+        resolve({ ok: false, why: 'net', err: em });
       });
     });
   }
@@ -209,12 +291,21 @@
   function readRaw() {
     const d = db();
     if (!d) return Promise.resolve({ ok: false, why: 'unsupported' });
+    /* ================= R1.1 · P0（父亲大人 2026-10-01 的任务书点名）=================
+       **彻底删掉"查询失败就退到集合级读取"的那条 fallback**。原写法：
+         · 先 `col.where({}).get()`（空条件＝集合扫描，靠数据库权限把自己那条筛出来）；
+         · 一旦那次失败 → **`d.collection(COLL).get()` 整集合读**。
+       风险是四重的：**安全 / 带宽 / 性能 / 隐私** —— 云库权限一旦配宽，
+       客户端就可能一次把整个 `saves` 拉下来（别的账号的档也在里面）。
+       我们自己在 `myDoc()` 里那句 `list.length > 1 → why:'multi'` 就是"客户端曾经真拿到多条"
+       留下的脚印，所以这条不是理论风险。
+       现在：**读不到就是读不到**（照常返回 `{ok:false, why}` 交给上层走"未连上/稍后重试"），
+       **绝不做集合级兜底**；`where` 不可用的老 SDK 也只走"自己的能力"那一支，不再二次全表。
+       做坏试验：把下面这句改回"失败再 `collection(COLL).get()`" → `cloud_sync_audit` 的
+       "客户端不许出现集合级读取"那条必须当场变红。 */
     return query(function () {
       const col = d.collection(COLL);
       return (typeof col.where === 'function') ? col.where({}).get() : col.get();
-    }).then(function (r) {
-      if (r.ok) return r;
-      return query(function () { return d.collection(COLL).get(); });
     });
   }
   /** 挑出"我这个账号"的那一条，并顺手把账号指纹学下来（默认权限只回自己那条；
@@ -242,6 +333,22 @@
       const m = myDoc(r.list);
       if (!m.ok) return { ok: false, why: m.why };
       const P = prefs(), doc = m.doc || null;
+      /* ================= 康康 2026-10-01 · **双端单活**：判"被顶下线" =================
+         云上那条的 `act.sess` 记的是"上一次是谁占的位"：
+           · 是本机        → 本机就是在场那一端（把本机租约时间对齐到那一笔）；
+           · 是别的设备、而且**比本机这次占位更晚** → 本机被顶下线（只读，不再写档）；
+           · 没有 / 是更旧的别人的 → 本机接着用。
+         判据放在**唯一的读入口**上 ⇒ 自动那条路（sync）、手动两颗（找回存档 / 取回上一份）
+         看到的都是同一个结论，不会各判一套。
+         做坏试验：把下面那句 `superseded = true` 删掉 → `cloud_sync_audit` ⑪ 那条当场红。 */
+      const sess = doc && doc.act && doc.act.sess;
+      if (sess && sess.id) {
+        if (String(sess.id) === deviceId()) { leaseTs = Math.max(leaseTs, Number(sess.ts) || 0); superseded = false; }
+        /* 别人的租约：**比本机这次占位晚**、而且**还在有效期内**（＝那台确实还在线）才算顶下线。
+           过期租约（那台早走了）不拦本机。 */
+        else if ((Number(sess.ts) || 0) > leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) superseded = true;
+        else superseded = false;
+      } else superseded = false;
       /* 顺手记住"云端那条里有没有更旧的备份"——设置页那行字（与一键取回）就看它。 */
       P.prevAt = doc ? (Number(doc.prevAt) || 0) : 0;
       P.prevTs = doc ? (Number(doc.prevTs) || 0) : 0;
@@ -261,7 +368,69 @@
         else req = d.collection(COLL).add({ data: data });
       } catch (e) { resolve({ ok: false, why: 'sdk' }); return; }
       Promise.resolve(req).then(function () { resolve({ ok: true }); })
-        .catch(function (e) { resolve({ ok: false, why: 'net', err: (e && (e.errMsg || e.message)) || '未知错误' }); });
+        .catch(function (e) {
+          const em = (e && (e.errMsg || e.message)) || '未知错误';
+          noteErr('write', em);               // ← 推不上去就落在这儿（原先只有 push_fail 那条，没原因）
+          resolve({ ok: false, why: 'net', err: em });
+        });
+    });
+  }
+  /* ================= 康康 2026-10-01 · **双端单活**：占位 / 顶下线提示 / 重新登录 =================
+     父亲大人：「只有一端能在线，避免双端打架……**以晚登陆的为主**」。
+     三件事都在这里，一处收口：
+       · `claimLease()`  —— 占位：把"本机这次会话在场"写进云上那条的 `act.sess`，
+                            **只写这一小块数字，payload 一个字不动**；
+       · `maybeNotifySuperseded()` —— 被顶下线时**只讲一次**（走现成的 `U.confirm`，
+                            不动页面结构；一颗「重新登录」、一颗「知道了」）；
+       · `reclaim()`      —— 「重新登录」＝再占一次位（晚登陆的为主），然后照常结算一趟。
+     ⚠️ 自动那条路（sync / push / retry）**平时一个字都不弹**（cloud_sync_audit ② 钉着）；
+        只有"被另一台设备顶下线"这一件事会说话 —— 因为不说的话，玩家只会以为"存档又没同步"，
+        而实际原因是"这台已经下线了"，两者要做的事完全不同。 */
+  function leaseOf(doc) { return (doc && doc.act && doc.act.sess) || null; }
+  /** 占位：云上那条的租约**不是本机**时才写（同一台设备连着开几次，一次都不多写）。 */
+  function claimLease(doc) {
+    const d = db();
+    if (!d || !doc || !doc._id) return Promise.resolve({ ok: false, why: 'nodoc' });
+    const ts = Date.now();
+    const act = actBlock(ts);
+    if (!act) return Promise.resolve({ ok: false, why: 'noact' });
+    return writeDoc(doc, { act: act }).then(function (w) {
+      if (w.ok) { leaseTs = ts; superseded = false; }
+      else noteErr('claim', w.err || w.why);
+      return { ok: !!w.ok, why: w.why || '' };
+    });
+  }
+  function maybeNotifySuperseded(on) {
+    if (!on) { noticeShown = false; noticeAt = 0; return; }
+    if (!superseded) { noticeShown = false; return; }
+    /* 讲过了、而且还在"静默期"内 → 不重复打扰；超过静默期还在这台玩 → 再讲一次。 */
+    if (noticeShown && (Date.now() - noticeAt) < NOTICE_HOLD_MS) return;
+    noticeShown = true; noticeAt = Date.now();
+    try {
+      const U2 = G.U;
+      if (!U2 || typeof U2.confirm !== 'function') { clog('superseded', { why: 'no-ui' }); return; }
+      U2.confirm(
+        '已在另一台设备登录',
+        '本机已下线：进度不再往云上传（云端更新的进度照样会同步下来）。\n要继续在这台设备玩，点下面这颗。',
+        function () { reclaim('notice'); },
+        { okLabel: '重新登录', cancelLabel: '知道了' }
+      );
+    } catch (e) { clog('superseded', { why: String((e && e.message) || '').slice(0, 40) }); }
+  }
+  /** 「重新登录」：把本机重新占回来（＝以晚登陆的为主），然后照常结算一趟。 */
+  function reclaim(reason) {
+    noticeShown = false; noticeAt = 0;
+    superseded = false;                        // 先放开：占位这一趟才有资格写
+    return sync('reclaim', { claim: true }).then(function (r) {
+      const ok = !!(r && r.ok && !superseded);
+      clog('reclaim', { ok: ok, why: String((r && (r.skip || r.took)) || '') });
+      const msg = ok ? '已在这台设备继续：之后这台推的进度就是云端那份。'
+        : ((r && r.msg) || '还是没连上，稍后再试（切回前台会自动再试一次）。');
+      try {
+        const U2 = G.U;
+        if (U2 && typeof U2.confirm === 'function') U2.confirm('重新登录', msg, null, { cancel: false, okLabel: '知道了' });
+      } catch (e) {}
+      return { ok: ok, msg: msg, why: String((reason || '')) };
     });
   }
   /** 云函数（存档码走它：客户端写不了别人那条，也只有服务端能做"用过就作废"这种原子判断）。 */
@@ -277,7 +446,9 @@
         if (r.ok) resolve({ ok: true, code: r.code, data: r.data, expireAt: r.expireAt, createdAt: r.createdAt });
         else resolve({ ok: false, why: String(r.msg || 'fail') });
       }).catch(function (e) {
-        resolve({ ok: false, why: 'net', err: (e && (e.errMsg || e.message)) || '未知错误' });
+        const em = (e && (e.errMsg || e.message)) || '未知错误';
+        noteErr('fn', em);                    // ← 云函数调用失败（存档码 / 机审都走这条）
+        resolve({ ok: false, why: 'net', err: em });
       });
     });
   }
@@ -310,6 +481,10 @@
 
   /* ---------- 推 ---------- */
   function push(P, doc, reason) {
+    /* 双端单活：被顶下线期间**一个字都不许写回云端**（否则两台设备就会互相覆盖，
+       正是父亲大人要防的"打架"）。这里再兜一道 —— 上面 sync 已经分流过一次，
+       但这颗是**所有**写路径的唯一出口，兜在出口上才不怕以后从别处绕进来。 */
+    if (superseded) return Promise.resolve({ ok: false, skip: 'superseded' });
     const raw = currentRaw();
     if (!raw) return Promise.resolve({ ok: false, skip: 'nodata' });
     const h = hash(raw);
@@ -320,7 +495,9 @@
     /* V1.1.20（F1-1）：这一条记录的 `ts`（对面那台设备比新旧的唯一依据）＝ **这份档自己**的
        `savedAt`（玩家最后一次真在玩的时刻）。整条链（本地判据 / 推上去的 ts / prev* 的 ts）同一个口径。 */
     const data = { payload: raw, ts: localTs() || Date.now(), bytes: raw.length, ver: String(G.GAME_VER || ''), at: Date.now() };
-    const act = actBlock();
+    /* 占位时间戳取一次、两处共用：写进云上的 `sess.ts` 与记在本机的 `leaseTs` 是同一个数。 */
+    const actTs = Date.now();
+    const act = actBlock(actTs);
     if (act) data.act = act;                            // V1.0.4 · W：只加这一小块数字（见上）
     if (doc && doc.payload && String(doc.payload) !== raw) {
       /* 云端被本地覆盖 → **旧云端另留一份**（同一条记录里的 `prev*` 栏，设置页能取回）。 */
@@ -331,6 +508,8 @@
     }
     return writeDoc(doc, data).then(function (w) {
       if (!w.ok) { clog('push_fail', { bytes: raw.length, why: String(w.why || '') }); return { ok: false, skip: 'fail', why: w.why, msg: NET_MSG(w) }; }
+      /* 推上去了 ⇒ 这一趟也算一次"占位"（本机就是在场那一端），租约时间对齐同一个数。 */
+      if (act) { leaseTs = actTs; superseded = false; }
       P.pushes++;
       P.lastPushHash = h;
       P.lastPushAt = Date.now();
@@ -344,10 +523,17 @@
 
   /* ---------- 静默结算（**唯一的一处收口**：读一次云端 → 谁新听谁的） ---------- */
  let busy = false, retryTimer = null, retryTries = 0, progressTimer = null;
-  function sync(reason) {
+  /** @param opts {claim} 开机 / 回前台那一趟要**先占位**（＝一次"登陆"，见 claimLease） */
+  function sync(reason, opts) {
+    const wantClaim = !!(opts && opts.claim);
     const P = rollDay();
     if (!P.on) return Promise.resolve({ ok: false, skip: 'off' });
-    if (!WX || !WX.cloud) return Promise.resolve({ ok: false, skip: 'unsupported' });
+    if (!WX || !WX.cloud) {
+      /* F2 · 0930L：**"这台设备根本没有云能力"必须落账** —— 这正是"电脑端没参与同步"最像的那一种；
+         以前它是**一声不响**就 return 掉的（玩家那台电脑上到底有没有 wx.cloud，谁都看不见）。 */
+      logAbsent(cloudAbsent());
+      return Promise.resolve({ ok: false, skip: 'unsupported' });
+    }
     if (busy) return Promise.resolve({ ok: false, skip: 'busy' });
     /* V1.1.20（F1-5）：**救援态（本机存档读不出来、主键禁写）期间云同步也停** ——
        那一刻内存里是"空新档"，推上去等于把玩家云上那份真进度顶掉（还会顺手覆盖
@@ -364,26 +550,45 @@
       if (!got.ok) return { ok: false, skip: 'fail', why: got.why, msg: NET_MSG(got) };
       const doc = got.doc || null;
       const cloudTs = doc ? (Number(doc.ts) || 0) : 0;
-      if (doc && cloudTs > localAtStart) {
-        /* 云端更新 → **直接换上**（不弹窗、不提示）；万一那份读不出来（比如来自更新的版本），
-           退到"用本地推上去"——推的时候旧云端会进 `prev*`，两头都不丢。 */
-        const r = applyCloudSave(doc.payload, doc.ts, 'cloud');
-        if (r.ok) return { ok: true, took: 'cloud', ts: r.ts };
+      /* ================= 康康 2026-10-01 · **双端单活**（两处分流）=================
+         ① **开机 / 回前台 ＝ 一次登陆 ⇒ 先占位**（父亲大人：「以晚登陆的为主」）。
+            只在云上那条的租约**不是本机**时才写 —— 同一台设备连着开几次，一次都不多写。
+         ② **被顶下线 ⇒ 只读**：云端更新照样换下来（双端内容保持一致），但一个字都不写回去，
+            并且把"本机已下线"这件事**讲一次**（不讲的话玩家只会以为"存档又没同步"）。 */
+      const sess = leaseOf(doc);
+      const needClaim = wantClaim && !!doc && !!doc._id && !(sess && String(sess.id) === deviceId());
+      return (needClaim ? claimLease(doc) : Promise.resolve(null)).then(function () {
+        if (superseded) {
+          maybeNotifySuperseded(true);
+          if (doc && cloudTs > localAtStart) {
+            const rr = applyCloudSave(doc.payload, doc.ts, 'cloud');
+            return { ok: true, took: 'cloud', ts: rr.ok ? rr.ts : 0, skip: 'superseded' };
+          }
+          return { ok: true, took: 'none', skip: 'superseded' };
+        }
+        if (doc && cloudTs > localAtStart) {
+          /* 云端更新 → **直接换上**（不弹窗、不提示）；万一那份读不出来（比如来自更新的版本），
+             退到"用本地推上去"——推的时候旧云端会进 `prev*`，两头都不丢。 */
+          const r = applyCloudSave(doc.payload, doc.ts, 'cloud');
+          if (r.ok) return { ok: true, took: 'cloud', ts: r.ts };
+          return push(P, doc, reason).then(function (p) {
+            return { ok: p.ok, took: 'fallback', pushed: !!p.pushed, skip: p.skip, bytes: p.bytes };
+          });
+        }
         return push(P, doc, reason).then(function (p) {
-          return { ok: p.ok, took: 'fallback', pushed: !!p.pushed, skip: p.skip, bytes: p.bytes };
+          return p.ok ? { ok: true, took: p.pushed ? 'local' : 'none', skip: p.skip, pushed: !!p.pushed, bytes: p.bytes } : p;
         });
-      }
-      return push(P, doc, reason).then(function (p) {
-        return p.ok ? { ok: true, took: p.pushed ? 'local' : 'none', skip: p.skip, pushed: !!p.pushed, bytes: p.bytes } : p;
       });
     }).then(function (r) {
       busy = false;
       /* 一次静默结算的最后取值（R1）：local ＝ 本地新推上去 / cloud ＝ 云端新换下来 /
-         none ＝ 两边一样 / fallback ＝ 云端那份读不出来、改推本地 / fail ＝ 没通 */
+         none ＝ 两边一样 / fallback ＝ 云端那份读不出来、改推本地 / fail ＝ 没通 /
+         superseded ＝ 本机被另一台设备顶下线（只读那一趟） */
       clog(r && r.ok ? 'sync' : 'sync_fail', {
         from: String((r && (r.took || r.skip)) || '?'), bytes: (r && r.bytes) || 0, ok: !!(r && r.ok),
       });
-      if (r && r.ok) { retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
+      /* 通了就把"最近一次失败"擦掉 —— 设置页那行诊断会自己回到「已连」 */
+      if (r && r.ok) { lastErr = null; retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
       else if (r && r.skip === 'fail') scheduleRetry();
       return r;
     }, function (e) {
@@ -402,6 +607,9 @@
   /* ---------- 三个触发口（都在"第一次用户交互之后"或更晚，首帧一次网络都不发） ---------- */
   /** @param mode 'first'（第一次触摸：结算一次）| 'hide'（切后台：**必推**）| 'progress'（打关/结算）*/
   function triggerAuto(mode) {
+    /* ⚠️ 归一化之前先留一份原样：'boot' / 'show' 会被下面那句映射成 'first'，
+       而**占位的判据认的是原样的那一个**（开机、回前台＝一次登陆）。 */
+    const raw = mode;
     mode = (mode === 'hide') ? 'hide' : (mode === 'progress' ? 'progress' : 'first');
     const P = rollDay();
     if (!P.on || !WX || !WX.cloud) return Promise.resolve({ ok: false, skip: 'off' });
@@ -412,7 +620,8 @@
       scheduleMergedPush();
       return Promise.resolve({ ok: true, skip: 'merged' });
     }
-    return sync(mode);
+    /* 开机 / 回前台 → 这一趟**先占位**（双端单活：以晚登陆的为主）；其余口子照旧。 */
+    return sync(mode, { claim: (raw === 'boot' || raw === 'show') });
   }
   function scheduleMergedPush() {
     if (progressTimer) return;
@@ -545,6 +754,7 @@
     if (!P.on) return Promise.resolve({ ok: false, msg: '云同步是关着的：先点上面那一行打开' });
     if (!WX || !WX.cloud) return Promise.resolve({ ok: false, msg: '这台设备没有云开发能力' });
     return sync('manual').then(function (r) {
+      if (r.ok && r.skip === 'superseded') return { ok: false, msg: '本机已下线（另一台设备在玩）：先点「重新登录」再同步' };
       if (r.ok && r.took === 'cloud') return { ok: true, msg: '云端那份更新：已经换成云端那份了' };
       if (r.ok && r.pushed) return { ok: true, msg: '已同步到微信（' + kb(r.bytes || 0) + '）' };
       if (r.ok) return { ok: true, msg: '本机和云端已经一样了，不用重复上传' };
@@ -564,6 +774,53 @@
       prevAt: P.prevAt, prevTs: P.prevTs, prevBytes: P.prevBytes,
     };
   }
+
+  /* ================= F2 · 0930L：**可见诊断**（把"静默"变成"看得见"）=================
+     父亲大人 09-30：「存档也是啊，同一个微信，都能上微信了，怎么可能没网络」——
+     他说得对：真问题从来不是"没网络"，而是这条链**出了事没人知道**。
+     这里只做两件事（口径一个字没改）：
+       · `diag()`       —— 给尺子与排查读的结构（状态 + 原因 + 时间戳）；
+       · `statusText()` —— 设置页那一行就是它（`云端：已连 · 上次同步 hh:mm` /
+                           `云端：未连（原因）· 上次同步 hh:mm`）。
+     ⚠️ 只显示**状态、原因与时间**，不显示 openid、不显示存档内容。 */
+  const WHY_TEXT = {
+    no_wx: '没有微信环境', no_cloud: '这台设备没有云开发能力',
+    init: '云服务初始化失败', read: '读不到云端', write: '存不到云端',
+    fn: '云函数调不通', sdk: '云接口不可用', net: '云端连不上', multi: '云端那份读不出来',
+  };
+  function diag() {
+    const P = prefs();
+    const miss = cloudAbsent();
+    const out = {
+      state: 'ok', why: '', detail: '', lastFailAt: 0,
+      lastSyncAt: Number(P.lastSyncAt) || 0, lastPushAt: Number(P.lastPushAt) || 0,
+      bound: !!P.accountId, env: ENV_ID,
+      /* 双端单活：本机是否已被另一台设备顶下线（设置页那行字读它）。 */
+      superseded: superseded,
+    };
+    if (miss) { out.state = 'nocloud'; out.why = miss; }
+    else if (initErr) { out.state = 'initerr'; out.why = 'init'; out.detail = initErr; }
+    else if (superseded) { out.state = 'superseded'; out.why = 'superseded'; }
+    else if (lastErr) { out.state = 'error'; out.why = lastErr.why; out.detail = lastErr.err; out.lastFailAt = lastErr.at; }
+    else if (!inited) { out.state = 'idle'; out.why = ''; }   // 还没试过（开机首帧一次网络都不发，这是正常态）
+    return out;
+  }
+  function hhmm(t) {
+    const d = new Date(Number(t) || 0), p = (n) => String(n).padStart(2, '0');
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  /** 设置页那一行。**不许**出现"云同步 / 立即同步"这两个词（cloud_sync_audit ⑦ 段钉着）。 */
+  function statusText() {
+    const d = diag();
+    const last = d.lastSyncAt ? ('上次同步 ' + hhmm(d.lastSyncAt)) : '还没同步过';
+    if (d.state === 'ok') return '云端：已连 · ' + last;
+    if (d.state === 'idle') return '云端：还没连过 · ' + last;
+    /* 双端单活：被顶下线时这一行必须自己说出来 —— 玩家才不会把"本机下线"当成"存档又没同步"。 */
+    if (d.state === 'superseded') return '云端：本机已下线（另一台设备在玩）· ' + last;
+    const why = WHY_TEXT[d.why] || (d.why || '未知原因');
+    const tail = (d.detail && d.state !== 'nocloud') ? ('｜' + d.detail) : '';
+    return '云端：未连（' + why + tail + '）· ' + last;
+  }
   function toggle() {
     /* V1.1.x（0927-P）：开关**关不掉**了（父亲大人 09-27：「默认开启云同步，关不了」）——
        函数留着只为兼容旧调用点：调它一律报"常开"，不再改任何标志位、也不再关掉联网口子。 */
@@ -579,17 +836,33 @@
     if (P.on === false) return;                    // 关着的时候连口子都不挂
     armed = true;
     hookProgress();
-    /* 回到前台 = 新的一次"会话"：把"这一轮还没看云端"重置掉（玩家切出去看了别人的进度、
-       或者另一台设备刚推过，回来第一下就该跟上）。 */
-    if (WX && WX.onShow) {
-      try { WX.onShow(function () { firstDone = false; }); } catch (e) {}
+    /* F2 · 0930L：开机就落一条"这台设备有没有云能力"（没有就有人知道原因了，不再是一团静默） */
+    {
+      const miss = cloudAbsent();
+      if (miss) logAbsent(miss);
     }
+    /* 回到前台 = 新的一次"会话"：**回来就拉**（父亲大人 2026-10-01：
+       「你要确保双端的数据是能拉取的，他得**一打开游戏就自动同步**」）——
+       不再等玩家先摸一下屏幕。 */
+    if (WX && WX.onShow) {
+      try { WX.onShow(function () { firstDone = false; triggerAuto('show'); }); } catch (e) {}
+    }
+    /* ================= 康康 2026-10-01 · **开机就拉**（父亲大人的新口径）=================
+       原设计是"**第一次用户交互之后**才联网"（怕首帧自动联网），代价就是：
+       玩家打开游戏、看着旧进度干等，直到他碰一下屏幕才去拉云 —— 双端看起来永远不同步。
+       现在改成：**开机 300ms 就拉一次**（先让首帧落、再联网），并把 `firstDone` 置上，
+       保证**同一次会话只拉一次**；`onShow`（切回前台）也同样立刻拉一次（另一台设备刚推过就该跟上）。
+       ⚠️ 触摸那条钩子**留着当兜底**：万一开机那次没跑成（云能力晚到 / 网络刚起来），
+          玩家第一次触摸会补拉一次（`firstDone` 为真时不重复）。
+       做坏试验：把下面这行删掉 → 一把"开机即拉"的断言（待补）当场红。 */
+    /* ⚠️ `firstDone` 必须**在真正开始拉的那一刻**才置真 —— 早置等于把触摸兜底关掉：
+       万一这 300ms 里玩家先摸了屏幕（或定时器没跑），那次触摸就成了**唯一**能拉的机会，
+       置早了它就 return 掉了 ⇒ 双端还是不同步。（这条是尺子"回到前台第一下要看一次云端"
+       抓出来的，不是我自己想到的。） */
+    try { unref(setTimeout(function () { firstDone = true; triggerAuto('boot'); }, 300)); }
+    catch (e) { firstDone = true; try { triggerAuto('boot'); } catch (e2) {} }
     if (WX && WX.onTouchStart) {
-      /* **第一次用户交互之后**才允许联网（微信不喜欢首帧自动联网，和自动播同一个道理）。
-         ⚠️ 一次会话只结算这一下（不是每个触摸都联网）—— 第一版按"6 小时冷却"写，
-            结果"上午在手机打了一关、中午回电脑"在冷却窗口里看不到新进度；父亲大人的口径是
-            **推档要跟上进度**，读一次云端本来也便宜，所以改成"回前台后的第一下 ⇒ 看一次"。
-            boot() 之前已经有过交互也不算：`firstDone` 从这里开始算。 */
+      /* 兜底：万一开机那次没跑成，玩家**第一次触摸**补拉一次（同一次会话只拉一次）。 */
       try {
         WX.onTouchStart(function () {
           if (firstDone) return;
@@ -608,9 +881,14 @@
     ENV_ID: ENV_ID, COLL: COLL, CODE_FN: CODE_FN, PREF_KEY: PREF_KEY,
     boot: boot, triggerAuto: triggerAuto, noteProgress: noteProgress, sync: sync,
     manualPush: manualPush, pullCloud: pullCloud, takeCloudPrev: takeCloudPrev,
+    /* 双端单活（父亲大人 10-01：「只有一端能在线……以晚登陆的为主」）：
+       `reclaim()` ＝ 那颗「重新登录」；`isSuperseded()` 给尺子与排查读状态。 */
+    reclaim: reclaim, isSuperseded: function () { return superseded; },
     makeCode: makeCode, claimCode: claimCode, normCode: normCode,
     wrapExport: wrapExport, checkImport: checkImport, applyExternal: applyExternal,
     applyCloudSave: applyCloudSave, info: info, toggle: toggle,
+    /* F2 · 0930L：诊断（设置页那一行 ＋ 尺子读它）。口径一个字没改，只是把静默变可见。 */
+    diag: diag, statusText: statusText,
     /* V1.1.x（0927-P · 删档先留一手）：把"覆盖前留档"这一个口**正式开出来**给界面用 ——
        就是模块内部一直在用的 `keepLocalBackup`（写 `wxlh_save_v5_bak`，格式与 core 的
        `backupSave` 逐字相同 ⇒ 设置页「找回存档」里那份"本机备份"与
@@ -619,6 +897,9 @@
     /* 尺子用：清掉内存缓存与挂着的计时器（偏好本身留在 localStorage 里，由尺子自己控制） */
     _reset: function () {
       cache = null; inited = false; busy = false; retryTries = 0; armed = false;
+      initErr = ''; lastErr = null;          // F2 · 0930L：诊断状态也一起清（尺子要反复试各种岔路）
+      absentLogged = false;
+      leaseTs = 0; superseded = false; noticeShown = false; noticeAt = 0;   // 双端单活：租约状态也一起清
       if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
       if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     },

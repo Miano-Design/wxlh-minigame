@@ -1617,6 +1617,24 @@
     };
     const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : ((fn) => setTimeout(fn, 16));
     let downY = 0, moved = false, startScroll = 0, lastY = 0, lastT = 0, vel = 0, raf = null;
+    /* ================= F1 · 0930L（父亲大人实测：「输入框弹出来两次、打了字没用」）=================
+     真根因之一就在这一层：**PC 微信同一次鼠标操作会走两个通道派事件** ——
+       `wx.onTouchStart/Move/End`（兼容那一套）＋ `wx.onMouseDown/Move/Up`（R7 我们接的那一套）。
+     两个通道都接 ⇒ **一次点击被派发两次**：
+       · 名字框 → `NameCheck.ask` 跑两遍 → 系统键盘弹两次、确认回调被顶掉 ⇒ 打得再对也回不来；
+       · 开关类按钮 → 翻两下 ⇒ 看着像"点了没反应"（这正是"改了几版都没改好"里最难认的那半）。
+     判据（只认**同一物理手势**，绝不吃两次真点击）：
+       · 两个通道**不同** ＋ 两次按下相隔 < 400ms ＋ 落点相差 ≤ 12px ⇒ 后到的那一次整段丢掉；
+       · 同一个通道连着来两次（**真双击**）**一个字都不动** —— 上面那条`kind`不同才成立。
+     ⚠️ 手机端没有鼠标通道 ⇒ 这段在手机上永不成立（行为一个字不变）。 */
+    const DUP_MS = 400, DUP_PX = 12;
+    let ptrChan = null, ptrAt = 0, ptrPt = null, dupGest = false;
+    const nearPt = (a, b) => !!a && !!b && Math.abs(a.x - b.x) <= DUP_PX && Math.abs(a.y - b.y) <= DUP_PX;
+    const claimGesture = function (kind, p) {
+      const now = Date.now();
+      if (ptrChan && ptrChan !== kind && (now - ptrAt) < DUP_MS && nearPt(ptrPt, p)) { dupGest = true; return; }
+      ptrChan = kind; ptrAt = now; ptrPt = p; dupGest = false;
+    };
     /* V1.1.15（2026-09-27 · 父亲大人："现在我界面滑动有点卡卡的，是我手机卡还是游戏卡"）：
        touchmove 在高刷屏上 60~120Hz 派发，而原来**每个事件都整页重画一次**——
        重页面（科技阁 816 次 fillText / 灯录 700 次 / 玩法指南 842 次）一拖就是每秒上百帧重画，
@@ -1709,8 +1727,11 @@
        PC 微信（基础库一侧）派的是 `wx.onMouseDown / onMouseMove / onMouseUp / onWheel`，
        **手机上没有这几个事件**；老基础库没有这几个函数 → 注册整段跳过（`typeof` 试一下）。
        注册点在 `CV.bindTouch()` 里（与触摸同一处，都由 game.js 在**读档之后**调用）。 */
-    const onDown = function (e) {
+    const onDown = function (e, kind) {
       const p = toW(e);
+      /* F1 · 0930L：同一次物理点击被两个通道各派一遍时，后到的那一遍整段丢掉（见上面那段注释） */
+      claimGesture(kind || 'touch', p);
+      if (dupGest) return;
       /* ================= V1.1.21（2026-09-28 · 父亲大人：「输入文字的时候得支持点击空白区域退出输入框，
          现在输入框一直收不起来」）=================
          小游戏没有 `<input>`，输入是借 `wx.showKeyboard` 起一个**系统键盘**；而它一旦起来，
@@ -1787,6 +1808,7 @@
       }
     };
     const onMove = function (e) {
+      if (dupGest) return;                       // F1 · 0930L：重复那一路的移动也不处理
       const p = toW(e);
       const dy = p.y - downY;
       if (Math.abs(dy) > 8) moved = true;
@@ -1810,6 +1832,8 @@
       if (next !== CV.scroll) { CV.scroll = next; drawSoon(); }
     };
     const onUp = function (e) {
+      /* F1 · 0930L：重复那一路的抬手只把状态清干净，**绝不派发**（这一下已经由先到的通道派过了） */
+      if (dupGest) { dupGest = false; CV.pressed = null; CV.dragging = false; clearGrabTimer(); return; }
       const p = toW(e);
       clearGrabTimer();
       CV.dragging = false;                    // 抬手＝这一次手势结束（原生组件这才允许重建）
@@ -1881,6 +1905,7 @@
     /* 触摸取消（V9.6.90）：来电、切前后台、系统手势打断时微信只发 onTouchCancel。
        鼠标没有对应事件（PC 上"按下时把指针移出窗口"这类罕见情况由 onMouseUp 兜）。 */
     const onCancel = function () {
+      if (dupGest) { dupGest = false; CV.pressed = null; CV.dragging = false; return; }
       /* 手里拿着东西时被打断（来电/切后台/系统手势）：这一下不算"放下"，
          继续拿着，但**不能再算"刚抓起的那一次手势"**（否则下一次点按钮会被当成继续拖）。 */
       if (CV.grab) CV.grab.fresh = false;
@@ -1888,9 +1913,9 @@
       CV.dragging = false;                    // 被打断也当成"手势结束"（否则原生按钮会一直不重建）
       CV.pressed = null; coachLock = false; stopMomentum(); CV.render();
     };
-    wx.onTouchStart(onDown);
-    wx.onTouchMove(onMove);
-    wx.onTouchEnd(onUp);
+    wx.onTouchStart(function (e) { onDown(e, 'touch'); });
+    wx.onTouchMove(function (e) { onMove(e, 'touch'); });
+    wx.onTouchEnd(function (e) { onUp(e, 'touch'); });
     /* V9.6.90（技能《weixin-game》§触摸事件）：**触摸取消也要接**。
        来电、切前后台、系统手势打断时微信只发 onTouchCancel 不发 onTouchEnd ——
        原来没接，于是"按下态"和"滑动惯性"会卡在那里：按钮一直是按下样子，
@@ -1905,17 +1930,17 @@
     if (typeof wx.onMouseDown === 'function') {
       let mouseHeld = false;
       try {
-        wx.onMouseDown(function (e) { mouseHeld = true; onDown(e); });
+        wx.onMouseDown(function (e) { mouseHeld = true; onDown(e, 'mouse'); });
         if (typeof wx.onMouseMove === 'function') {
           wx.onMouseMove(function (e) {
             if (!mouseHeld) return;             // 没按着 = 只是划过，不滚页
             /* 鼠标的"移动"在按住时就是拖：touch 那条路是靠 onTouchMove 自己来的，
                这里补一下"指针已经离开按下点"的判定（绝对值与触摸同一条 8px 阈值）。 */
-            onMove(e);
+            onMove(e, 'mouse');
           });
         }
         if (typeof wx.onMouseUp === 'function') {
-          wx.onMouseUp(function (e) { if (!mouseHeld) return; mouseHeld = false; onUp(e); });
+          wx.onMouseUp(function (e) { if (!mouseHeld) return; mouseHeld = false; onUp(e, 'mouse'); });
         }
       } catch (e) {}
     }

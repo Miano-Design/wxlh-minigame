@@ -755,10 +755,16 @@
            它返回 true ＝ 原生已经摆在这一格上，画布**不要再画**（画了就是两层叠着、字重影）；
            返回 false ＝ 原生这会儿不在位（开发者工具 / 老基础库 / 正在滑动），
            由下面的 `U.btn` 画兜底那颗顶上 —— 这正是 gameclub 那套"原生在位才交给它"。
+           ⚠️ F3 · 0930L：钩子也可以返回**一个矩形**（`{x,y,w,h}`，见 `N.canvasRect`）——
+              那就是"画布兜底这颗请画在这个**整数屏幕框**里"（与原生那颗逐像素对齐，
+              免得两层换手时描边差半个像素 / 长得不一样 = 父亲大人说的"闪")。
            ⚠️ 宽度与排布**照旧按 `b.label` 算**（原生那颗就是盖在这颗的位置上的），
               所以这一格不会被挤窄、也不会跟旁边那颗错位；也没有第二份排版算式。 */
-        if (typeof b.native === 'function' && b.native(x, y, widths[k], h)) { idx++; x += widths[k] + gap; return; }
-        U.btn(x, y, widths[k], h, b.label, b.style, b.id, b.dis); idx++; x += widths[k] + gap;
+        const nv = (typeof b.native === 'function') ? b.native(x, y, widths[k], h) : null;
+        if (nv === true) { idx++; x += widths[k] + gap; return; }
+        const nr = (nv && typeof nv === 'object') ? nv : null;
+        U.btn(nr ? nr.x : x, nr ? nr.y : y, nr ? nr.w : widths[k], nr ? nr.h : h,
+          b.label, b.style, b.id, b.dis); idx++; x += widths[k] + gap;
       });
       y += h + gap;
     });

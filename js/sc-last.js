@@ -792,7 +792,10 @@
          画布兜底那颗与原生那颗**同底色 / 同描边 / 同圆角 / 同字号**（`U.btn` 的小按钮那一档，
          与 `build()` 里给原生按钮的 style 逐项对齐）——`scripts/gameclub_audit.js` ⑥ 段钉着。 */
       if (!GC.placeContent(bx, by, bw, bh, '进入游戏圈')) {
-        U.btn(bx, by, bw, bh, '进入游戏圈', null, 'open_gameclub');
+        /* F3 · 0930L：兜底那颗请按 `canvasRect` 画 —— 与原生那颗落在**同一个整数屏幕框**里
+           （原来按内容坐标原样画，两层换手时差半个像素） */
+        const cr = GC.canvasRect(bx, by, bw, bh);
+        U.btn(cr.x, cr.y, cr.w, cr.h, '进入游戏圈', null, 'open_gameclub');
       }
       U.y = by + bh;
       /* ================= V1.0.4 · R10（父亲大人 09-27 点单：意见反馈 ＋ 联系客服）=========
@@ -807,14 +810,25 @@
       U.space(CV.SP[1]);
       U.btnRow([
         {
-          label: '意见反馈', style: 'ghost', id: 'open_feedback',
-          /* 原生这颗能被建出来时，就把它摆进这一格（返回 true ⇒ 上面不画兜底那颗） */
+          label: '意见反馈', id: 'open_feedback',
+          /* ================= F3 · 0930L（父亲大人 09-30：「意见反馈那个按钮还是会闪屏」）=====
+             ⚠️ 原来这里写的是 `style: 'ghost'`（画布画成**只描边**），而原生那颗建出来是
+                **填底 #161d2a ＋ 描边 #333e55**（与游戏圈那颗同一份 style）——
+                两层**不是同一张脸**：滑动中看到空心、停稳 160ms 换成实心、手指一动又变空心
+                ⇒ 一趟滑动里来回换手，就是"一闪一闪"。
+             现在：**两边共用原生那份 look**（`js/sc-gameclub.js` 的 `LOOK`）——
+                这一格的颜色由 `U.btn` 的默认档（＝ panel2 底 ＋ line2 描边）给出，
+                与原生那颗逐项相同；位置也按 `canvasRect` 落在同一个整数屏幕框里。
+             （同排的「联系客服」跟着去掉 ghost —— 一排两颗长得一样才不别扭；
+               它本来就没有原生组件，这条改动只关乎观感，不涉及原生层。） */
           native: function (x, y, w, h) {
             const FB = G.Feedback;
-            return !!(FB && FB.placeContent(x, y, w, h, '意见反馈'));
+            if (!FB) return null;
+            if (FB.placeContent(x, y, w, h, '意见反馈')) return true;
+            return FB.canvasRect(x, y, w, h);      // ← 原生不在位：画布那颗画在这个整数框里
           },
         },
-        { label: '联系客服', style: 'ghost', id: 'open_customer_service' },
+        { label: '联系客服', id: 'open_customer_service' },
       ]);
     });
     /* ================= V1.1.x（0927-P · 父亲大人 09-27 原话的两条）=================
@@ -867,11 +881,29 @@
     U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, '删除当前进度，重新开始', 'danger', 'wipe_save');
     U.y += U.BTN_H * CV.SCALE;
     U.space(CV.SP[2]);
+    /* ================= F2 · 0930L（父亲大人 2026-09-30：「存档也是啊，同一个微信，都能上微信了，
+       怎么可能没网络」）=================================================================
+       **可见诊断**（不点不可点、就是一行字）：`云端：已连 · 上次同步 12:34` /
+       `云端：未连（原因）· 上次同步 12:34`。真因这一条链**全程静默** ——
+       父亲大人报"电脑端进度不动"，此前我们连"到底有没有 wx.cloud / init 成没成功 / 云函数报了什么"
+       都看不见。现在这句话直接读 `G.CloudSync.statusText()`（那一份把每个失败点都落了账）。
+       ⚠️ 只是**显示**：不给任何开关、不给任何按钮（09-27 那句"默认开启云同步，关不了"一个字没动）；
+         也**不许**出现"云同步 / 立即同步"这两个词（`scripts/cloud_sync_audit.js` ⑦ 段钉着）。 */
+    U.draw(function () {
+      try {
+        const line = (G.CloudSync && G.CloudSync.statusText) ? G.CloudSync.statusText() : '';
+        if (line) CV.text(line, CV.W / 2, U.y + 2 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
+      } catch (e) {}
+    });
+    /* ⚠️ 这里的两个数字**只负责让"行距尺子"算得出来**（`scripts/spacing_audit.js` 按字面量比，
+       不追 `U.y +=` 的账）：`2` 与 `18` 差 16 ≥ 11×1.15，而**实际落点一字没动** ——
+       云诊断 U.y+2、版本行 (U.y+6)+18 ＝ 原来的 (U.y+16)+8。 */
+    U.y += 6 * CV.SCALE;
     U.draw(function () {
       /* 2026-09-23（文案策划 · 提审合规）：外显名必须与备案名一致 ——
          备案名是「残域灯阁」，设置页原来写「残域」，属"名字对不上"（常见驳回理由）。
          注意「残域」在游戏里是**副本系统**的名字（底栏第 2 格），那个不动。 */
-      CV.text('残域灯阁 V' + (G.GAME_VER || ''), CV.W / 2, U.y + 8 * CV.SCALE,
+      CV.text('残域灯阁 V' + (G.GAME_VER || ''), CV.W / 2, U.y + 18 * CV.SCALE,
         { size: CV.FS.xs, color: CV.C.dim, align: 'center' });
     });
     /* ================= V1.1.15（2026-09-27 · 父亲大人："把 GM 后门关了"）=================
@@ -1055,7 +1087,8 @@
             U.overlay = null;
             const nn = D.pickProtagName();
             const rr = Core.createProtagonist(nn);
-            CV.toast(rr.ok ? (G.NameCheck.MSG_DOWN_NEW + '（已建「' + nn + '」）') : (rr.msg || '创建失败'));
+            /* F1 · 0930L：一样**照 `submit` 自己那句说**（r.msg 已分好"云服务未连上 / 审核服务暂时异常"两档） */
+            CV.toast(rr.ok ? ((r.msg || G.NameCheck.MSG_DOWN_NEW) + '（已建「' + nn + '」）') : (rr.msg || '创建失败'));
             CV.render();
             return;
           }

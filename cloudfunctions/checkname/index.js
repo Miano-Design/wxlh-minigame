@@ -63,14 +63,40 @@ function norm(s) {
     .trim();
 }
 
-/* 专用优先、通用兜底；两条都没有就抛出去（上层 catch 成"接口失败"）。 */
+/* ================= F1 · 0930L（父亲大人 2026-09-30：「改了几个版本一直没改好」）=================
+   真机实测（开发者工具里跑真云函数，2026-09-30）：**正常名字与敏感词都返回**
+     `{ ok:false, why:'接口失败', err:'-604101' }`
+   —— `-604101` 是**平台侧**把这次云调用挡回来的错误码（这条接口的云调用权限没生效那一类；
+   我们客户端是 fail-closed ⇒ 任何自由名字都过不了，正是他报的"起名一直失败"）。
+
+   原来这里只在"游戏专用那条**函数不存在**"时才退到通用版 —— 于是**接口在、但调用被平台挡住**时
+   永远不会走兜底。现在把"兜底"补齐成**两种都退**：
+     · 专用那条不存在 → 退通用（原样保留）；
+     · 专用那条**调用抛错**（含 -604101 这类平台侧拒绝）→ 也退通用版再试一次。
+   ⚠️ 判据一个字没放宽：**两条都不行才判"接口失败"**，fail-closed 照旧；
+     命中敏感（返回了 suggest）**绝不退**——那是"名字不行"，换接口重试没有意义。
+   ⚠️ 返回值里带 `via` / `fellBack`，回单与排查能看出这次到底走的哪条。 */
 async function msgSecCheck(payload) {
   const openapi = cloud.openapi || {};
   const game = openapi.wxa && openapi.wxa.game && openapi.wxa.game.contentSpam;
-  if (game && typeof game.msgSecCheck === 'function') return game.msgSecCheck(payload);
-  if (openapi.security && typeof openapi.security.msgSecCheck === 'function') return openapi.security.msgSecCheck(payload);
+  const generic = openapi.security && openapi.security.msgSecCheck;
+  const out = { via: 'game', fellBack: false, err: null };
+  /* ① 专用那条：能调通就以它为准（命中敏感也在这条路上直接回，不退） */
+  if (game && typeof game.msgSecCheck === 'function') {
+    try { return { res: await game.msgSecCheck(payload), via: out.via, fellBack: false }; }
+    catch (e) { out.err = String((e && (e.errCode || e.errMsg || e.message)) || 'throw').slice(0, 80); }
+  } else { out.err = 'no_game_api'; }
+  /* ② 通用版兜底 */
+  if (typeof generic === 'function') {
+    try { return { res: await generic(payload), via: 'generic', fellBack: true }; }
+    catch (e) {
+      const e2 = new Error('两条都调不通');
+      e2.errCode = out.err + '|' + String((e && (e.errCode || e.errMsg || e.message)) || 'throw').slice(0, 80);
+      throw e2;
+    }
+  }
   const e = new Error('cloud.openapi 上没有 msgSecCheck（wx-server-sdk 太旧？）');
-  e.errCode = 'no_api';
+  e.errCode = out.err || 'no_api';
   throw e;
 }
 
@@ -89,21 +115,26 @@ exports.main = async (event) => {
   if (text !== raw) return { ok: false, why: '本地', err: 'too_long' };
   if (!openid) return { ok: false, why: '接口失败', err: 'no_openid' };
 
-  let r = null;
+  let pack = null;
   try {
-    r = await msgSecCheck({ openid: openid, version: 2, scene: SCENE, content: text });
+    pack = await msgSecCheck({ openid: openid, version: 2, scene: SCENE, content: text });
   } catch (e) {
     return { ok: false, why: '接口失败', err: String((e && (e.errCode || e.errMsg || e.message)) || 'throw').slice(0, 80) };
   }
+  const r = (pack && pack.res) || null;
+  const via = (pack && pack.via) || 'game';
+  const fellBack = !!(pack && pack.fellBack);
   const res = (r && r.result) || {};
   const suggest = String(res.suggest || '');
   const label = Number(res.label || 0);
-  if (suggest === 'pass') return { ok: true };
+  /* `via` / `fellBack` 只回给回单与排查看（客户端只读 ok / why —— 玩家看到的是固定那句人话）。
+     ⚠️ 有它才能回答"这次是用专用版过的、还是退到通用版才过的"。 */
+  if (suggest === 'pass') return { ok: true, via: via, fellBack: fellBack };
   /* 命中/待复核：给回单与排查留个标签（客户端只读 ok / why，玩家看到的是固定那句人话）。 */
   return {
     ok: false,
     why: (suggest === 'risky' || suggest === 'review') ? '敏感' : '接口失败',
     label: label, labelText: LABELS[label] || '', suggest: suggest,
-    err: suggest ? '' : 'no_suggest',
+    err: suggest ? '' : 'no_suggest', via: via, fellBack: fellBack,
   };
 };

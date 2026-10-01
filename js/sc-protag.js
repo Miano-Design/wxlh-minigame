@@ -327,13 +327,18 @@
                    而且**不许说成"你的名字没过审"**（父亲大人实测时正是被这句骗到，以为微信什么名字都不让起）。 */
             if (r.why === '敏感' || r.why === '本地') { CV.toast(r.msg); renameDialog(); return; }
             U.overlay = null;
-            CV.toast(G.NameCheck.MSG_DOWN_RENAME);
+            /* F1 · 0930L：**照 `submit` 自己那句说**（`r.msg` 已经分好档 ——
+               "云服务未连上" 还是 "审核服务暂时异常"），别拿一句固定的兜底话盖掉真原因。 */
+            CV.toast(r.msg || G.NameCheck.MSG_DOWN_RENAME);
             CV.render();
             return;
           }
           const ok = Core.setPlayerName(r.name || nm);
-          /* F7 ②：改完名字在页面上就写着（看得见 → 删成功语）；"这个名字没通过"留。 */
-          if (!ok) CV.toast('这个名字没通过，换一个试试');
+          /* F7 ②：改完名字在页面上就写着（看得见 → 删成功语）；失败那句留。
+             ⚠️ F1 · 0930L：这句原来写的是"这个名字没通过" —— 而走到这儿失败时，
+                名字**是过了机审的**（`submit` 已经签发了凭据），八成是**凭据过期/被别的入口用掉了**
+                （一次性、60 秒）。把锅甩给名字正是父亲大人被误导过的那一类说法，改说真因。 */
+          if (!ok) CV.toast('这次没审上（过审凭据是一次性的、60 秒过期）：再点一次「确定」重审一遍');
           CV.render();
         });
       },
