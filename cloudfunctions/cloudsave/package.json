@@ -1,0 +1,9 @@
+{
+  "name": "cloudsave",
+  "version": "1.0.0",
+  "description": "云存档：pull / claim / push（服务端强制单账号唯一存档 ＋ 单活租约）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -1005,6 +1005,64 @@
      取第一个**不撞**的。撞的判据、夹进画布、幽灵热区豁免全部照旧 ——
      **"绝不造出『点 A 触发 B』"这条纪律不变**（兜底仍然是"缩回原样"）。
      做坏试验：把 cands 收成只剩第一条（只居中撑）→ layout_audit ④ 立刻回到 9 条红。 */
+  /* ================= R1.2 · P1（父亲大人 2026-10-01 任务书点名）：热区碰撞的**空间索引** =========
+     原来给小于 44px 的热区放大到 44 时，要在"五个候选落位"里找第一个不撞别人的：
+       `free(nx, ny) = !CV.hits.some(o => …矩形相交 >2px…)`
+     每个小热区最多试 5 个候选 ⇒ 一屏里 N 个小热区就是 O(5N) 次**全量扫描**（几百个热区时是几万次
+     矩形相交，而且还会随"已登记数量"继续长）。
+     现在按网格分桶，只查候选覆盖到的格子：
+       · 这是**本轮登记的缓存**（跟着 `CV.hits` 换代重建），不是全局永久状态；
+       · 两个矩形相交 ⇒ 必共享至少一个格子（轴对齐矩形 ＋ 规则网格的必然结论）⇒
+         查到的集合是"可能相交的全部"的**超集**，判据仍旧照抄原来那一句 ⇒ 结果**逐条等价**。
+     ⚠️ 只查**同一 screen 层**的桶（原来那句 `o.screen === screen` 就是只比同层）；
+        `ghost`（屏外卡只量没画那一遍登记的锚点）照旧进索引、照旧被过滤掉。
+     做坏试验：把 `hIdxNear()` 换回"直接返回整个 CV.hits" → 结果仍然对（超集变大），
+     所以**等价性那一侧不做坏试验也稳**；真正会红的是"格子取错"（比如漏掉跨格的那个）——
+     `hit_handler_audit` 里那份"索引版 vs 全量扫描版逐条比对"就是干这个的。 */
+  const HIT_CELL = 48;
+  let hIdx = null, hIdxChecks = 0, hIdxQueries = 0;
+  /** 索引与 `CV.hits` 换代同步（换页会整支换掉数组；`.length = 0` 这种也认）。 */
+  function hIdxSync() {
+    const arr = CV.hits;
+    if (!hIdx || hIdx.arr !== arr || hIdx.n > arr.length) {
+      hIdx = { arr: arr, n: 0, cell: HIT_CELL, screen: new Map(), content: new Map() };
+    }
+    const c = hIdx.cell;
+    while (hIdx.n < arr.length) {
+      const o = arr[hIdx.n++];
+      const m = o.screen ? hIdx.screen : hIdx.content;
+      const xa = Math.min(o.x, o.x + o.w), xb = Math.max(o.x, o.x + o.w);
+      const ya = Math.min(o.y, o.y + o.h), yb = Math.max(o.y, o.y + o.h);
+      for (let gx = Math.floor(xa / c); gx <= Math.floor(xb / c); gx++) {
+        for (let gy = Math.floor(ya / c); gy <= Math.floor(yb / c); gy++) {
+          const k = gx + ',' + gy;
+          let b = m.get(k);
+          if (!b) { b = []; m.set(k, b); }
+          b.push(o);
+        }
+      }
+    }
+    return hIdx;
+  }
+  /** 候选矩形可能相交的已登记热区（**超集**，去重）。 */
+  function hIdxNear(nx, ny, nw, nh, screen) {
+    const idx = hIdxSync();
+    const m = screen ? idx.screen : idx.content, c = idx.cell;
+    const seen = new Set();
+    for (let gx = Math.floor(nx / c); gx <= Math.floor((nx + nw) / c); gx++) {
+      for (let gy = Math.floor(ny / c); gy <= Math.floor((ny + nh) / c); gy++) {
+        const b = m.get(gx + ',' + gy);
+        if (!b) continue;
+        for (let i = 0; i < b.length; i++) if (!seen.has(b[i])) seen.add(b[i]);
+      }
+    }
+    hIdxChecks += seen.size;            // 给尺子读的：这一趟"看了几个矩形"（不短路计数）
+    hIdxQueries++;                      // 给尺子读的：这一趟 = 一次候选碰撞检测
+    return seen;
+  }
+  /** 尺子接口：本轮热区登记里，索引一共查过多少个矩形（与"全量扫描版"对照用）。 */
+  CV.hitIndexStats = function () { hIdxSync(); return { hits: CV.hits.length, checks: hIdxChecks, queries: hIdxQueries, cell: HIT_CELL }; };
+  CV.hitIndexReset = function () { hIdx = null; hIdxChecks = 0; hIdxQueries = 0; };
   CV.hit = function (id, x, y, w, h) {
     const screen = CV.hitMode === 'screen' || CV.hitMode === 'overlay';
     const modal = CV.hitMode === 'overlay';
@@ -1015,9 +1073,18 @@
     const nw = w + dw, nh = h + dh;
     /* F6 #12：撞测跳过"幽灵热区"（屏外卡只量没画那一遍登记的）——
        它们不会被派发，就不该挡住别人的 44px 放大。 */
-    const free = (nx, ny) => !CV.hits.some((o) => !o.ghost && o.screen === screen
-      && Math.min(nx + nw, o.x + o.w) - Math.max(nx, o.x) > 2
-      && Math.min(ny + nh, o.y + o.h) - Math.max(ny, o.y) > 2);
+    /* 与原来那句**逐字同判据**（`>2` 的相交阈值、跳过 ghost、只比同层），
+       只是候选集从"整个 CV.hits"换成"网格里可能相交的那几个"（见上面 hIdxNear 那段）。 */
+    const free = (nx, ny) => {
+      const near = hIdxNear(nx, ny, nw, nh, screen);
+      let bad = false;
+      near.forEach((o) => {
+        if (bad || o.ghost || o.screen !== screen) return;
+        if (Math.min(nx + nw, o.x + o.w) - Math.max(nx, o.x) > 2
+          && Math.min(ny + nh, o.y + o.h) - Math.max(ny, o.y) > 2) bad = true;
+      });
+      return !bad;
+    };
     const CAND = [[x - dw / 2, y - dh / 2], [x - dw / 2, y], [x - dw / 2, y - dh],
       [x, y - dh / 2], [x - dw, y - dh / 2]];
     for (let i = 0; i < CAND.length; i++) {
@@ -1205,6 +1272,7 @@
        并且 `ensureState()` 会 console.warn 出声（能自证：真机上看到那条 warn 就说明撞上了这条缝）。 */
     if (G.Core && G.Core.ensureState && !G.Core.S) G.Core.ensureState();
     CV.hits = [];
+    if (CV.hitIndexReset) CV.hitIndexReset();      // R1.2 · P1：换页换的是数组，索引跟着换代
     /* ================= F6 #11（抢修单 0928 · `CV.hitMode` 帧首复位）=================
      `hitMode` 是**跨帧的全局状态**：登记热区的地方写着"设成 screen → 登记 → 还回 content"。
      那两句之间只要有一步抛错（页头右侧件 / 引导文案最容易犯），它就会**留在 screen**，

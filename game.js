@@ -84,6 +84,9 @@ if (!hadSave) { Core.newGame({ keepRescue: true }); Core.ensureDaily && Core.ens
    也就是说：只把建档那一段挪到前面还不够，这一颗雷会立刻顶上。 */
 let lastTick = Date.now();
 let saveCounter = 0;
+/* R1.2 · P1：心跳的句柄。**声明必须早于下面所有注册点** —— 真机上 `wx.onShow(...)` 会
+   在注册那一刻就同步回调（本项目为这一类 TDZ 栽过两次），到时候处理器里要碰它。 */
+let heartbeatTimer = null;
 /* 小游戏版本号（设置页底部那行读它） */
 /* V1.0.4（2026-09-27 · 父亲大人 09-27 点单：「官方能力接入」这一批**全部算 1.0.4**）。
    · 1.0.3 已于 09-27 传成体验版 ⇒ **那个号冻住，这一批不许再改它**；
@@ -176,7 +179,9 @@ if (wx.onShow) {
     relayoutNow(now.windowWidth, now.windowHeight, now);
     /* 切后台期间被系统节流掉的时间要补进挂机池（按离线规则封顶 + 吃离线效率），
        与网页版 main.js 的 visibilitychange 同一口径。 */
+    /* 回前台：**先把后台那段时间一次算清**，再起表（顺序不能反 —— 反了就是两条路各算一遍）。 */
     catchUp();
+    try { startHeartbeat(); } catch (e) {}
     /* 防熄屏（V1.1.19 · 父亲大人："玩着玩着手机就黑屏了"）：`setKeepScreenOn` 的效果
        **只在当前小游戏前台有效**，切出去（看广告、回消息）回来就没了 ⇒ 每次回前台补一次。
        放在 try 里 + 适配器里那句"没有这个 API 就静默跳过"，绝不因为这一条把开机弄崩。 */
@@ -187,7 +192,12 @@ if (wx.onShow) {
 /* V1.1.20（F1-1）：这一句是**自动**存盘（可能玩家根本没动手就被切走了）——
    照常落盘、照常推 idle.lastTs，但不许把"谁新听谁的"判据（savedAt）推成"现在"。
    玩家真玩过的那几下，各自的存盘已经把判据盖好了，不差这一句。 */
-if (wx.onHide) wx.onHide(function () { try { Core.save({ auto: true }); } catch (e) {} });
+/* 切后台：**先停表、再落盘** —— 后台那段时间交给回前台时的 `catchUp()` 一次算清，
+   心跳不许在后台继续跑（挂机数字 / CAP.tick / 15 秒自动存盘全都不该在那儿空转）。 */
+if (wx.onHide) wx.onHide(function () {
+  try { stopHeartbeat(); } catch (e) {}
+  try { Core.save({ auto: true }); } catch (e) {}
+});
 /* 云同步（js/sc-cloud.js）：**只在这里登记两个联网口子** —— 第一次用户交互之后 / 切后台。
    首帧一次网络都不发（存档照旧只读本地，秒进、断网可玩）；开关关着时连口子都不挂。 */
 if (G.CloudSync && G.CloudSync.boot) G.CloudSync.boot();
@@ -341,7 +351,11 @@ function catchUp() {
   const now = Date.now();
   const gap = (now - lastTick) / 1000;
   lastTick = now;
-  if (gap > 10) {
+  /* R1.2 · P1：心跳在后台是**停着的**（见下面 startHeartbeat/stopHeartbeat），所以回前台这一补
+     就是**唯一**一次对后台那段的结算 —— 门槛从原来的 10 秒放宽到"只要真的过了一段时间"，
+     否则几秒的切出（看广告回来那种）会白丢。封顶与效率口径**一个字没变**（还是
+     `offlineCapHours()` + `offlineEfficiency()`），不会重复计时：心跳那一路已经停了。 */
+  if (gap > 0.5) {
     const cap = (Core.offlineCapHours ? Core.offlineCapHours() : 6) * 3600;
     Core.onlineTick(Math.min(gap, cap) * (Core.offlineEfficiency ? Core.offlineEfficiency() : 1));
   }
@@ -367,7 +381,17 @@ function flushBootModals() {
   if (item.kind === 'login') { const lr = Core.loginReward && Core.loginReward(); if (lr) G.U.loginReward(lr); }
 }
 /* 七日登录：老档、新档都要发（网页版 queueLoginReward 同一处修补） */
-setInterval(function () {
+/* ================= R1.2 · P1（父亲大人 2026-10-01 任务书点名）：全局心跳的**生命周期** =============
+   原来这里是一句 `setInterval(..., 1000)` **从开机跑到进程结束** —— 切到后台（看广告、回消息、
+   锁屏）它照跑：挂机数字、能力层的小事、15 秒自动存盘全在后台空转，真机上就是实打实的耗电。
+   现在收成一对开关：
+     · `startHeartbeat()` —— 起表（重复调用无害；起表时把 `lastTick` 对齐到"现在"，
+        后台那段时间**只由 `catchUp()` 一次算清**，不许两条路各算一遍）；
+     · `stopHeartbeat()` —— 停表；
+     · `onHide` → **先停表再落盘**；`onShow` → **先 catchUp 再起表**。
+   业务逻辑一个字没动（还是这一秒里那五件事：onlineTick / actTick / 15 秒自动存盘 /
+   主页重画 / CAP.tick），只是"什么时候不该跑"被管住了。 */
+function heartbeatBody() {
   const now = Date.now();
   const dt = Math.min(10, (now - lastTick) / 1000);   // 单帧最多计 10 秒，防卡顿跳变
   lastTick = now;
@@ -395,7 +419,18 @@ setInterval(function () {
   flushBootModals();
   /* 能力层的一秒一次的小事（现在只有一件：收藏过的那句差别话，R8）—— 见 js/wx-cap.js */
   try { if (G.CAP && G.CAP.tick) G.CAP.tick(); } catch (e) {}
-}, 1000);
+}
+function startHeartbeat() {
+  if (heartbeatTimer) return;                 // 已经在跑：不重复起表
+  lastTick = Date.now();                      // 与 catchUp 的分工：后台那段由 catchUp 算，这里只从"现在"往后算
+  heartbeatTimer = setInterval(heartbeatBody, 1000);
+}
+function stopHeartbeat() {
+  if (!heartbeatTimer) return;
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+}
+startHeartbeat();
 /* 开局走完（进到灯阁）再发一次 —— 上面那 1 秒的心跳也会周期性地来碰这件事 */
 setTimeout(flushBootModals, 900);
 /* ================= V1.0.4 · 官方能力接入（R2~R8 · 父亲大人 09-27 点单）=================

@@ -384,7 +384,19 @@ window.Battle = (function () {
       // 行动顺序
       // 首回合速度：天赋「先制」在第 1 回合把速度按比例提高后再排行动顺序
       const spdOf = u => u.spd * (1 + (getBuffs(u).spdPct || 0)) * (round === 1 ? 1 + (u.firstStrike || 0) : 1);
-      const order = alive(all).sort((a, b) => spdOf(b) * (0.95 + Math.random() * 0.1) - spdOf(a) * (0.95 + Math.random() * 0.1));
+      /* ================= R1.2 · P1（父亲大人 2026-10-01 任务书点名）=================
+         原来这一句把 `Math.random()` 写在 `sort()` 的比较器**里面**：
+           `sort((a,b) => spdOf(b)*抖动 - spdOf(a)*抖动)`
+         比较器要求"同一个问题永远同一个答案"（自反 / 反对称 / 传递），而这里每比一次都重抽 ——
+         于是同一个单位的排序结果取决于引擎拿它跟谁比、比了几次，排序严格来说是**未定义行为**。
+         现在：**每个单位每个回合只抽一次**抖动，算完 initiative 再排。
+         口径一个字没变：还是 0.95~1.05 的等比抖动、还是速度大者先手、先制天赋 / 速度 buff
+         照旧进 `spdOf`（它们只是乘在同一个数上）。
+         做坏试验：把 `Math.random()` 挪回比较器里 → `battle_flow_audit` 的
+         「行动顺序：比较器里不许有随机数」＋「同一条随机序列下顺序唯一确定」当场红。 */
+      const initiative = alive(all).map(u => ({ u: u, roll: spdOf(u) * (0.95 + Math.random() * 0.1) }));
+      initiative.sort((a, b) => b.roll - a.roll);
+      const order = initiative.map(x => x.u);
       for (const u of order) {
         if (u.hp <= 0) continue;
         // 眩晕/冰冻

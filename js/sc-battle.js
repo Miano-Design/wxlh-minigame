@@ -865,6 +865,38 @@
   }
 
   /* 网页版 .reward-chip：bg --panel2 / 边 --line / 胶囊 / 左右 12px / 12px 字 */
+  /* ================= R1.2 · P2：**败因一行**（数据全部来自这一场的结算结果，不新增战报系统）=====
+     · 先把开场那一帧的两队名单读出来 → uid 到阵营；
+     · 再把这一场所有 `damage` 帧按"打给谁"分成"我方打出去的"与"对面打进来的"；
+     · 四档判据（都是可以直接看懂的比值，不猜机制）：
+         ① 三回合内就输            → 开局被压住（先补前排血量 / 减伤）
+         ② 打出去 < 挨打的 1/1.4   → 输出不够
+         ③ 打出去 > 挨打的 1.2 倍  → 输出够、收不掉（对面血厚 / 缺爆发节奏）
+         ④ 其余                    → 五五开，差一点数值
+     ⚠️ 拿不到数据（没有 start 帧 / 一次伤害都没有）就返回空串 —— **一个字都不显示**，
+        绝不为了"看起来有反馈"编一句。 */
+  function defeatHint(res) {
+    const frames = (res && res.frames) || [];
+    const start = frames.filter(function (f) { return f && f.type === 'start'; })[0];
+    if (!start) return '';
+    const side = {};
+    (start.allies || []).forEach(function (u) { if (u && u.uid != null) side[u.uid] = 'ally'; });
+    (start.enemies || []).forEach(function (u) { if (u && u.uid != null) side[u.uid] = 'enemy'; });
+    let dealt = 0, taken = 0;
+    frames.forEach(function (f) {
+      if (!f || f.type !== 'damage' || f.target == null) return;
+      const s = side[f.target];
+      const d = Number(f.dmg) || 0;
+      if (s === 'enemy') dealt += d;
+      else if (s === 'ally') taken += d;
+    });
+    if (!dealt && !taken) return '';
+    const rounds = Number(res.rounds) || 0;
+    if (rounds > 0 && rounds <= 3) return '开局就被压住了：先补前排的血量与减伤。';
+    if (taken > dealt * 1.4) return '输出不够：这一场打出去的总量差得有点多。';
+    if (dealt > taken * 1.2) return '输出是够的，收不掉 —— 把速度和暴击拉起来抢节奏。';
+    return '五五开：差的是一点数值，装备与伙伴再补一档。';
+  }
   /* 先算再画：结算层要**先知道胶囊占多高**才能把下面的按钮排开
      （V9.6.8 父亲大人真机截图：胶囊换行到第二排、下面的按钮却还按一排算，直接压上去）。 */
   function chipLayout(list) {
@@ -928,6 +960,18 @@
     const line2 = p.line2 || ((R.rounds ? (R.rounds + ' 回合') : '') + (p.sub ? ((R.rounds ? ' · ' : '') + p.sub) : ''));
     if (line2) CV.text(line2, cx, y + 8 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
     y += SUB + 12 * CV.SCALE;
+    /* ================= R1.2 · P2（父亲大人 2026-10-01 任务书点名）：失败了要让玩家知道**为什么输** ====
+       任务书：只用**已有的战斗结果数据**给一句短提示，不做战报系统。
+       数据都在 `res.frames` 里（每一帧的 `type/target/dmg` ＋ 开场那一帧的两队名单），
+       所以这里只做三件事：把"我方打出去的"和"对面打进来的"各自加总 → 按比值／回合数分四档
+       → 失败时多画**一行灰字**。判断不了（没帧、没伤害）就一个字都不显示，绝不编。 */
+    if (!R.win && !p.hintLine) {
+      const hint = defeatHint(R);
+      if (hint) {
+        CV.text(hint, cx, y - 12 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+        y += 20 * CV.SCALE;
+      }
+    }
     if (rewards.length) {
       drawChips(rewards, cx, y);
       y += chipsH + 10 * CV.SCALE;

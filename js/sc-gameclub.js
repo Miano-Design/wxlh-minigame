@@ -206,14 +206,24 @@
     /* 兜底那颗被点到时先走这里：原生**在位但刚被收起来**（滑动当口）→ 立刻催一次重建。
        返回 true ＝ 已经处理（别再说"请升级微信"，那句在滑动当口是误导）。 */
     N.nudge = function () {
-      if (N.available() && N.last) {
-        if (N.timer) { clearTimeout(N.timer); N.timer = null; }
-        N.pending = N.last;
-        build();
-        CV.toast('按钮正在就位，再点一下就行', 1600);
+      if (!(N.available() && N.last)) return false;
+      if (N.timer) { clearTimeout(N.timer); N.timer = null; }
+      N.pending = N.last;
+      /* ================= R1.2 · P2（父亲大人 2026-10-01 任务书点名）：nudge 不许绕过拖动期保护 =========
+         原来这里**直接 build()** —— 把 `N.tick` 里那条"手指按着时一次都不许建原生按钮"整个绕过去了：
+           拖动当口点到画布兜底那颗 → 原生按钮被建在"手指停住时那个**旧位置**"上 →
+           手指一动，`tick` 又把它 hide ⇒ 玩家看到的就是"按钮一闪一闪"（正是 F3 之前那条根因的复发形态）。
+         现在与 tick **逐字同源**：拖动中只把位置记进 `pending`、并保持原生收起，
+           等抬手（`cv.js` 的 onTouchEnd 会放开 `CV.dragging`）之后由 tick 那套 160ms settle 建——
+           位置是抬手那一刻算出来的，不会建在旧位置上。 */
+      if (CV.dragging) {
+        N.lastScroll = CV.scroll || 0;
+        CV.toast('按钮正在就位，抬手后就好', 1600);
         return true;
       }
-      return false;
+      build();
+      CV.toast('按钮正在就位，再点一下就行', 1600);
+      return true;
     };
     return N;
   }

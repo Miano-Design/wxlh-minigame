@@ -19,9 +19,12 @@
    推档跟上进度：**脏标记**（存档真变了才推）＋ **切后台必推** ＋ **打关/结算后推**
    （同一分钟内的多次合并成一次）＋ 每天记账上限 **20 次**（防异常刷；正常玩家一天 5 次以内）。
 
-   钥匙是**微信账号**：客户端 SDK 读写自己的记录会自动带 `_openid`、默认只能读写自己那条
-   —— 不用云函数也不用养 token。账号指纹（导出档里那个 `fp`）是 `_openid` 的哈希，
-   **openid 本体不落盘、不出档**。
+   钥匙是**微信账号**。⚠️ **R1.2 · P0 起，存档的读 / 写 / 占位全部走云函数 `cloudsave`**：
+   原来是客户端直接读集合（`where({}).get()` 靠数据库权限把自己那条筛出来），
+   权限一配宽整张表就落到客户端上；现在服务端用 `getWXContext().OPENID` 定位"这个账号唯一那条"，
+   **客户端一行云数据库代码都没有**，也永远拿不到别人的记录。
+   账号指纹（导出档里那个 `fp`）是 `_openid` 的哈希（服务端算好下发，口径没变），
+   **openid 本体不落盘、不出档、也不下发**。
    存档码那条路（`savecode` 云函数）走另一招：码本身就是钥匙（8 位、24 小时、用一次即失效）。
    环境 ID 全工程**只此一处**。 */
 (function () {
@@ -45,6 +48,8 @@
   const ENV_ID = 'cloudbase-d0gk9s3sv8a797189';
   const COLL = 'saves';
   const CODE_FN = 'savecode';
+  /* R1.2 · P0：存档的读 / 写 / 占位全走这一支云函数（客户端**一行云数据库代码都没有**）。 */
+  const SAVE_FN = 'cloudsave';
   const PREF_KEY = 'wxlh_cloud_v1';          // 云同步自己的偏好/账本（**不进玩家存档**，不碰 packSave 的口径）
   const SAVE_KEY = 'wxlh_save_v5';           // 与 core 同一把钥匙（**只读它、只往 _bak 里写留档**）
   const SAVE_BAK = SAVE_KEY + '_bak';
@@ -91,7 +96,9 @@
   /* `noticeAt` 与 `NOTICE_HOLD_MS`：被顶下线那条提示**不是只讲一次就再也回不来** ——
      玩家点了「知道了」之后如果还在这台玩（一直在推不上去），隔一段时间再提醒一次；
      不然他就被**永久困在只读态**、连"重新登录"的入口都找不到了。 */
-  let leaseTs = 0, superseded = false, noticeShown = false, noticeAt = 0;
+  /* `leaseToken` ＝ 服务端发给本机的"在场凭证"（每次登陆换一个；只活这一次会话，不落盘）。
+     它才是服务端认的那把钥匙：`push` 那边 `where({_id, 'lease.token': 本机token})`。 */
+  let leaseTs = 0, superseded = false, noticeShown = false, noticeAt = 0, leaseToken = '';
   const NOTICE_HOLD_MS = 3 * 60 * 1000;
 
   /** 偏好/账本：读出来一律**补齐默认值**（老版本写的对象里缺字段、或整段不存在，都按默认值走）。 */
@@ -262,91 +269,72 @@
     }
     return WX.cloud;
   }
-  function db() {
+  /* ================= R1.2 · P0（父亲大人 2026-10-01 的任务书）：**客户端一行云数据库代码都没有** =====
+     原来这里有两支 —— `db()`（拿 `wx.cloud.database()`）与 `query()`（跑一次集合查询），
+     读档走的是 `collection('saves').where({}).get()`：**空条件＝集合扫描**，
+     靠"数据库权限只回自己那条"把自己那条筛出来。权限一旦被配宽，整张表就落到客户端上
+     （别的账号的档也在里面）—— 这是安全 / 带宽 / 性能 / 隐私四重的洞。
+     **现在这两支整个删掉**：存档的读、写、占位全部走云函数 `cloudsave`，
+     服务端用 `getWXContext().OPENID` 定位"这个账号唯一那条"，客户端**永远拿不到别人的记录**。
+     做坏试验：把 `db()/query()` 任何一处加回来 → `cloud_sync_audit` 的「客户端不碰云数据库」当场红。 */
+  /** 读"自己那条"。默认权限（仅创建者可读写）下查回来的就是自己那条；
+      万一集合权限被设成"所有人可读"，这里**也绝不乱挑一条** —— 见下面 myDoc 的守卫。
+      ⚠️ 空条件 `where({})` 在某些基础库上会被判"参数不合法"—— 真被拒了就退到不带条件那条。 */
+  /** 调一次 `cloudsave` 云函数：`{ok, ...}`；异常一律收成 `{ok:false, why:'net'|'sdk'}`。 */
+  function saveFn(action, data) {
     const c = cloud();
-    if (!c) return null;
-    try { return c.database(); } catch (e) { return null; }
-  }
-  /** 一条查询走一遍（同步抛错与异步 reject 都收成同一种结果）。 */
-  function query(make) {
+    if (!c || !c.callFunction) return Promise.resolve({ ok: false, why: 'unsupported' });
+    const payload = Object.assign({ action: action }, data || {});
     return new Promise(function (resolve) {
       let req = null;
-      try { req = make(); }
-      catch (e) {
-        noteErr('sdk', (e && e.message) || '调用失败');
-        resolve({ ok: false, why: 'sdk', err: (e && e.message) || '调用失败' }); return;
-      }
+      try { req = c.callFunction({ name: SAVE_FN, data: payload }); }
+      catch (e) { noteErr('sdk', (e && e.message) || '调用失败'); resolve({ ok: false, why: 'sdk', err: (e && e.message) || '调用失败' }); return; }
       Promise.resolve(req).then(function (res) {
-        resolve({ ok: true, list: (res && res.data) || [] });
+        const r = (res && res.result) || null;
+        if (!r) { noteErr('fn', 'empty'); resolve({ ok: false, why: 'empty' }); return; }
+        if (r.ok) resolve(r);
+        else {
+          /* ⚠️ `superseded` 是**服务端**给的下线判决（不是网络错误）：不许当成"没连上"去重试 ——
+             它要走"被顶下线"那条路（只读 ＋ 提示 ＋ 重新登录），重试只会一直撞墙。 */
+          const why = String(r.msg || 'fail');
+          if (why !== 'superseded') noteErr('fn', why);
+          resolve({ ok: false, why: why, lease: r.lease || null });
+        }
       }).catch(function (e) {
         const em = (e && (e.errMsg || e.message)) || '未知错误';
-        noteErr('read', em);                  // ← 电脑端"读不到云端"就落在这儿（以前静默）
+        noteErr('fn', em);                    // ← 云函数调用失败（读档 / 写档 / 占位都走这一条）
         resolve({ ok: false, why: 'net', err: em });
       });
     });
   }
-  /** 读"自己那条"。默认权限（仅创建者可读写）下查回来的就是自己那条；
-      万一集合权限被设成"所有人可读"，这里**也绝不乱挑一条** —— 见下面 myDoc 的守卫。
-      ⚠️ 空条件 `where({})` 在某些基础库上会被判"参数不合法"—— 真被拒了就退到不带条件那条。 */
-  function readRaw() {
-    const d = db();
-    if (!d) return Promise.resolve({ ok: false, why: 'unsupported' });
-    /* ================= R1.1 · P0（父亲大人 2026-10-01 的任务书点名）=================
-       **彻底删掉"查询失败就退到集合级读取"的那条 fallback**。原写法：
-         · 先 `col.where({}).get()`（空条件＝集合扫描，靠数据库权限把自己那条筛出来）；
-         · 一旦那次失败 → **`d.collection(COLL).get()` 整集合读**。
-       风险是四重的：**安全 / 带宽 / 性能 / 隐私** —— 云库权限一旦配宽，
-       客户端就可能一次把整个 `saves` 拉下来（别的账号的档也在里面）。
-       我们自己在 `myDoc()` 里那句 `list.length > 1 → why:'multi'` 就是"客户端曾经真拿到多条"
-       留下的脚印，所以这条不是理论风险。
-       现在：**读不到就是读不到**（照常返回 `{ok:false, why}` 交给上层走"未连上/稍后重试"），
-       **绝不做集合级兜底**；`where` 不可用的老 SDK 也只走"自己的能力"那一支，不再二次全表。
-       做坏试验：把下面这句改回"失败再 `collection(COLL).get()`" → `cloud_sync_audit` 的
-       "客户端不许出现集合级读取"那条必须当场变红。 */
-    return query(function () {
-      const col = d.collection(COLL);
-      return (typeof col.where === 'function') ? col.where({}).get() : col.get();
-    });
-  }
-  /** 挑出"我这个账号"的那一条，并顺手把账号指纹学下来（默认权限只回自己那条；
-      真出现多条 → 判为权限配置有问题，停下来报错，不猜）。 */
-  function myDoc(list) {
-    const P = prefs();
-    if (!P.accountId) {
-      if (list.length > 1) return { ok: false, why: 'multi' };
-      if (list.length === 1) {
-        P.accountId = fpOf(list[0] && list[0]._openid);
-        if (P.accountId) savePrefs();
-      }
-      return { ok: true, doc: list[0] || null };
-    }
-    /* 同一个账号理论上一台设备一条；真留下两条（两台设备同时首推那种极端情况），
-       按存档时间戳取**最新那条**（只认自己账号的，别人的一条都不碰）。 */
-    const mine = list.filter(function (d) { return fpOf(d && d._openid) === P.accountId; });
-    if (!mine.length) return { ok: true, doc: null };
-    mine.sort(function (a, b) { return (Number(b.ts) || 0) - (Number(a.ts) || 0); });
-    return { ok: true, doc: mine[0] };
-  }
+
   function readOwn() {
-    return readRaw().then(function (r) {
-      if (!r.ok) return r;
-      const m = myDoc(r.list);
-      if (!m.ok) return { ok: false, why: m.why };
-      const P = prefs(), doc = m.doc || null;
+    return saveFn('pull', {}).then(function (r) {
+      if (!r.ok) return { ok: false, why: r.why, err: r.err };
+      const P = prefs(), doc = r.doc || null;
+      /* 账号指纹由**服务端**算（`fpOf(openid)`，与客户端同一套 FNV-1a）——
+         客户端再也看不到 openid，但导出档里的 `fp` 口径一个字没变。 */
+      if (r.fp && r.fp !== P.accountId) { P.accountId = String(r.fp); savePrefs(); }
       /* ================= 康康 2026-10-01 · **双端单活**：判"被顶下线" =================
-         云上那条的 `act.sess` 记的是"上一次是谁占的位"：
+         云上那条的 `lease` 记的是"上一次是谁占的位"（老记录上还可能是 `act.sess`）：
            · 是本机        → 本机就是在场那一端（把本机租约时间对齐到那一笔）；
            · 是别的设备、而且**比本机这次占位更晚** → 本机被顶下线（只读，不再写档）；
            · 没有 / 是更旧的别人的 → 本机接着用。
          判据放在**唯一的读入口**上 ⇒ 自动那条路（sync）、手动两颗（找回存档 / 取回上一份）
          看到的都是同一个结论，不会各判一套。
+         ⚠️ 这一支只是**UI 判断**（谁在场、要不要弹那句提示）；真正的强制在服务端：
+            `push` 那边是 `where({_id, 'lease.token': 本机 token})` 的**条件更新**，
+            本机即使把 `superseded` 认成 false，只要 token 不是当前那个，**一个字都写不进去**。
          做坏试验：把下面那句 `superseded = true` 删掉 → `cloud_sync_audit` ⑪ 那条当场红。 */
-      const sess = doc && doc.act && doc.act.sess;
+      const sess = (doc && (doc.lease || (doc.act && doc.act.sess))) || null;
       if (sess && sess.id) {
         if (String(sess.id) === deviceId()) { leaseTs = Math.max(leaseTs, Number(sess.ts) || 0); superseded = false; }
-        /* 别人的租约：**比本机这次占位晚**、而且**还在有效期内**（＝那台确实还在线）才算顶下线。
-           过期租约（那台早走了）不拦本机。 */
-        else if ((Number(sess.ts) || 0) > leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) superseded = true;
+        /* 别人的租约：**不比本机这次占位早**、而且**还在有效期内**（＝那台确实还在线）才算顶下线。
+           过期租约（那台早走了）不拦本机。
+           ⚠️ 这里是 `>=` 不是 `>`：`Date.now()` 只有毫秒分辨率，而"另一台抢租约"与"本机记租约"
+           完全可能落在**同一个毫秒**里（尺子上真的复现过：三次里错两次）。同刻且不是本机时，
+           判对方持有才是安全的 —— 反正服务端那一道条件更新也会拒（本机不会因此被误写成"在线"）。 */
+        else if ((Number(sess.ts) || 0) >= leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) superseded = true;
         else superseded = false;
       } else superseded = false;
       /* 顺手记住"云端那条里有没有更旧的备份"——设置页那行字（与一键取回）就看它。 */
@@ -357,24 +345,12 @@
       return { ok: true, doc: doc };
     });
   }
-  /** 写：有那条就 update、没有就 add（**合并写**：不管本地改了几处，写上去的都是当时那一整份）。 */
-  function writeDoc(doc, data) {
-    return new Promise(function (resolve) {
-      const d = db();
-      if (!d) { resolve({ ok: false, why: 'unsupported' }); return; }
-      let req = null;
-      try {
-        if (doc && doc._id) req = d.collection(COLL).doc(doc._id).update({ data: data });
-        else req = d.collection(COLL).add({ data: data });
-      } catch (e) { resolve({ ok: false, why: 'sdk' }); return; }
-      Promise.resolve(req).then(function () { resolve({ ok: true }); })
-        .catch(function (e) {
-          const em = (e && (e.errMsg || e.message)) || '未知错误';
-          noteErr('write', em);               // ← 推不上去就落在这儿（原先只有 push_fail 那条，没原因）
-          resolve({ ok: false, why: 'net', err: em });
-        });
-    });
-  }
+  /* ================= R1.2 · P0：客户端那支"直接写云数据库"的 `writeDoc()` 已整个删除 =================
+     原来它是"有那条就 update、没有就 add"，全靠客户端自己判断 —— 两台设备第一次同时推就会
+     `A add` ＋ `B add` ＝ **两条记录**（我们自己在 `myDoc()` 里留过 `list.length > 1 → why:'multi'`
+     这个脚印）。现在写走云函数 `cloudsave`：服务端按 OPENID 定位**唯一那条**（`_id` 由 OPENID 推导），
+     并且用 `where({_id, 'lease.token': 本机token})` 做**原子条件更新** —— 旧设备即使本地
+     `superseded === false`，token 对不上也**一个字都写不进去**。 */
   /* ================= 康康 2026-10-01 · **双端单活**：占位 / 顶下线提示 / 重新登录 =================
      父亲大人：「只有一端能在线，避免双端打架……**以晚登陆的为主**」。
      三件事都在这里，一处收口：
@@ -386,18 +362,17 @@
      ⚠️ 自动那条路（sync / push / retry）**平时一个字都不弹**（cloud_sync_audit ② 钉着）；
         只有"被另一台设备顶下线"这一件事会说话 —— 因为不说的话，玩家只会以为"存档又没同步"，
         而实际原因是"这台已经下线了"，两者要做的事完全不同。 */
-  function leaseOf(doc) { return (doc && doc.act && doc.act.sess) || null; }
-  /** 占位：云上那条的租约**不是本机**时才写（同一台设备连着开几次，一次都不多写）。 */
+  function leaseOf(doc) { return (doc && (doc.lease || (doc.act && doc.act.sess))) || null; }
+  /** 占位（登陆）：叫服务端把 `lease` 原子地换成本机的新 token。
+      云上那条还没建过（第一次玩）时占不了位 —— 但随后的 `push` 建记录会把同一个 token 一起写进去。
+      "以晚登陆的为主"就落在这一句上：谁后调它，谁就是当前设备。 */
   function claimLease(doc) {
-    const d = db();
-    if (!d || !doc || !doc._id) return Promise.resolve({ ok: false, why: 'nodoc' });
-    const ts = Date.now();
-    const act = actBlock(ts);
-    if (!act) return Promise.resolve({ ok: false, why: 'noact' });
-    return writeDoc(doc, { act: act }).then(function (w) {
-      if (w.ok) { leaseTs = ts; superseded = false; }
-      else noteErr('claim', w.err || w.why);
-      return { ok: !!w.ok, why: w.why || '' };
+    return saveFn('claim', { device: deviceId() }).then(function (r) {
+      if (!r.ok) { noteErr('claim', r.why || 'fail'); return { ok: false, why: r.why || 'fail' }; }
+      leaseToken = String(r.token || '');
+      leaseTs = Number(r.ts) || Date.now();
+      superseded = false;
+      return { ok: true };
     });
   }
   function maybeNotifySuperseded(on) {
@@ -455,7 +430,9 @@
 
   const NET_MSG = function (r) {
     if (r && r.why === 'unsupported') return '这台设备没有云开发能力，存档只在本机';
-    if (r && r.why === 'multi') return '云端这份存档读不出来（云端的配置有问题），先照本机这份玩，稍后再试。';
+    if (r && r.why === 'too_big') return '这份存档太大了，传不上去（先照本机玩，稍后我们再处理）';
+    if (r && r.why === 'empty') return '云端那边没收到存档内容，稍后再试';
+    if (r && r.why === 'no_token') return '这台还没占上位，稍后会自动再试一次';
     return '云端连不上（' + ((r && (r.err || r.why)) || '网络问题') + '）';
   };
 
@@ -494,30 +471,41 @@
     if (P.pushes >= PUSH_CAP_PER_DAY) return Promise.resolve({ ok: false, skip: 'cap' });
     /* V1.1.20（F1-1）：这一条记录的 `ts`（对面那台设备比新旧的唯一依据）＝ **这份档自己**的
        `savedAt`（玩家最后一次真在玩的时刻）。整条链（本地判据 / 推上去的 ts / prev* 的 ts）同一个口径。 */
-    const data = { payload: raw, ts: localTs() || Date.now(), bytes: raw.length, ver: String(G.GAME_VER || ''), at: Date.now() };
-    /* 占位时间戳取一次、两处共用：写进云上的 `sess.ts` 与记在本机的 `leaseTs` 是同一个数。 */
+    const ts = localTs() || Date.now();
+    /* 占位时间戳取一次、两处共用：写进 `act.sess.ts` 与记在本机的 `leaseTs` 是同一个数。 */
     const actTs = Date.now();
     const act = actBlock(actTs);
-    if (act) data.act = act;                            // V1.0.4 · W：只加这一小块数字（见上）
-    if (doc && doc.payload && String(doc.payload) !== raw) {
-      /* 云端被本地覆盖 → **旧云端另留一份**（同一条记录里的 `prev*` 栏，设置页能取回）。 */
-      data.prevPayload = String(doc.payload);
-      data.prevTs = Number(doc.ts) || 0;
-      data.prevBytes = String(doc.payload).length;
-      data.prevAt = Date.now();
-    }
-    return writeDoc(doc, data).then(function (w) {
-      if (!w.ok) { clog('push_fail', { bytes: raw.length, why: String(w.why || '') }); return { ok: false, skip: 'fail', why: w.why, msg: NET_MSG(w) }; }
+    /* 没占到位就先占一次（老窗口 / 云函数刚部署时的那种会话）——
+       `push` 那一步服务端要 token 对得上才写，所以这里不能省。 */
+    const path = (leaseToken ? Promise.resolve({ ok: true }) : claimLease(doc));
+    return path.then(function () {
+      return saveFn('push', {
+        payload: raw, ts: ts, bytes: raw.length, ver: String(G.GAME_VER || ''),
+        act: act, token: leaseToken, device: deviceId(),
+      });
+    }).then(function (r) {
+      if (!r.ok) {
+        if (String(r.why) === 'superseded') {
+          /* **服务端**判的下线：本机立刻转只读（本地那个 `superseded` 认成 false 也没用，
+             因为写这一下已经被服务端按 token 拒了）。然后走同一个提示口。 */
+          superseded = true; leaseToken = '';
+          maybeNotifySuperseded(true);
+          clog('push_denied', { bytes: raw.length });
+          return { ok: false, skip: 'superseded' };
+        }
+        clog('push_fail', { bytes: raw.length, why: String(r.why || '') });
+        return { ok: false, skip: 'fail', why: r.why, msg: NET_MSG(r) };
+      }
       /* 推上去了 ⇒ 这一趟也算一次"占位"（本机就是在场那一端），租约时间对齐同一个数。 */
-      if (act) { leaseTs = actTs; superseded = false; }
+      leaseTs = actTs; superseded = false;
       P.pushes++;
       P.lastPushHash = h;
       P.lastPushAt = Date.now();
       P.lastSyncAt = P.lastPushAt;
-      if (data.prevPayload) { P.prevAt = data.prevAt; P.prevTs = data.prevTs; P.prevBytes = data.prevBytes; }
+      if (r.prev && doc) { P.prevAt = Number(doc.ts) || 0; P.prevTs = Number(doc.ts) || 0; P.prevBytes = String(doc.payload || '').length; }
       savePrefs();
-      clog('push_ok', { bytes: raw.length, ts: data.ts, n: P.pushes });
-      return { ok: true, pushed: true, bytes: raw.length, ts: data.ts, prev: !!data.prevPayload };
+      clog('push_ok', { bytes: raw.length, ts: ts, n: P.pushes });
+      return { ok: true, pushed: true, bytes: raw.length, ts: ts, prev: !!r.prev };
     });
   }
 
@@ -556,7 +544,10 @@
          ② **被顶下线 ⇒ 只读**：云端更新照样换下来（双端内容保持一致），但一个字都不写回去，
             并且把"本机已下线"这件事**讲一次**（不讲的话玩家只会以为"存档又没同步"）。 */
       const sess = leaseOf(doc);
-      const needClaim = wantClaim && !!doc && !!doc._id && !(sess && String(sess.id) === deviceId());
+      /* ⚠️ 判据只看"云上那条的租约是不是本机"，**不看有没有那条** ——
+         R1.2 起服务端那边是"记录存不存在都认"，客户端也拿不到 `_id` 了
+         （`publicDoc()` 特意不下发 `_id` / `_openid`）。 */
+      const needClaim = wantClaim && !(sess && String(sess.id) === deviceId());
       return (needClaim ? claimLease(doc) : Promise.resolve(null)).then(function () {
         if (superseded) {
           maybeNotifySuperseded(true);
@@ -786,7 +777,8 @@
   const WHY_TEXT = {
     no_wx: '没有微信环境', no_cloud: '这台设备没有云开发能力',
     init: '云服务初始化失败', read: '读不到云端', write: '存不到云端',
-    fn: '云函数调不通', sdk: '云接口不可用', net: '云端连不上', multi: '云端那份读不出来',
+    fn: '云函数调不通', sdk: '云接口不可用', net: '云端连不上',
+    empty: '云端没收到存档内容', too_big: '存档太大', no_token: '还没占上位',
   };
   function diag() {
     const P = prefs();
@@ -878,7 +870,7 @@
   }
 
   G.CloudSync = {
-    ENV_ID: ENV_ID, COLL: COLL, CODE_FN: CODE_FN, PREF_KEY: PREF_KEY,
+    ENV_ID: ENV_ID, COLL: COLL, CODE_FN: CODE_FN, SAVE_FN: SAVE_FN, PREF_KEY: PREF_KEY,
     boot: boot, triggerAuto: triggerAuto, noteProgress: noteProgress, sync: sync,
     manualPush: manualPush, pullCloud: pullCloud, takeCloudPrev: takeCloudPrev,
     /* 双端单活（父亲大人 10-01：「只有一端能在线……以晚登陆的为主」）：
@@ -899,7 +891,7 @@
       cache = null; inited = false; busy = false; retryTries = 0; armed = false;
       initErr = ''; lastErr = null;          // F2 · 0930L：诊断状态也一起清（尺子要反复试各种岔路）
       absentLogged = false;
-      leaseTs = 0; superseded = false; noticeShown = false; noticeAt = 0;   // 双端单活：租约状态也一起清
+      leaseTs = 0; superseded = false; noticeShown = false; noticeAt = 0; leaseToken = '';   // 双端单活：租约状态也一起清
       if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
       if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     },

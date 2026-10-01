@@ -3184,13 +3184,27 @@ window.Core = (function () {
     if (!st.ready) return  getProxied({ error: st.left <= 0 ? '今日免费次数已用完' : '还要再等一会儿' });
     S.recruit.free[pool].used = st.used + 1;
     S.recruit.free[pool].at = Date.now();
-    const rar = rollRarityInPool(pool);                       // 出率跟该池同源
-    const base = pickCharOfRarity(rar, pool);
-    const res = addChar(base.id);
-    S.stats.recruits++;
-    task('recruit1', 1);
-    save();
-    return  getProxied({ id: base.id, name: base.name, rarity: base.rarity, isNew: res.isNew, shards: res.shards || 0, to: res.to || 'self', free: true, pool });
+    /* ================= R1.2 · P1（父亲大人 2026-10-01 任务书点名）：**每日免费抽与付费抽同源** =========
+       原来这里自己又走了一遍 `rollRarityInPool` ＋ `pickCharOfRarity` —— 于是同一个高级池
+       有**两条**免费路，行为却不一样：
+         · 看广告那次（`adRecruitAdv`）复用 `recruitOnce(noCost)` ⇒ **计保底、优先未拥有**；
+         · 每日免费那次（这里）自己摇 ⇒ **不计保底、不优先未拥有**。
+       而这与项目**已经写下的规则**是矛盾的（三处都在说要同源）：
+         · 高级池 ⓘ 的说明（data.js）："**每抽**累计 1 次保底：满 50 抽必出 SSR…"；
+         · 池子描述（data.js）："50 抽内必出 SSR、100 抽内必出 UR，并且**优先给「你还没有的伙伴」**"；
+         · `adRecruitAdv` 的注释（core.js）："免费抽和广告抽在抽卡这件事上**完全同源**，只有谁付钱不同"。
+       ⇒ 按任务书的**情况 A** 收口：抽卡本体一律走 `recruitOnce(noCost)`（出率 / 三档保底 /
+         优先未拥有 / 入库 / `stats.recruits` / 日常"招募 1 次" / 存档**全在里面**，不再有第二份），
+         这里只留"免费次数账"。**卡池基础概率 / pity 数值 / UP 概率 / 十连保底一个字没动。**
+       做坏试验：把 `recruitOnce` 那句换回"自己摇" → `test_game` 的
+       「每日免费高级抽也计入保底」当场红。 */
+    const r = recruitOnce(pool,  getProxied({ noCost: true }));
+    if (r.error) {                                       // 理论到不了（池子在上面已经验过），但账不能白扣
+      S.recruit.free[pool].used = st.used;
+      save();
+      return r;
+    }
+    return Object.assign(r,  getProxied({ free: true, pool }));
   }
   /* ================= V1.1.8（乙组 B7 · 高级池看广告免费 1 抽）=================
      口径（终版 §3.1 第 7 步）：**10 次/天**、每次免 1 抽（等价 ◆200）。
