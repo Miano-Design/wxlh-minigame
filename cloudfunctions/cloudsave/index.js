@@ -1,51 +1,36 @@
-/* 云存档云函数 `cloudsave`（2026-10-01 · R1.2 · P0）
+/* 云存档云函数 `cloudsave`（2026-10-01 · R1.2 收口 · **第二版：绕开 `update`**）
    ==============================================================================
-   父亲大人 2026-10-01 的任务书（R1.2 · P0）点名三件事，这一支就是它们的落地：
+   【这一版为什么重写】实测：这个云环境里
+     · `doc(id).update(...)`        → `-502001 database request failed`
+     · `where({_id}).update(...)`   → 同样 -502001（云库里 `_id` 不能当 update 条件）
+     · `doc(id).set(...)`           → **真跑通了**（老记录归并那一步就是它）
+   ⇒ 正式写入路径**不再使用任何 `update`**：
+     · 占位（claim）：读全文 → 只换 `lease` → `set` 整份回去；
+     · 推档（push）：走**服务端事务** `db.runTransaction`（事务里只允许 `doc` 操作、
+       没有 `where` —— 我们本来就是确定性 `_id`，刚好不需要）。
 
-     ① **客户端永远不许扫 `saves` 整个集合**。
-        原来客户端是 `collection('saves').where({}).get()`（空条件＝集合扫描），
-        靠"数据库权限只回自己那条"把自己那条筛出来 —— 权限一旦配宽，整张表就被拉下来了。
-        现在：**客户端一行云数据库代码都没有**，读写全走本函数。
+   【保留不动的东西】
+     · 确定性 `_id`：一个 OPENID ↔ 一条 `saves`（`'CS' + sha1('wxlh|'+openid).slice(0,30)`）；
+     · "后登录设备生效"：`claim` 抢租约；`push` 只在 token 相符时放行；
+     · 覆盖前留档：云端那份不同 → 进 `prev*`；
+     · `notifyAt` / `notifyErr` / `act` / `prev*` 一个字段都不许丢（`set` 是整份替换，
+       所以每一次都必须**先读全文、再改那几个字段**）。
 
-     ② **一个微信账号 = 唯一一份正式云存档**。
-        记录 `_id` 由 OPENID 推导（`sha1('wxlh|' + openid)` 前 30 位）⇒ 天然唯一，
-        两台设备同时首推也不可能各建一条。老记录（随机 `_id`）在第一次访问时**自动归并**：
-        取最新那条搬进确定性 `_id`，更旧那条塞进同一条的 `prev*` 栏（找回存档能回溯），
-        然后删掉老的 —— 全程不丢字节。
+   【错误必须能定位】所有数据库操作统一走 `dbErr(stage, e)` ——
+   回去的永远是 `{ok:false, msg, stage, errCode, errMsg}`，不再是一行 "claim_fail"。
 
-     ③ **双端单活由服务端强制**（不再靠客户端"自觉"）。
-        · `claim`：开机 / 回前台 = 一次"登陆" ⇒ 服务端把 `lease` 原子地换成本机的新 token；
-        · `push` ：**条件更新** `where({_id, 'lease.token': 本机token})` ——
-          token 对不上就 `stats.updated === 0`，**一个字都不会写进去**。
-          所以"B 抢到租约 → A 仍拿旧 doc → A update 整条记录"这条路是**物理上不存在**的。
-
-   ---- 服务端能看到的（也只看到这些）----------------------------------------
-     openid（`getWXContext().OPENID`）· payload（**密文原样，本函数不解**）· ts · bytes · ver · act
-     · lease{token,id,ts} · prev*
-   ⚠️ `js/mem-guard.js` 的加解密**绝不复制到这里** —— 服务端不需要、也不允许看懂玩家存档。
-   返回给客户端的 doc **只有自己的那一条**（其它账号的记录永远不会出现在任何应答里）。
-
-   ---- 与既有那支 `savecode` 的分工 ------------------------------------------
-     `savecode` 管"跨账号搬档"的 8 位短码；本函数管"同一个账号自己的那一份"。
-     两支职责不混。
-
-   ---- 与 `notify` / `gameact` 的关系 -----------------------------------------
-     那两支照样直接读 `saves` 的 `act` 小块（服务端读，合规）。所以本函数写的时候
-     **必须用 `update`（合并）而不是 `set`（替换）**，否则会把 `notify` 的 `notifyAt` 记号抹掉
-     —— 全量替换只在"归并老记录"那一处用，且把那两个字段显式搬过去。 */
+   ⚠️ 服务端**不解密玩家存档**（`mem-guard.js` 不复制到这里）：它只搬运密文
+      `payload` 与 `ts/bytes/ver/act/lease/prev*` 这些短字段。 */
 const cloud = require('wx-server-sdk');
 const crypto = require('crypto');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
-const _ = db.command;
 
 const COLL = 'saves';
-const MAX_CHARS = 256 * 1024;          // 存档密文上限（当前约 16KB；真超了就让玩家走导出/导入）
+const MAX_CHARS = 256 * 1024;
 
-/* ---------- 与客户端 `js/sc-cloud.js` 的 fpOf **同一套**哈希 ----------
-   导出档信封里的账号指纹就是它。两处必须逐字一致，否则老导出档在跨端导入时会被判"不是同一个账号"。
-   （客户端：32 位 FNV-1a，`(h >>> 0).toString(16)`；这里照抄，不做第二套。） */
+/* ---------- 与客户端 `js/sc-cloud.js` 的 fpOf **同一套**哈希（导出档信封里的账号指纹） ---------- */
 function fnv(s) {
   s = String(s == null ? '' : s);
   let h = 2166136261;
@@ -53,9 +38,6 @@ function fnv(s) {
   return (h >>> 0).toString(16);
 }
 function fpOf(openid) { return openid ? ('A' + fnv(openid)) : ''; }
-
-/* ---------- 确定性 `_id`：一个 OPENID ↔ 一条记录 ----------
-   sha1 前 30 位十六进制（120 bit）—— 撞车概率可以忽略；OPENID 本身不进 `_id`。 */
 function docIdOf(openid) {
   return 'CS' + crypto.createHash('sha1').update('wxlh|' + String(openid)).digest('hex').slice(0, 30);
 }
@@ -63,26 +45,42 @@ function newToken() { return crypto.randomBytes(18).toString('hex'); }
 const num = (v) => (Number(v) || 0);
 const str = (v) => String(v == null ? '' : v);
 
+/* ---------- 统一错误出口：**带 stage / errCode / errMsg** ---------- */
+function dbErr(stage, e) {
+  return {
+    ok: false,
+    msg: String(stage) + '_fail',
+    stage: String(stage),
+    errCode: String((e && (e.errCode || e.code)) || ''),
+    errMsg: String((e && (e.errMsg || e.message || e)) || 'unknown').slice(0, 160),
+  };
+}
+/** `set()` 的数据里**不能带 `_id`**（系统字段不能当普通字段写回去）；`_openid` 要保留。 */
+function dataForSet(doc) {
+  const out = Object.assign({}, doc || {});
+  delete out._id;
+  return out;
+}
+
 async function getById(id) {
   try {
     const r = await db.collection(COLL).doc(id).get();
     return (r && r.data) ? r.data : null;
-  } catch (e) { return null; }          // 不存在（doc.get 会抛）—— 不是错误
+  } catch (e) { return null; }          /* 不存在（doc.get 会抛）—— 不是错误 */
 }
 
-/** 找到"这个账号唯一那条"；老结构（随机 `_id`、可能多条）在这一步自动归并成一条。 */
+/** 定位"这个账号唯一那条"；老结构（随机 `_id`、可能多条）在这一步归并成一条。 */
 async function ensure(openid) {
   const id = docIdOf(openid);
   const cur = await getById(id);
   if (cur) return { id: id, doc: cur };
 
-  /* 老记录：同一个 openid 名下的全部（正常情况下 0~2 条；截 20 条足够兜底） */
   let list = [];
   try {
     const q = await db.collection(COLL).where({ _openid: openid }).limit(20).get();
     list = (q && q.data) || [];
   } catch (e) { list = []; }
-  if (!list.length) return { id: id, doc: null };          // 这个账号还没有云存档
+  if (!list.length) return { id: id, doc: null };
 
   list.sort((a, b) => num(b.ts) - num(a.ts));
   const main = list[0];
@@ -94,12 +92,11 @@ async function ensure(openid) {
     act: main.act || null,
     prevPayload: str(main.prevPayload), prevTs: num(main.prevTs),
     prevBytes: num(main.prevBytes), prevAt: num(main.prevAt),
-    /* ⚠️ `notify` 的记号必须搬过来 —— 它记在记录顶层，不搬就等于让玩家再收一次推送 */
+    /* ⚠️ `notify` 的记号记在顶层，不搬就等于让玩家再收一次推送 */
     notifyAt: num(main.notifyAt), notifyErr: main.notifyErr || null,
     lease: main.lease || null,
     migratedAt: Date.now(),
   };
-  /* 归并时**先保旧档**：另一条（更旧的）那份进 `prev*`，与平时"云端被覆盖"同一个口径 */
   const older = rest.find((x) => x && x.payload && str(x.payload) !== patch.payload);
   if (older) {
     patch.prevPayload = str(older.payload);
@@ -107,8 +104,8 @@ async function ensure(openid) {
     patch.prevBytes = str(older.payload).length;
     patch.prevAt = Date.now();
   }
-  await db.collection(COLL).doc(id).set({ data: patch });
-  /* 搬完再删老的 —— 顺序不能反（先删后写，中间失败就是真丢档） */
+  try { await db.collection(COLL).doc(id).set({ data: patch }); }
+  catch (e) { return { id: id, doc: null, err: dbErr('migrate_set', e) }; }
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
     if (!d || !d._id || d._id === id) continue;
@@ -125,110 +122,152 @@ function publicDoc(doc) {
     ver: str(doc.ver), at: num(doc.at), act: doc.act || null,
     prevPayload: str(doc.prevPayload), prevTs: num(doc.prevTs),
     prevBytes: num(doc.prevBytes), prevAt: num(doc.prevAt),
-    /* 租约交给客户端只为**UI 判断**（谁在场）；真正的强制在 push 那道的条件更新上 */
     lease: doc.lease ? { id: str(doc.lease.id), ts: num(doc.lease.ts) } : null,
   };
+}
+
+/** 推档要写回去的**整份**（`set` 是整份替换 ⇒ 必须从 current 复制、只改该改的那几个）。 */
+function buildPushDoc(current, input) {
+  const next = dataForSet(current);
+  const payloadIn = str(input.payload);
+  const prevPayload = str(current.payload);
+  if (prevPayload && prevPayload !== payloadIn) {
+    next.prevPayload = prevPayload;
+    next.prevTs = num(current.ts);
+    next.prevBytes = prevPayload.length;
+    next.prevAt = input.now;
+  }
+  next.payload = payloadIn;
+  next.ts = num(input.ts) || input.now;
+  next.bytes = num(input.bytes) || payloadIn.length;
+  next.ver = str(input.ver);
+  next.at = input.now;
+  next.act = input.act || null;
+  next.lease = { token: input.token, id: input.device, ts: input.now };
+  return next;
 }
 
 exports.main = async (event) => {
   const wx = cloud.getWXContext();
   const openid = wx.OPENID || '';
-  if (!openid) return { ok: false, msg: 'no_openid' };       // 拿不到账号 = 什么都没法做
+  if (!openid) return { ok: false, msg: 'no_openid', stage: 'openid' };
 
   const action = str(event && event.action);
   const now = Date.now();
 
-  /* ---------- 读：自己的那一条（没有就 null） ---------- */
+  /* ================= 读：自己的那一条（没有就 null） ================= */
   if (action === 'pull') {
     const r = await ensure(openid);
+    if (r.err) return r.err;
     return { ok: true, fp: fpOf(openid), doc: publicDoc(r.doc), hasDoc: !!r.doc };
   }
 
-  /* ---------- 占位（登陆）：把租约原子地换成本机的新 token ----------
-     "以晚登陆的为主"就落在这一句上：谁后调它，谁就是当前设备。
-     记录还不存在时（首次）占不了位 —— 但 `push` 建记录时会把同一个 token 一起写进去。 */
+  /* ================= 占位（登陆）：**读全文 → 只换 lease → set 整份** ================= */
   if (action === 'claim') {
     const r = await ensure(openid);
+    if (r.err) return r.err;
     const token = newToken();
     const device = str(event && event.device).slice(0, 32);
     if (r.doc) {
-      try {
-        /* ⚠️ 实测（-502001 collection.update:fail）：微信云库里 **`where({_id: …}).update()` 不被支持**
-           （`_id` 不能当更新条件）—— 这里必须走 `doc(id).update()`。
-           占位的语义本来就是"**后来的无条件顶掉**"，所以不需要条件，`doc()` 正好。 */
-        await db.collection(COLL).doc(r.id)
-          .update({ data: { lease: { token: token, id: device, ts: now } } });
-      } catch (e) {
-        /* R1.2 实测：这一句曾经抛过，而当时只回了个 `claim_fail`，**看不出为什么** ——
-           排查只能靠猜。现在把异常原文截 80 字带回去（里面没有玩家数据，只有 SDK 的 errMsg）。 */
-        const em = String((e && (e.errMsg || e.message)) || e || 'unknown').slice(0, 80);
-        return { ok: false, msg: 'claim_fail: ' + em };
-      }
+      const full = dataForSet(r.doc);
+      full.lease = { token: token, id: device, ts: now };
+      try { await db.collection(COLL).doc(r.id).set({ data: full }); }
+      catch (e) { return dbErr('claim_set', e); }
     }
     return { ok: true, token: token, ts: now, hasDoc: !!r.doc };
   }
 
-  /* ---------- 写：**条件更新**，token 对不上就一个字都不写 ---------- */
+  /* ================= 写：**服务端事务**（事务里只有 doc，没有 where） =================
+     "被顶下线"与"数据库出错"**必须分开报** —— 不然以后又会出现
+     "数据库坏了却提示玩家另一台设备登录"的假错误。用闭包变量记判定，
+     不依赖 SDK 是否把自定义错误属性透传出来。 */
   if (action === 'push') {
     const token = str(event && event.token);
-    if (!token) return { ok: false, msg: 'no_token' };
+    if (!token) return { ok: false, msg: 'no_token', stage: 'push_arg' };
     const payloadIn = str(event && event.payload);
-    if (!payloadIn) return { ok: false, msg: 'empty' };
-    if (payloadIn.length > MAX_CHARS) return { ok: false, msg: 'too_big' };
+    if (!payloadIn) return { ok: false, msg: 'empty', stage: 'push_arg' };
+    if (payloadIn.length > MAX_CHARS) return { ok: false, msg: 'too_big', stage: 'push_arg' };
 
     const r = await ensure(openid);
+    if (r.err) return r.err;
     const device = str(event && event.device).slice(0, 32);
-    const data = {
-      payload: payloadIn,
-      ts: num(event.ts) || now,
-      bytes: num(event.bytes) || payloadIn.length,
-      ver: str(event.ver),
-      at: now,
-      act: event.act || null,
-      lease: { token: token, id: device, ts: now },
+    const input = {
+      payload: payloadIn, ts: num(event && event.ts), bytes: num(event && event.bytes),
+      ver: str(event && event.ver), act: (event && event.act) || null,
+      token: token, device: device, now: now,
     };
-    /* 云端被本地覆盖 → 旧云端另留一份（与老口径一字不差） */
-    if (r.doc && r.doc.payload && str(r.doc.payload) !== payloadIn) {
-      data.prevPayload = str(r.doc.payload);
-      data.prevTs = num(r.doc.ts);
-      data.prevBytes = str(r.doc.payload).length;
-      data.prevAt = now;
-    }
 
-    if (r.doc) {
-      /* ① 正路：拿本机 token 做**原子**条件更新。
-         ⚠️ 条件里**不能带 `_id`**（同上，`where` 用 `_id` 会 -502001）—— 改成按 `lease.token` 匹配：
-         token 是 `crypto.randomBytes(18)` 出来的 36 位十六进制，不可能撞到别的账号那条。 */
-      const res = await db.collection(COLL).where({ 'lease.token': token }).update({ data: data });
-      if (res && res.stats && res.stats.updated === 1) {
-        return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
-      }
-      /* ①′ 那条**还没有过租约**（老版本写下的记录 / 刚迁移过来的）→ 允许无条件接手一次。
-         这里牺牲一点原子性换"能用"：这个窗口只出现在"老记录第一次被新版碰到"那一趟，
-         而且此时**两台设备本来就都没有 token**（跟旧版行为一样），不会比旧版更糟。 */
-      if (!(r.doc.lease && r.doc.lease.token)) {
-        const res2 = await db.collection(COLL).doc(r.id).update({ data: data });
-        if (res2 && res2.stats && res2.stats.updated === 1) {
-          return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
+    /* ① 那条还不存在 → 建。确定性 `_id`：两台同时建也只有一条成立 */
+    if (!r.doc) {
+      const seed = buildPushDoc({ _openid: openid }, input);
+      seed._openid = openid;
+      try {
+        await db.collection(COLL).add({ data: Object.assign({ _id: r.id }, seed) });
+        return { ok: true, pushed: true, created: true, ts: seed.ts, at: now, bytes: seed.bytes, prev: false };
+      } catch (e) {
+        /* 被另一端抢建了：**这不是服务异常** —— 重新读一次，按租约判 */
+        const cur = await getById(r.id);
+        if (!cur) return dbErr('create_add', e);
+        const ct = (cur.lease && cur.lease.token) ? str(cur.lease.token) : '';
+        if (ct && ct !== token) {
+          return { ok: false, msg: 'superseded', stage: 'create_lost',
+            lease: cur.lease ? { id: str(cur.lease.id), ts: num(cur.lease.ts) } : null };
         }
+        r.doc = cur;                       /* 抢建那条还没有租约 → 落到下面的事务路径接手 */
       }
-      /* ② 被顶下线：**服务端说了算**（客户端本地 `superseded === false` 也没用） */
-      return { ok: false, msg: 'superseded', lease: r.doc.lease ? { id: str(r.doc.lease.id), ts: num(r.doc.lease.ts) } : null };
     }
+    if (!r.doc) return { ok: false, msg: 'push_fail', stage: 'push_nodoc' };
 
-    /* ③ 还没有那条 → 建。`_id` 是确定性的 ⇒ 两台同时建也只有一条成立 */
+    let verdict = '';
     try {
-      await db.collection(COLL).add({ data: Object.assign({ _id: r.id, _openid: openid }, data) });
-      return { ok: true, pushed: true, created: true, ts: data.ts, at: now, bytes: data.bytes, prev: false };
+      const out = await db.runTransaction(async (tx) => {
+        const ref = tx.collection(COLL).doc(r.id);
+        const got = await ref.get();
+        const current = got && got.data;
+        if (!current) { verdict = 'missing'; throw new Error('missing_doc'); }
+        const curToken = (current.lease && current.lease.token) ? str(current.lease.token) : '';
+        /* 已经有租约、而且不是本机 ⇒ 旧设备，拒（"后登录设备生效"就落在这一句上）。
+           租约为空（老记录 / 刚迁移过来）⇒ 允许本机接手一次。 */
+        if (curToken && curToken !== token) { verdict = 'superseded'; throw new Error('superseded'); }
+        const next = buildPushDoc(current, input);
+        await ref.set({ data: next });
+        return { prev: !!(str(current.payload) && str(current.payload) !== payloadIn) };
+      });
+      return { ok: true, pushed: true, ts: num(input.ts) || now, at: now,
+        bytes: num(input.bytes) || payloadIn.length, prev: !!(out && out.prev) };
     } catch (e) {
-      /* 已经被另一台抢建了 → 回到条件更新那条路（本机 token 必然对不上 → 拒绝） */
-      const res = await db.collection(COLL).where({ 'lease.token': token }).update({ data: data });
-      if (res && res.stats && res.stats.updated === 1) {
-        return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
+      if (verdict === 'superseded') {
+        const cur = await getById(r.id);
+        return { ok: false, msg: 'superseded', stage: 'push_tx',
+          lease: (cur && cur.lease) ? { id: str(cur.lease.id), ts: num(cur.lease.ts) } : null };
       }
-      return { ok: false, msg: 'superseded', lease: null };
+      return dbErr(verdict === 'missing' ? 'push_missing' : 'push_tx', e);
     }
   }
 
-  return { ok: false, msg: 'unknown_action' };
+  /* ================= dev probe（**不接入正式游戏逻辑**） =================
+     一步一步来：get → set 一个探针字段 → 再 get 验证 → 清掉探针字段。
+     哪一步炸、炸在什么码上，原样回给客户端 —— 以后不用再"猜 API"。 */
+  if (action === 'probe') {
+    const out = { ok: true, hasDoc: false, get: false, set: false, verify: false, clean: false };
+    const r = await ensure(openid);
+    if (r.err) return r.err;
+    out.hasDoc = !!r.doc;
+    out.docId = r.id;
+    if (!r.doc) { out.stage = 'probe_nodoc'; return out; }
+    try { const g = await db.collection(COLL).doc(r.id).get(); out.get = !!(g && g.data); }
+    catch (e) { return Object.assign(dbErr('probe_get', e), out); }
+    const withProbe = dataForSet(r.doc);
+    withProbe.__probe = now;
+    try { await db.collection(COLL).doc(r.id).set({ data: withProbe }); out.set = true; }
+    catch (e) { return Object.assign(dbErr('probe_set', e), out); }
+    try { const g2 = await db.collection(COLL).doc(r.id).get(); out.verify = !!(g2 && g2.data && g2.data.__probe); }
+    catch (e) { return Object.assign(dbErr('probe_verify', e), out); }
+    const clean = dataForSet(r.doc);          /* r.doc 是探针之前那份快照 ⇒ 天然没有 __probe */
+    try { await db.collection(COLL).doc(r.id).set({ data: clean }); out.clean = true; }
+    catch (e) { return Object.assign(dbErr('probe_clean', e), out); }
+    return out;
+  }
+
+  return { ok: false, msg: 'unknown_action', stage: 'dispatch' };
 };
