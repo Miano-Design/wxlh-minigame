@@ -223,7 +223,10 @@
         U.y = top + h + CV.SP[1];
       };
       grid3([0, 1, 2].map((i) => ({ label: '存预设 ' + (i + 1), style: 'ghost', id: 'preset_save:' + i })));
-      grid3([0, 1, 2].map((i) => ({ label: '套用预设 ' + (i + 1), style: 'gold', id: 'preset_use:' + i })));
+      /* R1.5 UX 轮（§三十三）：三颗**同权重**的预设按钮原来全是金底 —— 一屏三颗主按钮，
+         玩家看不出"这一页的第一动作"是哪个。预设是**工具**，降成描边（ghost），
+         真正的主按钮留给这一页唯一的动作。 */
+      grid3([0, 1, 2].map((i) => ({ label: '套用预设 ' + (i + 1), style: 'ghost', id: 'preset_use:' + i })));
       const cur = S.presets.map((p, i) => (i + 1) + (p && p.filter(Boolean).length ? '✓' : '—')).join(' ');
       U.hint('当前预设：' + cur, 4 * CV.SCALE);
     });

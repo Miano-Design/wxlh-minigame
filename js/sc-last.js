@@ -675,6 +675,28 @@
     const h = U.listRow({ t1: t1, t2: t2, rightW: bw + 10 * CV.SCALE });
     U.btn(U.ix() + U.iw() - bw, rowTop + (h - bh) / 2, bw, bh, btnLabel, btnStyle, actId, dis);
   }
+  /* ================= R1.5 UX 轮 · **开关要长得像开关** =================
+     父亲大人这一轮的规矩（§三十二 / §三十三）：**金底按钮 = 这一页的第一动作**，
+     而"背景音乐 / 音效 / 省电 / 自动分解"这些是**状态**，不是动作。
+     原来它们开着的时候就是一颗金底"已开启"——和「进入残域」「强化」长得一模一样，
+     同一屏上会出现三四颗金按钮互相抢注意力（尺子 `ux_audit` 的主按钮计数报的就是它）。
+     现在画成轨道 + 圆点：开＝金色实心、关＝灰槽，**状态本身是颜色通道**（文字仍写 已开启/已关闭）。
+     ⚠️ 只换这一处的画法，`toggle:*` 的动作 id 与逻辑一个字没动。 */
+  function switchRow(t1, t2, on, actId) {
+    const bw = 78 * CV.SCALE, bh = U.BTN_SM * CV.SCALE;
+    const rowTop = U.y;
+    const h = U.listRow({ t1: t1, t2: t2, rightW: bw + 10 * CV.SCALE });
+    const x = U.ix() + U.iw() - bw, y = rowTop + (h - bh) / 2;
+    CV.round(x, y, bw, bh, bh / 2,
+      CV.a(on ? CV.C.goldBtn : CV.C.panel2, on ? .55 : .45),
+      CV.a(on ? CV.C.gold : CV.C.line, on ? .75 : .60));
+    /* 状态圆点：开＝金实心 / 关＝灰实心 —— 和文字一起凑成**两个视觉通道**（§三十二） */
+    const dr = 4 * CV.SCALE;
+    CV.round(x + 9 * CV.SCALE, y + bh / 2 - dr, dr * 2, dr * 2, dr, on ? CV.C.gold : CV.C.dim, null);
+    CV.text(on ? '已开启' : '已关闭', x + bw / 2 + 5 * CV.SCALE, y + bh / 2,
+      { size: CV.FS.xs, align: 'center', color: on ? CV.C.gold : CV.C.dim });
+    CV.hit(actId, x, y - 5 * CV.SCALE, bw + 10 * CV.SCALE, bh + 10 * CV.SCALE);
+  }
   function settingsPage() {
     const S = Core.S, set = S.settings;
     U.begin(); head('设置与存档');
@@ -744,7 +766,7 @@
          ⚠️ 保存键就是 `S.settings.savePower`（一个布尔），**没有第二个字段、不动存档那五个口子**。 */
       [['bgm', '背景音乐'], ['sfx', '音效'], ['savePower', '省电模式']].forEach(function (r) {
         const on = set[r[0]] !== false;
-        setRow(r[1], '', on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
+        switchRow(r[1], '', on, 'toggle:' + r[0]);   // R1.5 UX：开关画成开关，不做金底主按钮
       });
       /* ================= V1.0.4 · X（订阅消息 · 父亲大人「2，可以」）=================
          第四行：「**收益满了提醒我**」—— 点一次 = 请求一次微信订阅消息（一次性订阅：点一次只推一条），
@@ -753,8 +775,8 @@
          · 没有小字说明（本卡不放小字）；
          · **不假装成功**：拿不到 API / 玩家拒绝 / 调用失败 —— 各说各的话（尺子钉着）。
          · 模板 ID 只有一处：`js/wx-adapter.js` 的 `SUB_TMPL`。 */
-      setRow('收益满了提醒我', '', set.subMsg === true ? '已订阅' : '未订阅',
-        set.subMsg === true ? 'primary' : 'ghost', 'sub_msg');
+      /* R1.5 UX 轮：**已订阅是状态，不是本页第一动作** —— 不再长成金底主按钮（§三十二）。 */
+      setRow('收益满了提醒我', '', set.subMsg === true ? '已订阅' : '未订阅', 'ghost', 'sub_msg');
       /* ================= 康康 2026-10-01 · **分享**（R1.3 阶段④ · 父亲大人拍板）=================
          摆位：**还是「通用」这张卡、追加在末尾**（与省电模式 / 订阅消息同一条纪律：
          本卡只往后追加，**整页顺序一个字没动**）。
@@ -776,7 +798,7 @@
       [['autoSellN', '自动分解 N 装备', '掉到 N 品质直接换成 ◆ 异界结晶'],
         ['autoSellR', '自动分解 R 装备', '掉到 R 品质直接换成 ◆ 异界结晶']].forEach(function (r) {
         const on = !!set[r[0]];
-        setRow(r[1], r[2], on ? '已开启' : '已关闭', on ? 'primary' : 'ghost', 'toggle:' + r[0]);
+        switchRow(r[1], r[2], on, 'toggle:' + r[0]);   // R1.5 UX：状态用开关表达，不抢主按钮
       });
     });
     /* ================= 兑换码（2026-10-01 · 父亲大人点单）=================

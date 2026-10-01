@@ -126,7 +126,11 @@
         }
         {
           const one = { label: oneLabel, style: freeNow ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') };
-          const ten = { label: tenLabel, style: 'gold', id: 'pull10:' + pid };
+          /* R1.5 UX 轮（§三十三）：每张池卡里原来**两颗都是金底**（免费抽 ＋ 十连），
+             页面上一共五颗金按钮 —— 分不出主次。口径：**免费/单抽＝主按钮**（不花钱那一下），
+             十连降成中性实底（default）；"免费次数用完了"时单抽自动变 ghost，
+             那时十连才是这张卡唯一的主按钮。 */
+          const ten = { label: tenLabel, style: freeNow ? 'default' : 'gold', id: 'pull10:' + pid };
           /* ================= V1.1.16（0927-Y 数值轮 · 报告 §6-8①）：普通池多一颗「连抽 ×10」 =================
              点数到了中后期没有出口（建筑点满后 90 天剩 **727 万 ◉**，报告 §四/§6-8），
              而普通池单抽 ◉500 就是现成出口 —— 缺的只是"一次点 100 下"。

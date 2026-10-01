@@ -17,7 +17,9 @@ const R = makeReport('audit_release');
    它们和前面几支一样进总闸 —— 数值轮改完必须整条链一起绿。 */
 const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'audit_data',
   'audit_story', 'visual_story_audit', 'lore_timeline_audit', 'ad_text_audit',
-  'progression_audit', 'economy_sim', 'drop_economy_audit', 'naming_lore_audit', 'lore_reveal_audit'];
+  'progression_audit', 'economy_sim', 'drop_economy_audit', 'naming_lore_audit', 'lore_reveal_audit',
+  /* R1.5 UX 轮新增：真渲染 58 个页面，查返回链 / 滚动 / 热区 / 按钮主次 / 文案 / 四档屏宽。 */
+  'ux_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }
