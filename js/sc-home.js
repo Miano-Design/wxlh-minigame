@@ -1057,11 +1057,14 @@
         c.fillStyle = rg; c.fillRect(0, 0, CV.W, CV.H);
       }
     }
-    /* 压暗（顺着主视觉的构图：上方压得轻一点，把那片天留出来） */
+    /* 压暗：**必须让"卡片半透明"看得出来**（父亲大人：「卡片的半透明呢」）——
+       第一版压到 .58~.82，底图被压得几乎看不见，卡片再透也没东西可透。
+       现在收到 .34~.56：世界清清楚楚地在那儿，卡片是浮在它上面的半透明面板。
+       文字照样读得清 —— 卡片本身还有 70% 的深色底（两层加起来才是不透明的那部分）。 */
     const g = c.createLinearGradient(0, 0, 0, CV.H);
-    g.addColorStop(0, CV.a(CV.C.bg, .58));
-    g.addColorStop(0.45, CV.a(CV.C.bg, .74));
-    g.addColorStop(1, CV.a(CV.C.bg, .82));
+    g.addColorStop(0, CV.a(CV.C.bg, .34));
+    g.addColorStop(0.45, CV.a(CV.C.bg, .46));
+    g.addColorStop(1, CV.a(CV.C.bg, .56));
     c.fillStyle = g; c.fillRect(0, 0, CV.W, CV.H);
   };
 

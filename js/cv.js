@@ -922,8 +922,12 @@
        没有底图的页面（大多数二级页）下面是 `CV.C.bg`，合成结果与原来看不出差别 ——
        所以这一改是**全局收益、零回归风险**（`inset/spacing/layout` 量的都是几何，不含颜色）。
        ⚠️ 只改这两处默认值；页面自己要填色仍然传 `opt.fill`（命格卡那类照旧走 `opt.line`）。 */
+    /* ⚠️ 透明度**必须真的看得出来**（2026-10-02 父亲大人：「卡片的半透明呢」）：
+       第一版给了 88%，叠在**已经压暗**的底图上，合成结果和不透明几乎没有区别 ——
+       等于白改。现在收到 **70%**，并且把整页底图的压暗一起调轻（见 sc-home 的 veils.home）：
+       "透过卡片看得见世界"要**两层一起让**才成立，只改卡片那一层是看不出来的。 */
     CV.round(x, y, w, h, opt.radius === undefined ? CV.RADIUS : opt.radius,
-      opt.fill || CV.a(CV.C.panel, .88), opt.line === null ? null : (opt.line || CV.a(CV.C.line, .92)));
+      opt.fill || CV.a(CV.C.panel, .70), opt.line === null ? null : (opt.line || CV.a(CV.C.line, .9)));
     /* V9.6.10：网页版 .card 有一条 `inset 0 1px 0 #ffffff08` 的顶部高光 ——
        卡片"有厚度、不糊"的关键就是它；小游戏原来没画，所以整块看着是平的、笨的。 */
     if (opt.line !== null) {
