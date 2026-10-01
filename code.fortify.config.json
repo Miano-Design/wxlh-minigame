@@ -6,6 +6,7 @@
         "level": 3,
         "files": [
           "game.js",
+          "js/assets-icons.js",
           "js/audio.js",
           "js/battle.js",
           "js/core.js",
@@ -31,6 +32,9 @@
           "js/sc-roster.js",
           "js/sc-splash.js",
           "js/sc-start.js",
+          "js/sc-story-battle.js",
+          "js/sc-story-data.js",
+          "js/sc-story.js",
           "js/uiw.js",
           "js/wx-adapter.js",
           "js/wx-cap.js"
