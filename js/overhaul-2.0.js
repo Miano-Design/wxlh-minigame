@@ -25,79 +25,107 @@
     for(let i=0;i<a.length;i++) if(!a[i]) return i;
     return -1;
   }
+  /* ================= R2.0 体验收口（2026-10-02 · 父亲大人终验单 §六）=================
+     **红点只允许指向"真的能领到东西"的地方**。原稿这里各条自己判了一次（`claimable` 当布尔用、
+     用 `freeRecruitAvailable()` 而不带 `isUnlocked`）—— 实测在**新档**上会出问题：
+       · `freeRecruitAvailable()` 只看"免费次数还在"，**不看功能有没有解锁** →
+         新玩家还没解锁招募，首页就亮「免费招募」，点进去是锁着的页面（正是"红点点进去没内容"）；
+       · `t.claimable` 是**计数**，当布尔用碰巧没错，但可读性差、以后容易踩。
+     现在**只读 `Core.todayState()` 这一个口径**（它内部已经 AND 了 `isUnlocked`，且都是"现算"）：
+       `dailyClaimable / weeklyClaimable / achClaimable / codexClaimable / freeRecruitReady / signReady / idleReady`。 */
   function dailySignals(){
-    const s=S(), a=[];
-    try { const t=Core.todayState&&Core.todayState(); if(t&&t.claimable) a.push(['open_tasks','任务可领']); } catch(e){}
-    try { const sg=Core.signState&&Core.signState(); if(sg&&sg.canDraw) a.push(['open_sign','今日点灯']); } catch(e){}
-    try { if(Core.freeRecruitAvailable&&Core.freeRecruitAvailable()) a.push(['open_recruit','免费招募']); } catch(e){}
-    try { const cd=Core.codexState&&Core.codexState(); if(cd&&cd.claimable) a.push(['open_codex','图鉴可领']); } catch(e){}
+    const a=[];
+    try {
+      const t=Core.todayState&&Core.todayState();
+      if(!t) return a;
+      if(t.dailyClaimable||t.weeklyClaimable||t.achClaimable) a.push(['open_tasks','任务可领']);
+      if(t.signReady) a.push(['open_sign','今日点灯']);
+      if(t.freeRecruitReady) a.push(['open_recruit','免费招募']);   // ← 带解锁判定的那个
+      if(t.codexClaimable) a.push(['open_codex','图鉴可领']);
+    } catch(e){}
     return a.slice(0,3);
   }
   function storyLine(w){
     try { if(G.Story&&G.Story.clueOf) return G.Story.clueOf(w.id,'post')||G.Story.clueOf(w.id,'in')||''; } catch(e){} return '';
   }
-  function renderHome(){
-    const s=S(), w=currentWorld(), st=(s.worlds&&s.worlds[w.id])||{stages:{normal:[]}}, stage=nextStage(w.id,'normal');
-    const prog=(st.stages&&st.stages.normal||[]).filter(Boolean).length;
-    U.begin();
-    U.card(function(){
-      U.pageHead('灯阁');
-    },{padY:0});
-    /* pageHead 在卡片 dry-pass 中不能画，所以把它移除：真实页头由后面重新登记 */
-    /* 重新开始正文 */
-    U.y=CV.headH()+CV.TOP+8;
-    U.card(function(){
-      U.hint('当前旅程',0,CV.C.dim);
-      CV.text(w.name,U.ix(),U.y+2*CV.SCALE,{size:CV.FS.f2,bold:true});
-      U.y+=24*CV.SCALE;
-      U.note(stage>=0?'第 '+(stage+1)+'/12 关 · '+String(w.mechanic).split('：')[0]:'普通难度 12/12 已完成',4*CV.SCALE);
-      const bw=U.iw(), by=U.y+8*CV.SCALE;
-      CV.round(U.ix(),by,bw,5*CV.SCALE,3*CV.SCALE,CV.a(CV.C.line,.8),null);
-      const p=stage>=0?prog/12:1;
-      CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,p)),5*CV.SCALE,3*CV.SCALE,CV.C.gold,null);
-      U.y=by+14*CV.SCALE;
-      if(stage>=0){ U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,'继续探索','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE; }
-      else { U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,'进入下一世界','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE; }
-    });
-    const clue=storyLine(w);
-    if(clue){ U.card(function(){ U.h3('刚刚发现', '不是必须现在看'); U.note(clue,2*CV.SCALE); U.space(CV.SP[1]); U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'打开故事','ghost','ov_story'); U.y+=U.BTN_SM*CV.SCALE; }); }
-    U.sectionTitle('今天');
-    const ds=dailySignals();
-    const tiles=ds.map(function(x){return [x[0],x[1],'','',true];});
-    if(!tiles.length) tiles.push(['open_tasks','任务','没有急事','',false]);
-    /* R1.9 整合：`U.tiles` 的第三参是**整块引导锚点**（它会给这一块登记一个"无动作"的热区）。
-       原稿用了 `ov_*` 前缀，而项目里这一类**统一叫 `grid:`**（`grid:grow` / `grid:daily`），
-       `audit_pages` / `ux_audit` 的锚点白名单也是按 `grid:` 判的。
-       同类东西必须同前缀 —— 否则机器只能把它当死按钮，玩家点这块空白也确实没反应。 */
-    U.tiles(tiles,3,'grid:ov_today');
-    U.sectionTitle('快速整理');
-    U.tiles([
-      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],['open_recruit','招募','',null,false],
-      ['open_bag','背包','',null,false],['open_settings','设置','',null,false],['open_guide','指南','',null,false]
-    ],3,'grid:ov_quick');
-    U.hint('规则很简单：先推进残域，再用奖励补强；故事会在关键节点自己发生。',CV.SP[1]);
-  }
-  /* 修复一个结构性问题：U.pageHead 必须在 begin 后登记，而不是放进卡片 */
+  /* ⚠️ 原来这里还有一份 `renderHome()`（51~91 行）——**死代码**：真正挂上去的是下面的
+     `CV.panels.home → renderHomeBody()`，那一份从来没被调用过。
+     两套首页实现放在同一个文件里，改一处忘一处就分叉（任务书 §15「不允许两套实现」）。
+     收口：**只留 renderHomeBody 一份**，`CV.panels.home` 直接指向它。 */
   CV.panels.home=function(){
-    const old=U.pageHead; U.begin(); U.pageHead('灯阁');
+    U.begin(); U.pageHead('灯阁');
     renderHomeBody();
   };
+  /* ================= R2.0 体验收口 · 首页重排（父亲大人终验单 §三/§四/§五）=================
+     信息优先级（从上到下，**屏幕上一个主按钮**）：
+       ① **我是谁**  —— 主角卡（头像位 + 名字 + Lv + 命格 + 战力），点进 `open_protag`
+       ② **现在该做什么** —— 当前旅程（世界 + 第 N/12 关 + 机制 + 进度条 + 「继续探索」）
+       ③ **当前收益** —— 挂机收益 + 「收取奖励」（走后端既有的 `claim_all`，一次收完挂机/每日/周常/成就）
+       ④ **刚刚发现** —— 只在**没读过**时出现；读完（`stateOf().epilogueSeen`）就消失，历史进卷宗
+       ⑤ 今天 · 能领什么（只列真能领的，≤3 格）
+       ⑥ 快速整理（**只留 队伍 / 成长 / 招募 / 设置** —— 背包在底栏、指南在设置里，不重复摆）
+     为什么补 ①③：2.0 那一版的首页**丢了主角入口和挂机收取**，而底栏"挂机可领"的红点照旧会亮 ——
+     玩家会看到"红点亮着、首页却找不到能收的东西"（这正是父亲大人点名的那类假红点）。 */
   function renderHomeBody(){
     const s=S(),w=currentWorld(),st=(s.worlds&&s.worlds[w.id])||{stages:{normal:[]}},stage=nextStage(w.id,'normal');
     const prog=(st.stages&&st.stages.normal||[]).filter(Boolean).length;
+    const p=s.player||{};
+    /* ① 主角卡 */
+    U.card(function(){
+      const top=U.y, r=17*CV.SCALE, cx=U.ix()+r, cy=top+r;
+      CV.round(cx-r,cy-r,r*2,r*2,r,CV.a(CV.C.panel2,.55),CV.a(CV.C.gold,.35));
+      CV.text(CV.fit(String(Core.charName('@player')||'执灯者').slice(0,1),r*1.4,CV.FS.f1,true),cx,cy+1*CV.SCALE,{size:CV.FS.f1,bold:true,align:'center',color:CV.C.gold});
+      const tx=U.ix()+r*2+10*CV.SCALE;
+      CV.text(CV.fit(String(Core.charName('@player')||'执灯者'),U.iw()-r*2-70*CV.SCALE,CV.FS.f1,true),tx,top+8*CV.SCALE,{size:CV.FS.f1,bold:true});
+      CV.text('Lv.'+(p.level||0)+' · '+(p.bloodline||'未定命格'),tx,top+27*CV.SCALE,{size:CV.FS.sm,color:CV.C.dim});
+      CV.text('战力 '+fmt(Core.playerPower?Core.playerPower():0),U.ix()+U.iw(),top+8*CV.SCALE,{size:CV.FS.sm,color:CV.C.gold,align:'right'});
+      U.y=top+r*2+6*CV.SCALE;
+      U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'主角详情','ghost','open_protag'); U.y+=U.BTN_SM*CV.SCALE;
+    });
+    /* ② 当前旅程 */
     U.card(function(){
       U.hint('当前旅程');
       CV.text(w.name,U.ix(),U.y+2*CV.SCALE,{size:CV.FS.f2,bold:true}); U.y+=24*CV.SCALE;
       U.note(stage>=0?'第 '+(stage+1)+'/12 关 · '+String(w.mechanic).split('：')[0]:'普通难度 12/12 已完成',4*CV.SCALE);
       const bw=U.iw(),by=U.y+8*CV.SCALE; CV.round(U.ix(),by,bw,5*CV.SCALE,3*CV.SCALE,CV.a(CV.C.line,.8),null);
-      const p=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,p)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
+      const pp=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,pp)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
       U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,stage>=0?'继续探索':'查看新世界','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE;
     });
-    const clue=storyLine(w); if(clue){ U.card(function(){U.h3('刚刚发现','');U.note(clue,2*CV.SCALE);U.space(CV.SP[1]);U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'打开故事','ghost','ov_story');U.y+=U.BTN_SM*CV.SCALE;}); }
-    U.sectionTitle('今天'); const ds=dailySignals(); U.tiles((ds.length?ds:[['open_tasks','任务','','',false]]).map(x=>[x[0],x[1],'','',true]),3,'grid:ov_today');
+    /* ③ 挂机收益（2.0 那版丢了这块，底栏红点却照旧亮） */
+    let tk=null; try{ tk=Core.todayState&&Core.todayState(); }catch(e){}
+    if(tk){
+      const i=tk.idle||{}, mins=Math.floor((tk.idleSeconds||0)/60);
+      const parts=[]; if(i.points)parts.push('◉'+fmt(i.points)); if(i.otherworld)parts.push('◆'+fmt(i.otherworld));
+      if(i.exp)parts.push('EXP '+fmt(i.exp)); if(i.mat)parts.push('材料 '+fmt(i.mat));
+      U.card(function(){
+        U.h3('挂机收益', tk.idleReady?('已攒 '+mins+' 分钟'):'灯阁正在运转');
+        U.note(parts.length?parts.join(' · '):'还没有攒到可收的收益（满 1 分钟就能收）',2*CV.SCALE);
+        U.space(CV.SP[1]);
+        U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,
+          tk.claimable>0?('收取奖励（'+tk.claimable+' 项）'):'收取奖励',
+          tk.claimable>0?'primary':'ghost','claim_all',tk.claimable<=0);
+        U.y+=U.BTN_SM*CV.SCALE;
+      });
+    }
+    /* ④ 刚刚发现：**只在没读过时出现**（读完进卷宗，不再长期占首页） */
+    /* ⚠️ 判据要精确到"**打得出来**"：原稿是 `clueOf(post)||clueOf(in)` + 只看 `epilogueSeen`
+       —— 于是**全新档**首页就顶着一条"刚刚发现"（那其实是进图剧情的线索，玩家还没去过那儿），
+       正是父亲大人说的"看完剧情提示还长期挂着"的反面版本：还没发生就先挂着。
+       现在只在 **这个世界已经通关（`cleared`）但战后那一拍还没读过** 时出现：
+       打完守关 → 结算里给线索 → 首页提醒一次 → 读完（`epilogueSeen`）立刻消失，历史进卷宗。*/
+    const clue=storyLine(w);
+    const stW=(G.Story&&G.Story.stateOf)?G.Story.stateOf(w.id):{cleared:false,epilogueSeen:false};
+    if(clue&&stW.cleared&&!stW.epilogueSeen){ U.card(function(){U.h3('刚刚发现','');U.note(clue,2*CV.SCALE);U.space(CV.SP[1]);U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'打开故事','ghost','ov_story');U.y+=U.BTN_SM*CV.SCALE;}); }
+    /* ⑤ 今天：只列**真能领**的（`dailySignals` 现在只读 `todayState`，带解锁判定）。
+       一格都凑不出来时**不给红点**（`dot=false`）—— 空页面不该亮灯（§六）。 */
+    U.sectionTitle('今天'); const ds=dailySignals();
+    const todayTiles=(ds.length?ds:[['open_tasks','任务','','',false]]).map(x=>[x[0],x[1],'','',ds.length>0]);
+    U.tiles(todayTiles,3,'grid:ov_today');
+    /* ⑥ 快速整理：**只留没在别处重复的四个** ——
+       背包在底栏第二格、指南在「设置」里（父亲大人 §四 点名的两条重复入口）。 */
     U.sectionTitle('快速整理'); U.tiles([
-      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],['open_recruit','招募','',null,false],
-      ['open_bag','背包','',null,false],['open_settings','设置','',null,false],['open_guide','指南','',null,false]
+      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
+      ['open_recruit','招募','',null,false],['open_settings','设置','',null,false]
     ],3,'grid:ov_quick');
     U.hint('先推进残域，再用奖励补强；剧情会在关键节点自己发生。',CV.SP[1]);
   }

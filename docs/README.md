@@ -15,6 +15,7 @@
 | 轮次 | 文档 | 一句话 |
 |---|---|---|
 | **R1.9** 最终整合 | [docs/FINAL-CHANGELOG.md](FINAL-CHANGELOG.md) | **2.0(UX/经济/战斗反馈) × 2.1(36世界连续叙事) 熔成单版本 `2.1.0`**；逐项账目 + 没合并的东西与理由 |
+| **R2.0** 体验收口 | [docs/audit/R2.0-体验收口.md](audit/R2.0-体验收口.md) | 首页重排（补回主角卡与挂机收取、去掉重复入口、修假红点）；六类问题逐条带证据 |
 | R1.9 微信侧回溯 | [docs/audit/微信侧上线规范回溯核对.md](audit/微信侧上线规范回溯核对.md) | 云存档/命名/广告/发布/GM/隐私**逐条对当前代码**：一条没丢；唯一要人办的是 MP 后台隐私声明 |
 | R1.9 交接 | [docs/CODEX-HANDOFF-FINAL.md](CODEX-HANDOFF-FINAL.md) | 工程结构 / 三条纪律 / 怎么验 |
 | R1.9 测试 | [docs/FINAL-TEST-REPORT.md](FINAL-TEST-REPORT.md) | 27 PASS / 0 WARN / 0 FAIL + 数值实测对比 + 待真机项 |
