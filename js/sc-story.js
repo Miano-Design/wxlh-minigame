@@ -336,7 +336,24 @@
   };
   /* 当前这一拍 */
   function beat() { return cur ? cur.beats[cur.i] : null; }
-  function fullLen() { const b = beat(); return b ? String(b.s || '').length : 0; }
+  /* ================= 玩家署名的**唯一注入点** =================
+     A 批把"第八个名字"押在玩家自己起的名字上（世界页/碑庭/判决书都要出现它）。
+     规则（A 批 `characters.md` 写死的四条）：
+       · 文案里**不许写死任何一个名字** —— 一律写 `{名}` 令牌，由这里替换；
+       · 署名只有一个来源：`Core.charName('@player')`（正文里读第二份就是两处不同源）；
+       · 没起名 / 起名没过审 → 一律显示「未署名」（**不许让空串、undefined 上屏**）；
+       · 名字已经被内容安全闸管住了（`sc-namecheck` 那条路），这里不再自己判一遍。 */
+  function withName(s) {
+    const t = String(s == null ? '' : s);
+    if (t.indexOf('{名}') < 0) return t;
+    let nm = '';
+    try { nm = Core.charName && Core.charName('@player'); } catch (e) {}
+    nm = String(nm == null ? '' : nm).trim();
+    if (!nm || nm === '@player') nm = '未署名';
+    return t.split('{名}').join(nm);
+  }
+  Story.withName = withName;
+  function fullLen() { const b = beat(); return b ? withName(b.s).length : 0; }
   function revealed() { return cur ? Math.min(cur.reveal, fullLen()) : 0; }
   function done() { return !cur || revealed() >= fullLen(); }
   /* ================= 角色层：这一拍该画谁的剪影 =================
@@ -484,7 +501,7 @@
     const size = CV.FS.lg, lh = size * 1.75;
     if (!b) return { lines: [], size: size, lh: lh, blockH: 0 };
     const isD = b.k === 'd';
-    const lines = wrap(String(b.s || ''), boxW - (isD ? 8 * CV.SCALE : 0), size, false);
+    const lines = wrap(withName(b.s), boxW - (isD ? 8 * CV.SCALE : 0), size, false);
     const nameH = (isD && b.who) ? size * 1.6 : 0;
     return { lines: lines, size: size, lh: lh, nameH: nameH, blockH: nameH + lines.length * lh };
   };
@@ -550,7 +567,7 @@
     /* ⑤ 人物名 + 对话 / 旁白（底部 26% 安全区） */
     const boxW = CV.W - U.pad() * 2;
     const isD = b.k === 'd';
-    const txt = String(b.s || '').slice(0, revealed());
+    const txt = withName(b.s).slice(0, revealed());
     const size = CV.FS.lg;
     const lh = size * 1.75;
     /* ⚠️ 折行与行高走 `Story.measureBeat` **同一份**（尺子也读它）——
