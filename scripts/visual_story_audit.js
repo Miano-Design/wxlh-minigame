@@ -226,11 +226,17 @@ function pngInfo(buf) {
       { expected: '能 boot 出 Story.charScene / Story.itemScene', actual: '没拿到' });
   }
 
+  /* R1.6 叙事轮：残响从"只有一个触发点（第一次打到 Boss）"升级成**事件驱动**
+     （`BattleStory.trigger(event)`，见 `js/sc-story-battle.js`）——
+     这条尺子的**判据跟着实现走**，但要求一样：必须是战斗页**自己**触发 + 自己绘制，
+     不许出现"世界页上有个按钮能手动播残响"。 */
   t('⑭ 「残响」由战斗自动触发（不是世界页按钮）',
-    BATTLE_SRC.indexOf('maybeEcho(') >= 0 && BATTLE_SRC.indexOf('drawEcho') >= 0,
-    'sc-battle 里有触发 + 绘制',
-    (BATTLE_SRC.indexOf('maybeEcho(') >= 0 ? '触发✓' : '触发✗') + ' ' +
-      (BATTLE_SRC.indexOf('drawEcho') >= 0 ? '绘制✓' : '绘制✗'));
+    BATTLE_SRC.indexOf('echoTrigger(') >= 0 && BATTLE_SRC.indexOf('drawEcho') >= 0
+    && BATTLE_SRC.indexOf('BattleStory') >= 0,
+    'sc-battle 里有触发 + 绘制（触发＝BattleStory 事件）',
+    (BATTLE_SRC.indexOf('echoTrigger(') >= 0 ? '触发✓' : '触发✗') + ' ' +
+      (BATTLE_SRC.indexOf('drawEcho') >= 0 ? '绘制✓' : '绘制✗') + ' ' +
+      (BATTLE_SRC.indexOf('BattleStory') >= 0 ? '事件层✓' : '事件层✗'));
 
   /* ⑮ 「pre」自动触发 —— **行为验证**（在真代码里派发一次 Boss 关，看它是不是自己开剧情、
         播完是不是接着开打）。比"字符串在不在"强一层：走的是 sc-dungeon 那个真处理器。 */

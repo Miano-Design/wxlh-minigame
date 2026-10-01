@@ -362,6 +362,10 @@
     return false;
   }
   Story.bossReady = function (id) { const r = BOSS_IMG[id]; return !!(r && r.ok); };
+  /* R1.6 叙事轮：战斗页的「Boss 出场序列」要拿同一张立绘（`sc-story-battle.js`）。
+     只加一个**只读取图口**，剧情页那套懒加载/回落一个字没动。拿不到就返回 null（绝不画空框）。 */
+  Story.bossImage = function (id) { const r = BOSS_IMG[id]; return (r && r.ok) ? r.img : null; };
+  Story.ensureBoss = function (id) { try { return ensureBoss(id); } catch (e) { return false; } };
   /* 主视觉（首页大面积背景）：同一套懒加载 */
   let KV_IMG = null;
   Story.ensureKV = function () {

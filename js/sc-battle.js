@@ -124,6 +124,7 @@
     const onBattlePage = CV.stack.length === 1 && CV.stack[0] && CV.stack[0].name === 'battle';
     if (!onBattlePage || !B.back) B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
     B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
+    B._bsBossHit = 0;                       // R1.6：残响的 first_hit 每场只算一次
     /* 2026-10-02（父亲大人：「现在副本战斗的背景也没改啊」）：
        战斗页是**整屏接管**（chromeless），之前我一刀把它排除在铺底之外了 ——
        于是别处是一张画、进战斗就变回纯黑。
@@ -145,6 +146,27 @@
        · 斗法台 / 深井：没给账本 → 就记在 cfg 自己身上（一次挑战＝一场）。
      ⚠️ 账本只由 `battleRevive()` 写、只由这里读，**`start()` 不再复位它**。 */
     B.revived = !!(cfg && (cfg.reviveState || cfg).revived);
+    /* ================= R1.6 叙事轮（2026-10-02）· 战斗属于当前事件 =================
+       父亲大人：「一进战斗，场景 / Boss / 剧情全部消失，只剩 HP 和按钮，于是玩家感觉剧情结束了」。
+       两件事在这一行接上：
+         · `BattleStory.begin()` —— 把"这一场打的是哪个世界"报给叙事层，
+           之后每条残响都由**战斗里真实发生的事**触发（见 applyFrame 里那几处 trigger）；
+         · `B.entrance` —— **Boss 出场序列**（2.4 秒：场景 → Boss → 台词 → 机制 → 开打）。
+           §二十：只放一次（`BattleStory` 用 BATTLE_SEEN 闸门管），重刷直接开打。 */
+    B.entrance = null;
+    if (G.BattleStory) {
+      const isBossFight = !!(cfg.enemies || []).some(function (e) { return e && e.isBoss; });
+      G.BattleStory.begin({ worldId: cfg.worldId, isBoss: isBossFight });
+      const ent = isBossFight ? G.BattleStory.entranceOf(cfg.worldId) : null;
+      if (ent) {
+        ent.until = Date.now() + (ent.ms || 2400);
+        B.entrance = ent;
+        /* 立绘**先请求再演**：这 2.4 秒里图能到就画出来，到不了就只演文字（绝不空框、绝不阻塞） */
+        if (G.Story && G.Story.ensureBoss) G.Story.ensureBoss(cfg.worldId);
+        if (G.BattleStory.markBattleSeen) G.BattleStory.markBattleSeen(cfg.worldId);
+        ensureFx();                       // 借动效帧循环走这 2.4 秒
+      }
+    }
     CV.reset('battle', { title: B.title });
   }
 
@@ -241,6 +263,15 @@
 
   function step() {
     if (!B.on) return;
+    /* R1.6 叙事轮：**Boss 出场序列没走完，战斗不推进** ——
+       「玩家先看见它出现、听见它说什么，然后才开打」。2.4 秒到点自动放行，
+       期间不登记热区、不挡顶栏（撤离照样点得动）。 */
+    if (B.entrance && Date.now() < (B.entrance.until || 0)) {
+      if (B.timer) clearTimeout(B.timer);
+      B.timer = setTimeout(step, 80);
+      return;
+    }
+    if (B.entrance) B.entrance = null;
     /* B9：广告窗口到期要**自动回落**（`effSpeed` 是唯一口径）—— 每帧问一次最省事，
        也顺手把"免费档"的选择变化吃进来（不会出现"一场里两个档"的鬼状态）。 */
     if (Core.effSpeed) { const s = Core.effSpeed(); if (s !== B.speed) { B.speed = s; CV.battleSpeed = s; } }
@@ -322,6 +353,7 @@
       /* 残响也得算"还有活着的动效" —— 不然它刚淡到一半，帧循环就因为"没动效了"停下，
          那一行会**僵在屏幕上不消失**（这是这类"借别人的循环"最容易漏的一条腿）。 */
       || !!B.echo
+      || !!B.entrance                       // R1.6：Boss 出场那 2.4 秒也得有帧（否则它僵住不淡出）
       || (B.shakeUntil || 0) > now;
   }
   /* 动效帧画哪儿：能局部就局部，不能就退回整页（**绝不半块半块地画**）：
@@ -383,27 +415,41 @@
      两次保证：① 一进来先 `markSeen`（同一帧被调两次也不会播两遍）；
                ② 借战斗自己那条帧循环淡出（**不新起定时器**，离场即停，不会留着烧电）。
      不产生任何副作用：不改 B.res、不发奖、不动回合、不登记热区（**点不到，也挡不住操作**）。 */
-  const ECHO_MS = 1800;
-  function maybeEcho(uid) {
+  const ECHO_MS = (G.BattleStory && G.BattleStory.ECHO_MS) || 1800;
+  /* ================= R1.6 叙事轮 · 残响改由**战斗事件**驱动（§八） =================
+     以前只有一个触发点（第一次打到 Boss），文本也固定取 `mid` 的第一拍。
+     现在：`G.BattleStory` 是**唯一**的"事件 → 残响"映射表（世界 → 事件 → 一句），
+     战斗页只负责在**真实事件**发生时按名字喊一嗓子（`echoTrigger`），
+     然后从队列里取一条来播（`echoPull`）。顺序、文本、去重都在那一份表里，这里不判断。
+     ⚠️ 行为上一点没变坏：没有 `BattleStory`（旧版本 / 尺子单独加载）时，这一块**整段跳过**，
+        战斗照打，只是不播残响。 */
+  function echoPull() {
     if (B.echo) return;
-    const u = B.units[uid];
-    if (!u || !u.isBoss) return;
-    const wid = (B.cfg && B.cfg.worldId) || '';
+    const BS = G.BattleStory;
+    if (!BS) return;
+    const nxt = BS.take();
+    if (!nxt || !nxt.text) return;
+    const wid = BS.worldOf();
     const St = G.Story;
-    if (!wid || !St || !St.hasStory || !St.hasStory(wid)) return;
-    if (St.seen(wid, 'mid') || !St.part(wid, 'mid')) return;
-    const line = St.midLine ? St.midLine(wid) : '';
-    if (!line) return;
-    St.markSeen(wid, 'mid');
-    B.echo = { text: line, at: Date.now() };
+    /* 老口径留着：残响播过就把这一拍的 `mid` 记成已读（剧情页/卷宗那边的状态别分叉） */
+    if (wid && St && St.markSeen && St.seen && !St.seen(wid, 'mid')) St.markSeen(wid, 'mid');
+    B.echo = { text: nxt.text, at: Date.now(), ev: nxt.ev };
     ensureFx();
+  }
+  /* 战斗里发生了一件事 → 问叙事层要不要说话（要不要、说不说都归它管） */
+  function echoTrigger(ev) {
+    const BS = G.BattleStory;
+    if (!BS) return;
+    try { BS.trigger(ev); } catch (e) {}
+    echoPull();
   }
   /* 残响那一行：画在**战场上沿居中**（不盖阵容、不盖日志、不登记热区）。
      淡入 0.25s → 停留 → 淡出，整段 1.8s。 */
   function drawEcho() {
     if (!B.echo) return;
     const el = Date.now() - B.echo.at;
-    if (el > ECHO_MS) { B.echo = null; return; }
+    /* 这一条淡完 → 从叙事层的队列里接着取下一条（多条残响按"发生顺序"排队播，不叠加） */
+    if (el > ECHO_MS) { B.echo = null; echoPull(); return; }
     const k = Math.max(0, Math.min(1, el < 250 ? el / 250 : (ECHO_MS - el) / 450));
     const c = CV.ctx;
     const bw = Math.min(CV.W - U.pad() * 2, 340 * CV.SCALE);
@@ -446,8 +492,18 @@
       case 'damage': {
         const u = B.units[f.target];
         hitFx(f.target); atkFx(f.source || f.actor);      // 受击闪红 + 出手前冲
-        /* 残响（mid）的触发点就在这一行后面 —— 详见下面 `maybeEcho` 那段注释 */
-        maybeEcho(f.target);
+        /* ================= R1.6：残响的触发点全部落在**真实战斗事件**上（§七 / §八） =================
+           兵分两路：**打 Boss**（first_hit / 三条血量阈值）与 **我方挨打**（player_low_hp）。
+           每次都是"先问叙事层要不要说话"，不说话就什么都不发生 —— 不新起定时器、不挡操作。 */
+        if (u && u.isBoss) {
+          if (!B._bsBossHit) { B._bsBossHit = 1; echoTrigger('first_hit'); }
+          const ratio = u.maxHp ? Math.max(0, (u.hp - f.dmg) / u.maxHp) : 1;
+          if (ratio <= 0.75) echoTrigger('boss_hp75');
+          if (ratio <= 0.50) echoTrigger('boss_hp50');
+          if (ratio <= 0.25) echoTrigger('boss_hp25');
+        } else if (u && u.maxHp && (u.hp - f.dmg) / u.maxHp <= 0.30) {
+          echoTrigger('player_low_hp');       // 我方某个人快站不住了（含主角）
+        }
         /* V9.6.68（资料 §8/§9）：轻击一点点震、暴击明显一点 + 一下 hitstop（见 step）；
            平时不震，免得整场都在抖（原文："如果普通攻击都在震屏，玩家很快就烦"。） */
         B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
@@ -493,17 +549,26 @@
       /* 护盾 / 闪避：各自一声音色（续单要求"被闪避给一个弱的空音；护盾这类特殊事件各自有音"）。
          `heal`（回血 / 吸血）**故意不出声** —— 吸血几乎每次都触发，再叠一声就是糊；
          这是本岗的判断，不是漏（要加一句话就行）。 */
-      case 'shield': floater(f.target, '🛡+' + f.amount, CV.C.green); snd('shield'); break;
+      case 'shield': floater(f.target, '🛡+' + f.amount, CV.C.green); snd('shield');
+        if (B.units[f.target] && B.units[f.target].isBoss) echoTrigger('boss_buff');   // Boss 开盾＝叙事节点
+        break;
       case 'dodge': floater(f.target, '闪避', CV.C.dim); snd('dodge'); break;
       case 'skip': pushLog('😵 ' + nameOf(f.actor) + ' 无法行动'); break;
       case 'buff': floater(f.target, '↑ ' + f.name, CV.C.green); break;
-      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', CV.C.debuff, 1500); break;
+      case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', CV.C.debuff, 1500);
+        /* 状态落在谁身上，就是谁在被改变 —— Boss 中状态＝玩家破解了机制（player_break），
+           我方中状态＝Boss 在压制我们（boss_debuff）。两条都在 §八 的事件表里。 */
+        if (B.units[f.target] && B.units[f.target].isBoss) echoTrigger('player_break');
+        else echoTrigger('boss_debuff');
+        break;
       /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
          等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
-      case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text); break;
-      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻️ 复活', CV.C.green, 1500); snd('revive'); pushLog('♻️ ' + f.text); break; }
-      case 'summon': pushLog('🕯 ' + f.text); break;
-      case 'rule': pushLog('👁 ' + f.text); break;
+      case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text);
+        echoTrigger(f.phase === 70 ? 'boss_phase_2' : 'boss_phase_3'); break;
+      case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻️ 复活', CV.C.green, 1500); snd('revive'); pushLog('♻️ ' + f.text);
+        echoTrigger('player_revive'); break; }
+      case 'summon': pushLog('🕯 ' + f.text); echoTrigger('boss_skill'); break;
+      case 'rule': pushLog('👁 ' + f.text); echoTrigger('world_rule'); break;   // 世界机制改写＝"世界在说话"
       case 'nearDeath': floater(f.target, '⚠ 濒死', CV.C.gold); break;
       default: break;
     }
@@ -919,7 +984,13 @@
        从 24px 长到 36px 的本钱。表头中线 ≈ 卡顶 ＋ padY(SP2) ＋ 半个按钮高。 */
     if (compact) battleCornerButtons(FIELD_BOTTOM + CORNER_PAD + 6 * CV.SCALE + U.BTN_SM * CV.SCALE);
     /* 结算：交给 CV.pageOverlay 画（整屏覆盖层，不在内容层里 —— 这样才是真居中、命中区也对） */
-    CV.pageOverlay = B.panel ? function () { drawSettle(res, B.panel); } : null;
+    /* R1.6 叙事轮：Boss 出场序列**叠在战场之上**（战场照样已经画好，出场淡出后直接就是战斗）——
+       两件事共用一个 overlay 槽：先出场、后结算，永不同时。 */
+    const settleOv = B.panel ? function () { drawSettle(res, B.panel); } : null;
+    CV.pageOverlay = (B.entrance || settleOv) ? function () {
+      if (B.entrance) drawEntrance();
+      if (settleOv) settleOv();
+    } : null;
     /* 波次卡已经在 drawBattle 开头接管了整屏（含这一行字），这里不再重复画 */
 
   }
@@ -988,6 +1059,62 @@
     });
     return L.height;
   }
+  /* ================= R1.6 叙事轮 · Boss 出场序列（§三 / §四） =================
+     父亲大人要的因果链：**场景 → Boss 出现 → 动作 → 台词 → 开打**，控制在 2~5 秒。
+     这里画的是"已经在战场上"的那一层：战场（场景图 + 敌我阵型）就在下面，
+     出场层只做三件事 —— 压暗、把 Boss 立绘推上台、给三行字（Boss 台词 / 它为什么挡在这里 / 本世界机制）。
+     §五 的要求照办：**不铺大文字框**，只在底部淡入；不遮住 Boss 的画面。
+     §七 的要求照办：不登记热区、不改战斗结果、到点自己走。 */
+  function drawEntrance() {
+    const e = B.entrance;
+    if (!e) return;
+    const ms = e.ms || 2400;
+    const el = Date.now() - (e.until - ms);
+    if (el > ms + 400) { B.entrance = null; return; }
+    const k = Math.max(0, Math.min(1, el < 260 ? el / 260 : (ms - el) / 420));
+    const c = CV.ctx;
+    if (typeof c.globalAlpha === 'number') c.globalAlpha = k;
+    /* ① 压暗（场景与阵型看得见，但退到后面去） */
+    c.fillStyle = CV.a(CV.C.shade, .62);
+    c.fillRect(0, 0, CV.W, CV.H);
+    /* ② Boss 立绘：能拿到正式图就画（右 1/3、contain 不裁头），拿不到就不画 —— 绝不画空框 */
+    const img = (G.Story && G.Story.bossImage) ? G.Story.bossImage(e.worldId) : null;
+    const top = CV.TOP + 8, bottom = CV.H - CV.safeBottom;
+    if (img) {
+      const iw = img.width || 1080, ih = img.height || 1920;
+      let dh = (bottom - top) * 0.72, dw = dh * (iw / ih);
+      const maxW = CV.W * 0.92;
+      if (dw > maxW) { dw = maxW; dh = dw * (ih / iw); }
+      c.save();
+      c.drawImage(img, CV.W - dw - 6 * CV.SCALE, top + 10 * CV.SCALE, dw, dh);
+      c.restore();
+    }
+    /* ③ 三行字：Boss 名（最大）→ 台词 → 它为什么挡在这里 */
+    const pad = U.pad();
+    let y = bottom - 116 * CV.SCALE;
+    if (e.name) {
+      CV.text(CV.fit(e.name, CV.W - pad * 2, CV.FS.d3, true), pad, y, { size: CV.FS.d3, bold: true, color: CV.C.gold });
+      y += 30 * CV.SCALE;
+    }
+    if (e.say) {
+      const ls = CV.wrap(e.say, CV.W - pad * 2, CV.FS.lg, 2);
+      ls.forEach(function (ln) { CV.text(ln, pad, y, { size: CV.FS.lg, color: CV.C.text }); y += CV.FS.lg * 1.5; });
+    }
+    if (e.inner) {
+      y += 2 * CV.SCALE;
+      const ls = CV.wrap(e.inner, CV.W - pad * 2, CV.FS.sm, 2);
+      ls.forEach(function (ln) { CV.text(ln, pad, y, { size: CV.FS.sm, color: CV.C.dim }); y += CV.FS.sm * 1.55; });
+    }
+    /* ④ 世界机制那一行**走系统层**（§二十四：系统提示与角色台词彻底分开）：
+         放在最上面、带方括号、颜色与台词不同。玩家第一眼看机制，再看人说话。 */
+    if (e.mech) CV.text(CV.fit(e.mech, CV.W - pad * 2, CV.FS.sm), pad, top + 16 * CV.SCALE, { size: CV.FS.sm, color: CV.C.text2 });
+    /* ⑤ 进度细线：让"这是 2 秒的过场、不是卡住"这件事一眼可见 */
+    const pw = CV.W - pad * 2, ph = 2 * CV.SCALE;
+    CV.round(pad, bottom - 8 * CV.SCALE, pw, ph, ph, CV.a(CV.C.line, .4), null);
+    CV.round(pad, bottom - 8 * CV.SCALE, pw * Math.max(0, Math.min(1, el / ms)), ph, ph, CV.C.gold, null);
+    if (typeof c.globalAlpha === 'number') c.globalAlpha = 1;
+  }
+
   function drawSettle(res, p) {
     const c = CV.ctx;
     c.fillStyle = CV.a(CV.C.shade, .85);   // 2026-10-02 父亲大人：结算层压暗 = 85
@@ -1007,6 +1134,7 @@
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
     /* 剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
     if (p.lore) total += 44 * CV.SCALE;
+    if (p.changed) total += 40 * CV.SCALE;    // R1.6：「战场变化」那一行（只在 Boss 首通出现）
     if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
@@ -1046,6 +1174,21 @@
          · 正文是**那句话本身**（由调用方从战后那一拍的关键物件里取，见 `Story.clueOf`）；
          · 右侧一颗「查看」—— 想看全段才点它（不点也不影响任何流程）。
        位置仍夹在奖励胶囊与动作按钮之间：不抢按钮、不加奖励、不改流程。 */
+    /* ================= R1.6 叙事轮 · 「战场变化」 =================
+       §十四 要求的顺序：Boss 死亡 → **环境变化** → 线索 → 奖励 → 下一步。
+       奖励胶囊在上面已经列完，所以这一层读起来是：
+         （奖励）→ **战场变化：你改变了什么** → 发现：一条线索 → 下一步按钮。
+       文本取自 `BOSS[wid].after`（例："整条轨道重新亮起"），**只在守关 Boss 首通**给一次
+       （§二十：重刷不再演出）。不给按钮、不改流程。 */
+    if (p.changed) {
+      const cw2 = U.iw();
+      CV.text('战场变化', cx - cw2 / 2 + 10 * CV.SCALE, y, { size: CV.FS.sm, color: CV.C.gold });
+      const ls = CV.wrap(p.changed, cw2 - 20 * CV.SCALE, CV.FS.md, 2);
+      ls.forEach(function (ln, i) {
+        CV.text(ln, cx - cw2 / 2 + 10 * CV.SCALE, y + 16 * CV.SCALE + i * CV.FS.md * 1.5, { size: CV.FS.md, color: CV.C.text2 });
+      });
+      y += 40 * CV.SCALE;
+    }
     if (p.lore) {
       const lw = Math.min(320 * CV.SCALE, U.iw());
       const lh = 34 * CV.SCALE;
@@ -1343,6 +1486,9 @@
     /* V9.6.89（父亲大人报的"网页版斗法台能连点跳层"）：小游戏这边同一套结构，
        也补上防重入 —— 连点两下挑战只会开一场，而不是两场各自结算。 */
     busy: function () { return !!B.busy; },
+    /* R1.6 叙事轮：出场序列还在走吗（`BattleStory.entranceActive` 读它；
+       战斗页每帧 `step()` 也读它来"先演完再打"）。 */
+    entranceActive: function () { return !!(B.entrance && Date.now() < (B.entrance.until || 0)); },
     /* 打一场：cfg = { title, allies, enemies, worldId, maxRounds, onEnd(win,res,hpLeft), onQuit, onClose } */
     run(cfg) { if (this.busy()) { CV.toast('战斗进行中…'); return false; } start(cfg); fight(G.Battle.run({ allies: cfg.allies, enemies: cfg.enemies, worldId: cfg.worldId, maxRounds: cfg.maxRounds, allyHitMod: (G.Battle.MECHANICS[cfg.worldId] || {}).allyHitMod || 0 })); },
     fight,

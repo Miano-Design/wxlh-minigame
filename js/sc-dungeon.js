@@ -609,7 +609,18 @@
       if (unread) { lore = G.Story.clueOf(wid, 'post'); loreId = 'story_world_post:' + wid; }
       else { lore = '这一段已经看过了'; loreId = 'story_world_post:' + wid; }
     }
-    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''), rewards, acts, worldId: wid, lore: lore, loreId: loreId };
+    /* ================= R1.6 叙事轮（§十三 / §二十八）· **你改变了什么** =================
+       父亲大人：「战斗结束后不要只告诉玩家"你赢了"，要告诉他**你改变了什么**」。
+       只在**守关 Boss 首通**那一次给（`firstClear` 已经是"这一关第一次通关"的唯一判据，
+       不新造条件）：一句战场变化（`BOSS[wid].after`）+ 已有的那条线索。
+       为什么只给首通：§二十 明写"第二次快速进入战斗"——重刷不该再看一遍演出。 */
+    let changed = null;
+    if (firstClear && stage === 12 && G.BattleStory && G.BattleStory.changeOf) {
+      const ch = G.BattleStory.changeOf(wid);
+      if (ch && ch.after) changed = ch.after;
+    }
+    return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''),
+      rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed };
   }
 
   function fightWave() {
