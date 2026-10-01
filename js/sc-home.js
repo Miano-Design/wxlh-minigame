@@ -1065,11 +1065,8 @@
        第一版压到 .58~.82，底图被压得几乎看不见，卡片再透也没东西可透。
        现在收到 .34~.56：世界清清楚楚地在那儿，卡片是浮在它上面的半透明面板。
        文字照样读得清 —— 卡片本身还有 70% 的深色底（两层加起来才是不透明的那部分）。 */
-    const g = c.createLinearGradient(0, 0, 0, CV.H);
-    g.addColorStop(0, CV.a(CV.C.bg, .48));
-    g.addColorStop(0.45, CV.a(CV.C.bg, .60));
-    g.addColorStop(1, CV.a(CV.C.bg, .70));
-    c.fillStyle = g; c.fillRect(0, 0, CV.W, CV.H);
+    /* 2026-10-02（父亲大人）：底图压暗**统一 75** —— 不分段、不打折，一层平色压到底。 */
+    c.fillStyle = CV.a(CV.C.bg, .75); c.fillRect(0, 0, CV.W, CV.H);
   };
   CV.veils.home = CV.defaultVeil;      // 首页就是这张（同一处算式，不许各写一份）
 

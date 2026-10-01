@@ -134,7 +134,7 @@
       const on = shopTab === k;
       /* 选中态底：原来是写死的深红 #3a1620，改成"危险红 16% 透明度"——
          与背包页同一套选中态写法（V1.1.1 存量收敛）。 */
-      CV.round(x, U.y, w, pillH, pillH / 2, on ? CV.a(CV.C.danger, .16) : CV.a(CV.C.panel, .55), on ? CV.C.accent : CV.C.line);
+      CV.round(x, U.y, w, pillH, pillH / 2, on ? CV.a(CV.C.danger, .16) : CV.a(CV.C.panel, .50), on ? CV.C.accent : CV.C.line);
       CV.text(label, x + w / 2, U.y + pillH / 2, { size: CV.FS.md, align: 'center', color: on ? CV.C.text : CV.C.dim });
       CV.hit('shoptab:' + k, x, U.y, w, pillH);
       x += w + gap;
@@ -260,7 +260,7 @@
     /* − / 数字 / + */
     const ty2 = ty0 + titleH + gap, cw = (iw - gap * 2) / 3;
     U.btn(ix, ty2, cw, cellH, '−', 'ghost', 'buyminus', buyQty <= 1);
-    CV.card(ix + cw + gap, ty2, cw, cellH, { fill: CV.a(CV.C.panel2, .55) });
+    CV.card(ix + cw + gap, ty2, cw, cellH, { fill: CV.a(CV.C.panel2, .50) });
     CV.text(String(buyQty), ix + cw + gap + cw / 2, ty2 + cellH / 2,
       { size: CV.FS.f2, bold: true, align: 'center', color: CV.C.gold });
     CV.hit('buynum', ix + cw + gap, ty2, cw, cellH);              // 点数字 → 手动输入

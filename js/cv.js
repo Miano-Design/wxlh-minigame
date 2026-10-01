@@ -714,7 +714,7 @@
     const spec = D.avatarSpec(id, info);
     const r = size / 2, ink = CV.a(spec.tint, .55);
     c.save();
-    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = CV.a(CV.C.panel3, .55); c.fill();
+    c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = CV.a(CV.C.panel3, .50); c.fill();
     c.lineWidth = 2; c.strokeStyle = ring || CV.C.line2; c.stroke();
     c.beginPath(); c.arc(cx, cy, r - 1, 0, Math.PI * 2); c.clip();       // 剪影不许出圆盘
     D.avatarParts(id, info).forEach(function (p) {
@@ -927,7 +927,7 @@
        等于白改。现在收到 **70%**，并且把整页底图的压暗一起调轻（见 sc-home 的 veils.home）：
        "透过卡片看得见世界"要**两层一起让**才成立，只改卡片那一层是看不出来的。 */
     CV.round(x, y, w, h, opt.radius === undefined ? CV.RADIUS : opt.radius,
-      opt.fill || CV.a(CV.C.panel, .70), opt.line === null ? null : (opt.line || CV.a(CV.C.line, .9)));
+      opt.fill || CV.a(CV.C.panel, .50), opt.line === null ? null : (opt.line || CV.a(CV.C.line, .9)));
     /* V9.6.10：网页版 .card 有一条 `inset 0 1px 0 #ffffff08` 的顶部高光 ——
        卡片"有厚度、不糊"的关键就是它；小游戏原来没画，所以整块看着是平的、笨的。 */
     if (opt.line !== null) {
@@ -951,7 +951,7 @@
     const myth = (rar === 'MYTH');
     const bh = bandH === undefined ? Math.max(14 * CV.SCALE, Math.round(Math.min(w, h) * 0.24)) : bandH;
     const by = y + h - bh, br = Math.min(r, bh / 2, w / 2);
-    CV.round(x, y, w, h, r, CV.a(CV.C.panel2, .55), col);                                  /* 画面 + 档色环 */
+    CV.round(x, y, w, h, r, CV.a(CV.C.panel2, .50), col);                                  /* 画面 + 档色环 */
     if (myth) CV.round(x + 3, y + 3, w - 6, h - 6, Math.max(0, r - 3), null, CV.C.gold);
     const c = CV.ctx;                                                           /* 铭牌：上缘切平 */
     c.beginPath();
@@ -1262,7 +1262,7 @@
      键换成栈深之后，每一层各记各的，"返回恢复"才真的对得上"离开时那一层"。 */
   CV.scrollMemo = {};
   CV.reset = function (name, opts) {
-    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
+    CV.stack = [{ name, opts: opts || {} }]; CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.stickyH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
     CV.scrollMemo = {};                      // 换标签＝从头看：整条栈的记忆一起清掉（键是栈深，清空才算干净）
     /* ================= F6 #2（抢修单 0928 · 底栏四格各记各的现场，原来**是死代码**）=================
      父亲大人 09-27 深夜（底栏切回来不丢位置）：「点下面的导航按钮又得重新进去界面重新找」。
@@ -1323,7 +1323,7 @@
       CV.stack = m.stack.map(function (lvl) { return { name: lvl.name, opts: lvl.opts || {} }; });
       CV.scrollMemo = Object.assign({}, m.scrollMemo);
       CV.scroll = m.scroll || 0;             // 超出新内容高的部分由 render 里那一夹收回来
-      CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
+      CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.grabCfg = null; CV.dropGrab();
       CV.render();
       return;
     }
@@ -1352,13 +1352,13 @@
        被不同内容复用时会跳到很远的地方（伙伴详情那一类：一进去就在最底下）。
        现在 push 一律归零；"恢复"只发生在 pop（退回上一页）那一条路。 */
     CV.scroll = 0;
-    CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   CV.pop = function () {
     CV.scrollMemo[CV.stack.length - 1] = CV.scroll || 0;     // 离开这一层：记住它看到哪（键＝栈深）
     if (CV.stack.length > 1) CV.stack.pop();
     CV.scroll = CV.scrollMemo[CV.stack.length - 1] || 0;     // 回到上一层：**恢复它原来看到的位置**
-    CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null; CV.dropGrab(); CV.render();
+    CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null; CV.dropGrab(); CV.render();
   };
   /* V9.6.102（"新手指引和任务引导又走错乱了"）：从首页**直接跳**到某个子页 ——
      中间**不渲染首页**。goQuest 原来是 `CV.reset('home'); CV.push(dest)`，
@@ -1369,7 +1369,7 @@
     CV.stack = [{ name: 'home', opts: {} }, { name: name, opts: opts || {} }];
     CV.scrollMemo = {};                      // 直接跳页＝新的一条路：按 A7① 归零，别带旧记忆
     CV.tabMemo = {};                         // 同上：这是一条全新的路，四格的旧现场一并作废
-    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.pageHead = null;
+    CV.scroll = 0; CV.pageOverlay = null; CV.sticky = null; CV.stickyH = 0; CV.pageHead = null;
     CV.render();
   };
   CV.top = function () { return CV.stack[CV.stack.length - 1] || { name: 'home', opts: {} }; };
@@ -1461,7 +1461,7 @@
        页面同色渐变铺底，把整屏底图盖死了 —— 二级页的吸顶头在实机上就是一块实色板。
        现在给同一道渐变**加透明度**（.74/.80）：底图透得出来，滚上来的内容照样被挡住。 */
     const bgGrad = c.createLinearGradient(0, 0, 0, CV.H);
-    bgGrad.addColorStop(0, CV.a(CV.C.bg2, .74)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .80));
+    bgGrad.addColorStop(0, CV.a(CV.C.bg2, .50)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .50));
     c.fillStyle = bgGrad;
     c.fillRect(0, 0, CV.W, CV.H);
     /* 页面底图（V1.1.3）：有些页要一张**整屏的底**（现在只有"选命格"＝主视觉的背影）。
@@ -1485,7 +1485,14 @@
        也要把"裁剪 + 位移"还回去 —— 否则这一帧脏掉的坐标系会留在共享 ctx 上，
        下一帧从脏坐标起画，越点越偏、底栏整条跑出画面（V9.6.90）。 */
     try {
-      c.beginPath(); c.rect(0, CV.TOP + 8, CV.W, CV.H - CV.TOP - CV.NAV_H - CV.safeBottom - 8); c.clip();
+      /* 2026-10-02（父亲大人：「背包这些格子**只能在红框内显示**，不然滑上去会影响上面标签的阅读」）：
+         吸顶条现在是**半透明**的（他要的），于是滚上来的格子会从它后面透出来，把标签压花。
+         正确解法不是把条改回实色，而是**把内容裁在吸顶条下沿以下** ——
+         页面用 `CV.stickyH` 报出那条吸顶条的高度（屏幕坐标），这里把内容层的上沿让出去。
+         `CV.stickyH` 是跨帧状态：进页那一帧还没有值（那时 scroll=0、内容本来就在条下面），
+         下一页帧起就生效；`CV.reset/push/pop` 会把它清零，别的页面不受影响。 */
+      const clipTop = CV.TOP + 8 + (CV.stickyH || 0);
+      c.beginPath(); c.rect(0, clipTop, CV.W, CV.H - clipTop - CV.NAV_H - CV.safeBottom - 8); c.clip();
       c.translate(0, CV.TOP + 8 - (CV.scroll || 0));
       CV.y = 0;
       /* 父亲大人 09-27 深夜：吸顶顶栏**每一帧由当前这一页自己登记** ——
@@ -1605,7 +1612,7 @@
     /* 2026-10-02（§十一 场景驱动 UI）：顶栏压暗层从 .94 收到 .88 ——
        首页那种"整屏底图"的页面上，让主视觉在最上面一栏也**隐约透一点点**，
        整页才是一张画；数字与图标依旧压得住（它们本身是不透明的）。 */
-    c.fillStyle = CV.a(CV.C.bg, .62);
+    c.fillStyle = CV.a(CV.C.bg, .50);
     c.fillRect(0, 0, CV.W, h);
     c.strokeStyle = CV.C.line; c.lineWidth = 1;
     c.beginPath(); c.moveTo(0, h - .5); c.lineTo(CV.W, h - .5); c.stroke();
@@ -1656,7 +1663,7 @@
       const ww = CHIP_W;
       /* 2026-10-02（§三十：顶栏别像"开发调试 HUD"）：胶囊改**半透明底 + 细边**，
          四个货币之间本来就等宽 + gap，看着是"灯阁的资源状态栏"而不是四块实心方块。 */
-      CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.a(CV.C.panel, .78),
+      CV.round(x, cy, ww, CHIP_H, CV.RADIUS_SM, CV.a(CV.C.panel, .50),
         dashed ? CV.a(CV.C.line2, .9) : CV.a(CV.C.line, .85));
       const pad = 8 * CV.SCALE;                           // .cur-chip padding 左右 0.5rem
       /* 2026-10-01（§八.1）：货币图标**不再跟正文一个等级** —— 图标 22px、数字 12~13px，
@@ -1751,7 +1758,7 @@
     const c = CV.ctx;
     const h = CV.NAV_H + CV.safeBottom;
     const y = CV.H - h;
-    c.fillStyle = CV.a(CV.C.bg2, .62);   // 2026-10-02 父亲大人：底栏半透明（.62：底图透得出来）
+    c.fillStyle = CV.a(CV.C.bg2, .50);   // 2026-10-02 父亲大人：顶栏/底栏填充统一 50
     c.fillRect(0, y, CV.W, h);
     const tabW = CV.W / CV.NAV_TABS.length;
     CV.NAV_TABS.forEach((t, i) => {

@@ -73,7 +73,7 @@
       ws.forEach(function (w) {
         const t = list[idx++];
         const on = cur === t[0];
-        CV.round(x, y, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.a(CV.C.panel, .55), on ? CV.C.accent : CV.C.line);
+        CV.round(x, y, w, h, CV.PILL,  on ? CV.a(CV.C.danger, .13) : CV.a(CV.C.panel, .50), on ? CV.C.accent : CV.C.line);
         CV.text(t[1], x + w / 2, y + h / 2, { size: CV.FS.xs, align: 'center', color: on ? CV.C.white : CV.C.dim });
         CV.hit(prefix + t[0], x, y, w, h);
         x += w + gap;
@@ -194,7 +194,7 @@
     /* 和网页版 .batch-bar 一样带一层上投影（原来贴死的平色块，看着很"重"） */
     CV.ctx.save();
     CV.ctx.shadowColor = CV.a(CV.C.shade, .45); CV.ctx.shadowBlur = 20 * CV.SCALE; CV.ctx.shadowOffsetY = -4 * CV.SCALE;
-    CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  CV.a(CV.C.panel, .97), CV.C.line);
+    CV.round(pad, y, CV.W - pad * 2, h, CV.RADIUS,  CV.a(CV.C.panel, .50), CV.C.line);
     CV.ctx.restore();
     /* 快选各档：按钮用现成的 ghost 形，字用**现成的稀有度色**（不另造一套颜色）。
        「已选 N 件 · 预计 ◆ X」那一句在顶部吸顶条（eqBarRow）上，这里不重复。 */
@@ -254,7 +254,20 @@
   /* V9.6.121（父亲大人："背包装备里第一排标签跟顶部的三个标签太贴了，下来一点"）：
      标签下面的留白 10 → **16**（上面保持 10）—— 主标签下面还有一条金色下划线，
      10px 的留白在手机上看着就是"贴在筛选胶囊上"。吸顶条底与内容起点都从这条常量算，会自动跟着走。 */
-  const TAB_SAFE_GAP = 16 * CV.SCALE;    // 标签下面留的空（给下划线留出呼吸）
+  /* 2026-10-02（父亲大人：「这个**上下间距明显不一致**吧，明显下面太宽了」）：
+     上面 10、下面 16，而标签是**居中**在 32 高的卡片里的 ⇒ 视觉上"标签中心到上沿 26px、
+     到下沿 32px"，下面确实宽一截。V9.6.121 把下面从 10 抬到 16 是为了"下划线别贴在筛选胶囊上"，
+     但那条只对**装备页**（下面紧跟筛选行）成立，道具/材料页下面是格子，就只剩"下面空一大块"。
+     现在回到 **10**：上 10 / 下 10，配 32 的卡片 = 上下各 26px，与顶栏那条对齐。
+     ⚠️ 吸顶条高度、内容起点、以及 `CV.stickyH`（给 cv.js 裁内容用的）全部由这条常量派生，
+        改这一处三处自动跟着走 —— 不要只改其中一个。 */
+  const TAB_SAFE_GAP = 10 * CV.SCALE;    // 标签下面留的空（与上面 TAB_TOP_GAP 对称）
+  /* 2026-10-02（父亲大人：「装备这边也是一样的，下面的明显宽了」）：
+     装备页在"未穿戴 x/y 格 · 批量分解"那一行下面还有一层呼吸带（CV.HEAD_GAP=8），
+     叠上那行自己的内边距与网格的留白，视觉上就是"下面比上面宽一截"。
+     收到 **2px**（不是取消 —— 一上滑，最后一行会贴在吸顶板下沿上，很难看）。
+     ⚠️ 吸顶板高度 / 内容起点 / CV.stickyH 三处**必须用同一个值**，所以收在这一个常量里。 */
+  const BAG_TAIL_GAP = Math.max(2 * CV.SCALE, Math.round((CV.HEAD_GAP || 0) * 0.25));
   function tabCards() {
     /* 只占位（标签本身由 CV.sticky 画）：让内容从"标签 + 下面那条空"之后开始。
        内容原点在顶栏下方 8px，标签从顶栏下方 TAB_TOP_GAP 起，所以减掉这 8px 的基准差。 */
@@ -371,9 +384,9 @@
         /* V1.0.1（P2 第三步，AI 视觉工程师："道具/材料 43 件走**品质底框＋图形族**，不精绘 43 张"）：
            有品质的道具（箱子、装备类）按品质色描边 —— 一眼看出档次，
            而不用给每一件单独画图标（43 张图既做不完也没必要）。材料没有品质，保持原样。 */
-        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .55), rarColor(c.rarity), 2 * CV.SCALE);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .50), rarColor(c.rarity), 2 * CV.SCALE);
       } else {
-        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .55), CV.C.line);
+        CV.round(x, y, cw, cw, CV.RADIUS, CV.a(CV.C.panel2, .50), CV.C.line);
       }
       /* 名字：13px 粗体，最多两行，居中在"数量以上"那块区域（网页版 .bg-name）。
          V1.1.11（窄屏）：320 宽的屏上 5 列只有 ~55pt 宽，按 13px ＋ 左右各 7pt 内边距
@@ -432,7 +445,7 @@
          `contentStart = TOP + 8 + (32 + TAB_TOP_GAP + TAB_SAFE_GAP − 8) + eqH + HEAD_GAP`，两式相等）。
          做坏试验：把这里改回 `U.y += eqH` → 真渲染上「未穿戴」行与格子卡之间会当场出现 ~110px 空白
          （`_probe_bag_gap.js` 的像素带断言＋`验收截图-0929I/out-bagtop/` 那张图当场变样）。 */
-      U.y = prevY + eqH + (CV.HEAD_GAP || 0);
+      U.y = prevY + eqH + BAG_TAIL_GAP;
     }
     CV.sticky = function () {
       /* F6 #11：整段都在屏幕坐标里画，中间任何一处抛错都不许把 hitMode / U.y 留在半路。 */
@@ -449,10 +462,13 @@
         const h = 32 * CV.SCALE;    // 标签行高（和 drawTabCards / 占位一致）
         /* 2026-10-02：同 CV.drawPageHead —— 吸顶条改**半透明**，底图透得出来（父亲大人：实色块）*/
         const bgGrad = CV.ctx.createLinearGradient(0, 0, 0, CV.H);
-        bgGrad.addColorStop(0, CV.a(CV.C.bg2, .74)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .80));
+        bgGrad.addColorStop(0, CV.a(CV.C.bg2, .50)); bgGrad.addColorStop(1, CV.a(CV.C.bg, .50));
         CV.ctx.fillStyle = bgGrad;
         CV.ctx.fillRect(0, CV.TOP, CV.W,
-          TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + (CV.HEAD_GAP || 0));
+          TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + BAG_TAIL_GAP);
+        /* 报出这条吸顶条的高度（屏幕坐标）—— cv.js 用它把内容层裁在它下沿以下，
+           滚上来的格子就不会从半透明的条后面透出来（父亲大人 2026-10-02）。 */
+        CV.stickyH = TAB_TOP_GAP + h + TAB_SAFE_GAP + eqH + BAG_TAIL_GAP;
         drawTabCards(CV.TOP + TAB_TOP_GAP);
         /* 装备页那三行紧贴在标签下面（筛选在上、批量分解条紧贴其下 —— 派单给的顺序）。
            U.y 在这里临时当**屏幕坐标**用：这三行本来就只读 U.y 做纵向推进，

@@ -35,7 +35,7 @@
     const ring = id === '@player' ? CV.C.gold : rarColor(ch.rarity);
     const c = CV.ctx;
     c.beginPath(); c.arc(cx, cy, size / 2, 0, Math.PI * 2);
-    c.fillStyle = CV.a(CV.C.panel3, .55); c.fill();
+    c.fillStyle = CV.a(CV.C.panel3, .50); c.fill();
     c.lineWidth = 2; c.strokeStyle = ring; c.stroke();
     CV.text(String(Core.charName(id) || '?').slice(0, 1), cx, cy,
       { size: size * 0.44, bold: true, align: 'center', color: ring });
@@ -161,7 +161,7 @@
             CV.hit('pslot:' + i, x, y, cw, th);
             return;
           }
-          CV.round(x, y, cw, th, CV.RADIUS, CV.a(CV.C.panel2, .55), id === '@player' ? CV.C.gold : rarColor((D.charById[id] || {}).rarity));
+          CV.round(x, y, cw, th, CV.RADIUS, CV.a(CV.C.panel2, .50), id === '@player' ? CV.C.gold : rarColor((D.charById[id] || {}).rarity));
           /* 抓起那格描金边；手指压住的那格再画一圈金边 + 头顶写「放这里」 */
           if (grabbing) CV.round(x, y, cw, th, CV.RADIUS, null, CV.C.gold, 3);
           else if (holding) dashRound(x, y, cw, th);
