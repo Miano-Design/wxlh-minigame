@@ -479,6 +479,11 @@
        `push` 那一步服务端要 token 对得上才写，所以这里不能省。 */
     const path = (leaseToken ? Promise.resolve({ ok: true }) : claimLease(doc));
     return path.then(function () {
+      /* ⚠️ R1.2 实测抓到的：占位没成功时**不许硬推**。原来这里不看占位结果，
+         一旦 claim 那一下没成（云函数刚部署 / 网络抖），就会拿空 token 去推 ——
+         服务端照规矩回 `no_token`，玩家那行诊断变成"云函数调不通"，而其实只是"还没占上位"。
+         现在停在这一步、报一句人话，等下一轮（开机 / 回前台 / 打关）自动再占一次。 */
+      if (!leaseToken) return { ok: false, skip: 'notoken', why: 'no_token', msg: NET_MSG({ why: 'no_token' }) };
       return saveFn('push', {
         payload: raw, ts: ts, bytes: raw.length, ver: String(G.GAME_VER || ''),
         act: act, token: leaseToken, device: deviceId(),
@@ -580,7 +585,8 @@
       });
       /* 通了就把"最近一次失败"擦掉 —— 设置页那行诊断会自己回到「已连」 */
       if (r && r.ok) { lastErr = null; retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
-      else if (r && r.skip === 'fail') scheduleRetry();
+      /* `notoken`（还没占上位）也算"这一趟没成"—— 排一次静默重试，别干等下一轮开机。 */
+      else if (r && (r.skip === 'fail' || r.skip === 'notoken')) scheduleRetry();
       return r;
     }, function (e) {
       busy = false; scheduleRetry();

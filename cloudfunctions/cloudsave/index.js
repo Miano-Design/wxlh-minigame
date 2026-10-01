@@ -153,9 +153,17 @@ exports.main = async (event) => {
     const device = str(event && event.device).slice(0, 32);
     if (r.doc) {
       try {
-        await db.collection(COLL).where({ _id: r.id })
+        /* ⚠️ 实测（-502001 collection.update:fail）：微信云库里 **`where({_id: …}).update()` 不被支持**
+           （`_id` 不能当更新条件）—— 这里必须走 `doc(id).update()`。
+           占位的语义本来就是"**后来的无条件顶掉**"，所以不需要条件，`doc()` 正好。 */
+        await db.collection(COLL).doc(r.id)
           .update({ data: { lease: { token: token, id: device, ts: now } } });
-      } catch (e) { return { ok: false, msg: 'claim_fail' }; }
+      } catch (e) {
+        /* R1.2 实测：这一句曾经抛过，而当时只回了个 `claim_fail`，**看不出为什么** ——
+           排查只能靠猜。现在把异常原文截 80 字带回去（里面没有玩家数据，只有 SDK 的 errMsg）。 */
+        const em = String((e && (e.errMsg || e.message)) || e || 'unknown').slice(0, 80);
+        return { ok: false, msg: 'claim_fail: ' + em };
+      }
     }
     return { ok: true, token: token, ts: now, hasDoc: !!r.doc };
   }
@@ -188,19 +196,19 @@ exports.main = async (event) => {
     }
 
     if (r.doc) {
-      /* ① 正路：拿本机 token 做**原子**条件更新 */
-      const res = await db.collection(COLL).where({ _id: r.id, 'lease.token': token }).update({ data: data });
+      /* ① 正路：拿本机 token 做**原子**条件更新。
+         ⚠️ 条件里**不能带 `_id`**（同上，`where` 用 `_id` 会 -502001）—— 改成按 `lease.token` 匹配：
+         token 是 `crypto.randomBytes(18)` 出来的 36 位十六进制，不可能撞到别的账号那条。 */
+      const res = await db.collection(COLL).where({ 'lease.token': token }).update({ data: data });
       if (res && res.stats && res.stats.updated === 1) {
         return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
       }
-      /* ①′ 那条从来没有过租约（老版本写下的记录）→ 允许接手一次（两个条件都不匹配就还是拒绝） */
+      /* ①′ 那条**还没有过租约**（老版本写下的记录 / 刚迁移过来的）→ 允许无条件接手一次。
+         这里牺牲一点原子性换"能用"：这个窗口只出现在"老记录第一次被新版碰到"那一趟，
+         而且此时**两台设备本来就都没有 token**（跟旧版行为一样），不会比旧版更糟。 */
       if (!(r.doc.lease && r.doc.lease.token)) {
-        const res2 = await db.collection(COLL).where({ _id: r.id, lease: _.exists(false) }).update({ data: data });
+        const res2 = await db.collection(COLL).doc(r.id).update({ data: data });
         if (res2 && res2.stats && res2.stats.updated === 1) {
-          return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
-        }
-        const res3 = await db.collection(COLL).where({ _id: r.id, 'lease.token': '' }).update({ data: data });
-        if (res3 && res3.stats && res3.stats.updated === 1) {
           return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
         }
       }
@@ -214,7 +222,7 @@ exports.main = async (event) => {
       return { ok: true, pushed: true, created: true, ts: data.ts, at: now, bytes: data.bytes, prev: false };
     } catch (e) {
       /* 已经被另一台抢建了 → 回到条件更新那条路（本机 token 必然对不上 → 拒绝） */
-      const res = await db.collection(COLL).where({ _id: r.id, 'lease.token': token }).update({ data: data });
+      const res = await db.collection(COLL).where({ 'lease.token': token }).update({ data: data });
       if (res && res.stats && res.stats.updated === 1) {
         return { ok: true, pushed: true, ts: data.ts, at: now, bytes: data.bytes, prev: !!data.prevPayload };
       }
