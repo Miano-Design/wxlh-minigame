@@ -569,7 +569,7 @@
     if (!init()) return false;
     if (!unlocked) {
       unlocked = true;
-      if (G.console && console.log) console.log('[AUD] 首次交互，音频解锁：' + (bgmFailed || 'ok'));
+      if (G.LOG && G.LOG.info) G.LOG.info('audio', 'unlock', { status: bgmFailed || 'ok' });
     }
     /* F6 #5：**不等于 running 就 resume** —— iOS 的 WebAudio 有第三个状态 `interrupted`
        （被系统抢音频后就是它）。原来写死 `=== 'suspended'`，一旦平台把 state 置成它、

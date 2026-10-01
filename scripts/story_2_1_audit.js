@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),path=require('path');
+const root=process.cwd();
+let pass=0,fail=0; const ok=(b,m)=>{if(b){pass++;console.log('PASS',m)}else{fail++;console.log('FAIL',m)}};
+const ctx={};ctx.globalThis=ctx;ctx.GameGlobal=ctx;vm.runInNewContext(fs.readFileSync('js/sc-story-data.js','utf8'),ctx);vm.runInNewContext(fs.readFileSync('js/sc-story-overhaul-data.js','utf8'),ctx);
+const S=ctx.STORYDATA; const ids=Object.keys(S.WORLDS); ok(ids.length===36,'36 worlds present');
+let bad=[]; ids.forEach(id=>{const w=S.WORLDS[id]; if(!w.midstory||w.midstory.length<2) bad.push(id);}); ok(!bad.length,'all worlds have 2+ midstory beats'+(bad.length?' ['+bad.join(',')+']':''));
+let richBad=[]; ids.forEach(id=>{const w=S.WORLDS[id]; for(const p of ['in','pre','post']) if(!w[p]||w[p].length<2) richBad.push(id+':'+p)}); ok(!richBad.length,'all worlds have 2+ beats in each main segment'+(richBad.length?' ['+richBad.slice(0,8).join(',')+'...]':''));
+const game=fs.readFileSync('game.js','utf8'); ok(game.includes("require('./js/sc-story-overhaul-data.js')"),'game loads 2.1 story extension'); ok(/GAME_VER\s*=\s*'2\.1\.0'/.test(game),'version 2.1.0');
+const story=fs.readFileSync('js/sc-story.js','utf8'); ok(story.includes('cur.meta.worldId === \'W36\''),'W36 end choice hook exists'); ok(story.includes('cur.autoAt = now + 0.72'),'auto advance delay exists'); ok(story.includes('cur.autoAt = now + 0.35'),'chapter auto advance exists'); ok(story.includes('if (cur.chapter) return Story.autoOn()'),'save-power mode cannot freeze auto story'); ok(story.includes('W36 终局不是普通剧情'),'W36 skip cannot bypass final choice'); ok(story.includes('const tail = n === 1'),'W36 choice has consequence epilogue');
+const dun=fs.readFileSync('js/sc-dungeon.js','utf8'); ok(dun.includes("St.hasInterlude && St.hasInterlude(view.worldId)"),'stage-6 interlude trigger exists'); ok(dun.includes('postStoryAfterClose'),'boss-clear auto post hook exists');
+console.log(JSON.stringify({pass,fail})); process.exit(fail?1:0);

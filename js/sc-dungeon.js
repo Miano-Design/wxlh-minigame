@@ -402,6 +402,7 @@
 
   /* ================= ③ 扫荡（选关卡 + 选次数，照网页版 sweepModal） ================= */
   let sweepSel = 11;
+  let postStoryAfterClose = null;
   /* ================= V1.1.9（丙组 · 结算胶囊的唯一一处）=================
      把"结算拿到了什么"拼成胶囊文案 —— **战斗结算与扫荡结算共用这一个函数**（父亲大人：
      「现在扫荡的结算不行，里面还有乱码，**可以像战斗结算那样展示**」）。
@@ -594,6 +595,9 @@
     /* V9.6.69（资料 §4「让玩家觉得自己成功」）：首通给一次**看得见**的庆祝 ——
        只加表现、不加资源；"人生第一次通关"那一次更明显，而且只放一次（落盘）。 */
     const firstClear = !!(comp && comp.firstClearReward);
+    if (firstClear && isWorldBoss && G.Story && G.Story.autoOn && G.Story.autoOn() && G.Story.hasStory && G.Story.hasStory(wid) && !G.Story.seen(wid, 'post')) {
+      postStoryAfterClose = { worldId: wid };
+    }
     if (firstClear) {
       const firstEver = !S.celebratedFirst;
       if (firstEver) { S.celebratedFirst = true; Core.save(); }
@@ -649,7 +653,13 @@
       onQuit() { Core.clearPendingRun(); run = null; CV.reset('dungeon'); },
       /* 离开这一场（收下奖励返回 / 失败后返回世界）：run 与结算目标一起收干净。
          胜利那条路在 settleRun 里已经清过一遍，这里再清一次是幂等的（clearPendingRun 允许空清）。 */
-      onClose() { Core.clearPendingRun(); run = null; clearSettleTargets(); CV.reset('world'); },
+      onClose() {
+        const autoPost = postStoryAfterClose; postStoryAfterClose = null;
+        Core.clearPendingRun(); run = null; clearSettleTargets(); CV.reset('world');
+        if (autoPost && G.Story && G.Story.autoOn && G.Story.autoOn() && !G.Story.seen(autoPost.worldId,'post')) {
+          setTimeout(function(){ G.Story.openWorld(autoPost.worldId,'post',{kind:'boss'}); }, 80);
+        }
+      },
       onEnd(win, res, hpLeft) {
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
@@ -764,6 +774,14 @@
          每一张图**只打断一次**（`pre` 一旦读过就不再插）；剧情页右上角有「跳过」，
          所以"自动"不会变成"逼着看"。播完 `onDone` 里接着开打 —— 玩家少点一次，流程一步不少。 */
       const St = G.Story;
+      /* 2.1：第 6 关是每个世界的“故事转折点”。玩家已经实际玩过前半段后，剧情从战斗里自然长出来，
+         播完马上回到第 6 关，不增加一个独立剧情菜单。 */
+      if (i === 5 && St && St.autoOn && St.autoOn() && St.hasInterlude && St.hasInterlude(view.worldId)
+        && !St.seen(view.worldId, 'midstory')) {
+        const widMid = view.worldId, dfMid = view.diff;
+        St.openInterlude(widMid, { onDone: function () { startStage(widMid, dfMid, i); } });
+        return;
+      }
       const isBoss = i === 11;
       const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
       if (St && St.hasStory && St.hasStory(view.worldId) && (isBoss || isElite)

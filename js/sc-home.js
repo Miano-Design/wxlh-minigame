@@ -828,8 +828,9 @@
         const adSt = AD.status ? AD.status('idle_boost') : { ok: (AD.left ? AD.left('idle_boost') : 0) > 0, text: '' };
         const adTail = AD.quotaText ? AD.quotaText('idle_boost') : '';
         U.space(CV.SP[1]);
+        U.hint('今日剩余 ' + (adTail ? adTail.replace(/^（|）$/g,'') : '次数未知'), 4 * CV.SCALE);
         U.btnRow([{
-          label: '📺 看广告 · 加速 2 小时' + adTail,
+          label: '广告加速',
           style: 'ghost', id: adSt.ok ? 'ad_idle_boost' : '', dis: !adSt.ok,
         }]);
         U.y = U.y;                       // btnRow 已经推进游标

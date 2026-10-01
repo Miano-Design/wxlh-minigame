@@ -197,7 +197,7 @@
             U.kv(blMat, blHave + ' / ' + blCost.matN, blHave >= blCost.matN ? CV.C.green : CV.C.dim);
             U.space(CV.SP[1]);
           }
-          U.btnRow([{ label: '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）', style: 'ghost', id: 'pblup' }]);
+          U.btnRow([{ label: '命格升级', style: 'ghost', id: 'pblup' }]);
         } else {
           U.hint('已满级', 2 * CV.SCALE);
         }
@@ -219,7 +219,7 @@
       U.kv('当前境界', S.player.realm ? rs.curName : '未突破');
       U.kv('境界加成', '全属性 +' + Math.round(Core.realmBonusPct() * 100) + '%', CV.C.green);
       U.space(CV.SP[1]);
-      U.btnRow([{ label: '查看境界 · 渡劫 ›', style: 'ghost', id: 'open_realm' }]);
+      U.btnRow([{ label: '境界 · 渡劫', style: 'ghost', id: 'open_realm' }]);
     });
 
     /* ⑦ 属性面板 */

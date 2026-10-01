@@ -111,10 +111,17 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
       34: 8.02,   // W35 九幽渡口：1.08 → 11.28（旧 0.68；二轮 7.10→8.02）
       35: 7.34,   // W36 灯阁王座：1.11 → 11.61（旧 0.66；二轮 6.90→7.34）
     };
-    const ease = wi < EASE.length ? EASE[wi] : (EASE_LATE[wi] === undefined ? 1 : EASE_LATE[wi]);
-    const m = diffMult(diff) * stageMult(stage) * ease;                // HP 用满倍率（V5 §51）
-    const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease;   // 攻击放缓（V9.5.64 再放缓一档）
-    const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);           // 防御放缓，避免伤害坍缩
+    const easeRaw = wi < EASE.length ? EASE[wi] : (EASE_LATE[wi] === undefined ? 1 : EASE_LATE[wi]);
+    /* 2.1 终局连续曲线：W13-W22 是第一道真正的故事推进区，旧 EASE 是按历史满配档反推的
+       极端压力值，会把认真档玩家直接挡在第 13 世界外。保留表作为历史底稿，但运行时给这一段一个
+       温和的“剧情推进减压”，同时不动深井/奖励口径。 */
+    const progressionRelief = (wi >= 12 && wi <= 21) ? 0.42 : 1;
+    const ease = easeRaw * progressionRelief;
+    const earlyPace = wi < 12 ? 3.9 : 1;
+    const m = diffMult(diff) * stageMult(stage) * ease * earlyPace;      // HP 用满倍率（V5 §51）
+    const mAtkRelief = (wi >= 12 && wi <= 17) ? 0.68 : 1;
+    const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease * mAtkRelief; // 中段优先让玩家看完故事再被门槛拦住
+    const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);             // 防御放缓，避免伤害坍缩
     const faction = THEME_FACTION[w.theme];
     const mk = (name, hp, atk, def, opts) => Object.assign({
       name, hp: Math.round(hp), atk: Math.round(atk), def: Math.round(def),
@@ -140,11 +147,28 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     };
     if (kind === 'boss') {
       const bossHp = w.bossHp[D.DIFFICULTY.findIndex(d => d.id === diff)] || w.bossHp[0];
-      // Boss 血量按世界序号缩放（早期世界玩家战力低，避免数值碾压）
-      /* V9.5.64（父亲大人：前期副本卡关）——首关 Boss 血量系数 0.28 → 0.10，
-         之后每个世界再 +0.05：第一个 Boss 是"能打赢的关"，不是劝退墙。 */
-      const bossHpMult = (0.05 + wi * 0.05) * ease;
-      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * 1.4 * diffMult(diff) * (1 + stage * 0.05), { isBoss: true, position: 'back' })];
+      /* 2.1 Boss 重新按“事件高潮”而不是血量海绵定时：
+         W01-W05 略加厚，让玩家能看见第一次 Boss 机制；
+         W06-W22 沿用连续曲线，但不再让 Boss 变成数值墙；
+         W23-W36 单独压缩 Boss 血量倍率，把时间还给世界机制和战斗叙事。 */
+      let bossBase = 0.05 + wi * 0.05;
+      if (wi < 6) bossBase *= 1.45;
+      else if (wi >= 12 && wi <= 16) bossBase = 0.14 + (wi - 12) * 0.02;
+      else if (wi === 17) bossBase = 0.18;
+      else if (wi >= 18 && wi <= 21) bossBase = 0.34 + (wi - 18) * 0.01;
+      else if (wi >= 22) bossBase = 0.52 + Math.min(0.13, (wi - 22) * 0.01);
+      /* R1.9 整合：2.1 这张表把 Boss 从"血量海绵"拉回来了（W36 从 85~100 回合 → 13.7），
+         但用 `progression_audit` 实测仍有 12 个世界落在 §五 的 Boss 区间外（21~39 回合）。
+         这一版按**实测 TTK 反推**逐格降一档（目标 ≈20 回合以内），只动"超标那几格"：
+           W17 24.3→0.54 · W19 22.0→0.35 · W21 39.3→0.17 · W23 23.0→0.24 · W25 26.0→0.14
+           W26 21.0→0.13 · W27 24.3→0.15 · W29 27.7→0.10 · W31 29.0→0.12 · W32 22.7→0.11
+           W34 26.0→0.14 · W35 22.5→0.12
+         没超标的（W13~W16 / W18 / W20 / W22 / W24 / W28 / W30 / W33 / W36）**一格没动** ——
+         它们已经在区间内，动了只会把 Boss 变成秒杀。改完用同一把尺子复测（见 FINAL-TEST-REPORT）。 */
+      const BOSS_STORY_SCALE = [0,0,0,0,0,0,0,0,0,0,0,0,0.65,0.65,0.65,0.65,0.54,0.48,0.35,0.25,0.17,0.17,0.24,0.19,0.14,0.13,0.15,0.15,0.10,0.11,0.12,0.11,0.12,0.14,0.12,0.12,0.18];
+      const bossStoryScale = wi < 12 ? 1 : (BOSS_STORY_SCALE[wi] || 0.12);
+      const bossHpMult = bossBase * ease * bossStoryScale;
+      const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * (wi < 12 ? 1.4 : 0.65) * diffMult(diff) * (1 + stage * 0.05), { isBoss: true, position: 'back' })];
       list.push(mk(w.enemies[0], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, { position: 'front' }));
       if (diff !== 'normal') list.push(mk(w.enemies[1], w.hp * m * 1.5, w.atk * mAtk, w.def * mDef, { position: 'front' }));
       return label(list);

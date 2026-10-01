@@ -696,6 +696,9 @@
     CV.text(on ? '已开启' : '已关闭', x + bw / 2 + 5 * CV.SCALE, y + bh / 2,
       { size: CV.FS.xs, align: 'center', color: on ? CV.C.gold : CV.C.dim });
     CV.hit(actId, x, y - 5 * CV.SCALE, bw + 10 * CV.SCALE, bh + 10 * CV.SCALE);
+    /* 触区保持 44pt，但相邻开关不能挤在一起：给每行留出 6px 的视觉呼吸位，
+       这样撑大的触区也不会与下一行重叠。 */
+    if (U.y < rowTop + 50 * CV.SCALE) U.y = rowTop + 50 * CV.SCALE;
   }
   function settingsPage() {
     const S = Core.S, set = S.settings;
@@ -931,7 +934,7 @@
        **不用纯 #FF0000**：那在深色底上又刺眼又不过对比度（12px 红字要 4.5:1，
        `danger` 直接当字色只有 3.5 上下，项目里一直是"面用 danger、字用 dangerText"）。
        点它 → `wipe_save`（下面那段：随机 4 位数字的二次确认，敲对了才真删）。 */
-    U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, '删除当前进度，重新开始', 'danger', 'wipe_save');
+    U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, '删除进度', 'danger', 'wipe_save');
     U.y += U.BTN_H * CV.SCALE;
     U.space(CV.SP[2]);
     /* ================= F2 · 0930L（父亲大人 2026-09-30：「存档也是啊，同一个微信，都能上微信了，
@@ -1837,7 +1840,7 @@
       U.space(CV.SP[1]);
       U.btnRow([{ label: '⚔️ 挑战本层', style: 'primary', id: 'corridor_fight' }]);
     });
-    U.btnRow([{ label: '🏪 深井商店（◆ ' + fmt(S.cur.otherworld || 0) + '）', style: 'ghost', id: 'corridor_shop' }]);
+    U.btnRow([{ label: '深井商店', style: 'ghost', id: 'corridor_shop' }]);
   });
   CV.on('corridor_fight', function () {
     /* V9.6.128（父亲大人："深井的自动下一关倒数和点击都无效，点完提示战斗进行中"）：

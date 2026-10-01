@@ -1008,7 +1008,7 @@
         绝不为了"看起来有反馈"编一句。 */
   function defeatHint(res) {
     const frames = (res && res.frames) || [];
-    const start = frames.filter(function (f) { return f && f.type === 'start'; })[0];
+    const start = frames.find(function (f) { return f && f.type === 'start'; });
     if (!start) return '';
     const side = {};
     (start.allies || []).forEach(function (u) { if (u && u.uid != null) side[u.uid] = 'ally'; });
@@ -1016,17 +1016,31 @@
     let dealt = 0, taken = 0;
     frames.forEach(function (f) {
       if (!f || f.type !== 'damage' || f.target == null) return;
-      const s = side[f.target];
-      const d = Number(f.dmg) || 0;
+      const s = side[f.target], d = Number(f.dmg) || 0;
       if (s === 'enemy') dealt += d;
       else if (s === 'ally') taken += d;
     });
-    if (!dealt && !taken) return '';
     const rounds = Number(res.rounds) || 0;
-    if (rounds > 0 && rounds <= 3) return '开局就被压住了：先补前排的血量与减伤。';
-    if (taken > dealt * 1.4) return '输出不够：这一场打出去的总量差得有点多。';
-    if (dealt > taken * 1.2) return '输出是够的，收不掉 —— 把速度和暴击拉起来抢节奏。';
-    return '五五开：差的是一点数值，装备与伙伴再补一档。';
+    const bossPhase = frames.some(function (f) { return f && f.type === 'phase'; });
+    const summoned = frames.some(function (f) { return f && f.type === 'summon'; });
+    const revived = frames.some(function (f) { return f && f.type === 'revive'; });
+    const worldId = (B.cfg && B.cfg.worldId) || '';
+    const world = D.WORLDS.find(function (w) { return w.id === worldId; });
+    const mech = world ? String(world.mechanic || '').split('：')[0] : '';
+    /* 先给“真发生过的战斗事件”更高优先级，再回落到伤害比。这样提示不会只告诉玩家
+       “数值不够”，而是能告诉他这一场到底经历了什么。 */
+    if (summoned && !bossPhase && rounds >= 8) {
+      return '敌方已经进入召唤节奏：先解决小怪，再把爆发留给 Boss。' + (mech ? ' 本世界重点是「' + mech + '」。' : '');
+    }
+    if (revived) return 'Boss 已经触发复生：这场不是单纯拼面板，优先提高爆发与持续输出。';
+    if (bossPhase && rounds >= 8) return '已经打进 Boss 狂暴阶段：输出基本够，但收尾太慢，优先补暴击 / 速度。' + (mech ? ' 注意「' + mech + '」阶段。' : '');
+    if (!dealt && !taken) return '';
+    if (rounds > 0 && rounds <= 3) return '前排承伤先稳住：这一场在成型前就倒了，优先补血量 / 减伤。';
+    if (taken > dealt * 1.4) return '输出缺口明显：这一场承受伤害远高于你打出的伤害，先补主输出与队伍成型。';
+    if (dealt > taken * 1.2) return '输出已经够了但收尾太慢：优先补速度 / 暴击，让关键回合尽快打完。';
+    return mech
+      ? '双方接近五五开：数值只差一点，下一次围绕「' + mech + '」调整阵容。'
+      : '双方接近五五开：装备与伙伴补一档，再回来会更稳。';
   }
   /* 先算再画：结算层要**先知道胶囊占多高**才能把下面的按钮排开
      （V9.6.8 父亲大人真机截图：胶囊换行到第二排、下面的按钮却还按一排算，直接压上去）。 */

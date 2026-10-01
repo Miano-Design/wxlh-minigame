@@ -158,7 +158,9 @@
         const can = (S.cur.points || 0) >= cost && lv < 50;
         const lack = can ? [] : [lv >= 50 ? '已到 50 级封顶'
           : ('点数不够：还差 ◉ ' + fmt(Math.max(0, cost - (S.cur.points || 0))) + '（当前 ◉ ' + fmt(S.cur.points || 0) + '）')];
-        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 3).concat(lack);
+        const dLines = CV.wrap(b.desc, textW, CV.FS.sm, 3).concat(
+          lv >= 50 ? ['已到 50 级封顶'] : ['升级消耗：◉ ' + fmt(cost)].concat(lack)
+        );
         const rowH = (dLines.length >= 3 ? (56 + (dLines.length - 1) * 17) : dLines.length === 2 ? 62 : 56) * CV.SCALE;
         const h = rowH;
         CV.text(CV.fit(b.name + '  Lv.' + lv + '/50', textW, CV.FS.lg, true), U.ix(), top + 16 * CV.SCALE, { size: CV.FS.lg, bold: true });
@@ -167,7 +169,7 @@
             { size: CV.FS.sm, color: (k2 >= dLines.length - lack.length && lack.length) ? CV.C.accent : CV.C.dim });
         });
         U.btn(U.ix() + U.iw() - bw, top + (h - U.BTN_SM * CV.SCALE) / 2, bw, U.BTN_SM * CV.SCALE,
-          lv >= 50 ? '已满级' : ('升级（◉ ' + fmt(cost) + '）'), 'ghost', 'bup:' + b.id, !can);
+          lv >= 50 ? '已满级' : '升级', 'ghost', 'bup:' + b.id, !can);
         U.y = top + h;
       });
     });
@@ -219,7 +221,7 @@
         U.kv('渡劫材料', ((D.ITEMS[st.matItem] || {}).name || st.matItem) + ' ' + st.haveMat + ' / ' + st.matN);
         U.kv('点数', '◉ ' + fmt(st.points));
         U.space(CV.SP[1]);
-        U.btnRow([{ label: '⚡ 渡劫（成功率 ' + Math.round(nx.rate * 100) + '%）', style: 'primary', id: 'realm_try' }]);
+        U.btnRow([{ label: '渡劫', style: 'primary', id: 'realm_try' }]);
         U.hint('失败也扣材料与点数（等级不掉）', 4 * CV.SCALE);
       } else {
         /* V9.6.90：网页版走到大圆满时是**一张明确的卡**（"已至大圆满 / 当前境界已是这条血统的终点"）。
@@ -315,8 +317,8 @@
       U.kv('孵化', '兽魂石 ' + st.eggs + ' 颗 · 每 ' + st.eggCost + ' 颗孵 1 只');
       U.space(CV.SP[1]);
       U.btnRow([
-        { label: '孵 1 只（🥚' + st.eggCost + '）', style: 'ghost', id: 'beast_hatch1', dis: st.eggs < st.eggCost },
-        { label: '孵 10 只（🥚' + st.eggCost * 10 + '）', style: 'gold', id: 'beast_hatch10', dis: st.eggs < st.eggCost * 10 },
+        { label: '孵化×1', style: 'ghost', id: 'beast_hatch1', dis: st.eggs < st.eggCost },
+        { label: '孵化×10', style: 'gold', id: 'beast_hatch10', dis: st.eggs < st.eggCost * 10 },
       ]);
     });
     U.card(function () {
@@ -549,7 +551,7 @@
     U.begin(); head('灯录');
     /* 两个标签（用与背包同一套按钮语汇，不新增组件） */
     U.btnRow(Core.codexState().volumes.map(function (v) {
-      return { label: v.name + ' ' + v.owned + '/' + v.total, style: codexVol === v.id ? 'primary' : 'ghost', id: 'codexvol:' + v.id };
+      return { label: v.name.replace('伙伴卷','伙伴').replace('装备卷','装备'), style: codexVol === v.id ? 'primary' : 'ghost', id: 'codexvol:' + v.id };
     }));
     U.space(CV.SP[1]);
     /* ================= B 批（2026-10-01）· 卷宗入口 =================
@@ -557,7 +559,7 @@
        卷宗是它旁边那一本（只记你看过的：世界段落 / Boss / 人物 / 装备）。
        一行按钮，不动本页既有的两卷结构与顺序。 */
     if (G.Story) {
-      U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '卷宗 · 剧情记录', 'ghost', 'story_archive');
+      U.btn(U.ix(), U.y, U.iw(), U.BTN_SM * CV.SCALE, '剧情卷宗', 'ghost', 'story_archive');
       U.y += U.BTN_SM * CV.SCALE;
       U.space(CV.SP[1]);
     }

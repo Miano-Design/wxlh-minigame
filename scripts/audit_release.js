@@ -25,7 +25,10 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   /* R1.7 新增：36 世界"各有一件事"的连续性 + 视觉资源真实使用路径。 */
   'story_continuity_audit', 'story_visual_path_audit',
   /* R1.8 玩家旅程轮：把"开机→W01→战斗→结算→返回→成长"用真函数走一遍。 */
-  'player_journey_audit'];
+  'player_journey_audit',
+  /* R1.9 整合轮：2.1 自带的两把（自动剧情状态机 + 36 世界运行时流程）也进总闸 ——
+     任务书 §13 点名要跑，接进来以后就不会"改完忘了跑"。 */
+  'story_2_1_audit', 'story_2_1_flow_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

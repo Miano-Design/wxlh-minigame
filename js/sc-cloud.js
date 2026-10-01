@@ -892,7 +892,7 @@
         别在"两台设备同时正在推档"的时候连着点。它不接入任何正式游戏逻辑。 */
   function probeCloud() {
     return saveFn('probe').then(function (r) {
-      try { if (typeof console !== 'undefined' && console.log) console.log('[probe]', JSON.stringify(r)); } catch (e) {}
+      try { if (G.LOG && G.LOG.info) G.LOG.info('cloud', 'probe', { ok: !!(r && r.ok), stage: r && r.stage, errCode: r && r.errCode }); } catch (e) {}
       return r;
     });
   }

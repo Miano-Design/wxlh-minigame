@@ -511,7 +511,7 @@
        没有这个分包 / 拉失败都**静默忽略** —— 场景与 Boss 会各自回落程序化占位。 */
     trySubpackage();
     cur = {
-      beats: o.beats, i: 0, reveal: 0, t0: Date.now() / 1000, ts: Date.now() / 1000,
+      beats: o.beats, i: 0, reveal: 0, t0: Date.now() / 1000, ts: Date.now() / 1000, autoAt: 0, choiceLocked: false,
       scene: o.scene || 'god_hall', title: o.title || '', chNo: o.chNo || '',
       actor: o.actor || null,               // 说话人 charId（画剪影）
       obj: o.obj || '',                     // 关键物件名（物件层）
@@ -539,9 +539,18 @@
       beats: beats, title: w.title, chNo: chNo, scene: Story.sceneOf(worldId),
       obj: w.obj, chapter: chapter, actor: opts.actor || null,
       kind: opts.kind || 'world', onDone: opts.onDone || null,
-      meta: { worldId: worldId, part: part },
+      meta: { worldId: worldId, part: part, interlude: !!opts.interlude },
     });
   };
+  /* 2.1：每个世界第 6 关前的中段事件。它不显示在故事菜单里，作为主线推进的一部分自动发生。 */
+  Story.openInterlude = function (worldId, opts) {
+    const w = WORLDS[worldId]; if (!w || !w.midstory || !w.midstory.length) return false;
+    opts = opts || {};
+    if (Story.seen(worldId, 'midstory')) return false;
+    return Story.play({ beats: w.midstory, title: w.title, chNo: 'W' + String(WORLDLIST.findIndex(function(x){return x.id===worldId;})+1).padStart(2,'0'), scene: Story.sceneOf(worldId), obj: w.obj, actor: null, kind:'world', onDone: opts.onDone || null, meta:{worldId:worldId,part:'midstory',interlude:true} });
+  };
+  Story.hasInterlude = function(worldId){ const w=WORLDS[worldId]; return !!(w&&w.midstory&&w.midstory.length); };
+
   /* Boss 两段（战前 / 战后）+ 内核 */
   Story.openBoss = function (worldId, which) {
     /* ================= 2026-10-01（父亲大人 · 二轮）：**删掉作者解释腔** =================
@@ -651,10 +660,15 @@
 
   function advance() {
     if (!cur) return;
+    if (cur.choiceLocked) return;
     /* 章节转场期间点一下 = **跳过转场**（不是"显完整句"—— 那时台上还没有台词） */
     if (cur.chapter) { cur.chapter = null; cur.ts = Date.now() / 1000; return; }
     if (!done()) { cur.reveal = fullLen(); return; }      // 没显完 → 一次显完
-    if (cur.i < cur.beats.length - 1) { cur.i++; cur.reveal = 0; cur.ts = Date.now() / 1000; return; }
+    if (cur.i < cur.beats.length - 1) { cur.i++; cur.reveal = 0; cur.ts = Date.now() / 1000; cur.autoAt = 0; return; }
+    if (cur.meta && cur.meta.worldId === 'W36' && cur.meta.part === 'post' && !Core.S.story.choice) {
+      cur.choiceLocked = true;
+      return;
+    }
     finish();
   }
   function finish() {
@@ -678,7 +692,19 @@
        先退回上一页（世界页），再启动战斗，栈才是对的。 */
     if (typeof after === 'function') { try { after(); } catch (e) {} }
   }
-  Story.skip = function () { finish(); };
+  Story.skip = function () {
+    if (!cur) return;
+    /* W36 终局不是普通剧情：跳过只能跳过演出，不能绕过最终选择。 */
+    if (cur.meta && cur.meta.worldId === 'W36' && cur.meta.part === 'post' && !(Core.S && Core.S.story && Core.S.story.choice)) {
+      cur.i = Math.max(0, cur.beats.length - 1);
+      cur.reveal = fullLen();
+      cur.autoAt = 0;
+      cur.choiceLocked = false;
+      CV.render();
+      return;
+    }
+    finish();
+  };
 
   /* 帧驱动：显字推进 + 背景氛围（省电模式下显完字就停） */
   function alive() { return !!cur && CV.top().name === 'story'; }
@@ -687,15 +713,30 @@
     const now = Date.now() / 1000;
     const dt = Math.min(0.2, Math.max(0, now - cur.ts));
     cur.ts = now;
-    /* 转场期间**不推进显字**（否则卷名卡放完，第一句已经自己显完了 —— 那是白给） */
-    if (cur.chapter) return;
-    if (!done()) cur.reveal = Math.min(fullLen(), cur.reveal + dt * REVEAL_CPS);
+    /* 转场期间不推进显字，但自动阅读要在卷名卡结束后自动进入正文。 */
+    if (cur.chapter) {
+      if (Story.autoOn() && !cur.choiceLocked) {
+        if (!cur.autoAt) cur.autoAt = now + 0.35;
+        if (now >= cur.autoAt) advance();
+      }
+      return;
+    }
+    if (!done()) {
+      cur.reveal = Math.min(fullLen(), cur.reveal + dt * REVEAL_CPS);
+      cur.autoAt = 0;
+    } else if (!cur.chapter && Story.autoOn() && !cur.choiceLocked) {
+      if (!cur.autoAt) cur.autoAt = now + 0.72;
+      if (now >= cur.autoAt) advance();
+    }
   }
   function powerSave() { return !!(Core.S && Core.S.settings && Core.S.settings.savePower); }
   function needFrames() {
     if (!cur) return false;
+    if (cur.chapter) return Story.autoOn();
     if (!done()) return true;
-    return !powerSave();                 // 显完字后：省电模式停帧（静态一张），否则继续跑氛围
+    /* 自动阅读正在等待下一句时必须继续有帧；否则省电模式会把 autoAt 永久冻住。 */
+    if (Story.autoOn() && !cur.choiceLocked) return true;
+    return !powerSave();
   }
   const RAF = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : null;
   const CAF = (typeof cancelAnimationFrame === 'function') ? cancelAnimationFrame : null;
@@ -879,6 +920,17 @@
       c.fillText(ln, U.pad() + 0, y + lh * i + lh / 2);
     });
     c.restore();
+    if (cur.meta && cur.meta.worldId === 'W36' && cur.meta.part === 'post' && done() && !(Core.S && Core.S.story && Core.S.story.choice)) {
+      const bh = 44 * CV.SCALE, gap = 10 * CV.SCALE, bw = (boxW - gap) / 2;
+      const by = bottom - 8 * CV.SCALE - bh;
+      CV.round(U.pad(), by, bw, bh, 12 * CV.SCALE, CV.a(C.gold, .16), C.gold);
+      CV.text('让灯熄灭', U.pad()+bw/2, by+bh/2, {size:CV.FS.md,align:'center',color:C.gold,bold:true});
+      CV.hit('story_choice:1',U.pad(),by,bw,bh);
+      CV.round(U.pad()+bw+gap, by, bw, bh, 12 * CV.SCALE, CV.a(C.panel2,.72), C.line2);
+      CV.text('继续点燃', U.pad()+bw+gap+bw/2, by+bh/2, {size:CV.FS.md,align:'center',color:C.text});
+      CV.hit('story_choice:2',U.pad()+bw+gap,by,bw,bh);
+      cur.choiceLocked = true;
+    }
     /* 继续提示（全屏热区 · 点一下往下） */
     const hint = done() ? (cur.i < cur.beats.length - 1 ? '轻点继续' : '轻点结束') : '';
     if (hint) {
@@ -1025,6 +1077,27 @@
     }
   }
   CV.register('story_archive', drawArchive);
+  CV.on('story_choice:*', function (v) {
+    if (!cur) return;
+    const n = +v || 0;
+    if (n !== 1 && n !== 2) return;
+    Story.setChoice(n);
+    cur.choiceLocked = false;
+    const tail = n === 1 ? [
+      { k: 'n', s: '你把灯芯按进最后一层灰里。长久不散的光，在你手里第一次安静下来。' },
+      { k: 'o', s: '王座后的九十六盏灯一盏接一盏熄灭，回音却没有消失。它沿着来路，替你把三十六个世界重新连了起来。' },
+      { k: 'n', s: '门没有关。只是这一次，出去的人不再需要留下自己的名字。' },
+    ] : [
+      { k: 'n', s: '你接住灯火。火焰没有灼伤你，反而像终于等到了一个愿意继续的人。' },
+      { k: 'o', s: '三十六盏远灯同时亮起，世界深处传来一声迟到很久的回应。' },
+      { k: 'n', s: '你转身走下王座。灯还在燃，而下一扇门已经替你打开。' },
+    ];
+    cur.beats = cur.beats.concat(tail);
+    cur.i = cur.beats.length - tail.length;
+    cur.reveal = 0;
+    cur.autoAt = 0;
+    CV.render();
+  });
   CV.on('story_back', function () { CV.pop(); });
   /* ⚠️ 动态热区必须注册成 `前缀:*`（cv.js:dispatch 把冒号后面那段当参数传进来）——
        写成 'arctab:world' 只有**那一个** id 命中，'arctab:boss' 那几颗会变成死键。 */

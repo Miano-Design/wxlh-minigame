@@ -42,12 +42,29 @@ function boot(opts) {
     vibrateShort() {}, setKeepScreenOn() {}, triggerGC() {}, onMemoryWarning() {},
     env: { USER_DATA_PATH: '/tmp' },
   };
-  ['wx-adapter.js', 'data.js', 'core.js', 'battle.js', 'dungeon.js', 'cv.js', 'uiw.js']
-    .concat(fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)))
-    .forEach((f) => {
-      const p = path.join(JS, f);
-      if (fs.existsSync(p)) require(p);
-    });
+  /* ================= R1.9 整合：加载清单**从 game.js 派生** =================
+     以前这里写死成"7 个基础文件 + 所有 `sc-*.js`" —— 于是**任何不叫 `sc-` 的页面层都不会被加载**
+     （2.0 的 `js/overhaul-2.0.js` 正好不是 `sc-` 开头）。
+     后果是典型的"审计环境才生效"：尺子测的是 A，真机跑的是 B（任务书 §15 明令禁止）。
+     现在直接读 `game.js` 里的 `require('./js/xxx.js')` **按真实顺序**加载 ——
+     真机加载什么，尺子就加载什么；以后再加文件也不用回来同步这份清单。 */
+  function runtimeList() {
+    const out = [];
+    try {
+      const src = fs.readFileSync(path.join(ROOT, 'game.js'), 'utf8');
+      src.replace(/require\(['"]\.\/js\/([^'"]+)['"]\)/g, (m, f) => { out.push(f); return m; });
+    } catch (e) {}
+    /* 兜底：万一 game.js 读不到（老环境），退回原来的写法，不许因此少加载界面层 */
+    if (!out.length) {
+      return ['wx-adapter.js', 'data.js', 'core.js', 'battle.js', 'dungeon.js', 'cv.js', 'uiw.js']
+        .concat(fs.readdirSync(JS).filter((f) => /^sc-.*\.js$/.test(f)));
+    }
+    return out;
+  }
+  runtimeList().forEach((f) => {
+    const p = path.join(JS, f);
+    if (fs.existsSync(p)) require(p);
+  });
   const CV = global.CV;
   CV.setup(global.wx.getWindowInfo());
   return { CV, Core: global.Core, D: global.DATA, U: global.GameGlobal.U, G: global.GameGlobal, TEXT, store, ROOT, JS };

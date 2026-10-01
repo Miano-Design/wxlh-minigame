@@ -33,6 +33,7 @@
 
   /* ---------- 招募页 ---------- */
   CV.register('recruit', function () {
+    let pagePrimaryAssigned = false;
     const S = Core.S;
     U.begin();
     /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 5 条）：页头那个 ⓘ 照网页版
@@ -80,10 +81,8 @@
          （U.btnRow 只会把宽度**放大**到铺满，放大不会造成折行）。 */
       const near = CV.W < 360 * CV.SCALE;
       const oneLabel = fst.left > 0
-        ? (fst.ready ? (near ? ('免费抽 1 次（剩 ' + fst.left + '）') : ('免费抽 1 次（今日还剩 ' + fst.left + ' 次）'))
-          : (payLabel + ' · 免费还差 ' + mmss(fst.waitSec)))
-        : payLabel;
-      const tenLabel = (tk && tk.n >= 10) ? ('十连（' + tkIco + ' ' + tkName + '×10）') : ('十连（' + tenText + '）');
+        ? (fst.ready ? '免费抽' : '单抽') : '单抽';
+      const tenLabel = '十连';
       U.card(function () {
         U.h3(p.name);
         /* 招募券行（网页版 .ticket-row）：有券 = 金色实线，没券 = 灰虚线 */
@@ -125,12 +124,12 @@
           }
         }
         {
-          const one = { label: oneLabel, style: freeNow ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') };
+          const one = { label: oneLabel, style: (freeNow && !pagePrimaryAssigned) ? 'gold' : 'ghost', id: 'pull1:' + pid + (freeNow ? ':free' : '') };
           /* R1.5 UX 轮（§三十三）：每张池卡里原来**两颗都是金底**（免费抽 ＋ 十连），
              页面上一共五颗金按钮 —— 分不出主次。口径：**免费/单抽＝主按钮**（不花钱那一下），
              十连降成中性实底（default）；"免费次数用完了"时单抽自动变 ghost，
              那时十连才是这张卡唯一的主按钮。 */
-          const ten = { label: tenLabel, style: freeNow ? 'default' : 'gold', id: 'pull10:' + pid };
+          const ten = { label: tenLabel, style: (!freeNow && !pagePrimaryAssigned) ? 'gold' : 'default', id: 'pull10:' + pid };
           /* ================= V1.1.16（0927-Y 数值轮 · 报告 §6-8①）：普通池多一颗「连抽 ×10」 =================
              点数到了中后期没有出口（建筑点满后 90 天剩 **727 万 ◉**，报告 §四/§6-8），
              而普通池单抽 ◉500 就是现成出口 —— 缺的只是"一次点 100 下"。
@@ -138,7 +137,7 @@
              「连抽 ×10（◉45,000）」（＝10 次十连 ＝ 100 抽），点了先出一个确认弹窗报价。
              别的池不加（限定池/高级池的货币本来就紧，给它们开口子等于改那条线的定价）。 */
           const bulk = pid === 'normal'
-            ? { label: '连抽 ×10（' + Object.keys((p.ten || p.cost)).map((k) => curIcon(k) + fmt(((p.ten || p.cost)[k]) * 10)).join('') + ' · 共 100 抽）', style: 'ghost', id: 'pull100:' + pid }
+            ? { label: '百抽', style: 'ghost', id: 'pull100:' + pid }
             : null;
           /* 「一行放不放得下」必须**在卡片里量**（`U.iw()` 在卡内是卡内宽 268，在卡外是页宽 296）——
              第一版把这段算在 `U.card` 外面，于是拿 296 去判、实际只有 268，
@@ -155,6 +154,7 @@
           })();
           if (oneRowFits) U.btnRow([one, ten]);
           else { U.btnRow([one]); U.space(CV.SP[1]); U.btnRow([ten]); }   // 排不下 → 竖排（一颗一行、整宽）
+          if (!pagePrimaryAssigned && (freeNow || !oneLabel.startsWith('抽 1 次（'))) pagePrimaryAssigned = true;
           if (bulk) { U.space(CV.SP[1]); U.btnRow([bulk]); }
         }
         /* ================= V1.1.8（乙组 B7 · 高级池看广告免费 1 抽）=================
@@ -168,8 +168,9 @@
           const adLeft = G.AD.status ? G.AD.status('recruit_adv') : { ok: (G.AD.left ? G.AD.left('recruit_adv') : 0) > 0 };
           const adTail = G.AD.quotaText ? G.AD.quotaText('recruit_adv') : '';
           U.space(CV.SP[1]);
+          U.hint(adTail ? ('今日剩余 ' + adTail.replace(/^（|）$/g,'')) : '广告抽取次数按每日额度恢复', 3 * CV.SCALE);
           U.btnRow([{
-            label: '📺 看广告 · 免费 1 抽' + adTail,
+            label: '广告抽',
             style: 'ghost', id: adLeft.ok ? ('ad_pull1:' + pid) : '', dis: !adLeft.ok,
           }]);
         }

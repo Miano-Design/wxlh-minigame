@@ -278,7 +278,7 @@
         U.space(CV.SP[1]);
       }
       U.btnRow([{
-        label: blCost ? '命格升级（◆ ' + blCost.otherworld + ' + ◉ ' + fmt(blCost.points) + '）' : '已满级',
+        label: blCost ? '命格升级' : '已满级',
         /* V1.1.17（父亲大人 09-27 深夜）：满级 / 材料不够都走 dis（不再用 'noop' 假按钮）——
            差什么写在卡片上方那行材料 kv 与「已满级」标签里。 */
         style: 'ghost', id: (blCost && blMatOk) ? 'blup' : '', dis: !(blCost && blMatOk),

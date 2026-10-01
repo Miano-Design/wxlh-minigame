@@ -1160,8 +1160,8 @@ window.DATA = (function () {
   }
   const DIFFICULTY = [
     { id: 'normal', name: '普通', mult: 1.0, rewardMult: 1.0 },
-    { id: 'hard',   name: '困难', mult: 1.8, rewardMult: 1.6 },
-    { id: 'hell',   name: '地狱', mult: 3.2, rewardMult: 2.5 },
+    { id: 'hard',   name: '困难', mult: 1.35, rewardMult: 1.45 },
+    { id: 'hell',   name: '地狱', mult: 1.75, rewardMult: 2.0 },
   ];
   const FIRST_CLEAR = { // 世界首通奖励
     normal: { holy: 100, points: 500, otherworld: 300 },
@@ -2981,7 +2981,7 @@ window.DATA = (function () {
   const kejiById = id => KEJI.find(k => k.id === id) || null;
   // V9.5.70：整体压慢 ×1.25（这里统一乘，不用逐条改 42 条线的基础值）
   /* V9.6.134：异界结晶价格 ×1.55（并入技能芯片 / 血统结晶 / 深井徽记之后池子变大） */
-  const KEJI_COST_MULT = 1.25 * 1.55;
+  const KEJI_COST_MULT = 1.25 * 1.15;
   const kejiCost = (k, lv) => Math.round((k.base + k.step * lv) * KEJI_COST_MULT);
   /* V1.1.4（A12-F · 秘术阁接「秘卷残章」）——《收口2》§3.1：**每 5 级 1 张**（42 条线共 301 张）。
      账：§3.3 说 301 ÷ 4 张/天 ≈ 75 天，而秘术阁本身就是长线（42 条 × 20~60 级）→ 不会卡住。
@@ -3078,10 +3078,10 @@ window.DATA = (function () {
     { w: 'W36', name: '通关 灯阁王座·普通' },
   ];
   const GARDEN = [
-    { id: 'g1', name: '下品灵田', points: 800,   sec: 600,  out: { item: 'mat_t1', n: 5 },  extra: { item: 'beast_egg', n: 1, p: 0.15 } },
-    { id: 'g2', name: '中品灵田', points: 3200,  sec: 1800, out: { item: 'mat_t2', n: 8 },  extra: { item: 'beast_egg', n: 1, p: 0.25 } },
-    { id: 'g3', name: '上品灵田', points: 12000, sec: 3600, out: { item: 'mat_t3', n: 12 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
-    { id: 'g4', name: '极品灵田', points: 40000, sec: 7200, out: { item: 'mat_t4', n: 16 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
+    { id: 'g1', name: '下品灵田', points: 800,   sec: 600,  out: { item: 'mat_t1', n: 1 },  extra: { item: 'beast_egg', n: 1, p: 0.15 } },
+    { id: 'g2', name: '中品灵田', points: 3200,  sec: 1800, out: { item: 'mat_t2', n: 2 },  extra: { item: 'beast_egg', n: 1, p: 0.25 } },
+    { id: 'g3', name: '上品灵田', points: 12000, sec: 3600, out: { item: 'mat_t3', n: 3 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
+    { id: 'g4', name: '极品灵田', points: 40000, sec: 7200, out: { item: 'mat_t4', n: 4 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
   ];
   /* V1.1.4（A12-F · 药园接「灵植种」）——《收口2》§3.1：**每块地播 1 颗**，收成时**回收 70%**。
      账（同一条 §3.1）：播 10 收 7 ≈ 自循环，"永远不会卡住药园"；缺口由**副本材料档**与**市集**补
@@ -3218,7 +3218,7 @@ window.DATA = (function () {
   function fabaoRefineCost(f, lv) {                 // 第 lv → lv+1 级的花费
     const mul = { R: 1, SR: 1.6, SSR: 2.4, UR: 3.5 }[f.rarity] || 1;
     // V9.6.134：异界结晶价格 ×1.55（同 KEJI / 增强化）
-    return { otherworld: Math.round(280 * mul * Math.pow(1.16, lv)), mat: FABAO_REFINE_MAT[f.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.1, lv))) };
+    return { otherworld: Math.round(180 * mul * Math.pow(1.14, lv)), mat: FABAO_REFINE_MAT[f.rarity], matN: Math.max(2, Math.round(2 * mul * Math.pow(1.1, lv))) };
   }
   const MOUNTS = [
     { id: 'mt01', name: '铁甲蜥', rarity: 'N',  cost: { points: 10000 },                                          pct: { hpPct: 0.04 },  desc: '生命 +4%' },
@@ -3323,7 +3323,7 @@ window.DATA = (function () {
     lv: i + 1, desc, req: authorityReq(i + 1),
   }));
   // 权限加成：按"哪些等级属于哪条效果"累加，界面与实装共用这一份数据
-  const AUTHORITY_PER_LV = { idlePct: 0.06, expPct: 0.04, capHours: 0.5, sweep: 4, offlinePct: 0.05, allPct: 0.05 };
+  const AUTHORITY_PER_LV = { idlePct: 0.05, expPct: 0.035, capHours: 0.45, sweep: 3, offlinePct: 0.04, allPct: 0.04 };
   const AUTHORITY_STEPS = {
     idlePct: [1, 4, 9, 13, 17],
     expPct: [1, 6, 11, 16, 18],             // V1.0.1：+18 —— Lv.18 原来是个空级（见 AUTHORITY_DESC 上面的注释）

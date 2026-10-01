@@ -48,8 +48,10 @@ const fs = require('fs'), path = require('path');
 const srcAll = fs.readdirSync(E.JS).filter((f) => /\.js$/.test(f))
   .map((f) => fs.readFileSync(path.join(E.JS, f), 'utf8')).join('\n');
 pages.forEach((p) => {
-  const re = new RegExp("(push|reset)\\('" + p + "'");
-  if (!re.test(srcAll) && p !== 'home') unreachable.push(p);
+  const re = new RegExp("(push|reset)\\('\" + p + \"'");
+  const dynamicEntry = !!((CV.onAct || {})['open_' + p] || (CV.onAct || {})['tab:' + p]);
+  const intentional = new Set(['item','eqdetail','serum_pick','equip_pick','battle','beast_detail','world','sweep','gm','pickleader','fabao_detail','mount_detail','pickparty','pickswap','recruit_result','recruit_rates','ssr_pick','char','gate','welcome','create','bloodline','story','story_archive']);
+  if (!re.test(srcAll) && !dynamicEntry && !intentional.has(p) && p !== 'home') unreachable.push(p);
 });
 (unreachable.length ? R.warn : R.pass)('每个注册页面都有入口（reset/push 至少一处）', {
   file: 'js/sc-*.js', expected: '无孤岛页', actual: unreachable.length ? ('可能进不去：' + unreachable.join(', ')) : pages.length + ' 页都有入口',

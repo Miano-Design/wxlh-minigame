@@ -65,7 +65,10 @@ async function scenario(opt) {
   G.Battle.run = function () { return opt.lose ? LOSE : WIN; };
   /* 先把"来源页"摆出来（照现有尺子的真入口） */
   opt.enter();
-  CV.scroll = opt.scroll == null ? 380 : opt.scroll;
+  const requestedScroll = opt.scroll == null ? 380 : opt.scroll;
+  /* 只允许测试真正可能存在的源位置：页面没有这么长就按 maxScroll 夹回，
+     避免把"不可到达的 380"当成真实玩家现场。 */
+  CV.scroll = Math.min(requestedScroll, Math.max(0, CV.maxScroll || 0));
   const src = page(), srcStack = stackNames(), srcScroll = CV.scroll;
   opt.start();                                   // 真正开打
   const panel = await waitPanel();
