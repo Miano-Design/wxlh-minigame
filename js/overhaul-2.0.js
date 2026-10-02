@@ -68,13 +68,22 @@
   function storyLine(w){
     try { if(G.Story&&G.Story.clueOf) return G.Story.clueOf(w.id,'post')||G.Story.clueOf(w.id,'in')||''; } catch(e){} return '';
   }
-  /* ================= R3.4（父亲大人 2026-10-02：「3，你安排，怎么合理怎么来」）=================
-     主页格子的"还没开放"标记。判据**只读 `D.HOME_GROUPS` 的 `unlock` 字段**（那份是真源），
-     用 `Core.isUnlocked` 问它现在开了没有 —— 与页面底部那句「还没解锁：…」**同一份来源、同一个判据**，
-     两处再也不会一个说开了、一个说没开。
-     ⚠️ 只改**显示**：入口照旧能进（"能看不能领"——里面动手时由 `Core` 拦，并给出"通关 X 解锁"的原因）。 */
-  const LOCK_OF=(function(){ const m={}; (D.HOME_GROUPS||[]).forEach(function(g){ g.members.forEach(function(x){ if(x.unlock) m[x.id]=x.unlock; }); }); return m; })();
-  function isLocked(id){ return !!LOCK_OF[id] && !Core.isUnlocked(LOCK_OF[id]); }
+  /* ================= R3.7（父亲大人 2026-10-02：「这些还没解锁的就不显示了吧，等解锁了再显示」）=================
+     主页那两排格子**只摆已经开放的**：没开的不占位，开一个冒一个。
+     判据**不在本文件** —— 走 `G.homeVis.locked()`（sc-home.js 那一份，与开场引导的文案同源）：
+        · R3.4 我曾经把没解锁的格子"标个 🔒 灰着摆出来"（那时父亲大人要"合理就行"），
+          他看过之后定了口径：**干脆不摆**；
+        · 没解锁的功能**不是消失**：页面底部那行「还没解锁：… ›」照样点得进"怎么解锁"页。 */
+  function isLocked(id){ return G.homeVis ? G.homeVis.locked(id) : false; }
+  /* 过滤一行格子：锁着的不画。`U.tiles` 的列数不变（剩几格就摆几格，从左往右排）。
+     顺手把"这一排真画了哪几格"登记到 `G.homeRowNames[rowId]` —— 开场引导的文案读它，
+     于是"引导说的"永远等于"屏幕上摆的"（这一条以前写死过两轮，每次都因为格子改动而对不上）。 */
+  function visTiles(list, rowId){
+    const out = list.filter(function (t) { return !isLocked(t[0]); });
+    G.homeRowNames = G.homeRowNames || {};
+    G.homeRowNames[rowId] = out.map(function (t) { return t[1]; });
+    return out;
+  }
   /* ⚠️ 原来这里还有一份 `renderHome()`（51~91 行）——**死代码**：真正挂上去的是下面的
      `CV.panels.home → renderHomeBody()`，那一份从来没被调用过。
      两套首页实现放在同一个文件里，改一处忘一处就分叉（任务书 §15「不允许两套实现」）。
@@ -291,19 +300,21 @@
        顺序与内容照他念的来；`grid:daily` / `grid:grow` 两个**锚点 id 不变**（新手指引还指着它们）。 */
     const dots={}; dailySignals().forEach(function(s){ dots[s[0]]=true; });
     U.sectionTitle('日常');
-    U.tiles([
-      ['open_tasks','任务','',null,!!dots.open_tasks,isLocked('open_tasks')],
-      ['open_garden','药园','',null,false,isLocked('open_garden')],
-      ['open_recruit','招募','',null,!!dots.open_recruit,isLocked('open_recruit')]
-    ],3,'grid:daily');
+    /* R3.7：锁着的不占位 —— 新档这一排只有「药园」（任务要 W01-4、招募要 W01-1），
+       推图开一个冒一个。底栏那句「还没解锁：…」仍然写着它们怎么开。 */
+    U.tiles(visTiles([
+      ['open_tasks','任务','',null,!!dots.open_tasks],
+      ['open_garden','药园','',null,false],
+      ['open_recruit','招募','',null,!!dots.open_recruit]
+    ], 'daily'),3,'grid:daily');
     U.sectionTitle('常去的地方');
-    U.tiles([
-      ['open_party','队伍','',null,false,isLocked('open_party')],['open_grow','成长','',null,false,isLocked('open_grow')],
-      ['open_arena','斗法台','',null,false,isLocked('open_arena')],['open_keji','秘术阁','',null,false,isLocked('open_keji')],
-      ['open_fabao','法宝','',null,false,isLocked('open_fabao')],['open_mount','坐骑','',null,false,isLocked('open_mount')],
-      ['open_beast','伴生体','',null,false,isLocked('open_beast')],['open_shop','市集','',null,false,isLocked('open_shop')],
-      ['open_sign','点灯','',null,!!dots.open_sign,isLocked('open_sign')]
-    ],3,'grid:grow');
+    U.tiles(visTiles([
+      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
+      ['open_arena','斗法台','',null,false],['open_keji','秘术阁','',null,false],
+      ['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
+      ['open_beast','伴生体','',null,false],['open_shop','市集','',null,false],
+      ['open_sign','点灯','',null,!!dots.open_sign]
+    ], 'grow'),3,'grid:grow');
     /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名）
        R2.9：它与上面那排格子**贴在一起了** —— `U.tiles` 画完不留下沿间距，卡片直接接着画。
        这里按全站口径补一道卡间距（`U.cardGap()` —— 与 `U.card` 用的是同一个派生值）。 */
@@ -329,10 +340,10 @@
        原首页底部就是这一排（`[玩法指南][设置与存档]`）——指南在设置里已有、不再重复摆。
        ⚠️ `D.HOME_GROUPS` 里**没有**设置（它不是养成/日常线），所以必须单独摆一行；
           成就原来在「日常」那排，跟着这次调整挪到这里。 */
-    U.tiles([
-      ['open_ach','成就','',null,!!dots.open_ach,isLocked('open_ach')],
+    U.tiles(visTiles([
+      ['open_ach','成就','',null,!!dots.open_ach],
       ['open_settings','设置与存档']
-    ],3,'grid:sys');
+    ], 'sys'),3,'grid:sys');
   }
   CV.on('ov_continue',function(){ const w=currentWorld(); if(!w)return; CV.dispatch('w:'+w.id); });
   CV.on('ov_story',function(){ const w=currentWorld(); if(G.Story&&G.Story.openWorld) G.Story.openWorld(w.id,'post'); else CV.dispatch('w:'+w.id); });
