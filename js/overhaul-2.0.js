@@ -75,18 +75,49 @@
     const s=S(),w=currentWorld(),st=(s.worlds&&s.worlds[w.id])||{stages:{normal:[]}},stage=nextStage(w.id,'normal');
     const prog=(st.stages&&st.stages.normal||[]).filter(Boolean).length;
     const p=s.player||{};
-    /* ① 主角卡 */
-    U.card(function(){
-      const top=U.y, r=17*CV.SCALE, cx=U.ix()+r, cy=top+r;
-      CV.round(cx-r,cy-r,r*2,r*2,r,CV.a(CV.C.panel2,.55),CV.a(CV.C.gold,.35));
-      CV.text(CV.fit(String(Core.charName('@player')||'执灯者').slice(0,1),r*1.4,CV.FS.f1,true),cx,cy+1*CV.SCALE,{size:CV.FS.f1,bold:true,align:'center',color:CV.C.gold});
-      const tx=U.ix()+r*2+10*CV.SCALE;
-      CV.text(CV.fit(String(Core.charName('@player')||'执灯者'),U.iw()-r*2-70*CV.SCALE,CV.FS.f1,true),tx,top+8*CV.SCALE,{size:CV.FS.f1,bold:true});
-      CV.text('Lv.'+(p.level||0)+' · '+(p.bloodline||'未定命格'),tx,top+27*CV.SCALE,{size:CV.FS.sm,color:CV.C.dim});
-      CV.text('战力 '+fmt(Core.playerPower?Core.playerPower():0),U.ix()+U.iw(),top+8*CV.SCALE,{size:CV.FS.sm,color:CV.C.gold,align:'right'});
-      U.y=top+r*2+6*CV.SCALE;
-      U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'主角详情','ghost','open_protag'); U.y+=U.BTN_SM*CV.SCALE;
-    });
+    /* ================= ① 主角卡（R2.7 · 父亲大人："主角的角色卡按之前那样做，内容展示详细点"）==
+       原来（老首页 `.card.text-rows`）是**四行【标签】值 + 行间虚线，整块可点进角色页**：
+         【境界】当前境界 + 已突破 N/36 阶
+         【等级】Lv.N + EXP x%
+         【主角】六维待分 N · 技能待加 N      ← 有点数才高亮，没点数是灰的
+         【转生】N 世 + 权限 Lv.N · 评级 Lv.N
+       我上一版图省事压成了"头像 + 名字 + Lv + 战力 + 一颗按钮"，信息少了 —— 按原样铺回四行。
+       四行**各自登记一颗热区**（`hero:0..3`）：开局引导要逐项讲，只有整卡一颗锚点没法只高亮某一行。 */
+    {
+      const st = Core.realmState(), au = Core.authorityInfo(), sect = Core.sectInfo();
+      const prows = [
+        ['【境界】', st.curName || '未定命格', st.hasBloodline ? ('已突破 ' + st.realm + ' / ' + D.REALM_STAGE_COUNT + ' 阶') : ''],
+        ['【等级】', 'Lv.' + p.level, p.level >= D.PLAYER_MAX_LV ? 'EXP MAX'
+          : 'EXP ' + Math.floor(((p.exp || 0) / (D.EXP_TABLE[p.level] || 1)) * 100) + '%'],
+        ['【主角】', '六维待分 ' + (p.attrPoints || 0) + ' · 技能待加 ' + (p.skillPoints || 0), ''],
+        ['【转生】', (p.reincarnations || 0) + ' 世', '权限 Lv.' + au.lv + ' · 评级 Lv.' + sect.lv],
+      ];
+      const cardH = U.card(function(){
+        const rowH = 33.5 * CV.SCALE, top = U.y;
+        prows.forEach(function(r, i){
+          const cy = top + rowH * i + rowH / 2;
+          CV.text(r[0], U.ix(), cy, { size: CV.FS.md, color: CV.C.dim });
+          const vw = CV.measure(r[1], CV.FS.lg, true);
+          const sw = r[2] ? CV.measure(r[2], CV.FS.sm) + 8 * CV.SCALE : 0;
+          /* 有点数才金、没有就灰（父亲大人："没有待加的时候灰字就行，不用一直高亮"） */
+          const vc = (i === 0 && st.hasBloodline) ? CV.C.gold
+            : i === 2 ? ((p.attrPoints || p.skillPoints) ? CV.C.gold : CV.C.dim) : CV.C.text;
+          CV.text(CV.fit(r[1], U.iw() - 28 * CV.SCALE - sw, CV.FS.lg, true), U.ix() + U.iw() - vw - sw, cy,
+            { size: CV.FS.lg, bold: true, color: vc });
+          if (r[2]) CV.text(r[2], U.ix() + U.iw(), cy, { size: CV.FS.sm, color: CV.C.dim, align: 'right' });
+          CV.hit('hero:' + i, U.ix(), cy - rowH / 2, U.iw(), rowH);
+          if (i < prows.length - 1) {
+            CV.ctx.save();
+            CV.ctx.strokeStyle = CV.C.lineSoft; CV.ctx.setLineDash([4, 4]); CV.ctx.lineWidth = 1;
+            CV.ctx.beginPath(); CV.ctx.moveTo(U.ix(), top + rowH * (i + 1) - .5); CV.ctx.lineTo(U.ix() + U.iw(), top + rowH * (i + 1) - .5); CV.ctx.stroke();
+            CV.ctx.restore();
+          }
+        });
+        U.y = top + rowH * prows.length;
+      });
+      /* 整块可点 → 角色页（四行是引导锚点，真动作还是这一颗） */
+      CV.hit('open_protag', U.pad(), U.y - cardH - CV.SP[2], U.cw(), cardH);
+    }
     /* ② 当前旅程 */
     U.card(function(){
       /* R2.3（父亲大人截图点名：「当前旅程」和「灯阁王座」压在一起）——
