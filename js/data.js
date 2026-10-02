@@ -18,6 +18,11 @@ window.DATA = (function () {
   /* MYTH 是**装备**的最高档（血统神装），角色永远不会有这个稀有度；
      放进来是为了让"按稀有度取颜色"的界面（小游戏 canvas 就是这么取的）不用各自兜底。 */
   const RARITY_COLOR = { N: '#9aa4b2', R: '#4da3ff', SR: '#b06bff', SSR: '#ffb03a', UR: '#ff5fa2', MYTH: '#e6b64c' };
+  /* 药园 3.0 的**统一种植价**（2026-10-02 · 父亲大人提案）。
+     ⚠️ 它必须声明在这里（文件顶部的基础常量区）：百科正文（GUIDE_CHAPTERS，第 2283 行那条）
+       要引用它，而 const 是 TDZ —— 放在下面那张药园表里，正文读到它就 "Cannot access before
+       initialization"（改这一轮时当场踩过）。其余药园常量（地块表 / 概率表）仍在药园那一段。 */
+  const GARDEN_PLANT_COST = 1500;
   const STAR_MULT = [1, 1.10, 1.22, 1.36, 1.52, 1.70];
   const RARITY_MAXSTAR = { N: 3, R: 4, SR: 5, SSR: 6, UR: 6 };
   /* V9.6.129（父亲大人两条一起定）：
@@ -2280,7 +2285,7 @@ window.DATA = (function () {
     ] },
     { id: 'garden', title: '⑯ 药园 · 斗法台 · 法宝', body: [
       '这三条都不占队伍位置、不用操作，是「等着收菜」型的成长线。',
-      '**药园**：开局给 4 块地，之后每通关 9 张图多开 1 块（最多 8 块）。花 ◉ 点数种下灵田，等时间到收强化材料（上品/极品还会额外掉装备箱）。种下去就能去干别的，回来点「一键全收」一次收完——这是点数除了强化、招募之外的第三个出口，也是强化材料不用死刷副本的一条路。',
+      '**药园**：开局 2 块地，往后用 ◉ 点数开垦新地（最多 8 块，越到后面越贵）。播种**统一价 ◉ ' + GARDEN_PLANT_COST + ' ＋ 1 颗灵植种**，**种下去才知道**是下品 / 中品 / 上品 / 极品——抽到哪一档，就按那一档等时间（20 分 ~ 3 小时）、收那一档的材料，上品 / 极品还会额外掉装备箱。种下去就能去干别的，回来点「一键全收」一次收完——这是点数除了强化、招募之外的第三个出口，也是强化材料不用死刷副本的一条路。',
       '**斗法台**：单机没有真 PVP，所以做成「镜像擂台」——守擂者按你自己的队伍战力换算，台数越高越强。每天 5 次，赢了升一台拿 ◆ 异界结晶，输了退一台（保底第 1 台，永远不会卡死）。推图推不动的时候，这里是最稳的异界结晶来源。',
       /* V1.0.1（文案策划会诊）：实装 buyFabao 扣的是 **◉ 点数**，原文写 ◆ 异界结晶 ——
          货币种类写错，玩家会攒错钱。 */
@@ -3069,19 +3074,42 @@ window.DATA = (function () {
      （W09 / W18 / W27 / W36 各一块）。
      为什么不直接给到 10 块：一块极品灵田 2 小时产 16 个 T4 材料，
      8 块已经是"养成材料基本不用刷副本"的量；再多就把副本的材料掉落架空了。 */
-  const GARDEN_PLOTS = 4;
-  const GARDEN_MAX = 8;
-  const GARDEN_PLOT_REQ = [
-    { w: 'W09', name: '通关 巨兽孤屿·普通' },
-    { w: 'W18', name: '通关 白墙疗养院·普通' },
-    { w: 'W27', name: '通关 长明夜行·普通' },
-    { w: 'W36', name: '通关 灯阁王座·普通' },
-  ];
+  /* ================= 药园 3.0（2026-10-02 · 父亲大人提案）=================
+     他的原话：「药园统一种植的价格吧，然后再随机的出现下品、中品、上品、极品……八块灵田都统一价格，
+     然后点种植后再出现种出什么灵田、需要多久这样，然后前期只给两块灵田，然后加一个新增灵田的按钮，
+     最多买到八块，然后购买价格按开启的数量递增」。
+
+     落地时康康补了两条（都是为了不把药园做成坑）：
+       · **概率随进度加权**（对上他早先定的"各个功能都最好能跟着游戏进程一起发展"）：
+         前期多下品/中品，后期多上品/极品 —— 否则中后期一块地老出 T1（那时候 T1 已经没用了）。
+       · **期望值必须 ≥ 投入的 1.1 倍**（本工程的老红线，`test_game` 钉着）：
+         改之前实测四种灵田是 **0.25~0.31 倍**（投入 800~40000 ◉，收成只值 200~12000 ◉）——
+         药园当时是个**亏本买卖**，那两条断言一直是红的。这一轮把账掰回来。 */
+  const GARDEN_PLOTS = 2;              // 开局两块（父亲大人 2026-10-02：「前期只给两块灵田」）
+  const GARDEN_MAX = 8;                // 最多买到八块
+  /* 开第 i+1 块地的价钱（下标 = 已开数量）——按开启数量递增，最后那块是长线目标。
+     锚点：认真档日收入 ◉ 5.9 万（W01）→ 23 万（W36），所以第 3/4 块开局当天就能买，
+     第 8 块（50 万）是后期一两天的收入。 */
+  const GARDEN_PLOT_PRICE = [0, 0, 2000, 6000, 20000, 60000, 180000, 500000];
+  /* ⚠️ 统一种植价 `GARDEN_PLANT_COST` 声明在**文件顶部的基础常量区**（百科正文要引用它，
+     这里读不到会踩 TDZ）—— 别在本地再写一份。 */
+  /* 四档品质：**产出与时长一起给**（父亲大人："点种植后再出现种出什么灵田、需要多久"）——
+     时长按品质拉开，于是"回来收"这件事有自己的节奏，也顺带限住了刷的频率。 */
   const GARDEN = [
-    { id: 'g1', name: '下品灵田', points: 800,   sec: 600,  out: { item: 'mat_t1', n: 1 },  extra: { item: 'beast_egg', n: 1, p: 0.15 } },
-    { id: 'g2', name: '中品灵田', points: 3200,  sec: 1800, out: { item: 'mat_t2', n: 2 },  extra: { item: 'beast_egg', n: 1, p: 0.25 } },
-    { id: 'g3', name: '上品灵田', points: 12000, sec: 3600, out: { item: 'mat_t3', n: 3 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
-    { id: 'g4', name: '极品灵田', points: 40000, sec: 7200, out: { item: 'mat_t4', n: 4 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
+    { id: 'g1', name: '下品灵田', sec: 20 * 60,  out: { item: 'mat_t1', n: 5 }, extra: { item: 'beast_egg', n: 1, p: 0.15 } },
+    { id: 'g2', name: '中品灵田', sec: 40 * 60,  out: { item: 'mat_t2', n: 4 }, extra: { item: 'beast_egg', n: 1, p: 0.25 } },
+    { id: 'g3', name: '上品灵田', sec: 90 * 60,  out: { item: 'mat_t3', n: 3 }, extra: { item: 'box_sr', n: 1, p: 0.20 } },
+    { id: 'g4', name: '极品灵田', sec: 180 * 60, out: { item: 'mat_t4', n: 3 }, extra: { item: 'box_ssr', n: 1, p: 0.15 } },
+  ];
+  /* 品质概率（三档进度，权重顺序＝GARDEN 的 下/中/上/极）。折算成材料替代价后的期望：
+       前期 60/30/8/2   → 1668 ◉ = 投入的 **1.11 倍**
+       中期 40/35/20/5  → 2270 ◉ = **1.51 倍**
+       后期 30/35/28/7  → 2642 ◉ = **1.76 倍**
+     最差的一档（下品 5 个 T1 = 1000 ◉）是投入的 0.67 倍 —— 抽到差的会心疼，但不至于像旧版那样只剩三成。 */
+  const GARDEN_ODDS = [
+    { upTo: 7,  w: [60, 30, 8, 2] },     // 前期 W01–W08
+    { upTo: 19, w: [40, 35, 20, 5] },    // 中期 W09–W20
+    { upTo: 999, w: [30, 35, 28, 7] },   // 后期 W21+
   ];
   /* V1.1.4（A12-F · 药园接「灵植种」）——《收口2》§3.1：**每块地播 1 颗**，收成时**回收 70%**。
      账（同一条 §3.1）：播 10 收 7 ≈ 自循环，"永远不会卡住药园"；缺口由**副本材料档**与**市集**补
@@ -3119,14 +3147,15 @@ window.DATA = (function () {
      从中间劈开、也不会在行尾留一个孤零零的「·」。网页版把两截用「 → 」连起来当一句。
      （V9.6.141：这正是父亲大人指出"药园排版明显有问题"的那一行。） */
   function gardenRowLines(kind, state, leftSec) {
-    const head = state === 'empty'
-      /* V1.1.4（A12-F · 药园接「灵植种」）：把"还要一颗种子"写进**这一行数据**里 ——
-         两端共用这一份文案，所以不会出现"网页版写了、小游戏没写"这种分叉。
-         收获那一截补一句"回收 70%"，否则玩家看到种子在减少会以为药园是纯消耗、
-         就不敢升级地块了（这一句是解释，不是数字展示，所以放在收成那一截）。 */
-      ? ('可种「' + kind.name + '」：◉ ' + kind.points + ' + ' + gardenItemName(GARDEN_SEED) + '×' + GARDEN_SEED_N + ' · ' + Math.round(kind.sec / 60) + ' 分钟')
-      : (state === 'ready' ? '已成熟，可以收了' : ('成熟还需 ' + fmtClock(leftSec || 0)));
-    return [head, '收 ' + gardenYieldText(kind) + (state === 'empty' ? '（种子回收 ' + Math.round(GARDEN_SEED_RECYCLE * 100) + '%）' : '')];
+    /* ================= 药园 3.0 简版（2026-10-02 · 父亲大人第二轮）=================
+     原话：「现在文案太长了……下面的灵田只要还没种就显示一个种植的按钮就行了，
+     种完显示什么品阶和倒计时就行了，不用像现在写的那么复杂」。
+     ⇒ 这一行**只说状态**：空地什么都不写（右边那颗「播种」就是全部信息）、
+       生长中只留倒计时、熟了只留"可以收了"。价格 / 能收什么 / 各品阶概率
+       全部收进**上面那张大卡片**（见 sc-lines.js 药园头部卡），一屏之内不重复说第二遍。 */
+    if (state === 'empty') return [];                       // 空地：行里只有「空地」＋右侧按钮
+    if (state === 'ready') return ['可以收了'];
+    return ['成熟还需 ' + fmtClock(leftSec || 0)];
   }
   function gardenRowText(kind, state, leftSec) {
     return gardenRowLines(kind, state, leftSec).join(' → ');
@@ -4439,7 +4468,8 @@ window.DATA = (function () {
     SECT_MAX, SECT_PCT_PER_LV, sectExpNeed, sectBonusPct, SECT_EXP,
     KEJI, KEJI_COIN, kejiById, kejiCost, KEJI_MAT, KEJI_MAT_EVERY, kejiMatNeed,
     TRAVELS, TRAVEL_TOTAL_W, TRAVEL_STEPS_SEC,
-    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_REQ, GARDEN_SEED, GARDEN_SEED_N, GARDEN_SEED_RECYCLE, gardenYieldText, gardenRowText, gardenRowLines, fmtClock,
+    GARDEN, GARDEN_PLOTS, GARDEN_MAX, GARDEN_PLOT_PRICE, GARDEN_PLANT_COST, GARDEN_ODDS,
+    GARDEN_SEED, GARDEN_SEED_N, GARDEN_SEED_RECYCLE, gardenItemName, gardenYieldText, gardenRowText, gardenRowLines, fmtClock,
     ARENA_DAILY, arenaReward, arenaEnemy,
     FABAO, fabaoById,
     MOUNTS, mountById, MOUNT_PCT_NAME,

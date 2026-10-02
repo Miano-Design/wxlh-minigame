@@ -151,7 +151,10 @@ window.Core = (function () {
       keji:  getProxied({}),                  // 秘术阁（对标"KeJi"）：id → 等级
       travel:  getProxied({ bankSec: 0, pending: null, got: 0, round: 0, day: '' }),   // 挂机游历奇遇（对标"YouLi"）
       charExp: 0,               // 伙伴经验池（V9.5.46）：所有伙伴共用这一份，升级从这里扣、重生返还回来
-      garden: Array(4).fill(null),       // 药园（对标"洞府·药园"）：每块地 null 或 {kind, at}
+      /* 药园 3.0：开几块地由 `gardenPlots` 记（**玩家花点数买**，开局 2 块、最多 8 块）。
+         每块地 null，或 { q: 品质id, at: 成熟时间戳 }（`q` 就是种下去那一刻掷到的下品/中品/上品/极品）。 */
+      gardenPlots: 2,
+      garden: Array(D.GARDEN_MAX).fill(null),
       arena:  getProxied({ floor: 1, best: 1, date: '', used: 0 }),   // 斗法台（对标"Arena"）
       /* V9.6.130：法宝多一条"祭炼"等级线、坐骑多一条"喂养"等级线（父亲大人点头的方案）
          lvMap = { id → 等级 }；0 级＝刚买到时的原始效果 */
@@ -1016,6 +1019,22 @@ window.Core = (function () {
         S.reincarnWorldRestored = true;
       }
       const cf = S.corridor || (S.corridor =  getProxied({ floor: 1, best: 0 }));
+      /* ================= 药园 3.0 迁移（2026-10-02 · 父亲大人提案）=================
+         3.0 之前"开了几块地"是**算出来的**（基础 4 块 ＋ 通关 W09/W18/W27/W36 各一块）；
+         3.0 起改成"玩家花点数买、存在 `S.gardenPlots` 里"。
+         老档没有这个字段 → `fillDefaults` 会补上默认值 **2**，那等于**把老玩家的地收回两块**。
+         所以这里按**当年那条规则**算一遍补给他（只加不减），并留迁移标记。
+         ⚠️ 里程碑清单是**历史规则的快照**，故意写死在这里 —— 迁移代码就该冻在"当时那一刻"，
+            跟着新的表走会算错（同理别去读 D.GARDEN_PLOT_REQ，它已经删了）。 */
+      if (!S.gardenMigrated3) {
+        let legacy = 4;                                  // 3.0 之前的基础块数
+        ['W09', 'W18', 'W27', 'W36'].forEach(function (wid) {
+          const w = S.worlds[wid];
+          if (w && w.stages && w.stages.normal && w.stages.normal.every(function (x) { return x > 0; })) legacy++;
+        });
+        S.gardenPlots = Math.max(S.gardenPlots || D.GARDEN_PLOTS, Math.min(D.GARDEN_MAX, legacy));
+        S.gardenMigrated3 = true;
+      }
       if ((cf.floor || 1) <= 1 && (cf.best || 0) > 0 && !S.reincarnCorridorRestored) {
         cf.floor = cf.best + 1;                                // 深井停在哪层：唯一解（见上面的不变量）
         S.reincarnCorridorRestored = true;
@@ -4052,56 +4071,93 @@ window.Core = (function () {
   function gardenState() {
     if (!S.garden) S.garden = Array(D.GARDEN_MAX).fill(null);
     while (S.garden.length < D.GARDEN_MAX) S.garden.push(null);
-    /* V9.6.137：地按进度开 —— 已开的地正常玩，没开的挂一个 locked + 差哪张图。
-       地块索引固定（0..7），老存档那 4 块位置不变，后面 4 块只是解锁了才让种。 */
+    /* ================= 药园 3.0（2026-10-02 · 父亲大人提案）=================
+       地不再"按进度自动开"、也不再"第 i 块固定第 i%4 种灵田"：
+         · 开几块 = **玩家自己买**（S.gardenPlots，开局 2 块、最多 8 块、价按已开数量递增）；
+         · 种下去那一刻**掷品质**（下品/中品/上品/极品，概率随进度加权，见 data.js 的账），
+           收成与时长都跟着那一档走 —— 所以"这块地现在是哪一档"必须读**存档里那一块**，
+           不能再从地块索引推。 */
     const total = gardenPlots();
-    /* 原来 `D.GARDEN.map` 只产出 4 项（4 种灵田一一对应 4 块地）——
-       扩地不是加"新种类"，而是**同一种可以多种一块**：第 i 块地固定取第 i%4 种灵田，
-       所以 8 块 = 下品/中品/上品/极品各 2 块。这样不用给每块地再做一个"选种子"的界面。 */
     const out =  getProxied([]);
     for (let i = 0; i < D.GARDEN_MAX; i++) {
-      const g = D.GARDEN[i % D.GARDEN.length];
       const plot = S.garden[i] || null;
       const locked = i >= total;
       const leftMs = plot ? Math.max(0, plot.at - Date.now()) : 0;
-      out.push( getProxied({ idx: i, kind: g, plot, locked, req: locked ? (D.GARDEN_PLOT_REQ[i - D.GARDEN_PLOTS] ||  getProxied({})).name : '', leftMs, ready: !!plot && leftMs <= 0 }));
+      /* `kind` 只在**已经种着**时才有值 = 掷出来的那一档；空地没有 kind。
+         老档（3.0 之前）存的是 { id:'g1', at } —— 由 plotKindOf 兼容读出来。 */
+      const g = plot ? plotKindOf(plot) : null;
+      out.push( getProxied({ idx: i, kind: g, plot, locked, leftMs, ready: !!plot && leftMs <= 0 }));
     }
     return out;
   }
-  /* 现在开了几块地：基础 4 块 + 每通关 9 张图 1 块 */
+  /* 现在开了几块地：**玩家买出来的**（S.gardenPlots）。老档在 loadSave 里做一次迁移补齐。 */
   function gardenPlots() {
-    let n = D.GARDEN_PLOTS;
-    D.GARDEN_PLOT_REQ.forEach((r) => {
-      const w = S.worlds[r.w];
-      if (w && w.stages && w.stages.normal && w.stages.normal.every((x) => x > 0)) n++;
-    });
+    const n = Math.max(D.GARDEN_PLOTS, Math.floor(S.gardenPlots || D.GARDEN_PLOTS));
     return Math.min(D.GARDEN_MAX, n);
   }
+  /* 开下一块地要多少 ◉（买满返回 0 = 不能再买） */
+  function gardenNextPrice() {
+    const n = gardenPlots();
+    return n >= D.GARDEN_MAX ? 0 : (D.GARDEN_PLOT_PRICE[n] || 0);
+  }
+  /* 存档里那块地种的是哪一档：新档存 q（品质 id）；老档只存 id（3.0 之前的灵田 id） */
+  function plotKindOf(plot) {
+    const key = plot && (plot.q || plot.id);
+    return D.GARDEN.find(x => x.id === key) || D.GARDEN[0];
+  }
+  /* 掷品质：按**进度**取一张权重表（前期多下品、后期多上品/极品）。
+     进度只认一个数：S.player.bestWorldIdx（历史最高通关世界下标，0 起）—— 与别处同一口径。 */
+  function gardenOdds() {
+    const idx = Math.max(0, S.player.bestWorldIdx || 0);
+    const band = D.GARDEN_ODDS.find(b => idx <= b.upTo) || D.GARDEN_ODDS[D.GARDEN_ODDS.length - 1];
+    return band.w.slice();
+  }
+  function gardenRollQuality() {
+    const w = gardenOdds(), sum = w.reduce((a, b) => a + b, 0);
+    let r = Math.random() * sum;
+    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r < 0) return D.GARDEN[i]; }
+    return D.GARDEN[0];
+  }
+  /* 买地：价钱按"已开数量"递增（第 3 块起），买满 8 块为止 */
+  function buyGardenPlot() {
+    const n = gardenPlots();
+    if (n >= D.GARDEN_MAX) return  getProxied({ ok: false, msg: `最多 ${D.GARDEN_MAX} 块，已经满了` });
+    const price = gardenNextPrice();
+    if (!canAfford( getProxied({ points: price }))) return  getProxied({ ok: false, msg: `◉ 点数不足（新增灵田需要 ${fmtNum(price)}）` });
+    spend( getProxied({ points: price }));
+    S.gardenPlots = n + 1;
+    save();
+    return  getProxied({ ok: true, msg: `开垦了第 ${n + 1} 块灵田（◉ ${fmtNum(price)}）` });
+  }
   function plantGarden(idx, gardenId) {
-    if (idx >= gardenPlots()) return  getProxied({ ok: false, msg: `这块地还没开（${(D.GARDEN_PLOT_REQ[idx - D.GARDEN_PLOTS] ||  getProxied({})).name || '继续推图'}）` });
-    const g = D.GARDEN.find(x => x.id === gardenId);
-    if (!g) return  getProxied({ ok: false, msg: '没有这种灵田' });
+    if (idx >= gardenPlots()) return  getProxied({ ok: false, msg: '这块地还没开（在下面点「新增灵田」）' });
     if (S.garden[idx]) return  getProxied({ ok: false, msg: '这块地还种着东西' });
-    if (!canAfford( getProxied({ points: g.points }))) return  getProxied({ ok: false, msg: `◉ 点数不足（需要 ${fmtNum(g.points)}）` });
+    const cost = D.GARDEN_PLANT_COST;
+    if (!canAfford( getProxied({ points: cost }))) return  getProxied({ ok: false, msg: `◉ 点数不足（播种需要 ${fmtNum(cost)}）` });
     /* V1.1.4（A12-F · 药园接「灵植种」）：每块地 1 颗（《收口2》§3.1）。
        收成时回收 70%（见 harvestGarden）→ 播 10 收 7，自循环；缺口由副本材料档与市集补（不设卡）。 */
     const seedId = D.GARDEN_SEED, seedN = D.GARDEN_SEED_N || 1;
     if ((S.items[seedId] || 0) < seedN) {
       return  getProxied({ ok: false, msg: `${(D.ITEMS[seedId] ||  getProxied({})).name || seedId} 不足（${S.items[seedId] || 0}/${seedN}，市集可买）` });
     }
-    spend( getProxied({ points: g.points }));
+    /* 掷品质 → 收成与时长都跟着它走。**掷的结果直接落在存档里**（收成时按存档读，
+       绝不重掷一次），否则"看到的"和"收到的"就是两回事。 */
+    const g = gardenRollQuality();
+    spend( getProxied({ points: cost }));
     addItem(seedId, -seedN);
-    S.garden[idx] =  getProxied({ id: g.id, at: Date.now() + g.sec * 1000 });
+    S.garden[idx] =  getProxied({ q: g.id, at: Date.now() + g.sec * 1000 });
     task('gard1', 1);           // 0929-I 额外任务：药园种植 1 次（周常 w_garden 由 TASK_SRC['gard1']='garden' 自动喂）
     save();
-    return  getProxied({ ok: true, msg: `已种下「${g.name}」，${Math.round(g.sec / 60)} 分钟后可收` });
+    return  getProxied({ ok: true, kind: g, msg: `种出了「${g.name}」，${D.fmtClock(g.sec)}后可以收` });
   }
   // 收获一块地；熟了才让收（没熟的提示还剩多久）
   function harvestGarden(idx) {
     const p = S.garden[idx];
     if (!p) return  getProxied({ ok: false, msg: '这块地是空的' });
     if (Date.now() < p.at) return  getProxied({ ok: false, msg: `还没熟（剩 ${Math.ceil((p.at - Date.now()) / 1000)} 秒）` });
-    const g = D.GARDEN.find(x => x.id === p.id);
+    /* 收成读**存档里那一档**（3.0 起存 `q`；老档只有 `id`，由 plotKindOf 兼容）——
+       不在收成时重掷，玩家看到的那一档就是拿到的那一档。 */
+    const g = plotKindOf(p);
     const got =  getProxied([]);
     // 收获一律保底：装得下进背包，装不下进待领箱——绝不出现"地清了、东西没了"
     const take = (id, n) => {
@@ -5578,7 +5634,7 @@ window.Core = (function () {
     sectInfo, sectBonusPct, addSectExp,
     kejiLv, kejiCostOf, kejiBonus, kejiUp,
     travelAccrue, travelTick, travelProgress, travelEverySec, pendingTravel, claimTravel, rollTravel, rewardTextOf,
-    gardenState, gardenPlots, plantGarden, harvestGarden, harvestAllGarden,
+    gardenState, gardenPlots, gardenNextPrice, gardenOdds, buyGardenPlot, plantGarden, harvestGarden, harvestAllGarden,
     arenaState, arenaSettle, fabaoState, buyFabao, wearFabao, refineFabao, fabaoLv, fabaoEffMul, feedMount, mountLv, mountBonusPct,
     mountState, buyMount, wearMount, applyMount,
     signState, drawSign, signIdleMult,

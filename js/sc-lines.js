@@ -369,12 +369,53 @@
       /* V9.6.137：地按进度开（基础 4 块，每通关 9 张图多 1 块，最多 8 块）。
          没开的地也画出来、灰着并写清"通关哪张图开"，玩家才知道药园还能扩。 */
       U.h3('药园', busy + ' 块在用 · 已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块');
-      U.note('有几率出稀有物（兽魂石 / 装备箱）', 2 * CV.SCALE);
-      /* V1.1.4（A12-F · 药园接「灵植种」）：播种要 1 颗种子、收成回收 70% ——
-         颗数写在卡片顶上（每一行都再报一遍会刷屏），来源也写出来，
-         不然"一颗种子都没有"的玩家只会看到一颗点不动的按钮。 */
+      /* ================= 药园 3.0 简版（2026-10-02 · 父亲大人第二轮）=================
+         原话：「上面的大卡片就写**种田的价格、可以获得什么东西、以及各个品阶灵田的概率**就行了」。
+         ⇒ 这一张卡就是**全部规则**，地列表那边不再重复任何一句（只留状态与倒计时）：
+           ① 价格（统一价 ＋ 1 颗灵植种）
+           ② 能收到什么（四档材料 ＋ 稀有掉落）
+           ③ 各品阶概率（**读当前进度那一档的权重表**，不是写死的四行数字 ——
+              概率是随进度变化的，写死就成假公示了）
+         种子颗数留在这里：它是"播种按钮能不能点"的依据（没有种子时按钮是禁用态）。 */
+      U.kv('统一种植价', '◉ ' + D.GARDEN_PLANT_COST + ' ＋ ' + (seedItem.name || '灵植种') + '×' + (D.GARDEN_SEED_N || 1));
+      /* 材料 / 概率都用**整行说明**（`U.note` 独占一行、能自己折行）——
+         kv 的值列只有一小半宽，四档材料名或四个百分号一定被 `CV.fit` 砍成「基础金属 / 强化合金 / 异界…」
+         （第一版就是这么被砍的）。稀有掉落**去重**：下品与中品都会掉兽魂石，不去重就是"兽魂石 / 兽魂石"。 */
+      U.note('可收：' + D.GARDEN.map(function (g) { return D.gardenItemName(g.out.item); }).join(' / '), 1 * CV.SCALE);
+      const rare = [];
+      D.GARDEN.forEach(function (g) { const nm = g.extra && D.gardenItemName(g.extra.item); if (nm && rare.indexOf(nm) < 0) rare.push(nm); });
+      U.note('可收稀有：' + rare.join(' / '), 1 * CV.SCALE);
+      /* 品阶概率：四档排成一条**按品阶上色**的梯子（下品暗灰 → 极品金），
+         与地列表里那颗品阶名同一套颜色（`CV.tierColor`）—— 玩家扫一眼就知道"哪个是好的"。
+         一行放不下（320 小屏四个百分号挤不下）就自动折到下一行。
+         ⚠️ 文案只说玩家看得懂的事：「越往后越容易出好品阶」——**不写**"概率随进度加权"那种
+            实现口径（父亲大人 2026-10-02：「不要开发者自己看的文案」）。 */
+      const odds = Core.gardenOdds();
+      const sum = odds.reduce(function (a, b) { return a + b; }, 0);
+      const segs = [{ t: '品阶概率', c: CV.C.dim }].concat(D.GARDEN.map(function (g, i) {
+        return { t: g.name.replace('灵田', '') + ' ' + Math.round(odds[i] / sum * 100) + '%', c: CV.tierColor(i) };
+      })).concat([{ t: '（越往后越容易出好品阶）', c: CV.C.dim }]);
+      const segGap = 6 * CV.SCALE, segLh = CV.FS.md * 1.75;
+      const segRows = [[]];
+      let segW = 0;
+      segs.forEach(function (s) {
+        const w = CV.measure(s.t, CV.FS.md) + segGap;
+        if (segW + w > U.iw() && segRows[segRows.length - 1].length) { segRows.push([]); segW = 0; }
+        segRows[segRows.length - 1].push(s); segW += w;
+      });
+      const segTop = U.y + 1 * CV.SCALE;
+      U.draw(function () {
+        segRows.forEach(function (row, ri) {
+          let x0 = U.ix();
+          row.forEach(function (s) {
+            CV.text(s.t, x0, segTop + segLh * (ri + 0.5), { size: CV.FS.md, color: s.c });
+            x0 += CV.measure(s.t, CV.FS.md) + segGap;
+          });
+        });
+      });
+      U.y = segTop + segLh * segRows.length + 1 * CV.SCALE;
+      U.space(CV.SP[1]);
       U.kv((seedItem.icon || '') + ' ' + (seedItem.name || '灵植种'), String(seedHave), seedHave > 0 ? CV.C.text : CV.C.dangerText);
-      U.hint('每通关 9 张图多开 1 块，同一种灵田可以多种一块。', 2 * CV.SCALE);
       if (seedHave <= 0) U.hint('没有种子：副本有概率掉、市集可买（◉）。', 2 * CV.SCALE);
     });
     U.card(function () {
@@ -404,14 +445,22 @@
         const chipH = CV.FS.xs * 1.4 + 2 * CV.SCALE;
         const state = p.locked ? '🔒 未开垦' : (p.plot ? p.kind.name : '空地');
         /* ⚠️ 必须用 p.kind，不能写 D.GARDEN[i] —— 地和灵田是"循环对应"，扩到 8 块后 D.GARDEN[4] 是 undefined */
+        /* 未开垦的那几行现在只说一件事：**多少钱能开**（价钱按已开数量递增，见下表）。
+           3.0 之前这里写的是"通关 XX 后开放" —— 规则换了，那句话已经不成立。 */
+        const nextPrice = Core.gardenNextPrice();
         const desc = p.locked
-          ? (p.req ? (p.req + ' 后开放') : '继续推图后开放')
+          ? ('未开垦 · 点下面「新增灵田」用 ◉ ' + nextPrice + ' 开出来')
           : D.gardenRowText(p.kind || {}, !p.plot ? 'empty' : (ready ? 'ready' : 'growing'), p.leftMs / 1000);
         /* 说明那一列要**让开右边的按钮**（网页版是 flex 兄弟节点，天然不许叠）——
            这也是"文字从按钮底下穿过去"这一类缺陷的根治写法。 */
         const colW = U.iw() - chipW - gapX - (p.locked ? 0 : bw + gapX);
         const t1H = CV.FS.f1 * 1.35, t2H = CV.FS.sm * 1.55;     // .list-row .t1 / .t2 line-height
         const l1 = CV.wrapTokens(state, colW, CV.FS.f1, 1);
+        /* 品阶名**按品阶上色**（父亲大人："不同的灵田品阶要用不同的颜色展示，现在都是白色"）：
+           生长中/成熟的地显示的是掷到的品阶 → 走 `CV.tierColor`；空地是灰的、没开垦是更暗的灰。
+           颜色只在标题这一行 —— 下面的倒计时与按钮保持中性，别整行花掉。 */
+        const tierIdx = p.plot ? D.GARDEN.indexOf(p.kind) : -1;
+        const t1Color = p.locked ? CV.C.text2 : (tierIdx >= 0 ? CV.tierColor(tierIdx) : CV.C.dim);
         const l2 = CV.wrapTokens(desc, colW, CV.FS.sm);
         const h = padY * 2 + l1.length * t1H + 4 * CV.SCALE + l2.length * t2H;
         U.draw(function () {
@@ -420,7 +469,7 @@
           CV.round(U.ix(), cy - chipH / 2, chipW, chipH, CV.RADIUS_SM, null, p.locked ? CV.C.line : CV.C.line2);
           CV.text('第 ' + (i + 1) + ' 块', U.ix() + chipW / 2, cy, { size: CV.FS.xs, align: 'center', color: CV.C.text2 });
           l1.forEach(function (ln, k) {
-            CV.text(ln, cx, y0 + t1H * (k + 0.5), { size: CV.FS.f1, bold: true, color: p.locked ? CV.C.text2 : CV.C.text });
+            CV.text(ln, cx, y0 + t1H * (k + 0.5), { size: CV.FS.f1, bold: true, color: t1Color });
           });
           l2.forEach(function (ln, k) {
             CV.text(ln, cx, y0 + l1.length * t1H + 4 * CV.SCALE + t2H * (k + 0.5),
@@ -451,7 +500,27 @@
         U.y = top + h;
       });
       U.space(CV.SP[1]);
+      /* 「新增灵田」已经提到地列表**上面**那一张卡里（见药园头部之后那段）—— 这里只留收成。 */
       U.btnRow([{ label: '一键收成熟的地', style: 'ghost', id: 'garden_all' }]);
+      /* ================= 药园 3.0（父亲大人第二轮："新增灵田放到最下面"）=================
+         第一版我把它提到地列表**上面**（怕它藏在八行地后面没人看见），他明确要求放最下面 ——
+         照办：**地列表 → 一键收 → 新增灵田**，它就是这个面板的最后一行。
+         价钱按已开数量递增（第 3 块 2000 → 第 8 块 50 万），买满就换成一句说明。 */
+      const left = D.GARDEN_MAX - Core.gardenPlots();
+      if (left > 0) {
+        const price = Core.gardenNextPrice();
+        U.space(CV.SP[2]);
+        U.btnRow([{ label: '新增灵田（第 ' + (Core.gardenPlots() + 1) + ' 块）◉ ' + price,
+                    style: 'primary', id: 'garden_buy', dis: !Core.canAfford({ points: price }) }]);
+        U.space(CV.SP[1]);
+        /* 文案只说玩家关心的事：还能开几块。**不写**"价钱按已开数量递增"这种实现口径
+           （父亲大人 2026-10-02：「不要开发者自己看的文案」）——价钱就在上面那颗按钮上，
+           玩家看得见"下一块多少钱"。 */
+        U.hint('已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块（还能再开 ' + left + ' 块）', 0);
+      } else {
+        U.space(CV.SP[2]);
+        U.hint('灵田已经开满（' + D.GARDEN_MAX + ' 块）。', 0);
+      }
     });
   });
   /* ================= V1.1.17（父亲大人 09-27 深夜 · 派单 Z-A，**他点名的第二处**）=================
@@ -467,9 +536,12 @@
   for (let gi = 0; gi < D.GARDEN_MAX; gi++) {
     (function (i) {
       CV.on('garden_plant:' + i, function () {
-        const r = Core.plantGarden(i, (D.GARDEN[i % D.GARDEN.length] || {}).id);
-        /* F7 ②：地块当场变成"生长中"（看得见 → 删成功）；"这块地还没开"这类前置不足留。 */
-        if (!r.ok) CV.toast(r.msg || '种不了');
+        /* 药园 3.0：**不用再传灵田 id** —— 品质是 `plantGarden` 内部掷出来的，
+           掷的结果落在这块地上（`S.garden[i].q`），收成时按它结算。 */
+        const r = Core.plantGarden(i);
+        /* F7 ②：掷到哪一档是**一次性信息**（别处看不到：那一刻才知道要等多久）→ 必须说。
+           "这块地还没开 / 种子不够"这类前置不足也留。 */
+        if (r.msg) CV.toast(r.msg);
         CV.render();
       });
       CV.on('garden_get:' + i, function () {
@@ -484,6 +556,12 @@
     const r = Core.harvestAllGarden();
     /* F7 ②：一次性奖励（一次收了几块地）→ 留，本来就是最短的一句。 */
     CV.toast(r.msg || '有成熟的地就收了');
+    CV.render();
+  });
+  /* 药园 3.0：新增灵田（价钱与上限都由逻辑层把关，这里只报结果） */
+  CV.on('garden_buy', function () {
+    const r = Core.buyGardenPlot();
+    if (r.msg) CV.toast(r.msg);
     CV.render();
   });
 

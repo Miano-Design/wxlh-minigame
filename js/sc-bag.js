@@ -748,7 +748,8 @@
            （灰 → 白 → 绿 → 金，从差到好；都是既有色令牌，不新造色），标题也不再写档位词。 */
       const ownByKey = {};
       ((rq && rq.perAffix) || []).forEach((a) => { ownByKey[a.k] = a; });
-      const TIER_COLOR = { '粗': CV.C.dim, '良': CV.C.text, '优': CV.C.gain, '极': CV.C.gold };
+      /* 品阶配色**不再本地写一份**：与药园那块地共用 `CV.tierColor`（0 粗/下品 → 3 极/极品） */
+      const TIER_COLOR = { '粗': CV.tierColor(0), '良': CV.tierColor(1), '优': CV.tierColor(2), '极': CV.tierColor(3) };
       Object.keys(est.affix || {}).forEach((k) => {
         const band = D.affixRange ? D.affixRange(k, eq.rarity) : null;
         const v = '+' + (est.affix[k] * 100).toFixed(1) + '%';
