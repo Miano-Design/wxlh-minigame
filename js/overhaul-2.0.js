@@ -121,6 +121,8 @@
       CV.hit('open_protag', U.pad(), U.y - cardH - CV.SP[2], U.cw(), cardH);
     }
     /* ② 当前旅程 */
+    /* 「今天有什么可收」先算一次（当前旅程卡与下面的挂机卡都用它；算不动就当没有） */
+    const homeTk = (function(){ try { return Core.todayState ? Core.todayState() : null; } catch(e){ return null; } })();
     U.card(function(){
       /* R2.3（父亲大人截图点名：「当前旅程」和「灯阁王座」压在一起）——
          原稿是 `U.hint('当前旅程')` 之后**手画**一个大字：`U.hint` 只推进 11px 行高，
@@ -134,6 +136,27 @@
       const pp=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,pp)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
       U.space(CV.SP[1]);   /* R2.5：说明/进度条与按钮之间留一口气（父亲大人："这个也是"贴在一起） */
       U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,stage>=0?'继续探索':'查看新世界','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE;
+      /* ================= R3.0 阶段五（GPT 复审建议 + 红点规则）=================
+         「底栏'灯阁'那格的红点是按**挂机可领**亮的，可挂机卡在第 7 屏段 —— 玩家点了红点要往下翻才找得到」
+         ⇒ 红点必须对应一个**立即能完成的动作**（点下去 5 秒内能收完）。
+         所以：把挂机收益**提一行到当前旅程卡里**（优先级：继续探索 > 收取挂机）——
+           · 有得收时才出现（`idleReady` 或 `claimable>0`），没有就整行不占空间；
+           · 右边一颗**小**按钮（不是第二个大按钮），动作仍是后端既有的 `claim_all`；
+           · 下面那张完整挂机卡**保留**（派人分工 / 广告加速都在那儿），两处不重复收费、只是入口更近。 */
+      if (homeTk && (homeTk.idleReady || homeTk.claimable > 0)) {
+        U.space(CV.SP[1]);
+        const iw2 = homeTk.idle || {}, mins2 = Math.floor((homeTk.idleSeconds || 0) / 60);
+        const sum = [];
+        if (iw2.points) sum.push('◉' + fmt(iw2.points));
+        if (iw2.otherworld) sum.push('◆' + fmt(iw2.otherworld));
+        if (!sum.length) sum.push('可领 ' + homeTk.claimable + ' 项');
+        const bw2 = 64 * CV.SCALE, bh2 = U.BTN_SM * CV.SCALE;
+        const rowTop = U.y;
+        CV.text(CV.fit('挂机收益 ' + sum.join(' · ') + (mins2 ? '（已攒 ' + mins2 + ' 分）' : ''),
+          U.iw() - bw2 - 10 * CV.SCALE, CV.FS.sm), U.ix(), rowTop + bh2 / 2, { size: CV.FS.sm, color: CV.C.gold });
+        U.btn(U.ix() + U.iw() - bw2, rowTop, bw2, bh2, '领取', 'ghost', 'claim_all');
+        U.y = rowTop + bh2;
+      }
     });
     /* ③ 挂机收益（2.0 那版丢了这块，底栏红点却照旧亮）
        ⚠️ R2.8（父亲大人 2026-10-02："把挂机收益放到常去的地方下面"）：
@@ -257,7 +280,10 @@
        R2.9：原来这一行后面拖着一长串括号说明（"（坐骑 · 炼化台 · …）"），父亲大人要
        **把那句注释去掉** —— 去掉说明、只留一行的入口本身（不删入口，否则那几项就没有入口了）。 */
     U.space(CV.SP[1]);
-    const hAll=U.hint('全部系统  ›', 0);
+    /* R3.0（GPT 复审：`全部系统 ›` 保留、但改名）——
+       "全部系统"太像后台；这一行通向的其实是**成长体系总览**（坐骑/炼化/评级/权限/铭刻/伴生体/图鉴/转生），
+       所以在《残域》的语境里叫「更多成长 ›」。入口与动作（`open_grow`）不变。 */
+    const hAll=U.hint('更多成长  ›', 0);
     CV.hit('open_grow', U.ix()-2, U.y-hAll, U.iw()+4, hAll);
     /* 未解锁的功能照样能查"怎么解锁"（这一行就是 `open_locked` 的入口） */
     {
