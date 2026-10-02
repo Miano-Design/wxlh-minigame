@@ -87,8 +87,13 @@
     });
     /* ② 当前旅程 */
     U.card(function(){
+      /* R2.3（父亲大人截图点名：「当前旅程」和「灯阁王座」压在一起）——
+         原稿是 `U.hint('当前旅程')` 之后**手画**一个大字：`U.hint` 只推进 11px 行高，
+         而标题用的是 17px 字号、画在 `U.y + 2`，两者的字框直接叠上（截图就是那个样子）。
+         现在改用全站统一的卡内标题通用件 `U.h3` —— 它自己管"标签行 → 标题"的间距与行高，
+         和别的卡片（队伍/成长/法宝…）完全一致，不会再各写一套。 */
       U.hint('当前旅程');
-      CV.text(w.name,U.ix(),U.y+2*CV.SCALE,{size:CV.FS.f2,bold:true}); U.y+=24*CV.SCALE;
+      U.h3(w.name);
       U.note(stage>=0?'第 '+(stage+1)+'/12 关 · '+String(w.mechanic).split('：')[0]:'普通难度 12/12 已完成',4*CV.SCALE);
       const bw=U.iw(),by=U.y+8*CV.SCALE; CV.round(U.ix(),by,bw,5*CV.SCALE,3*CV.SCALE,CV.a(CV.C.line,.8),null);
       const pp=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,pp)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
