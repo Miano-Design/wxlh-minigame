@@ -155,7 +155,11 @@
       ['open_realm','长期成长','境界 / 铭刻跟着推进解锁'],
       ['open_buildings','基础收益','挂机、离线、强化效率一起涨'],
     ];
-    rows.forEach(function(x){ U.card(function(){ U.h3(x[1]); U.note(x[2],1*CV.SCALE); U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'去看看','ghost',x[0]);U.y+=U.BTN_SM*CV.SCALE;}); });
+    /* R2.4（父亲大人截图点名：说明文字跟「去看看」贴在一起）——
+       实测：说明行（12px 字、行高 1.75）画完 U.y 就停在**它自己那一行的下沿**，
+       紧接着按钮的顶边就压在那里 —— 字框下沿离按钮只剩 3px（窄屏上就是贴住）。
+       按项目里别处同一口径（主页挂机卡、各类"说明 → 按钮"的卡）**先留一口气再放按钮**。 */
+    rows.forEach(function(x){ U.card(function(){ U.h3(x[1]); U.note(x[2],1*CV.SCALE); U.space(CV.SP[1]); U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'去看看','ghost',x[0]);U.y+=U.BTN_SM*CV.SCALE;}); });
     U.sectionTitle('其他系统');
     U.tiles([
       ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
