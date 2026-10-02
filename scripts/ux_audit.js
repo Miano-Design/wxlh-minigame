@@ -457,6 +457,44 @@ const islands = PAGES.filter((p) => TABS.indexOf(p) < 0 && entered.indexOf(p) < 
   });
 }
 
+/* ---------- ⑫b 帧首清屏：换页不许把上一帧留在屏幕上（2026-10-02 父亲大人） ----------
+   现场：新档签完《灯阁契约》进起名页，**契约那张卡还留在屏幕上**，和起名卡叠着。
+   根因不在排版 —— `CV.render()` 以前**从来不擦画布**，靠"铺底渐变不透明"顺手盖住上一帧；
+   10-02 那道渐变为了"底图透得出来"收到 50% alpha，于是**没有底图的页面**（`welcome` / `create`）
+   把上一页的像素当底图透了出来。
+   这条尺子只问一件事：**每一帧的第一笔画的是不是 clearRect** ——
+   是，换页就不可能留鬼影；不是，将来任何一次"把底色调透明"都会让同一个病复发。
+   （实现：包一层 ctx 记账；`_env` 的假画布对任何方法都返回函数，所以这里只看"调用顺序"。） */
+{
+  const seq = [];
+  const inner = CV.ctx;
+  const WATCH = ['clearRect', 'fillRect', 'fillText', 'drawImage', 'beginPath', 'fill', 'stroke'];
+  CV.ctx = new Proxy(inner, {
+    get(t, k) {
+      if (WATCH.indexOf(k) >= 0) {
+        return function () { seq.push(k); const f = t[k]; if (typeof f === 'function') return f.apply(t, arguments); };
+      }
+      const v = t[k];
+      return typeof v === 'function' ? v.bind(t) : v;
+    },
+    set(t, k, v) { t[k] = v; return true; },
+  });
+  const bad = [];
+  const probe = ['home', 'dungeon', 'bag', 'grow', 'welcome', 'create', 'gate', 'bloodline', 'story'];
+  probe.forEach((p) => {
+    if (!CV.panels[p]) return;
+    seq.length = 0;
+    let err = null;
+    try { CV.reset(p); } catch (e) { err = String((e && e.message) || e); }
+    if (err) return;
+    if (seq[0] !== 'clearRect') bad.push(p + '（首笔=' + (seq[0] || '无绘制') + '）');
+  });
+  CV.ctx = inner;
+  (bad.length ? R.fail : R.pass)('每一帧的第一笔都是"擦干净画布"（换页不留上一帧的鬼影）', {
+    file: 'js/cv.js', expected: '渲染序列以 clearRect 开头', actual: bad.length ? bad.join(' ; ') : '9 页全部以 clearRect 起笔',
+  });
+}
+
 /* ---------- ⑬ 需要前置状态、静态渲染不了的页面（诚实记录，不算 PASS） ---------- */
 if (blocked.length) {
   R.note('⚠️ 需真实前置状态、本轮静态渲染不了的页面（**未验证**）：' + blocked.map((p) => p + '(' + String(results[p].err).slice(0, 40) + ')').join(' ; '));

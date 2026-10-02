@@ -47,15 +47,31 @@
       text: '① 角色卡：你的身份和状态都在这 —— 境界（修为阶段）、等级、待分配的属性/技能点、转生次数。 点开这张卡，里面的六维我接着讲。' },
     { key: 'tut_blk1x', page: 'protag', target: 'attr_card', back: true, where: '角色卡',
       text: '这就是六维：升级拿到的属性点在这里一点一点加，每一维管什么下面都写着（生命/速度/技能伤害…）。 看完我带你回首页，接着讲别的。' },
-    { key: 'tut_blk2', page: 'home', target: 'grid:grow',
+    /* ================= R3.2（父亲大人 2026-10-02）："把养成区和日常换一下，先讲日常，再讲养成，
+       养成讲完着重讲下成长的二级界面里还有其他功能" =================
+       顺序照他念的改：② 日常 → ③ 养成 → ④ 成长的二级页 → ⑤ 主线。
+       ⚠️ 每一句文案都必须与**屏幕上真有的东西**逐字对得上（那两排是读 `D.HOME_GROUPS` 摆的）：
+          · 日常（`grid:daily`）= 任务 / 药园 / 招募；
+          · 常去的地方（`grid:grow`）= 队伍 / 成长 / 斗法台 / 秘术阁 / 法宝 / 坐骑 / 伴生体 / 市集 / 点灯。
+       上一版②那句还写着"法宝、市集、点灯…"却没提坐骑/伴生体，而且把两排的顺序讲反了 ——
+       父亲大人："这个是老版本的介绍了"。 */
+    { key: 'tut_blk2', page: 'home', target: 'grid:daily',
+      /* R2.9：日常那排收紧成三格（任务 / 药园 / 招募），点灯、市集、成就分别挪到「常去的地方」
+         与底部那一排 —— 这句文案同步改，别再说屏幕上没有的东西。 */
+      text: '② 日常：每天最先做的三件 —— 任务（悬赏＋每日＋周常并成一页，页头能一键领取）、药园、招募。 有红点的就是"有东西可领"，别让它亮着。' },
+    { key: 'tut_blk3', page: 'home', target: 'grid:grow',
       /* V1.1.5（A2）：这一排**按常用度从高到低**排。
          R2.9（父亲大人 2026-10-02）：首页那两排的成员调整过（药园/成就挪走、市集/点灯挪进来），
          文案**跟着实际内容改**——引导说的话必须和玩家看到的那排一致，否则等于教学错了。 */
-      text: '② 养成区：养成线都在这排格子里 —— 队伍、斗法台、秘术阁、法宝、市集、点灯…排在前面的每天都要回来点，越靠后越少动。前期不用全点，缺什么补什么。' },
-    { key: 'tut_blk3', page: 'home', target: 'grid:daily',
-      /* R2.9：日常那排收紧成三格（任务 / 药园 / 招募），点灯、市集、成就分别挪到「常去的地方」
-         与底部那一排 —— 这句文案同步改，别再说屏幕上没有的东西。 */
-      text: '③ 日常：每天最先做的三件 —— 任务（悬赏＋每日＋周常并成一页，页头能一键领取）、药园、招募。 有红点的就是"有东西可领"，别让它亮着。' },
+      text: '③ 养成区：养成线都在这排格子里 —— 队伍、成长、斗法台、秘术阁、法宝、坐骑、伴生体、市集、点灯。越靠前的每天都要回来点，越靠后越少动；前期缺什么补什么。' },
+    /* ④-A（父亲大人："养成讲完**着重讲下成长的二级界面里还有其他功能**"）：
+       这一下是**真的点进去**（enter:true）—— 光说"里面还有别的"没用，得带他看一眼。 */
+    { key: 'tut_blk3x', page: 'home', target: 'open_grow', enter: true,
+      text: '这一排里的「成长」是总入口 —— 点开看一眼：主页摆不下的系统都收在里面。' },
+    /* ④-B：落在成长页，指着「其他系统」那一整块（`grid:ov_growth_more`，见 overhaul-2.0.js）。
+       `back:true` = 讲完自动退回灯阁，接着讲⑤（这条链的纪律：不横跨模块、不替他做决定）。 */
+    { key: 'tut_blk3y', page: 'grow', target: 'grid:ov_growth_more', back: true, where: '成长',
+      text: '④ 其他系统：铭刻、转生、图鉴、炼化台、灯阁评级、灯阁权限、境界渡劫、基地建设 —— 主页那排没有的都在这里，随进度一层层解锁。看完我带你回灯阁。' },
     { key: 'tut_blk4', page: 'home', enter: true,
       /* 锚点与文案**按当前进度算**（V1.1.5 · A3 的"兜底"）：
          还有没走完的主线步 → 指那颗「领取奖励 / 去完成」；
@@ -64,7 +80,7 @@
       text: function () {
         return mainQuestDone()
           ? '主线 27 步已经全部走完 —— 那张卡不再占位置了。之后每天回来，把「任务」那一格里的悬赏 / 每日 / 周常收一下就行（页头有一键领取）。'
-          : '详细怎么玩，跟着主线走就行 —— 每点一次「去完成」，我都会带你做那一步。 下面这条就是主线：做完一步回来领奖励，接着下一步。';
+          : '详细怎么玩，跟着主线走就行 —— 每点一次「去完成」，我都会带你做那一步。 这张卡就是主线：做完一步回来领奖励，接着下一步。';
       } },
   ];
   /* V9.6.69：首页那一行"还没解锁：…"点开要能看到"怎么解锁" —— 这里存一份当前未解锁的条目 */
@@ -500,6 +516,71 @@
   });
   CV.on('open_locked', function () { CV.push('locked'); });
 
+  /* ================= R3.2（父亲大人 2026-10-02："现在好像没有主线任务了，主线任务的入口在哪，
+     新手指引有提到，但没看到入口"）=================
+     背景：主线 27 步**只在主页那一张卡上**——父亲大人 09-26 定过口径：
+       「主线任务就直接放在主页按顺序完成」「全都完成后就可以直接把主线任务的卡片去掉」，
+     所以任务页里不再放主线（见 sc-last.js 顶上那段）。
+     可 2.0 换掉 `CV.panels.home` 时，这张卡**跟着旧首页一起被换掉了**，于是：
+       · 主页没有主线入口 —— 做完一步回来没地方领奖励，整条主线玩不下去；
+       · 开场链第 ④ 步（`tut_blk4`）与主页页面引导（PAGE_GUIDE）的锚点都是
+         `claim_quest` / `goto_quest`，这两颗按钮**只在这个旧首页里登记过** ⇒
+         新首页上永远找不到目标（`miss`），那一步既收不掉也不会亮。
+     修法：把这段卡**原样提出来**当公用件，一份实现喂两处 ——
+       新首页（overhaul-2.0.js 的 renderHomeBody）与下面这段旧正文都调 `G.homeQuestCard()`。
+     ⚠️ 不许在 overhaul 里再写第二份（两套实现＝改一处忘一处，任务书 §15）。
+     行为一个字没改：**27 步全部领完之后整卡不画**（判据见本文件顶部的 mainQuestDone()）。 */
+  function homeQuestCard() {
+    const mq = Core.mainQuestState();
+    const qi = mq.findIndex((x) => !x.claimed);
+    const q = qi < 0 ? null : mq[qi];
+    /* V1.1.5（A3）：**27 步全部领完之后，这张卡整块不画**（不留"主线 · 已走完"占位卡）。
+       父亲大人：「全都完成后就可以直接把主线任务的卡片去掉」+「不要放在那占位」。 */
+    if (!q) return 0;
+    return U.card(function () {
+      const BH = U.BTN_SM * CV.SCALE, top = U.y;
+      /* V9.6.93（父亲大人："主线任务那个板块大字和小字贴一起了"）：
+         网页版这块是 `.t1` + 两条 `.t2`，行距按 CSS 精确算：
+           .t1  font-size 15 · line-height 1.35 → 行盒 20.25
+           .t2  font-size 11 · line-height 1.55 → 行盒 17.05，且 **margin-top: 0.25rem = 4px**
+         小游戏以前把三行写死在 top+10 / top+24 / top+39（推进只有 14、15），
+         比网页版少了 6px 一行 —— 所以"大字和小字贴在一起"。
+         现在照 CSS 直接算，行盒高度决定卡片高度（网页版是内容撑高，不是按钮撑高）。 */
+      const LH1 = CV.FS.f1 * 1.35;              // 20.25 标题行
+      const LH2 = CV.FS.sm * 1.55;              // 17.05 小字行
+      const LGAP = 4 * CV.SCALE;                // .t2 的 margin-top
+      const y1 = LH1 / 2;                       // 标题中线
+      const label = q.done ? '领取奖励' : '去完成 ›';
+      const bw = CV.measure(label, CV.FS.md) + 26 * CV.SCALE;
+      const tag = '第 ' + (qi + 1) + '/' + mq.length + ' 步';
+      /* .tag：11px · line-height 1.4 + padding 1px 6px + border 1px → 盒高 19.4 */
+      const tagH = CV.FS.xs * 1.4 + 2 * CV.SCALE + 2 * CV.SCALE;
+      const tagW = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE + 2 * CV.SCALE;
+      const textW = U.iw() - bw - 10 * CV.SCALE;
+      /* V1.1.12（0927-B · 三机型复审）：单行 `CV.fit` 在 320 上把任务名砍成「主线 · 熟…」，
+         改成**折到两行**（步数标签永远跟第一行，与网页版 flex 行同义），
+         下面"完成条件/完成奖励"两行随标题行数整体下移 —— 卡片是内容撑高的，不会挤到下一张卡。 */
+      const titleLines = CV.wrap('主线 · ' + q.q.name, textW - tagW - 6 * CV.SCALE, CV.FS.f1, 2);
+      const tw = CV.measure(titleLines[0], CV.FS.f1, true);
+      titleLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y1 + i * LH1, { size: CV.FS.f1, bold: true }));
+      /* 标签和标题**同一中线**（.t1 是 align-items:center 的 flex 行） */
+      CV.round(U.ix() + tw + 6 * CV.SCALE, top + y1 - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
+      CV.text(tag, U.ix() + tw + 6 * CV.SCALE + tagW / 2, top + y1, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
+      /* V9.6.72 / V9.6.142：条件与奖励两行**按判定原样折行**（`check` 与 `desc` 必须一致）。 */
+      const condLines = CV.wrap('完成条件：' + q.q.desc, textW, CV.FS.sm, 2);
+      const rwLines = CV.wrap('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm, 2);
+      const y2top = titleLines.length * LH1 + LGAP;
+      condLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y2top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
+      const y3top = y2top + condLines.length * LH2 + LGAP;
+      rwLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y3top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
+      const blockH = y3top + rwLines.length * LH2;
+      /* 按钮跟整块内容**垂直居中**（.list-row 是 align-items:center），不是贴顶 */
+      U.btn(U.ix() + U.iw() - bw, top + (blockH - BH) / 2, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
+      U.y = top + blockH;                  // 内容撑高（每多折一行就多一个行盒）
+    });
+  }
+  G.homeQuestCard = homeQuestCard;
+
  CV.register('home', function () {
    const S = Core.S;
    U.begin();
@@ -557,70 +638,10 @@
     });
     CV.hit('open_protag', U.pad(), U.y - cardH - CV.SP[2], U.cw(), cardH);
 
-    /* ② 主线卡（网页版 questStrip） */
-    const mq = Core.mainQuestState();
-    const qi = mq.findIndex((x) => !x.claimed);
-    const q = qi < 0 ? null : mq[qi];
-    /* V9.6.2（父亲大人："网页版的这个主线卡间距很合理，小游戏显得卡片太大"）：
-       网页版主线卡是一行 .list-row（padding 0），**高度由右侧那个 40px 的按钮决定** →
-       卡片实测 71.3（= 40 + 上下内边距 28 + 边框）。小游戏原来把内容写死成 72 → 卡片 100，白白高了 30。
-       现在照网页版：内容块高 = 按钮高（40），标题/奖励两行在这个高度里排。 */
-    /* V1.1.5（A3）：**27 步全部领完之后，这张卡整块不画**（不留"主线 · 已走完"占位卡）。
-       父亲大人：「全都完成后就可以直接把主线任务的卡片去掉」+「不要放在那占位」。
-       连带处理见本文件顶部的 `mainQuestDone()`：指这张卡的引导（开场链 tut_blk4 与主页页面引导）
-       会改成指「任务」那一格，不会指着一颗不存在的按钮。 */
-    if (q) U.card(function () {
-      const BH = U.BTN_SM * CV.SCALE, top = U.y;
-      /* V9.6.93（父亲大人："主线任务那个板块大字和小字贴一起了"）：
-         网页版这块是 `.t1` + 两条 `.t2`，行距按 CSS 精确算：
-           .t1  font-size 15 · line-height 1.35 → 行盒 20.25
-           .t2  font-size 11 · line-height 1.55 → 行盒 17.05，且 **margin-top: 0.25rem = 4px**
-         小游戏以前把三行写死在 top+10 / top+24 / top+39（推进只有 14、15），
-         比网页版少了 6px 一行 —— 所以"大字和小字贴在一起"。
-         现在照 CSS 直接算，行盒高度决定卡片高度（网页版是内容撑高，不是按钮撑高）。 */
-      const LH1 = CV.FS.f1 * 1.35;              // 20.25 标题行
-      const LH2 = CV.FS.sm * 1.55;              // 17.05 小字行
-      const LGAP = 4 * CV.SCALE;                // .t2 的 margin-top
-      const y1 = LH1 / 2;                       // 标题中线
-      const y2 = LH1 + LGAP + LH2 / 2;          // 完成条件中线
-      const y3 = LH1 + LGAP + LH2 + LGAP + LH2 / 2;   // 完成奖励中线
-      {
-        const label = q.done ? '领取奖励' : '去完成 ›';
-        const bw = CV.measure(label, CV.FS.md) + 26 * CV.SCALE;
-        const tag = '第 ' + (qi + 1) + '/' + mq.length + ' 步';
-        /* .tag：11px · line-height 1.4 + padding 1px 6px + border 1px → 盒高 19.4 */
-        const tagH = CV.FS.xs * 1.4 + 2 * CV.SCALE + 2 * CV.SCALE;
-        const tagW = CV.measure(tag, CV.FS.xs) + 12 * CV.SCALE + 2 * CV.SCALE;
-        const textW = U.iw() - bw - 10 * CV.SCALE;
-        /* 标题要给右边的步数标签**留位置**（网页版是 flex 行：标题 + tag 同排，
-           标题过长时自己换行）—— 原来按未截断的宽度量，长任务名会把标签顶出卡片。 */
-        /* V1.1.12（0927-B · 三机型复审）：单行 `CV.fit` 在 320 上把任务名砍成「主线 · 熟…」
-           （主页那张"主线 · 一路推进"卡，实测 320×568）。
-           改成**折到两行**（步数标签永远跟第一行，与网页版 flex 行同义），
-           下面"完成条件/完成奖励"两行随标题行数整体下移 —— 卡片是内容撑高的，不会挤到下一张卡。 */
-        const titleLines = CV.wrap('主线 · ' + q.q.name, textW - tagW - 6 * CV.SCALE, CV.FS.f1, 2);
-        const tw = CV.measure(titleLines[0], CV.FS.f1, true);
-        titleLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y1 + i * LH1, { size: CV.FS.f1, bold: true }));
-        /* 标签和标题**同一中线**（.t1 是 align-items:center 的 flex 行） */
-        CV.round(U.ix() + tw + 6 * CV.SCALE, top + y1 - tagH / 2, tagW, tagH, CV.RADIUS_SM, null, CV.C.line2);
-        CV.text(tag, U.ix() + tw + 6 * CV.SCALE + tagW / 2, top + y1, { size: CV.FS.xs, color: CV.C.text2, align: 'center' });
-        /* V9.6.72（父亲大人："通关条件这一行小字注释吧，要符合实际"）：
-           desc 就是判定条件，原样写出来；check 和 desc 必须一致（网页版有审计规则⑥盯着）。 */
-        /* V9.6.142（父亲大人："伴生体的孵化那行字被省略了"顺带全站扫）：这两行也是单行 fit →
-           任务条件一长就被砍成「完成条件：打开主页最上面的主角卡，…」。
-           网页版那两行是 HTML，会自己折行；画布这边改成**折到最多两行**、卡片高度跟着算。 */
-        const condLines = CV.wrap('完成条件：' + q.q.desc, textW, CV.FS.sm, 2);
-        const rwLines = CV.wrap('完成奖励：' + Core.rewardTextOf(q.q.reward), textW, CV.FS.sm, 2);
-        const y2top = titleLines.length * LH1 + LGAP;
-        condLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y2top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
-        const y3top = y2top + condLines.length * LH2 + LGAP;
-        rwLines.forEach((ln, i) => CV.text(ln, U.ix(), top + y3top + LH2 * (i + 0.5), { size: CV.FS.sm, color: CV.C.dim }));
-        const blockH = y3top + rwLines.length * LH2;
-        /* 按钮跟整块内容**垂直居中**（.list-row 是 align-items:center），不是贴顶 */
-        U.btn(U.ix() + U.iw() - bw, top + (blockH - BH) / 2, bw, BH, label, q.done ? 'primary' : 'ghost', q.done ? 'claim_quest' : 'goto_quest');
-        U.y = top + blockH;                  // 内容撑高（每多折一行就多一个行盒）
-      }
-    });
+    /* ② 主线卡（网页版 questStrip）——
+       R3.2：实现提到上面的公用件 `homeQuestCard()`（新首页与这里共用同一份，
+       原来那坨只活在这段已被 overhaul-2.0.js 换掉的正文里，等于主线在新首页**没有入口**）。 */
+    homeQuestCard();
 
     /* ③ 养成（网页版 growBlock）：一条线一个入口 + 未解锁的收成一行灰字 */
     const keji = D.KEJI.reduce((a, k) => a + Core.kejiLv(k.id), 0);

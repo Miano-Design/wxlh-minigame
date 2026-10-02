@@ -1689,17 +1689,25 @@
     const lines = CV.wrap(textAll, CV.W - 60 * CV.SCALE, CV.FS.lg, 6);
     /* V9.6.108（父亲大人："去了那个小字后框也没跟着缩上去"）：
        卡片高度原来按"上下各 22"算（44），其中下面那 22 是留给「跳过这一步」那行小字的。
-       小字去掉之后，底部就多出一整条空白。现在按内容算：
-         有高亮 → 底部只留 10；
-         没高亮 → 底部留 20（那里还要写一行「点任意处继续 ›」）。 */
-    const padBottom = r ? 10 : 20;
-    const th = 22 * CV.SCALE + lines.length * CV.FS.lg * 1.7 + padBottom * CV.SCALE;
+       小字去掉之后，底部就多出一整条空白 —— 从此按内容算（下面那一段是最新一轮的收口：
+       上下**同宽**，有高亮 11 / 没高亮 24，因为后者底部还要写一行「点任意处继续 ›」）。 */
+    /* ================= 2026-10-02（父亲大人："文本框底部还有一行空白，去掉；
+       好像新手指引的文本框都会有这一行空白"）=================
+       真因：`CV.text` 的 y 是**字的中线**，而卡片高度却是按"顶上先留 22（≈半个行盒）＋ 每行一个
+       行盒 ＋ 底下 10/20"算的 —— 上下不对称：字块顶上只空 11px，底下却空了 21px，
+       正好看着像"文字下面还空着一行"。现在上下同宽（各 11），高度按行盒累加，
+       整张卡矮掉约 10px、字块在框里居中。
+       ⚠️ 没高亮那一条（`!r`）底部还要写一行「点任意处继续 ›」，所以它保留更宽的底边距。 */
+    const LH = CV.FS.lg * 1.7;                 // 行盒高（与下面画字的步进同一个值）
+    const PAD_V = 11 * CV.SCALE;
+    const padBottom = r ? PAD_V : 24 * CV.SCALE;
+    const th = PAD_V + lines.length * LH + padBottom;
     const tw = CV.W - 40 * CV.SCALE;
     const tx = 20 * CV.SCALE;
     const ty = r ? Math.min(CV.H - th - 40 * CV.SCALE, r.y + r.h + 16 * CV.SCALE) : (CV.H - th) / 2;
     CV.round(tx, ty, tw, th, CV.RADIUS,  CV.a(CV.C.panel, .50), CV.C.gold);
     lines.forEach(function (ln, i) {
-      CV.text(ln, tx + 14 * CV.SCALE, ty + 22 * CV.SCALE + CV.FS.lg * 1.7 * i, { size: CV.FS.lg });
+      CV.text(ln, tx + 14 * CV.SCALE, ty + PAD_V + LH * (i + 0.5), { size: CV.FS.lg });
     });
     /* V9.6.38（自审）：mustTap 但这次**没找到锚点**（目标按钮是条件出现的，比如
        "突破铭刻"只在能突破时才有）→ 必须退回"点一下继续"，否则玩家找不到可点的高亮、直接卡死。

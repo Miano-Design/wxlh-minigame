@@ -125,6 +125,28 @@
   let nameBusy = false;          // 机审在跑：这一下别让他连点（一次请求 <1s）
   CV.register('create', function () {
     U.begin();
+    /* ================= 2026-10-02（父亲大人："签完契约那个弹窗就该换成起名弹窗，**且在画面中间**，
+       你现在两个窗口叠在一起，位置也不对"）=================
+       两件事一起收：
+         · "叠在一起"的根因是**渲染没擦上一帧**（在 cv.js 的帧首 clearRect 修掉了，那张卡已经消失）；
+         · "位置不对"是这一页自己的事 —— 欢迎/主画面两页都是**居中弹窗**，
+           而这一页从屏幕**顶部**（y=0）起画，卡片会突然蹦到最上面。
+       现在照 `gate`（主画面）那把尺子：把"标题 ＋ 名字框 ＋ 主按钮"当一个**整块**，
+       居中在安全可视窗里（同一套光学中心：比几何中心高 5% 屏高）。
+       ⚠️ 块高逐项与下面真正画的东西对应 —— 改了卡里的内容，要回来对一遍
+          （`scripts/layout_audit.js` 的《构图》一节会量四档屏宽的落点）。 */
+    const S0 = CV.SCALE;
+    const viewTop = CV.safeTop + 8;
+    const viewH = CV.H - CV.safeBottom - viewTop;
+    /* 卡片高 = 上下内边距（CV.SP[2]×2）
+              ＋ 标题行（U.h3 = 行高 f1×1.3 ＋ 标题下边距 10）
+              ＋ 名字行前的 SP[1] ＋ 名字框 44 */
+    const nameRowH = 44;
+    const cardH0 = CV.SP[2] * 2 + CV.FS.f1 * 1.3 + 10 * S0 + CV.SP[1] + nameRowH * S0;
+    /* 块高 = 卡片 ＋ 卡片后那道卡间距（U.cardGap，与 U.card 同一个派生值）＋ 段距 SP[3] ＋ 主按钮 */
+    const blockH0 = cardH0 + U.cardGap() + CV.SP[3] + U.BTN_H * S0;
+    const centerY = viewTop + viewH / 2 - CV.H * 0.05;
+    U.space(Math.max(CV.SP[4], centerY - blockH0 / 2 - viewTop));
     U.card(function () {
       U.h3('创建你的执灯者');
       /* V1.0.4 · V2（父亲大人 09-27：「起名窗口不用有那么多小字注释」）：
