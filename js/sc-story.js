@@ -475,6 +475,16 @@
     const zoom = 1 + 0.012 * Math.sin(t * 0.05);         // 极缓的推近
     const ox = Math.sin(t * 0.037) * w * 0.008;          // 极缓的横移
     c.save();
+    /* ================= R3.0 自查（`frame_audit` 报的"story 页漏还原"）=================
+       真因不是"忘了写 restore"，而是 **save 与 restore 之间没兜异常**：
+       这一段会调 `createRadialGradient / drawImage / 一堆多边形` —— 任何一句抛错
+       （尺子的桩 ctx、真机上某个 API 不稳、素材解码失败…），下面的 `c.restore()` 就**不会执行**，
+       于是**这一帧的 translate/scale 留给下一帧**：画面越点越偏、底栏整条掉出屏幕
+       （`frame_audit` 文件头写的就是这个症状）。
+       现在改成 try/finally：**无论中间出什么事，坐标系一定还原**。
+       ⚠️ 同样的写法只加在"整屏铺底"这一层（它包住的代码最多、最容易出事）；
+         页面里那些短小的 save/restore 对（画一行字、画一个图形）不涉及整屏位移，保持原样。 */
+    try {
     c.translate(w / 2 + ox, h / 2); c.scale(zoom, zoom); c.translate(-w / 2, -h / 2);
     /* 底：ready → 正式图；loading → 主题平底（**不画旧场景**）；failed → 才走程序化保险 */
     const st = Story.sceneState(sceneId);
@@ -488,7 +498,7 @@
       bgFlat(c, sceneId, w, h);
     }
     bgAir(c, w, h, t, sceneId);
-    c.restore();
+    } finally { c.restore(); }
     /* 上下压暗（给标题与台词留安全区；母版规格：上 22% / 下 26%） */
     let g = c.createLinearGradient(0, 0, 0, h * 0.30);
     g.addColorStop(0, CV.a(CV.C.shade, .78)); g.addColorStop(1, CV.a(CV.C.shade, 0));

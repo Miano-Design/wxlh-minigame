@@ -43,7 +43,9 @@
       if(t.achClaimable) a.push(['open_ach','成就有奖']);
       if(t.signReady) a.push(['open_sign','今日点灯']);
       if(t.freeRecruitReady) a.push(['open_recruit','免费招募']);   // ← 带解锁判定的那个
-      if(t.codexClaimable) a.push(['open_codex','图鉴可领']);
+      /* ⚠️ R3.0 自查：原来这里还给「图鉴可领」算过一条信号，可**首页没有图鉴那一格**
+         （图鉴在成长页的"其他系统"里）—— 算了没人用，是死信号。老首页也没有图鉴红点
+         （`HOME_GROUPS` 的格子不带 dot），所以这里删掉，与老口径一致。 */
     } catch(e){}
     return a;
   }
@@ -248,8 +250,8 @@
     ],3,'grid:grow');
     /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名）
        R2.9：它与上面那排格子**贴在一起了** —— `U.tiles` 画完不留下沿间距，卡片直接接着画。
-       这里按全站口径补一道卡间距（`U.CARD_GAP`）。 */
-    U.space(U.CARD_GAP);
+       这里按全站口径补一道卡间距（`U.cardGap()` —— 与 `U.card` 用的是同一个派生值）。 */
+    U.space(U.cardGap());
     drawIdleCard();
     /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页。
        R2.9：原来这一行后面拖着一长串括号说明（"（坐骑 · 炼化台 · …）"），父亲大人要
