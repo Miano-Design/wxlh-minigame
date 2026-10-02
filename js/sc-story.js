@@ -349,9 +349,21 @@
        ③ 加载成功 → cover 铺满 + 原有的雾/光/尘/压暗（**层不变，只换底**）；
        ④ 加载失败 / 文件不在 / 平台没有 createImage → **回落程序化占位**（永不黑屏、永不抛错）。
      换图 = 往 `story/scene/` 丢 12 张同名文件；**不改任何剧情代码**。 */
-  const IMG = {};                 // sceneId → {ok:true,img} | {fail:true} | {loading:true}
+  const IMG = {};                 // key（sceneId **或世界 id**）→ {ok:true,img} | {fail:true} | {loading:true}
   let subpkgTried = false;
-  function sceneFile(id) { return ((SD.SCENE_FILE || {})[id]) || null; }
+  /* R3.3（父亲大人："36 个世界的场景和 boss 图片…到时你可以分别替换进去"）：
+     取图的**文件名**允许按世界来 —— `WORLD_SCENE_FILE['W07'] = 'story/scene/img_scene_W07.jpg'`。
+     命中就用专属图；没配/没这张文件 → 回落 12 张母版（`SCENE_FILE[sceneId]`）→ 再回落程序化占位。
+     于是"换图"永远只是**丢文件**，不改代码（这条是 B 批立的规矩）。 */
+  function sceneFile(id) {
+    const byWorld = (SD.WORLD_SCENE_FILE || {})[id];
+    return byWorld || ((SD.SCENE_FILE || {})[id]) || null;
+  }
+  /* 这个世界该用哪把取图 key：有专属图 → 用世界 id；没有 → 用那 12 个母版里的 sceneId。 */
+  Story.sceneKeyOf = function (worldId) {
+    return (SD.WORLD_SCENE_FILE || {})[worldId] ? worldId : Story.sceneOf(worldId);
+  };
+  Story.sceneFileOf = function (worldId) { return sceneFile(Story.sceneKeyOf(worldId)); };
   function trySubpackage() {
     if (subpkgTried) return;
     subpkgTried = true;
@@ -369,11 +381,29 @@
     if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
     const file = sceneFile(id);
     if (!file || typeof wx === 'undefined' || !wx.createImage) { IMG[id] = { fail: true }; return false; }
+    /* ================= R3.3：**先专属图、后母版**的两级兜底 =================
+       插槽铺满之后（36 个世界都声明了 `img_scene_W##.jpg`），如果只按"声明了就用专属图"，
+       那么**图还没到的世界会连现成的 12 张主题母版一起丢掉**，整片掉回程序化占位 ——
+       等于"为了等新图，把旧图先撕了"。所以这里加一级：专属图加载失败 → **同一把 key 上
+       再试一次它所属的那张母版**（`SCENE[wid]` → `SCENE_FILE`）。
+       玩家看到的结果：新图到了就是新图；没到就还是原来那张；都没有才程序化（永不黑屏）。 */
+    const master = (function () {
+      const m = (SD.SCENE_FILE || {})[(SCENE || {})[id]];
+      return (m && m !== file) ? m : null;
+    })();
     try {
       const img = wx.createImage();
       IMG[id] = { loading: true };
       img.onload = function () { IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
-      img.onerror = function () { IMG[id] = { fail: true }; };
+      img.onerror = function () {
+        if (!master) { IMG[id] = { fail: true }; return; }
+        try {
+          const fb = wx.createImage();
+          fb.onload = function () { IMG[id] = { ok: true, img: fb }; try { CV.render(); } catch (e) {} };
+          fb.onerror = function () { IMG[id] = { fail: true }; };
+          fb.src = master;
+        } catch (e) { IMG[id] = { fail: true }; }
+      };
       img.src = file;
     } catch (e) { IMG[id] = { fail: true }; }
     return false;
@@ -452,8 +482,9 @@
   /* 进世界 / 开打前预热：把这一张图（和它的 Boss 图）先挂上去 —— 不阻塞、不返回 Promise。 */
   Story.preloadWorld = function (worldId) {
     if (!worldId) return;
-    const sc = SCENE[worldId];
-    if (sc) ensureScene(sc);
+    /* R3.3：预热的 key 与真正取图时**同一个**（`sceneKeyOf`）—— 有专属图就预热专属图，
+       没有就预热那 12 张母版里的那张。两处用一把尺子算，避免"预热的是 A、画的是 B"。 */
+    ensureScene(Story.sceneKeyOf(worldId));
     const bf = bossFile(worldId);
     if (bf) ensureBoss(worldId);
   };
@@ -471,7 +502,12 @@
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);
   }
-  Story.bg = function (c, sceneId, w, h, t) {
+  /* R3.3：多一个 `imgKey`（可省）——**色调/结构仍按 sceneId 那 12 个母版走**，
+     但"取哪张图"允许**按世界**（`WORLD_SCENE_FILE`，36 张专属场景图到位后启用）。
+     两个 key 分开是必须的：世界 id（W01…）在 `SCENE_INFO` 里没有条目，
+     直接拿它当 sceneId 会让底色/结构掉进兜底分支（那就不是"只换底图"了）。 */
+  Story.bg = function (c, sceneId, w, h, t, imgKey) {
+    const scKey = imgKey || sceneId;
     const zoom = 1 + 0.012 * Math.sin(t * 0.05);         // 极缓的推近
     const ox = Math.sin(t * 0.037) * w * 0.008;          // 极缓的横移
     c.save();
@@ -487,9 +523,9 @@
     try {
     c.translate(w / 2 + ox, h / 2); c.scale(zoom, zoom); c.translate(-w / 2, -h / 2);
     /* 底：ready → 正式图；loading → 主题平底（**不画旧场景**）；failed → 才走程序化保险 */
-    const st = Story.sceneState(sceneId);
+    const st = Story.sceneState(scKey);
     if (st === 'ready') {
-      try { drawSceneCover(c, IMG[sceneId].img, w, h); }
+      try { drawSceneCover(c, IMG[scKey].img, w, h); }
       catch (e) { bgFlat(c, sceneId, w, h); }
     } else if (st === 'failed') {
       bgBase(c, sceneId, w, h);
@@ -523,6 +559,9 @@
     cur = {
       beats: o.beats, i: 0, reveal: 0, t0: Date.now() / 1000, ts: Date.now() / 1000, autoAt: 0, choiceLocked: false,
       scene: o.scene || 'god_hall', title: o.title || '', chNo: o.chNo || '',
+      /* R3.3：取图 key 与"色调 sceneId"分开（见 `Story.bg` 那段）——
+         从 `meta.worldId` 算一次，**只有这里算**，后面全都读它。 */
+      sceneKey: (o.meta && o.meta.worldId) ? Story.sceneKeyOf(o.meta.worldId) : (o.scene || 'god_hall'),
       actor: o.actor || null,               // 说话人 charId（画剪影）
       obj: o.obj || '',                     // 关键物件名（物件层）
       chapter: o.chapter || null,           // 章节转场（卷首第一次进入才带）
@@ -962,7 +1001,7 @@
   CV.veils = CV.veils || {};
   CV.veils.story = function (c) {
     const t = Date.now() / 1000;
-    Story.bg(c, (cur && cur.scene) || 'god_hall', CV.W, CV.H, t);
+    Story.bg(c, (cur && cur.scene) || 'god_hall', CV.W, CV.H, t, cur && cur.sceneKey);
   };
   /* ================= 副本战斗的背景（2026-10-02 · 父亲大人：「现在副本战斗的背景也没改啊」） =================
      战斗页是整屏接管（chromeless），之前被我一刀排除在铺底之外 —— 别处是一张画，一进战斗就纯黑。
@@ -972,11 +1011,13 @@
   CV.veils.battle = function (c) {
     const wid = CV.battleWorld || '';
     const scene = wid && SCENE[wid] ? SCENE[wid] : null;
+    /* R3.3：图按世界取（有专属图就用它），色调仍按那 12 个母版 —— 两者分开算。 */
+    const scKey = (wid && Story.sceneKeyOf) ? Story.sceneKeyOf(wid) : scene;
     /* R1.7 闪屏修法（与 `Story.bg` 同一份口径，**一处判断不许各写一份**）：
        ready → 正式场景图；loading → 主题平底；failed → 才回落程序化。 */
-    const st = Story.sceneState(scene);
+    const st = Story.sceneState(scKey);
     if (st === 'ready') {
-      try { drawSceneCover(c, IMG[scene].img, CV.W, CV.H); } catch (e) { bgFlat(c, scene, CV.W, CV.H); }
+      try { drawSceneCover(c, IMG[scKey].img, CV.W, CV.H); } catch (e) { bgFlat(c, scene, CV.W, CV.H); }
     } else if (st === 'failed') {
       bgBase(c, scene || 'tech_base', CV.W, CV.H);
     } else {

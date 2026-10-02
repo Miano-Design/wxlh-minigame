@@ -316,43 +316,54 @@
 
   CV.panels.grow=function(){
     const s=S(), r=Core.realmState(), au=Core.authorityInfo(); U.begin(); U.pageHead('成长');
+    /* ① 当前进度（R3.3 · 父亲大人 2026-10-02："现在变强路线名字重复"）——
+       这张卡的标题原来也叫「变强路线」，而下面那一节的小标题也是「变强路线」：
+       一屏之内"变强路线"写两遍，玩家看到的是一个重复的词，不是两个东西。
+       现在这张卡只管"我现在什么水平" → 叫「当前进度」；「变强路线」这个名字留给下面那一节。 */
     U.card(function(){
-      U.h3('变强路线','只看现在有用的');
+      U.h3('当前进度','只看现在有用的');
       const pwr=Core.teamPower?Core.teamPower():0; U.kv('队伍战力',fmt(pwr));
       U.kv('当前境界',r&&r.curName?(''+r.curName):'未定命格');
       U.kv('权限', 'Lv.'+(au&&au.lv||0));
     });
-    /* R3.1：这一节的四张卡**改成纯说明（不带按钮）** ——
-       原来每张卡都挂一颗「去看看」，而其中"战斗阵容→队伍""装备强度→背包"在主页/底栏已经有了，
-       等于同一个入口在两屏各摆一次（父亲大人："成长页把主页有的去掉，避免重复"）。
-       现在这里只讲"先练什么"，真正的入口在**主页那一排**与下面那张宫格；进出都只有一条路。 */
-    /* 2026-10-02（父亲大人："成长里的（入口在主页）去掉"）：
-       括号里那句是上一轮为了让"卡片没按钮"说得通才加的 —— 玩家看到的是一句解释，
-       不是信息。撤掉，只留「变强路线」；入口在哪儿由那排格子和引导去讲。 */
+    /* ================= R3.3（父亲大人 2026-10-02）："这四张能做成按钮吗，有合适的出口吗" =================
+       来龙去脉（三轮，别再翻烧饼）：
+         · R3.0 每张卡挂一颗大「去看看」（R2.4 修过"说明贴按钮"）；
+         · R3.1 父亲大人说"成长页把主页有的去掉、避免重复" → 我把按钮撤了、改成纯说明；
+         · R3.3 他看到四张**点不动的卡**，问能不能做成按钮 —— 所以按钮回来，
+           但**出口按"这张卡讲的事"逐条挑**，并且**不再跟同一页的宫格重复**：
+             战斗阵容 → 队伍（`open_party`）
+             装备强度 → 背包·**装备标签**（`open_bag_equip`：只 push 背包会停在道具页，
+                         所以照 sc-last.js 里"强化类任务"的同一段落点，切到装备页）
+             长期成长 → 境界渡劫（`open_realm`）
+             基础收益 → 基地建设（`open_buildings`）
+           下面「其他系统」那张宫格里原本也有**境界渡劫 / 基地建设** —— 那两格**撤掉**
+           （同一页不摆两份），宫格剩 6 格。
+       按钮长在**标题行右侧**（通用件 `U.h3` 的 `opt.btn`，与主线卡同一种按钮、34px）——
+       卡片因此不再需要"说明行 ＋ 一颗大按钮"，也就不会再有"说明跟按钮贴住"那个老毛病。 */
     U.sectionTitle('变强路线');
-    /* 四张卡**只有文案**：R3.1 去掉按钮之后，那四个 `open_*` 就成了没人读的死字段，
-       这一轮一并清掉（入口去下面那张宫格 / 主页那排找，别在这里留假线索）。 */
     const rows=[
-      ['战斗阵容','先把 5 个位置配完整'],
-      ['装备强度','优先强化当前上阵装备'],
-      ['长期成长','境界 / 铭刻跟着推进解锁'],
-      ['基础收益','挂机、离线、强化效率一起涨'],
+      /* ⚠️ 说明行跟着按钮一起排（`U.h3` 的 sub 是**右对齐单行**），
+         320 小屏上一句话长过可用宽就会被 `CV.fit` 砍成「境界 / 铭刻跟着推…」——
+         所以这里一律压到 **8 个字以内**（`layout_audit` 在 320×568 上逐页量"有没有被省略号砍"）。 */
+      ['战斗阵容','配满 5 个位置','去队伍','open_party'],
+      ['装备强度','强化上阵装备','去装备','open_bag_equip'],
+      ['长期成长','境界 / 铭刻','去境界','open_realm'],
+      ['基础收益','挂机 / 离线效率','去基地','open_buildings'],
     ];
-    rows.forEach(function(x){ U.card(function(){ U.h3(x[0]); U.note(x[1],1*CV.SCALE); }); });
+    rows.forEach(function(x){ U.card(function(){ U.h3(x[0], x[1], { btn: { label: x[2], id: x[3] } }); }); });
     /* ================= R3.1（父亲大人："成长的二级页可以把主页有的去掉，避免重复"）=================
        这一页是**二级页**，只放主页那排**没有**的系统 —— 同一个入口不在两屏各摆一次。
        主页「常去的地方」现在有：队伍 / 成长 / 斗法台 / 秘术阁 / 法宝 / **坐骑 / 伴生体** / 市集 / 点灯，
        日常有：任务 / 药园 / 招募；底排：成就 / 设置。
-       ⇒ 这里只留主页没有的：**铭刻 / 转生 / 图鉴 / 炼化台 / 灯阁评级 / 灯阁权限**（6 格）。
+       ⇒ 这里只留主页没有的：**铭刻 / 转生 / 图鉴 / 炼化台 / 灯阁评级 / 灯阁权限**（6 格）
+         —— R3.3 又把**境界渡劫 / 基地建设**挪到了上面那两张路线卡上（同一页只摆一份）。
        ⚠️ 被去掉的都不是"没入口"：它们在主页那一排（`entry_audit` 会逐条反查，不会漏）。 */
     U.sectionTitle('其他系统');
     U.tiles([
       ['open_genelock','铭刻','',null,false],['open_reincarn','转生','',null,false],
       ['open_codex','图鉴','',null,false],['open_refine','炼化台','',null,false],
       ['open_sect','灯阁评级','',null,false],['open_authority','灯阁权限','',null,false],
-      /* 这两项原来挂在"变强路线"的说明卡上（长期成长→境界 / 基础收益→基地建设），
-         卡片去掉按钮之后，它们必须有正式入口，否则就成了"有功能没入口"（entry_audit 会红）。 */
-      ['open_realm','境界渡劫','',null,false],['open_buildings','基地建设','',null,false]
     ],3,'grid:ov_growth_more');
   };
 
@@ -406,7 +417,12 @@
   if(prev.battle){
     CV.panels.battle=function(){
       prev.battle();
-      const st=Core.BattleUI&&Core.BattleUI.state;
+      /* 2026-10-02（康康 · `api_audit` 第一次扫到这个文件时抓到的**真死代码**）：
+         战斗状态的真出口是 **`G.BattleUI.state`**（js/sc-battle.js 末尾 `G.BattleUI = {state:B,…}`，
+         `sc-dungeon.js` / `sc-lines.js` 都读它）—— 这里原来写成 `Core.BattleUI`（那个名字全仓不存在），
+         于是 `st` 恒为 undefined、下面这段"战斗页顶部显示当前世界机制"**从来没画出来过**。
+         改一个词就活：`Core.` → `G.`（仍是"先判存在再取"，缺了也不抛错）。 */
+      const st=G.BattleUI&&G.BattleUI.state;
       if(!st||!st.on||!st.cfg||st.panel)return;
       const wid=st.cfg.worldId,w=D.WORLDS.find(x=>x.id===wid); if(!w)return;
       const txt=String(w.mechanic||'');
@@ -430,5 +446,14 @@
      结论：**保留 battle HUD 的机制条（有价值），去掉这段重复的返回接管。** */
   /* safer secondary-page entry aliases */
   ['open_bag','open_protag'].forEach(function(id){ if(!CV.onAct[id]) CV.on(id,function(){CV.push(id==='open_bag'?'bag':'protag');}); });
+  /* ================= R3.3：装备强度那张卡的出口 =================
+     「去装备」要落在**装备标签**上 —— 只 `push('bag')` 会停在道具页（背包默认那一页），
+     玩家还得自己找一下标签。这里照 `sc-last.js` 里"强化类任务"的**同一段落点**写：
+     先钉住底栏那一格、切到装备标签、再 reset 重画（那一段是既有的唯一写法，别另发明一套）。 */
+  if (!CV.onAct['open_bag_equip']) CV.on('open_bag_equip', function () {
+    CV.cur = 'bag';
+    CV.dispatch('bagview:equip');
+    CV.reset('bag');
+  });
   G.OVERHAUL_2_0={version:'2.0.0',ready:true,currentWorld:currentWorld,nextStage:nextStage};
 })();

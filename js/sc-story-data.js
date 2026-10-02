@@ -73,11 +73,24 @@
   };
   /* 六个核心 Boss 立绘（1080×1920 · **真透明 RGBA** ⇒ 当"人物前景层"用，不当背景贴）。
      也是按投递原名（`img_boss_W06.png` …）。 */
-  const BOSS_FILE = {
-    W06: 'story/boss/img_boss_W06.png', W12: 'story/boss/img_boss_W12.png',
-    W18: 'story/boss/img_boss_W18.png', W24: 'story/boss/img_boss_W24.png',
-    W30: 'story/boss/img_boss_W30.png', W36: 'story/boss/img_boss_W36.png',
-  };
+  /* ================= R3.3（父亲大人 2026-10-02）=================
+     「我这边在做 36 个世界的场景和 boss 图片，到时你可以分别替换进去」——
+     所以这里**把 36 个世界的插槽一次铺满**（不是只留六个卷末锚点）：
+       · 场景：`WORLD_SCENE_FILE['W07'] = story/scene/img_scene_W07.jpg`
+       · 立绘：`BOSS_FILE['W07'] = story/boss/img_boss_W07.png`
+     声明了但**文件还没到**的：`ensureScene/ensureBoss` 会各自 `fail` 一次，
+     然后**回落现有的那张**（场景→12 张主题母版→程序化；立绘→程序剪影）——
+     不许黑屏、不许空框、不许报错给玩家看（`story_visual_path_audit` 钉这条）。
+     ⇒ 换图 = **把文件丢进 story/scene/ 或 story/boss/**，一行代码都不用改。
+     ⚠️ 命名契约（不许中文、不许空格、两位数字）：
+        `img_scene_W01.jpg` … `img_scene_W36.jpg`（1080×1920 或 720×1280 等比）
+        `img_boss_W01.png`  … `img_boss_W36.png` （1080×1920，**透明底 PNG**）
+     六个卷末锚点（W06/W12/W18/W24/W30/W36）原来的那六张**先留着**，
+     新图到位后同名覆盖即可。 */
+  const WORLD_SCENE_FILE = {};
+  for (let i = 1; i <= 36; i++) WORLD_SCENE_FILE['W' + (i < 10 ? '0' + i : i)] = 'story/scene/img_scene_W' + (i < 10 ? '0' + i : i) + '.jpg';
+  const BOSS_FILE = {};
+  for (let i = 1; i <= 36; i++) BOSS_FILE['W' + (i < 10 ? '0' + i : i)] = 'story/boss/img_boss_W' + (i < 10 ? '0' + i : i) + '.png';
   /* 主视觉（1080×1920）：**在主包 `brand/`**（R1.9 起；更早的一版放剧情分包，已作废）。
      用途：**启动页（gate）+ 灯阁首页**的大面积背景（`Story.kvImage()` 一个取图口）。
      ⚠️ 旧的 `icons/mv-main-lamp.jpg` 已移进 `story-inbox/legacy-icons/` 归档、**正常路径不再引用**；
@@ -1002,7 +1015,12 @@
         { trigger: 'boss_phase_2', type: 'narrative', line: '祭司：留住是要还的。他从来没说。' },
         { trigger: 'battle_win', type: 'environment_change', line: '香灰散开，册子上露出一行被涂掉的字。' },
       ],
-      environmentChange: '圣所的香火熄了一次', clue: '被涂掉的那行是"第八个已经还过"', transition: '镜界法庭就在册子背面' },
+      /* R3.3：`香火` 是平台备案的**封建迷信类禁词**（`page_text_audit` ②-c 当场报红，同一张表
+         V1.0.1 那轮整改期定下的）。换成本作自己的核心意象「长明灯」——
+         意思一个字没变（圣所里那点火灭了一次），还跟 W27「长明夜行」的灯线接上。
+         ⚠️ 附近那几个词（香灰 / 焚香 / 祭司 / 献祭）**不在禁词表里**，故意留着不动；
+             将来人工提审要是被问，再一起换（已记进交付说明）。 */
+      environmentChange: '圣所的长明灯熄了一次', clue: '被涂掉的那行是"第八个已经还过"', transition: '镜界法庭就在册子背面' },
 
     /* ---------- 第四卷《没有归途的文明》：灯阁保存了什么 ---------- */
     W25: { premise: '册子背面是一行坐标', anomaly: '法庭里的镜面会复制玩家', conflict: '镜子里的玩家动作和你不一样', playerGoal: '上庭', enemyPurpose: '它按规则审判，规则是灯阁定的', battleMechanic: '规则轮转：每 4 回合换一条；镜面幻觉', bossRole: '镜界审判者——它审的是"你是不是本人"', bossTrigger: '玩家第一次看见镜子里的自己先动了',
@@ -1105,6 +1123,6 @@
        sc-story.js 直接按名字反查 id。**加新说话人时先看这里要不要补一条。** */
     WHO_ALIAS: { '代行': 'C120' },
     /* 正式资产清单（sceneId / Boss 世界号 → 分包内路径）：见上头那段注释 */
-    SCENE_FILE: SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
+    SCENE_FILE: SCENE_FILE, WORLD_SCENE_FILE: WORLD_SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
   };
 })();
