@@ -121,6 +121,18 @@
           tk.claimable>0?('收取奖励（'+tk.claimable+' 项）'):'收取奖励',
           tk.claimable>0?'primary':'ghost','claim_all', tk.claimable<=0);
         U.y+=bh;
+        /* ★ 挂机加速（看广告）—— 原首页挂机卡里就有这一颗（B5：每天 3 次 × 每次 2 小时产出）。
+           2.0 换首页时丢了，父亲大人点名"快速挂机看广告的入口还是没有"。
+           文案与禁用态**统一读 `AD.status('idle_boost')`**（点位配额 / 全局总闸 / 弱网一起看），
+           所以不会出现"写着还剩 1 次、点下去说没了"（`ad_text_audit` 钉着这条）。 */
+        const AD=G.AD;
+        if(AD&&AD.show){
+          const adSt=AD.status?AD.status('idle_boost'):{ok:(AD.left?AD.left('idle_boost'):0)>0,text:''};
+          const adTail=AD.quotaText?AD.quotaText('idle_boost'):'';
+          U.space(CV.SP[1]);
+          U.hint('今日剩余 '+(adTail?adTail.replace(/^（|）$/g,''):'次数未知'), 4*CV.SCALE);
+          U.btnRow([{ label:'广告加速', style:'ghost', id: adSt.ok?'ad_idle_boost':'', dis:!adSt.ok }]);
+        }
       });
     }
     /* ③b 游历（原首页一整张可点卡）：挂着"待领"就点它领，没有就点进游历页 —— 2.0 换首页时丢的入口 */
@@ -169,21 +181,40 @@
     /* ⚠️ 两排宫格**读官方真源 `D.HOME_GROUPS`**（组名 + 成员顺序 + 常用度分，判据写在 data.js 表头）——
        原稿在这里手写了 12 格，于是**漏了 6 个入口**（评级/权限/图鉴/炼化台/基地建设… 与 `open_ach`）。
        手写一份就不可能跟表对齐（《定调与口径》§3.2：同一件事不许写两份），这里只负责"按表摆 + 挂红点"。 */
+    /* ================= 首页宫格（**新逻辑**：常用优先，不铺按钮墙）=================
+       父亲大人 2026-10-02 的两句话定死了这里：
+         · "你现在是把主页回归到一开始的界面逻辑，我意思是按新的界面逻辑去补充优化" ——
+           所以**不铺 `HOME_GROUPS` 那 20 格**（那是老首页的铺法），只留**最常用的**；
+         · "今日板块能不能多加些常用功能 / 任务别单独放" —— 日常那排按表的成员补齐到 5 格，
+           任务变成第一格，不再单独一节。
+       被收起来的那几格**不是没入口**：成长页（`open_grow`）就是系统总览，
+       本页也给一行「全部系统 ›」，所以 `entry_audit` 里不会出现孤儿。
+       ⚠️ 锚点必须叫 `grid:daily` / `grid:grow`：新手指引第②③步指的就是这两个 id。 */
     const dots={}; dailySignals().forEach(function(s){ dots[s[0]]=true; });
-    (D.HOME_GROUPS||[]).forEach(function(g){
-      const all=g.members.map(function(m){ return [m.id, m.name, null, m.unlock||null, !!dots[m.id]]; });
-      U.sectionTitle(g.name||g.id);
-      U.tiles(all.filter(function(x){ return !x[3]||Core.isUnlocked(x[3]); }), 3,
-        g.id==='daily'?'grid:daily':(g.id==='grow'?'grid:grow':'grid:'+g.id));
-      /* 未解锁的不铺出来（一屏灰的更乱），但**留一行可点**：点开逐条写明怎么解锁
-         —— 这一行就是 `open_locked` 的入口（原首页有，2.0 换页时丢了）。 */
-      const lk=all.filter(function(x){ return x[3]&&!Core.isUnlocked(x[3]); });
+    const dGroup=(D.HOME_GROUPS||[]).filter(function(g){return g.id==='daily';})[0]||{name:'每天要做的',members:[]};
+    U.sectionTitle(dGroup.name||'每天要做的');
+    U.tiles(dGroup.members.filter(function(m){return !m.unlock||Core.isUnlocked(m.unlock);})
+      .map(function(m){ return [m.id, m.name, null, m.unlock||null, !!dots[m.id]]; }), 3, 'grid:daily');
+    U.sectionTitle('常去的地方');
+    U.tiles([
+      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
+      ['open_garden','药园','',null,false],['open_arena','斗法台','',null,false],
+      ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false]
+    ],3,'grid:grow');
+    /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页 */
+    U.space(CV.SP[1]);
+    const hAll=U.hint('全部系统（坐骑 · 炼化台 · 评级 · 权限 · 铭刻 · 伴生体 · 图鉴 · 转生）  ›', 0);
+    CV.hit('open_grow', U.ix()-2, U.y-hAll, U.iw()+4, hAll);
+    /* 未解锁的功能照样能查"怎么解锁"（这一行就是 `open_locked` 的入口） */
+    {
+      const lk=[];
+      (D.HOME_GROUPS||[]).forEach(function(g){ g.members.forEach(function(m){ if(m.unlock&&!Core.isUnlocked(m.unlock)) lk.push(m); }); });
       if(lk.length){
         U.space(CV.SP[1]);
-        const hh=U.hint('还没解锁：'+lk.map(function(x){return x[1];}).join(' / ')+'  ›', 0);
+        const hh=U.hint('还没解锁：'+lk.map(function(x){return x.name;}).join(' / ')+'  ›', 0);
         CV.hit('open_locked', U.ix()-2, U.y-hh, U.iw()+4, hh);
       }
-    });
+    }
     U.hint('先推进残域，再用奖励补强；剧情会在关键节点自己发生。',CV.SP[1]);
     /* 最后一行：**设置与存档**。原首页底部就是这一排（`[玩法指南][设置与存档]`）——
        父亲大人 §四 说"指南在设置里已有、别在一级入口重复摆"，所以这里**只留设置**。
@@ -219,7 +250,10 @@
       ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
       ['open_garden','药园','',null,false],['open_arena','斗法台','',null,false],['open_sign','点灯','',null,false],
       ['open_genelock','铭刻','',null,false],['open_beast','伴生体','',null,false],['open_reincarn','转生','',null,false],
-      ['open_codex','图鉴','',null,false],['open_shop','市集','',null,false],['open_refine','炼化台','',null,false]
+      ['open_codex','图鉴','',null,false],['open_shop','市集','',null,false],['open_refine','炼化台','',null,false],
+      /* ★ R2.6：这两格**必须在这里**（父亲大人 2026-10-02 点名的"功能少了入口"）——
+         首页那排只放常用的，评级/权限就收到"其他系统"里；缺了它们这俩就又成了没入口的功能。 */
+      ['open_sect','灯阁评级','',null,false],['open_authority','灯阁权限','',null,false]
     ],3,'grid:ov_growth_more');
   };
 
@@ -234,16 +268,16 @@
       else U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,'查看当前世界','ghost','ov_current_world');
       U.y+=U.BTN_H*CV.SCALE;
     });
-    U.sectionTitle('世界线');
-    const ws=unlockedWorlds().slice().reverse();
-    /* ★ 深井的入口在**残域页**（底栏第 2 格），不在首页 —— 原 `sc-dungeon.js` 就是一张
-       `worldCard('♾','深井',…)`。2.0 换掉残域面板时把它丢了（反查出来"有功能没入口"）。
-       这里按原样放回：排在世界线最上面（"深井 → 世界倒序"就是原文的顺序）。 */
+    /* ★ 深井：**自己单独一节**（父亲大人 2026-10-02：「深井要跟世界线分开，不要放在世界线里面」）——
+       原 `sc-dungeon.js` 就是「深井挑战」这一节 + 一张 `worldCard('♾','深井',…)`，
+       排在**世界线之前**；2.0 换掉残域面板时整节丢了，我上一版又把它塞进了世界线里（都不对）。
+       ⚠️ 图标用**字形 '♾'**（`worldIco` 既吃 SVG op 也吃字形；原稿传的就是这个字符）——
+          我上一版取的是 `iconOpsOf('nav','corridor')`，那个命名空间里没有它，所以图标画不出来。 */
     if (Core.isUnlocked && Core.isUnlocked('corridor')) {
       const corFloor = (S.corridor && S.corridor.floor) || 1;   // 有些状态里 corridor 还没建，兜底 1 层
+      U.sectionTitle('深井挑战');
       U.card(function(){
-        const ico=D.iconOpsOf&&D.iconOpsOf('nav','corridor');
-        if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.C.gold);
+        CV.text('♾', U.ix()+18*CV.SCALE, U.y+24*CV.SCALE, { size: CV.AICO.worldSm*CV.SCALE, align:'center', color: CV.C.gold });
         CV.text('深井',U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
         CV.text('当前第 '+corFloor+' 层',U.ix()+U.iw(),U.y+12*CV.SCALE,{size:CV.FS.md,color:CV.C.gold,align:'right'});
         CV.text('一直往上打、没有重置',U.ix()+46*CV.SCALE,U.y+33*CV.SCALE,{size:CV.FS.sm,color:CV.C.dim});
@@ -251,6 +285,8 @@
       });
       CV.hit('open_corridor',U.ix(),U.y-54*CV.SCALE,U.iw(),54*CV.SCALE);
     }
+    U.sectionTitle('世界线');
+    const ws=unlockedWorlds().slice().reverse();
     ws.forEach(function(x){ const q=(s.worlds[x.id].stages.normal||[]).filter(Boolean).length; U.card(function(){
       const ico=D.iconOpsOf&&D.iconOpsOf('world',x.id); if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.worldIconColor(x.theme,x.id===w.id?'current':'idle'));
       CV.text(x.name,U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
