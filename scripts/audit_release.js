@@ -28,7 +28,9 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   'player_journey_audit',
   /* R1.9 整合轮：2.1 自带的两把（自动剧情状态机 + 36 世界运行时流程）也进总闸 ——
      任务书 §13 点名要跑，接进来以后就不会"改完忘了跑"。 */
-  'story_2_1_audit', 'story_2_1_flow_audit'];
+  'story_2_1_audit', 'story_2_1_flow_audit',
+  /* R2.5 新增：**入口反查**（注册过的页面入口有没有地方能点到）+ 新手指引锚点存在性。 */
+  'entry_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

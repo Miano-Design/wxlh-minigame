@@ -38,12 +38,14 @@
     try {
       const t=Core.todayState&&Core.todayState();
       if(!t) return a;
-      if(t.dailyClaimable||t.weeklyClaimable||t.achClaimable) a.push(['open_tasks','任务可领']);
+      /* 红点**逐格挂**（不再把"任务/成就"并成一条）：下面首页那排格子是按 id 取红点的。 */
+      if(t.dailyClaimable||t.weeklyClaimable) a.push(['open_tasks','任务可领']);
+      if(t.achClaimable) a.push(['open_ach','成就有奖']);
       if(t.signReady) a.push(['open_sign','今日点灯']);
       if(t.freeRecruitReady) a.push(['open_recruit','免费招募']);   // ← 带解锁判定的那个
       if(t.codexClaimable) a.push(['open_codex','图鉴可领']);
     } catch(e){}
-    return a.slice(0,3);
+    return a;
   }
   function storyLine(w){
     try { if(G.Story&&G.Story.clueOf) return G.Story.clueOf(w.id,'post')||G.Story.clueOf(w.id,'in')||''; } catch(e){} return '';
@@ -97,6 +99,7 @@
       U.note(stage>=0?'第 '+(stage+1)+'/12 关 · '+String(w.mechanic).split('：')[0]:'普通难度 12/12 已完成',4*CV.SCALE);
       const bw=U.iw(),by=U.y+8*CV.SCALE; CV.round(U.ix(),by,bw,5*CV.SCALE,3*CV.SCALE,CV.a(CV.C.line,.8),null);
       const pp=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,pp)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
+      U.space(CV.SP[1]);   /* R2.5：说明/进度条与按钮之间留一口气（父亲大人："这个也是"贴在一起） */
       U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,stage>=0?'继续探索':'查看新世界','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE;
     });
     /* ③ 挂机收益（2.0 那版丢了这块，底栏红点却照旧亮） */
@@ -109,12 +112,37 @@
         U.h3('挂机收益', tk.idleReady?('已攒 '+mins+' 分钟'):'灯阁正在运转');
         U.note(parts.length?parts.join(' · '):'还没有攒到可收的收益（满 1 分钟就能收）',2*CV.SCALE);
         U.space(CV.SP[1]);
-        U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,
+        /* ★ 两颗按钮（与原首页 `.btn-row` 同规格：左「派人分工」小、右「收取奖励」主）——
+           2.0 换首页时**只剩了收取奖励**，于是「挂机分工 / 分配队长」整条路没有入口
+           （父亲大人点名找不到的就是这个）。这里按原文搬回。 */
+        const gap=10*CV.SCALE, bh=U.BTN_H*CV.SCALE, bw=(U.iw()-gap)*0.42;
+        U.btn(U.ix(), U.y, bw, bh, '派人分工', 'ghost', 'open_idlelines');
+        U.btn(U.ix()+bw+gap, U.y, U.iw()-bw-gap, bh,
           tk.claimable>0?('收取奖励（'+tk.claimable+' 项）'):'收取奖励',
-          tk.claimable>0?'primary':'ghost','claim_all',tk.claimable<=0);
-        U.y+=U.BTN_SM*CV.SCALE;
+          tk.claimable>0?'primary':'ghost','claim_all', tk.claimable<=0);
+        U.y+=bh;
       });
     }
+    /* ③b 游历（原首页一整张可点卡）：挂着"待领"就点它领，没有就点进游历页 —— 2.0 换首页时丢的入口 */
+    try {
+      const prog=Core.travelProgress(), pend=Core.pendingTravel();
+      if(prog){
+        U.card(function(){
+          const h=33*CV.SCALE, top=U.y, cy=top+h/2;
+          CV.text('【游历奇遇】',U.ix(),cy,{size:CV.FS.md,color:pend?CV.C.gold:CV.C.dim});
+          if(pend){
+            const rw=Core.rewardTextOf(pend.effect), rwW=CV.measure(rw,CV.FS.sm)+10*CV.SCALE;
+            CV.text(CV.fit(pend.name,U.iw()-100*CV.SCALE-rwW,CV.FS.md),U.ix()+U.iw()-rwW,cy,{size:CV.FS.md,color:CV.C.gold,align:'right'});
+            CV.text(CV.fit(rw,rwW,CV.FS.sm),U.ix()+U.iw(),cy,{size:CV.FS.sm,color:CV.C.dim,align:'right'});
+            CV.hit('claim_travel',U.pad(),top,U.cw(),h);
+          } else {
+            CV.text('距下一次 '+D.fmtClock(Math.max(0,prog.every-prog.sec)),U.ix()+U.iw(),cy,{size:CV.FS.md,color:CV.C.dim,align:'right'});
+            CV.hit('open_travel',U.pad(),top,U.cw(),h);
+          }
+          U.y=top+h;
+        },{padY:2});
+      }
+    } catch(e){}
     /* ④ 刚刚发现：**只在没读过时出现**（读完进卷宗，不再长期占首页） */
     /* ⚠️ 判据要精确到"**打得出来**"：原稿是 `clueOf(post)||clueOf(in)` + 只看 `epilogueSeen`
        —— 于是**全新档**首页就顶着一条"刚刚发现"（那其实是进图剧情的线索，玩家还没去过那儿），
@@ -124,18 +152,44 @@
     const clue=storyLine(w);
     const stW=(G.Story&&G.Story.stateOf)?G.Story.stateOf(w.id):{cleared:false,epilogueSeen:false};
     if(clue&&stW.cleared&&!stW.epilogueSeen){ U.card(function(){U.h3('刚刚发现','');U.note(clue,2*CV.SCALE);U.space(CV.SP[1]);U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'打开故事','ghost','ov_story');U.y+=U.BTN_SM*CV.SCALE;}); }
-    /* ⑤ 今天：只列**真能领**的（`dailySignals` 现在只读 `todayState`，带解锁判定）。
-       一格都凑不出来时**不给红点**（`dot=false`）—— 空页面不该亮灯（§六）。 */
-    U.sectionTitle('今天'); const ds=dailySignals();
-    const todayTiles=(ds.length?ds:[['open_tasks','任务','','',false]]).map(x=>[x[0],x[1],'','',ds.length>0]);
-    U.tiles(todayTiles,3,'grid:ov_today');
-    /* ⑥ 快速整理：**只留没在别处重复的四个** ——
-       背包在底栏第二格、指南在「设置」里（父亲大人 §四 点名的两条重复入口）。 */
-    U.sectionTitle('快速整理'); U.tiles([
-      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
-      ['open_recruit','招募','',null,false],['open_settings','设置','',null,false]
-    ],3,'grid:ov_quick');
+    /* ================= R2.5 · 首页宫格重排（父亲大人 2026-10-02）=================
+       原话：「今日板块能不能多加些常用功能？现在只有一个任务按钮，要么就把任务按钮跟下面的放一起，别单独」。
+       而且这一轮的反查发现 **8 个页面入口没人能点到**（2.0 换首页时把这几个入口弄丢了）：
+         `open_corridor`（深井）· `open_idlelines`（挂机分工/分配队长）· `open_travel`（游历）·
+         `open_authority`（灯阁权限）· `open_sect`（灯阁评级）· `open_ach`（成就）
+       —— 父亲大人问的"快速领取挂机奖励""挂机分配队长"找不到，就是这条。
+
+       现在分**两排**（不再单独做"今天"那一节）：
+         · 上排「每天要做的」= 任务 / 点灯 / 招募 / 市集 / 成就 —— 红点逐格挂（只挂真能领的）
+         · 下排「常去的地方」= 队伍 / 成长 / 深井 / 挂机分工 / 游历 / 灯阁权限 / 灯阁评级 / 设置
+       ⚠️ 两排的**锚点 id 必须是 `grid:daily` / `grid:grow`**：新手指引第②③步指的就是这两个
+          （`sc-home.js` 的 OPENING），原来写成 `grid:ov_*` 会让那两步**指空**。
+         ②的文案是"养成线都在这排格子里"、③的文案是"任务、点灯、招募、市集、成就"——
+          现在的两排内容与那两句**逐字对得上**。 */
+    /* ⚠️ 两排宫格**读官方真源 `D.HOME_GROUPS`**（组名 + 成员顺序 + 常用度分，判据写在 data.js 表头）——
+       原稿在这里手写了 12 格，于是**漏了 6 个入口**（评级/权限/图鉴/炼化台/基地建设… 与 `open_ach`）。
+       手写一份就不可能跟表对齐（《定调与口径》§3.2：同一件事不许写两份），这里只负责"按表摆 + 挂红点"。 */
+    const dots={}; dailySignals().forEach(function(s){ dots[s[0]]=true; });
+    (D.HOME_GROUPS||[]).forEach(function(g){
+      const all=g.members.map(function(m){ return [m.id, m.name, null, m.unlock||null, !!dots[m.id]]; });
+      U.sectionTitle(g.name||g.id);
+      U.tiles(all.filter(function(x){ return !x[3]||Core.isUnlocked(x[3]); }), 3,
+        g.id==='daily'?'grid:daily':(g.id==='grow'?'grid:grow':'grid:'+g.id));
+      /* 未解锁的不铺出来（一屏灰的更乱），但**留一行可点**：点开逐条写明怎么解锁
+         —— 这一行就是 `open_locked` 的入口（原首页有，2.0 换页时丢了）。 */
+      const lk=all.filter(function(x){ return x[3]&&!Core.isUnlocked(x[3]); });
+      if(lk.length){
+        U.space(CV.SP[1]);
+        const hh=U.hint('还没解锁：'+lk.map(function(x){return x[1];}).join(' / ')+'  ›', 0);
+        CV.hit('open_locked', U.ix()-2, U.y-hh, U.iw()+4, hh);
+      }
+    });
     U.hint('先推进残域，再用奖励补强；剧情会在关键节点自己发生。',CV.SP[1]);
+    /* 最后一行：**设置与存档**。原首页底部就是这一排（`[玩法指南][设置与存档]`）——
+       父亲大人 §四 说"指南在设置里已有、别在一级入口重复摆"，所以这里**只留设置**。
+       ⚠️ 特别注意：`D.HOME_GROUPS` 那张表里**没有**设置（它不是养成/日常线），
+          所以换成读表之后必须单独补这一行，否则设置就又没有入口了。 */
+    U.tiles([['open_settings','设置与存档']], 3, 'grid:sys');
   }
   CV.on('ov_continue',function(){ const w=currentWorld(); if(!w)return; CV.dispatch('w:'+w.id); });
   CV.on('ov_story',function(){ const w=currentWorld(); if(G.Story&&G.Story.openWorld) G.Story.openWorld(w.id,'post'); else CV.dispatch('w:'+w.id); });
@@ -182,6 +236,21 @@
     });
     U.sectionTitle('世界线');
     const ws=unlockedWorlds().slice().reverse();
+    /* ★ 深井的入口在**残域页**（底栏第 2 格），不在首页 —— 原 `sc-dungeon.js` 就是一张
+       `worldCard('♾','深井',…)`。2.0 换掉残域面板时把它丢了（反查出来"有功能没入口"）。
+       这里按原样放回：排在世界线最上面（"深井 → 世界倒序"就是原文的顺序）。 */
+    if (Core.isUnlocked && Core.isUnlocked('corridor')) {
+      const corFloor = (S.corridor && S.corridor.floor) || 1;   // 有些状态里 corridor 还没建，兜底 1 层
+      U.card(function(){
+        const ico=D.iconOpsOf&&D.iconOpsOf('nav','corridor');
+        if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.C.gold);
+        CV.text('深井',U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
+        CV.text('当前第 '+corFloor+' 层',U.ix()+U.iw(),U.y+12*CV.SCALE,{size:CV.FS.md,color:CV.C.gold,align:'right'});
+        CV.text('一直往上打、没有重置',U.ix()+46*CV.SCALE,U.y+33*CV.SCALE,{size:CV.FS.sm,color:CV.C.dim});
+        U.y+=46*CV.SCALE;
+      });
+      CV.hit('open_corridor',U.ix(),U.y-54*CV.SCALE,U.iw(),54*CV.SCALE);
+    }
     ws.forEach(function(x){ const q=(s.worlds[x.id].stages.normal||[]).filter(Boolean).length; U.card(function(){
       const ico=D.iconOpsOf&&D.iconOpsOf('world',x.id); if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.worldIconColor(x.theme,x.id===w.id?'current':'idle'));
       CV.text(x.name,U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
