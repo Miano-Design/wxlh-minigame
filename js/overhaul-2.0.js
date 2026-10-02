@@ -133,7 +133,11 @@
       U.space(CV.SP[1]);   /* R2.5：说明/进度条与按钮之间留一口气（父亲大人："这个也是"贴在一起） */
       U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,stage>=0?'继续探索':'查看新世界','primary','ov_continue'); U.y+=U.BTN_H*CV.SCALE;
     });
-    /* ③ 挂机收益（2.0 那版丢了这块，底栏红点却照旧亮） */
+    /* ③ 挂机收益（2.0 那版丢了这块，底栏红点却照旧亮）
+       ⚠️ R2.8（父亲大人 2026-10-02："把挂机收益放到常去的地方下面"）：
+          这一段**搬到「常去的地方」那排格子之后**再画（函数里的内容一个字没改，
+          只是调用位置从"当前旅程下面"移到了"常去的地方下面"）。 */
+    const drawIdleCard = function(){
     let tk=null; try{ tk=Core.todayState&&Core.todayState(); }catch(e){}
     if(tk){
       const i=tk.idle||{}, mins=Math.floor((tk.idleSeconds||0)/60);
@@ -166,6 +170,7 @@
         }
       });
     }
+    };
     /* ③b 游历（原首页一整张可点卡）：挂着"待领"就点它领，没有就点进游历页 —— 2.0 换首页时丢的入口 */
     try {
       const prog=Core.travelProgress(), pend=Core.pendingTravel();
@@ -232,6 +237,8 @@
       ['open_garden','药园','',null,false],['open_arena','斗法台','',null,false],
       ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false]
     ],3,'grid:grow');
+    /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名） */
+    drawIdleCard();
     /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页 */
     U.space(CV.SP[1]);
     const hAll=U.hint('全部系统（坐骑 · 炼化台 · 评级 · 权限 · 铭刻 · 伴生体 · 图鉴 · 转生）  ›', 0);
