@@ -152,9 +152,10 @@
     const brandH = U.brandTitleH(brandW);
     U.brandTitle(cx - brandW / 2, CV.H * 0.42 - brandH / 2, brandW);
     const ty = CV.H * 0.42 + brandH / 2;
-    CV.text('提灯入残域', cx, ty + 26 * CV.SCALE, { size: CV.FS.lg, align: 'center', color: CV.C.text2, ls: 4 });
+    /* R2.2：与主画面同步去掉「提灯入残域」副题（父亲大人 2026-10-02）——
+       两屏是同一套构图，留一边会让这行字在开机时闪一下又没了。加载条顺带上移补空档。 */
     const bw = CV.W * 0.34, bh = 3 * CV.SCALE;
-    const bx = cx - bw / 2, by = ty + 56 * CV.SCALE;
+    const bx = cx - bw / 2, by = ty + 30 * CV.SCALE;
     CV.round(bx, by, bw, bh, CV.RADIUS_CHIP, CV.a(CV.C.gold, 0.18));
     /* 来回走的灯芯：不定进度（真正的结束信号是这一层自己淡出，不是进度走满） */
     const kw = bw * 0.4;

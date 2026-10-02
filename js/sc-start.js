@@ -48,11 +48,14 @@
     const viewH = CV.H - CV.safeBottom - viewTop;
     /* V1.1.11（父亲大人 09-27：「这个是我做的主画面标题…换掉电脑字，记得适配不同手机的屏幕」）：
        品牌从**两行活字**换成他的题字图（`U.brandTitle`，宽度按屏宽 86%、短屏再夹一道高度上限）。
-       ⇒ 块高里那一条 `DISP.d3×0.7` 换成 `U.brandTitleH(brandW)`，其余项不变；
-       「提灯入残域」作为副题**仍是活字**（图里只有那四个字，没有这句）。 */
+       ⇒ 块高里那一条 `DISP.d3×0.7` 换成 `U.brandTitleH(brandW)`，其余项不变。
+       R2.2（父亲大人 2026-10-02）：原来题字下面还有一行活字副题「提灯入残域」，
+       **已去掉** —— 这一屏现在只有「题字 + 进入残域」两样。 */
     const brandW = Math.min(CV.W * 0.94, 620 * S);   // 2026-10-01 题字放大：0.86 → 0.94（父亲大人："不太突出"）
     const brandH = U.brandTitleH(brandW);
-    const blockH = brandH + 6 * S + 30 * S + 12 * S + CV.SP[4] + U.BTN_H * S;
+    /* R2.2：副题去掉之后，块高里对应那两截（`30*S + 12*S`）也要跟着去掉 ——
+       否则整块仍按"旧高度"居中，题字与按钮会整体偏高约 42px（看着像没居中）。 */
+    const blockH = brandH + 6 * S + CV.SP[4] + U.BTN_H * S;
     /* 落位再收半步：**光学中心**——几何居中看着偏下，本室惯用比几何中心高一点（约 5% 屏高）；
        这一下也正好让开主视觉里右下那尊提灯者（真图里它的头部上沿约在 58% 处，
        块底压在 53% 左右才留得出净距 —— **主体不许被色块/文字压**，那是红线，不是偏好）。
@@ -66,9 +69,11 @@
     U.draw(function () {
       const y0 = U.y;
       U.brandTitle(CV.W / 2 - brandW / 2, y0, brandW);       // 题字图（图没到位时自动退回活字）
-      const ty = y0 + brandH + 6 * CV.SCALE;
-      CV.text('提灯入残域', CV.W / 2, ty + 30 * CV.SCALE, { size: CV.FS.lg, align: 'center', color: CV.C.text2, ls: 4 });
-      U.y = ty + 30 * CV.SCALE + 12 * CV.SCALE;
+      /* R2.2（父亲大人 2026-10-02）：**主页去掉「提灯入残域」那行副题** ——
+         现在这一屏只有两样东西：题字「残域灯阁」＋那颗「进入残域」。
+         品牌启动屏（`sc-splash.js`）画的是同一套构图，同步去掉，
+         否则玩家会看见这行字在开机那一帧出现、进主画面又消失。 */
+      U.y = y0 + brandH + 6 * CV.SCALE;
     });
     U.space(CV.SP[4]);
     /* 唯一的出口：与网页版 mainScreenHtml 的 `data-enter` 同一件事（1.0.3 那两道"必须点才放行"的
