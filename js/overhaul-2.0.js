@@ -15,8 +15,24 @@
     (D.WORLDS||[]).forEach(function(w){ if(s.worlds&&s.worlds[w.id]&&s.worlds[w.id].unlocked) out.push(w); });
     return out;
   }
+  /* ================= R3.5（父亲大人 2026-10-02："为啥现在世界线 W01 还没通关 W02 就出现了"）=================
+     查清了，两件事要分开看：
+       ① **W02 为什么会"已解锁"** —— 是 core.js 那段**"已转过生的老档补偿"**给的：
+          `bestWorldIdx = k` 的档（= 第 k 张图当年 12/12 打穿过，这是**有凭据**的）如果 `S.worlds`
+          被清过（旧转生规则 / 迁移），就把 W01…W(k+1) 恢复成"已解锁"——
+          依据是"通关第 k 张本来就会解锁第 k+1 张"。**星数不补**（凭空造星＝编数据），
+          所以恢复出来的世界显示 0/12。**这一列本身没错**，是老档的历史真相。
+       ② **错的是"当前旅程"指到了 W02** —— 这里原来取"最后一个已解锁的世界"，
+          于是 W01 一关没打，主页却写着「潜影窟 第 1/12 关」，看着就是"W01 没通就冒出 W02"。
+     现在改成真正的进度前沿：**第一个还没打通的普通世界**；全部打通了才退回最后一个已解锁的。
+     ⇒ 补偿恢复出来的"提前解锁"不再抢方向盘，玩家照旧从 W01 打起（列表里那一列也照样看得见）。
+     ⚠️ 只改"指哪儿"，一个字节的存档都不动。 */
   function currentWorld(){
     const ws=unlockedWorlds(); if(!ws.length) return D.WORLDS[0];
+    for(let i=0;i<ws.length;i++){
+      const a=((S().worlds[ws[i].id]||{}).stages||{}).normal||[];
+      if(a.filter(Boolean).length<12) return ws[i];
+    }
     return ws[ws.length-1];
   }
   function nextStage(wid,diff){
