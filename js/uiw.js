@@ -622,6 +622,12 @@
       /* t = [动作, 名字, 小字(可空), 解锁(可空), 红点] —— 和网页版 tile(x) 同一份结构。
          V9.5.68（父亲大人）：主页格子里**只留功能名**；"有东西可领"改用红点表达。 */
       const dot = t[4];
+      /* ================= R3.4：格子的"还没开放"标记（t[5]）=================
+         父亲大人 2026-10-02 看到的矛盾：主页底部写着「还没解锁：任务 / 招募伙伴 / 市集」，
+         可那三格**点开其实能用**（入口不设闸门，只有里面的动作会被 `Core` 拦并给原因）。
+         ⇒ 结论是"能看不能领"，那就在格子上**如实标出来**，别让玩家以为已经开了：
+           名字压成 --dim ＋ 名字前面一枚小锁。**不加闸门**（既不动玩法，也不会把谁锁在门外）。 */
+      const locked = !!t[5];
       draw(() => {
         CV.round(x, y, cellW, th, CV.RADIUS_CHIP, CV.a(CV.C.panel, .50), CV.C.line2);
         const inner = cellW - 12 * CV.SCALE;
@@ -629,11 +635,16 @@
         const cy = hasSub ? y + th / 2 - 7 * CV.SCALE : y + th / 2;
         const nameW = CV.measure(t[1], CV.FS.lg, true);
         const dotW = dot ? 10 * CV.SCALE : 0;
-        const tx = x + cellW / 2 - (nameW + dotW) / 2;
-        CV.text(CV.fit(t[1], inner - dotW, CV.FS.lg, true), tx, cy, { size: CV.FS.lg, bold: true });
+        /* 锁字形**单独量、单独画**（不并进名字串）—— 名字原样保留，
+           尺子/引导按名字精确匹配的那些断言不会被这枚小锁影响。 */
+        const lockW = locked ? (CV.measure('🔒', CV.FS.sm) + 3 * CV.SCALE) : 0;
+        const tx = x + cellW / 2 - (lockW + nameW + dotW) / 2;
+        if (locked) CV.text('🔒', tx, cy, { size: CV.FS.sm, color: CV.C.dim });
+        CV.text(CV.fit(t[1], inner - dotW - lockW, CV.FS.lg, true), tx + lockW, cy,
+          { size: CV.FS.lg, bold: true, color: locked ? CV.C.dim : undefined });
         if (dot) {                                    // 网页版 .tt-dot：6px 红点，跟在名字右边 4px
           CV.ctx.beginPath();
-          CV.ctx.arc(tx + nameW + 4 * CV.SCALE + 3 * CV.SCALE, cy - 5 * CV.SCALE, 3 * CV.SCALE, 0, Math.PI * 2);
+          CV.ctx.arc(tx + lockW + nameW + 4 * CV.SCALE + 3 * CV.SCALE, cy - 5 * CV.SCALE, 3 * CV.SCALE, 0, Math.PI * 2);
           CV.ctx.fillStyle = CV.C.accent; CV.ctx.fill();
         }
         if (hasSub) CV.text(CV.fit(t[2], inner, CV.FS.xs), x + cellW / 2, cy + 15 * CV.SCALE, { size: CV.FS.xs, color: CV.C.dim, align: 'center' });

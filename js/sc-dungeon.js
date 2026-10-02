@@ -61,6 +61,13 @@
   function diffAllCleared(worldId, diff) {
     return !!(Core.worldCleared && Core.worldCleared(worldId, diff));
   }
+  /* ================= R3.4（父亲大人 2026-10-02：「4，加回来吧」）=================
+     三枚难度小标签（普通 / 困难 / 地狱）**只服务世界列表那一张卡**。
+     R3.2 之后列表改由 `overhaul-2.0.js` 画 —— 那两个小函数（画法 `pill` ＋ 判据
+     `diffAllCleared`）就留在这里**挂出去**给新列表用：**一份形状、一份判据，谁都不许再写第二份**
+     （原来那版旧列表正文已经删掉，这两个函数是它唯一留下的东西）。 */
+  G.worldDiffPill = pill;                      // (x, cy, label, on) → 返回这一枚的宽度
+  G.worldDiffAllCleared = diffAllCleared;      // (worldId, diff) → 该难度 12 关全通？
   /* bg：格底色。V1.0.1 起由数据层的 D.worldTint(世界id) 给（五族色相 × 族内明度阶梯），
      网页版同一串颜色内联到 .world-ico 上；不传就退回旧底色（转生门那张、以及 ♾ 深井格）。 */
   /* tags：`[{ t: '普通', on: true }, …]`（不传 / 空数组＝这张卡没有标签，深井与转生门就是） */
@@ -132,75 +139,6 @@
   }
 
   /* ================= ① 世界列表 ================= */
-  CV.register('dungeon', function () {
-    const S = Core.S;
-    U.begin();
-    /* 继续上次探索（只有存档里有未打完的进度才画，和网页版一致） */
-    const pr = S.pendingRun;
-    if (pr && pr.worldId && pr.waves) {
-      const w = D.WORLDS.find((x) => x.id === pr.worldId);
-      U.card(function () {
-        U.h3('继续上次探索', (w ? w.name : pr.worldId) + ' · 第 ' + pr.stage + '/12 关 · 第 ' +
-          Math.min((pr.wave || 0) + 1, (pr.waves || [1]).length) + '/' + (pr.waves || [1]).length + ' 波');
-        U.space(CV.SP[1]);
-        U.btnRow([
-          { label: '继续探索', style: 'primary', id: 'dun_resume' },
-          { label: '放弃这一轮', style: 'ghost', id: 'dun_drop' },
-        ]);
-      });
-    }
-    /* 深井挑战：同样"没解锁就不显示"（父亲大人：还没解锁的地图先隐藏，解锁了再出现） */
-    const corridorLocked = !Core.isUnlocked('corridor');
-    if (!corridorLocked) {
-      U.sectionTitle('深井挑战');
-      /* V9.6.24（父亲大人）：去掉终局挑战标签与历史最高 —— 深井是一直往上打的、没有重置，
-         所以历史最高这个概念本身就不成立。 */
-      worldCard('♾', '深井', '当前第 ' + S.corridor.floor + ' 层', null, 'open_corridor', false);
-    }
-    /* 残域：**只列已解锁的世界**（V9.6.2 父亲大人："还没解锁的地图就别显示，等解锁了再显示"）——
-       以前把 20 个全列出来、未解锁的压暗加锁，一屏全是"🔒 通关上一世界解锁"，既没用又碍眼。
-       ---- 派单 J（父亲大人 09-29）：**列表倒序**，最新的排最上面（深井 → W03 → W02 → W01）----
-       「倒序」**只在这一处定义**：世界详情页 / 关卡格 / 扫荡页一律按 `D.WORLDS` 的原序取世界，
-       谁也不许再按 id 排一遍 —— 免得"列表倒序、点进去正序"两套口径打架。
-       排序**显式按 id 比**（不靠 `D.WORLDS` 现在的排布）：数据层哪天重新排过也不会跟着乱。
-       ⚠️ 深井是**独立页**（`corridor`，从灯阁进），它上面那张卡是"深井挑战"单独一节、
-          **不属于这份列表**，所以这次排序不碰它（父亲大人那句是在举例说顺序，不是要求并进来）。 */
-    const worldList = D.WORLDS.filter((w) => S.worlds[w.id] && S.worlds[w.id].unlocked)
-      .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
-    U.sectionTitle('残域（' + worldList.length + '/' + D.WORLDS.length + '）');
-    worldList.forEach((w) => {
-      const st = S.worlds[w.id];
-      const unlocked = true;
-      const prog = st.stages.normal.filter((s) => s > 0).length;
-      /* 三档难度标签（父亲大人 09-29，**09-29 二次纠正**）：
-         **该难度 12 关全通＝高亮，没全通＝灰** —— 一眼看出哪张图把哪几档**打穿了**。
-         （他原话：「我说的世界的三个难度标签，是**通关还难度 12 关才点亮**，
-           你现在只要打了第一关就点亮了」——第一版按"有通关记录"点亮，是理解错了。）
-         状态一律读 `diffAllCleared`（本文件里唯一的判定，内部走 `Core.worldCleared`），
-         不在这儿再写一遍 `every(s > 0)`。
-         「已通关」（普通 12/12）那枚独立标签**撤掉了** —— 它的信息在下面小字里本来就有
-         （全清时小字正是「进度 12/12」），三枚标签的位子留给难度（320 上四个标签挤不下）。 */
-      worldCard(icoOf(w), w.name,   // V9.6.127：每个世界自己的图标（data.js），主题图标只兜底
-        unlocked ? ('进度 ' + prog + '/12 · ' + String(w.mechanic).split('：')[0]) : '🔒 通关上一世界解锁',
-        D.DIFFICULTY.map((d) => ({ t: d.name, on: diffAllCleared(w.id, d.id) })),
-        /* 底色：§五 —— 不再用 `D.worldTint(w.id)`（按主题生成的 36 种彩底），
-           统一中性表面；主题色只在图标与族形上出现。 */
-        'w:' + w.id, false, CV.a(CV.C.panel3, .50), w.theme,
-        /* 世界图标的状态（§九）：这张图**普通档 12 关全通**＝已完成（低饱和暖灰），
-           否则＝普通（偏冷灰白）。"选中/重要节点"这两档在世界详情页与 Boss 关用。 */
-        diffAllCleared(w.id, 'normal') ? 'done' : 'idle');
-    });
-    /* 转生门：门后那一张要显示出来（跟网页版同一口径）。
-       "没解锁的不显示"说的是**还没走到**的世界；转生门是"走到了、过不去"，
-       藏起来玩家就不知道下一步在哪 —— 这是 V9.6.76 加的，两边保持一致。 */
-    const nextLocked = D.WORLDS.find((w) => !(S.worlds[w.id] && S.worlds[w.id].unlocked));
-    const gateNeed = nextLocked ? Core.worldReincarnNeed(nextLocked.id) : 0;
-    if (gateNeed) {
-      worldCard('🔒', nextLocked.name,
-        '需要转生 ' + gateNeed + ' 次才能进入 · 当前 ' + (S.player.reincarnations || 0) + ' 次',
-        null, 'w:' + nextLocked.id, true);
-    }
-  });
 
   /* ================= ② 世界详情 ================= */
   CV.register('world', function () {

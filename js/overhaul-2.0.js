@@ -52,6 +52,13 @@
   function storyLine(w){
     try { if(G.Story&&G.Story.clueOf) return G.Story.clueOf(w.id,'post')||G.Story.clueOf(w.id,'in')||''; } catch(e){} return '';
   }
+  /* ================= R3.4（父亲大人 2026-10-02：「3，你安排，怎么合理怎么来」）=================
+     主页格子的"还没开放"标记。判据**只读 `D.HOME_GROUPS` 的 `unlock` 字段**（那份是真源），
+     用 `Core.isUnlocked` 问它现在开了没有 —— 与页面底部那句「还没解锁：…」**同一份来源、同一个判据**，
+     两处再也不会一个说开了、一个说没开。
+     ⚠️ 只改**显示**：入口照旧能进（"能看不能领"——里面动手时由 `Core` 拦，并给出"通关 X 解锁"的原因）。 */
+  const LOCK_OF=(function(){ const m={}; (D.HOME_GROUPS||[]).forEach(function(g){ g.members.forEach(function(x){ if(x.unlock) m[x.id]=x.unlock; }); }); return m; })();
+  function isLocked(id){ return !!LOCK_OF[id] && !Core.isUnlocked(LOCK_OF[id]); }
   /* ⚠️ 原来这里还有一份 `renderHome()`（51~91 行）——**死代码**：真正挂上去的是下面的
      `CV.panels.home → renderHomeBody()`，那一份从来没被调用过。
      两套首页实现放在同一个文件里，改一处忘一处就分叉（任务书 §15「不允许两套实现」）。
@@ -269,17 +276,17 @@
     const dots={}; dailySignals().forEach(function(s){ dots[s[0]]=true; });
     U.sectionTitle('日常');
     U.tiles([
-      ['open_tasks','任务','',null,!!dots.open_tasks],
-      ['open_garden','药园','',null,false],
-      ['open_recruit','招募','',null,!!dots.open_recruit]
+      ['open_tasks','任务','',null,!!dots.open_tasks,isLocked('open_tasks')],
+      ['open_garden','药园','',null,false,isLocked('open_garden')],
+      ['open_recruit','招募','',null,!!dots.open_recruit,isLocked('open_recruit')]
     ],3,'grid:daily');
     U.sectionTitle('常去的地方');
     U.tiles([
-      ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
-      ['open_arena','斗法台','',null,false],['open_keji','秘术阁','',null,false],
-      ['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
-      ['open_beast','伴生体','',null,false],['open_shop','市集','',null,false],
-      ['open_sign','点灯','',null,!!dots.open_sign]
+      ['open_party','队伍','',null,false,isLocked('open_party')],['open_grow','成长','',null,false,isLocked('open_grow')],
+      ['open_arena','斗法台','',null,false,isLocked('open_arena')],['open_keji','秘术阁','',null,false,isLocked('open_keji')],
+      ['open_fabao','法宝','',null,false,isLocked('open_fabao')],['open_mount','坐骑','',null,false,isLocked('open_mount')],
+      ['open_beast','伴生体','',null,false,isLocked('open_beast')],['open_shop','市集','',null,false,isLocked('open_shop')],
+      ['open_sign','点灯','',null,!!dots.open_sign,isLocked('open_sign')]
     ],3,'grid:grow');
     /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名）
        R2.9：它与上面那排格子**贴在一起了** —— `U.tiles` 画完不留下沿间距，卡片直接接着画。
@@ -307,7 +314,7 @@
        ⚠️ `D.HOME_GROUPS` 里**没有**设置（它不是养成/日常线），所以必须单独摆一行；
           成就原来在「日常」那排，跟着这次调整挪到这里。 */
     U.tiles([
-      ['open_ach','成就','',null,!!dots.open_ach],
+      ['open_ach','成就','',null,!!dots.open_ach,isLocked('open_ach')],
       ['open_settings','设置与存档']
     ],3,'grid:sys');
   }
@@ -405,7 +412,21 @@
       const ico=D.iconOpsOf&&D.iconOpsOf('world',x.id); if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.worldIconColor(x.theme,x.id===w.id?'current':'idle'));
       CV.text(x.name,U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
       CV.text(q+'/12',U.ix()+U.iw(),U.y+12*CV.SCALE,{size:CV.FS.md,color:q>=12?CV.C.gain:CV.C.dim,align:'right'});
-      CV.text(String(x.mechanic).split('：')[0],U.ix()+46*CV.SCALE,U.y+33*CV.SCALE,{size:CV.FS.sm,color:CV.C.dim});
+      /* ================= R3.4（父亲大人 2026-10-02：「4，加回来吧」）=================
+         三枚难度小标签（普通 / 困难 / 地狱）**加回世界线卡片**：该难度 12 关全通＝点亮，没全通＝灰。
+         · 画法与判据**不在这里实现** —— 读 `G.worldDiffPill` / `G.worldDiffAllCleared`
+           （sc-dungeon.js 里那一份，原来是旧列表用的，正文删掉时保留并挂了出来）；
+         · 排在**第二行右端**（第一行右端已经被 `N/12` 占了）：三枚一共约 110px，
+           第二行有整行宽，320 小屏也放得下（`layout_audit` 逐页量"有没有出画/被砍"）。 */
+      const pills=[['普通','normal'],['困难','hard'],['地狱','hell']];
+      const pw=pills.reduce(function(a,pl){ return a+CV.measure(pl[0],CV.FS.tag)+12*CV.SCALE+4*CV.SCALE; },0)-4*CV.SCALE;
+      let px=U.ix()+U.iw()-pw;
+      const cy2=U.y+33*CV.SCALE;
+      const mechW=CV.fit(String(x.mechanic).split('：')[0], U.iw()-46*CV.SCALE-pw-8*CV.SCALE, CV.FS.sm);
+      CV.text(mechW,U.ix()+46*CV.SCALE,cy2,{size:CV.FS.sm,color:CV.C.dim});
+      if(G.worldDiffPill&&G.worldDiffAllCleared){
+        pills.forEach(function(pl){ px+=G.worldDiffPill(px,cy2,pl[0],G.worldDiffAllCleared(x.id,pl[1]))+4*CV.SCALE; });
+      }
       U.y+=46*CV.SCALE;
     }); CV.hit('w:'+x.id,U.ix(),U.y-54*CV.SCALE,U.iw(),54*CV.SCALE); });
     const locked=D.WORLDS.find(x=>!(s.worlds[x.id]&&s.worlds[x.id].unlocked));
