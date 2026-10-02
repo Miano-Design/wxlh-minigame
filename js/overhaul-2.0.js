@@ -53,7 +53,10 @@
      两套首页实现放在同一个文件里，改一处忘一处就分叉（任务书 §15「不允许两套实现」）。
      收口：**只留 renderHomeBody 一份**，`CV.panels.home` 直接指向它。 */
   CV.panels.home=function(){
-    U.begin(); U.pageHead('灯阁');
+    /* R2.1（父亲大人截图点名）：**一级页不摆"‹ 标题"那条顶栏** ——
+       它是根页、返回键点了也没地方去，白占一条；灯阁顶部直接就是主角卡（见 renderHomeBody ①）。
+       正文从货币栏下面开始（`U.begin()` 已经把 U.y 放在那儿）。 */
+    U.begin();
     renderHomeBody();
   };
   /* ================= R2.0 体验收口 · 首页重排（父亲大人终验单 §三/§四/§五）=================
@@ -158,7 +161,9 @@
   };
 
   CV.panels.dungeon=function(){
-    const s=S(),w=currentWorld(),st=(s.worlds&&s.worlds[w.id])||{stages:{normal:[]}},stage=nextStage(w.id,'normal');U.begin();U.pageHead('残域');
+    /* 残域也是**一级页**（底栏第 2 格）—— 同上：不摆标题+返回那条。
+       页面自己的 H1「继续探索 / 世界线」已经说明了这是哪一页。 */
+    const s=S(),w=currentWorld(),st=(s.worlds&&s.worlds[w.id])||{stages:{normal:[]}},stage=nextStage(w.id,'normal');U.begin();
     U.card(function(){
       U.h3('继续探索',w.name);
       U.note(stage>=0?'下一关：'+(stage+1)+'/12 · '+String(w.mechanic).split('：')[0]:'本世界普通难度已清');
