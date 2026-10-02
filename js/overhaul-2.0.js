@@ -226,22 +226,36 @@
        被收起来的那几格**不是没入口**：成长页（`open_grow`）就是系统总览，
        本页也给一行「全部系统 ›」，所以 `entry_audit` 里不会出现孤儿。
        ⚠️ 锚点必须叫 `grid:daily` / `grid:grow`：新手指引第②③步指的就是这两个 id。 */
+    /* R2.9（父亲大人 2026-10-02 逐条点名）：
+         · 「日常就保留任务、药园和招募三个」   → 日常 = 任务 / 药园 / 招募
+         · 「把市集让到成长的矩阵里」           → 市集 移到「常去的地方」
+         · 「点灯放到常去的板块」               → 点灯 移到「常去的地方」
+         · 「把成就放到下面设置键的左边」       → 底排 = 成就 / 设置与存档
+       顺序与内容照他念的来；`grid:daily` / `grid:grow` 两个**锚点 id 不变**（新手指引还指着它们）。 */
     const dots={}; dailySignals().forEach(function(s){ dots[s[0]]=true; });
-    const dGroup=(D.HOME_GROUPS||[]).filter(function(g){return g.id==='daily';})[0]||{name:'每天要做的',members:[]};
-    U.sectionTitle(dGroup.name||'每天要做的');
-    U.tiles(dGroup.members.filter(function(m){return !m.unlock||Core.isUnlocked(m.unlock);})
-      .map(function(m){ return [m.id, m.name, null, m.unlock||null, !!dots[m.id]]; }), 3, 'grid:daily');
+    U.sectionTitle('日常');
+    U.tiles([
+      ['open_tasks','任务','',null,!!dots.open_tasks],
+      ['open_garden','药园','',null,false],
+      ['open_recruit','招募','',null,!!dots.open_recruit]
+    ],3,'grid:daily');
     U.sectionTitle('常去的地方');
     U.tiles([
       ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
-      ['open_garden','药园','',null,false],['open_arena','斗法台','',null,false],
-      ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false]
+      ['open_arena','斗法台','',null,false],['open_keji','秘术阁','',null,false],
+      ['open_fabao','法宝','',null,false],['open_shop','市集','',null,false],
+      ['open_sign','点灯','',null,!!dots.open_sign]
     ],3,'grid:grow');
-    /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名） */
+    /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名）
+       R2.9：它与上面那排格子**贴在一起了** —— `U.tiles` 画完不留下沿间距，卡片直接接着画。
+       这里按全站口径补一道卡间距（`U.CARD_GAP`）。 */
+    U.space(U.CARD_GAP);
     drawIdleCard();
-    /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页 */
+    /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页。
+       R2.9：原来这一行后面拖着一长串括号说明（"（坐骑 · 炼化台 · …）"），父亲大人要
+       **把那句注释去掉** —— 去掉说明、只留一行的入口本身（不删入口，否则那几项就没有入口了）。 */
     U.space(CV.SP[1]);
-    const hAll=U.hint('全部系统（坐骑 · 炼化台 · 评级 · 权限 · 铭刻 · 伴生体 · 图鉴 · 转生）  ›', 0);
+    const hAll=U.hint('全部系统  ›', 0);
     CV.hit('open_grow', U.ix()-2, U.y-hAll, U.iw()+4, hAll);
     /* 未解锁的功能照样能查"怎么解锁"（这一行就是 `open_locked` 的入口） */
     {
@@ -253,12 +267,17 @@
         CV.hit('open_locked', U.ix()-2, U.y-hh, U.iw()+4, hh);
       }
     }
-    U.hint('先推进残域，再用奖励补强；剧情会在关键节点自己发生。',CV.SP[1]);
-    /* 最后一行：**设置与存档**。原首页底部就是这一排（`[玩法指南][设置与存档]`）——
-       父亲大人 §四 说"指南在设置里已有、别在一级入口重复摆"，所以这里**只留设置**。
-       ⚠️ 特别注意：`D.HOME_GROUPS` 那张表里**没有**设置（它不是养成/日常线），
-          所以换成读表之后必须单独补这一行，否则设置就又没有入口了。 */
-    U.tiles([['open_settings','设置与存档']], 3, 'grid:sys');
+    /* R2.9（父亲大人）："**下面的注释文字去掉**" ——
+       原来这一行是 `先推进残域，再用奖励补强；剧情会在关键节点自己发生。`
+       （一句引导性说明，占一屏底部还容易跟上面那排挤在一起）。**整句删掉**。 */
+    /* 最后一行：**成就 + 设置与存档**（父亲大人 R2.9："把成就放到下面设置键的左边"）。
+       原首页底部就是这一排（`[玩法指南][设置与存档]`）——指南在设置里已有、不再重复摆。
+       ⚠️ `D.HOME_GROUPS` 里**没有**设置（它不是养成/日常线），所以必须单独摆一行；
+          成就原来在「日常」那排，跟着这次调整挪到这里。 */
+    U.tiles([
+      ['open_ach','成就','',null,!!dots.open_ach],
+      ['open_settings','设置与存档']
+    ],3,'grid:sys');
   }
   CV.on('ov_continue',function(){ const w=currentWorld(); if(!w)return; CV.dispatch('w:'+w.id); });
   CV.on('ov_story',function(){ const w=currentWorld(); if(G.Story&&G.Story.openWorld) G.Story.openWorld(w.id,'post'); else CV.dispatch('w:'+w.id); });
