@@ -5,8 +5,10 @@
    这一把查**反方向**：**注册过的动作，有没有哪个页面能点到它** —— 查不出来的就是
    "有功能、没入口"（玩家永远用不到，等于被删了）。
    做法：真渲染全部页面（一份"玩到中期"的夹具）→ 收集所有热区 id → 和 `CV.onAct` 对照。
-   ⚠️ 已知的两类**允许存在**的孤儿（写在这里，免得下次又当新问题报）：
+   ⚠️ 已知**允许存在**的孤儿（写在这里，免得下次又当新问题报）：
      · `open_bounty`：悬赏已经并进任务页（标签 `tasktab:bounty`），这个名字是**遗留别名**；
+     · `open_bag` ：「背包」就是**底栏第 4 格**（`tab:bag`），页面级别名没人用是正常的
+       （R3.1 把成长页"装备强度"那颗按钮去掉之后它才浮出来 —— 不是功能丢了）；
      · `open_locked`：要有"锁着的功能"才出现那一行，夹具全解锁时本来就不该有。
    只读：不改任何代码、不碰存档。 */
 const path = require('path');
@@ -56,13 +58,13 @@ const matched = (act) => {
 };
 /* 页面入口类（`open_*`）才是"玩家点不到就永远见不到"的功能；其余（属性加点、对话选项…）
    由各自页面内部触发，不在这把尺子的判据里。 */
-const ALLOW = ['open_bounty', 'open_locked'];      // 见文件头那两条
+const ALLOW = ['open_bounty', 'open_bag', 'open_locked'];      // 见文件头那三条
 const orphans = Object.keys(CV.onAct)
   .filter((a) => a.indexOf('open_') === 0 && !matched(a) && ALLOW.indexOf(a) < 0);
 R.note('页面 ' + PAGES.length + ' 个 · 热区 id ' + hitIds.length + ' 个 · 注册动作 ' + Object.keys(CV.onAct).length + ' 个');
 (orphans.length ? R.fail : R.pass)('每个页面入口都有地方能点到（没有"有功能没入口"）', {
   file: 'js/overhaul-2.0.js', expected: '0 个孤儿入口',
-  actual: orphans.length ? orphans.join(' , ') : '0 个（允许清单里的 2 条不算：' + ALLOW.join(' / ') + '）',
+  actual: orphans.length ? orphans.join(' , ') : '0 个（允许清单里的 ' + ALLOW.length + ' 条不算：' + ALLOW.join(' / ') + '）',
 });
 /* 新手指引依赖的三个首页锚点必须真的存在（`sc-home.js` 的 OPENING 指的就是它们） */
 {

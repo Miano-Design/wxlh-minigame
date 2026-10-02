@@ -268,7 +268,8 @@
     U.tiles([
       ['open_party','队伍','',null,false],['open_grow','成长','',null,false],
       ['open_arena','斗法台','',null,false],['open_keji','秘术阁','',null,false],
-      ['open_fabao','法宝','',null,false],['open_shop','市集','',null,false],
+      ['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
+      ['open_beast','伴生体','',null,false],['open_shop','市集','',null,false],
       ['open_sign','点灯','',null,!!dots.open_sign]
     ],3,'grid:grow');
     /* R2.8：挂机收益**在「常去的地方」下面**（父亲大人点名）
@@ -276,15 +277,9 @@
        这里按全站口径补一道卡间距（`U.cardGap()` —— 与 `U.card` 用的是同一个派生值）。 */
     U.space(U.cardGap());
     drawIdleCard();
-    /* 其余系统（坐骑 / 炼化台 / 评级 / 权限 / 铭刻 / 伴生体 / 图鉴 / 转生…）收进成长页。
-       R2.9：原来这一行后面拖着一长串括号说明（"（坐骑 · 炼化台 · …）"），父亲大人要
-       **把那句注释去掉** —— 去掉说明、只留一行的入口本身（不删入口，否则那几项就没有入口了）。 */
-    U.space(CV.SP[1]);
-    /* R3.0（GPT 复审：`全部系统 ›` 保留、但改名）——
-       "全部系统"太像后台；这一行通向的其实是**成长体系总览**（坐骑/炼化/评级/权限/铭刻/伴生体/图鉴/转生），
-       所以在《残域》的语境里叫「更多成长 ›」。入口与动作（`open_grow`）不变。 */
-    const hAll=U.hint('更多成长  ›', 0);
-    CV.hit('open_grow', U.ix()-2, U.y-hAll, U.iw()+4, hAll);
+    /* R3.1（父亲大人："主页最下面的**更多成长**的小字去掉"）——
+       整行撤掉。**不是删入口**：成长页仍从上面「常去的地方 · 成长」那一格进得去，
+       而主页那一排已经涵盖了常用系统；剩下的（铭刻/转生/图鉴/炼化台/评级/权限）都在成长页里。 */
     /* 未解锁的功能照样能查"怎么解锁"（这一行就是 `open_locked` 的入口） */
     {
       const lk=[];
@@ -318,27 +313,32 @@
       U.kv('当前境界',r&&r.curName?(''+r.curName):'未定命格');
       U.kv('权限', 'Lv.'+(au&&au.lv||0));
     });
-    U.sectionTitle('四个重点');
+    /* R3.1：这一节的四张卡**改成纯说明（不带按钮）** ——
+       原来每张卡都挂一颗「去看看」，而其中"战斗阵容→队伍""装备强度→背包"在主页/底栏已经有了，
+       等于同一个入口在两屏各摆一次（父亲大人："成长页把主页有的去掉，避免重复"）。
+       现在这里只讲"先练什么"，真正的入口在**主页那一排**与下面那张宫格；进出都只有一条路。 */
+    U.sectionTitle('变强路线（入口在主页）');
     const rows=[
       ['open_party','战斗阵容','先把 5 个位置配完整'],
       ['open_bag','装备强度','优先强化当前上阵装备'],
       ['open_realm','长期成长','境界 / 铭刻跟着推进解锁'],
       ['open_buildings','基础收益','挂机、离线、强化效率一起涨'],
     ];
-    /* R2.4（父亲大人截图点名：说明文字跟「去看看」贴在一起）——
-       实测：说明行（12px 字、行高 1.75）画完 U.y 就停在**它自己那一行的下沿**，
-       紧接着按钮的顶边就压在那里 —— 字框下沿离按钮只剩 3px（窄屏上就是贴住）。
-       按项目里别处同一口径（主页挂机卡、各类"说明 → 按钮"的卡）**先留一口气再放按钮**。 */
-    rows.forEach(function(x){ U.card(function(){ U.h3(x[1]); U.note(x[2],1*CV.SCALE); U.space(CV.SP[1]); U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'去看看','ghost',x[0]);U.y+=U.BTN_SM*CV.SCALE;}); });
+    rows.forEach(function(x){ U.card(function(){ U.h3(x[1]); U.note(x[2],1*CV.SCALE); }); });
+    /* ================= R3.1（父亲大人："成长的二级页可以把主页有的去掉，避免重复"）=================
+       这一页是**二级页**，只放主页那排**没有**的系统 —— 同一个入口不在两屏各摆一次。
+       主页「常去的地方」现在有：队伍 / 成长 / 斗法台 / 秘术阁 / 法宝 / **坐骑 / 伴生体** / 市集 / 点灯，
+       日常有：任务 / 药园 / 招募；底排：成就 / 设置。
+       ⇒ 这里只留主页没有的：**铭刻 / 转生 / 图鉴 / 炼化台 / 灯阁评级 / 灯阁权限**（6 格）。
+       ⚠️ 被去掉的都不是"没入口"：它们在主页那一排（`entry_audit` 会逐条反查，不会漏）。 */
     U.sectionTitle('其他系统');
     U.tiles([
-      ['open_keji','秘术阁','',null,false],['open_fabao','法宝','',null,false],['open_mount','坐骑','',null,false],
-      ['open_garden','药园','',null,false],['open_arena','斗法台','',null,false],['open_sign','点灯','',null,false],
-      ['open_genelock','铭刻','',null,false],['open_beast','伴生体','',null,false],['open_reincarn','转生','',null,false],
-      ['open_codex','图鉴','',null,false],['open_shop','市集','',null,false],['open_refine','炼化台','',null,false],
-      /* ★ R2.6：这两格**必须在这里**（父亲大人 2026-10-02 点名的"功能少了入口"）——
-         首页那排只放常用的，评级/权限就收到"其他系统"里；缺了它们这俩就又成了没入口的功能。 */
-      ['open_sect','灯阁评级','',null,false],['open_authority','灯阁权限','',null,false]
+      ['open_genelock','铭刻','',null,false],['open_reincarn','转生','',null,false],
+      ['open_codex','图鉴','',null,false],['open_refine','炼化台','',null,false],
+      ['open_sect','灯阁评级','',null,false],['open_authority','灯阁权限','',null,false],
+      /* 这两项原来挂在"变强路线"的说明卡上（长期成长→境界 / 基础收益→基地建设），
+         卡片去掉按钮之后，它们必须有正式入口，否则就成了"有功能没入口"（entry_audit 会红）。 */
+      ['open_realm','境界渡劫','',null,false],['open_buildings','基地建设','',null,false]
     ],3,'grid:ov_growth_more');
   };
 
@@ -349,6 +349,10 @@
     U.card(function(){
       U.h3('继续探索',w.name);
       U.note(stage>=0?'下一关：'+(stage+1)+'/12 · '+String(w.mechanic).split('：')[0]:'本世界普通难度已清');
+      /* R3.1（父亲大人截图点名：「残域界面的小字和按钮太贴了」）——
+         说明行画完 U.y 就停在那一行的下沿，按钮顶边紧接在那里（实测只剩 3px）。
+         与首页/成长页同一口径：按钮前留一口气。 */
+      U.space(CV.SP[1]);
       if(stage>=0) U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,'进入当前世界','primary','ov_current_world');
       else U.btn(U.ix(),U.y,U.iw(),U.BTN_H*CV.SCALE,'查看当前世界','ghost','ov_current_world');
       U.y+=U.BTN_H*CV.SCALE;
