@@ -28,6 +28,14 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
 const COLL = 'saves';
+/* ================= 2026-10-03（任务书 §17「云函数部署必须真正核实」）=================
+   GitHub 里这份源码改了 **不等于** 微信云端真的部署了新代码 —— 部署没跟上时，
+   三台设备看起来"各说各话"，而客户端无从判断自己调的是哪一版。
+   所以：**给这份云函数盖一个版本戳，并让 probe 原样回给客户端**。
+   排查时只需在任意一台上跑 `GameGlobal.CloudSync.probe()`，看 version / env 就能确认
+   三台是不是同一版云函数。改这份文件时**必须**把这个字符串一起改（当天的日期 + 代号）。 */
+const CLOUDSAVE_VERSION = '2026-10-03-FINAL';
+const ENV_TAG = String(process.env.TCB_ENV || process.env.SCF_NAMESPACE || 'dyn');
 const MAX_CHARS = 256 * 1024;
 
 /* ---------- 与客户端 `js/sc-cloud.js` 的 fpOf **同一套**哈希（导出档信封里的账号指纹） ---------- */
@@ -249,11 +257,22 @@ exports.main = async (event) => {
      一步一步来：get → set 一个探针字段 → 再 get 验证 → 清掉探针字段。
      哪一步炸、炸在什么码上，原样回给客户端 —— 以后不用再"猜 API"。 */
   if (action === 'probe') {
-    const out = { ok: true, hasDoc: false, get: false, set: false, verify: false, clean: false };
+    const out = { ok: true, hasDoc: false, get: false, set: false, verify: false, clean: false,
+      version: CLOUDSAVE_VERSION, env: ENV_TAG };
     const r = await ensure(openid);
     if (r.err) return r.err;
     out.hasDoc = !!r.doc;
     out.docId = r.id;
+    /* 云端那份的"指纹"（**只回 hash 与时间戳，不回 payload 本体**，任务书 §11/§18）：
+       三台设备一比对，就知道自己看到的是不是同一份档。 */
+    if (r.doc) {
+      out.cloudTs = Number(r.doc.ts) || 0;
+      out.cloudBytes = Number(r.doc.bytes) || 0;
+      out.cloudHash = crypto.createHash('sha1').update(String(r.doc.payload || '')).digest('hex').slice(0, 12);
+      out.leaseId = (r.doc.lease && r.doc.lease.id) || '';
+      out.leaseTs = (r.doc.lease && Number(r.doc.lease.ts)) || 0;
+      out.hasPrev = !!r.doc.prevPayload;
+    }
     if (!r.doc) { out.stage = 'probe_nodoc'; return out; }
     try { const g = await db.collection(COLL).doc(r.id).get(); out.get = !!(g && g.data); }
     catch (e) { return Object.assign(dbErr('probe_get', e), out); }

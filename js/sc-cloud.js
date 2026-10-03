@@ -977,10 +977,32 @@
      哪一步炸、什么码，一眼可见（今天那个 `-502001` 就是靠它定的位）。
      ⚠️ 只在**排查时**手动调：它会对**你自己那条云存档**做两次 `set`（探针前 / 探针后各一次），
         别在"两台设备同时正在推档"的时候连着点。它不接入任何正式游戏逻辑。 */
+  /* ================= 2026-10-03（任务书 §11/§12/§18）=================
+     一台设备"说不清楚"的地方，基本都在**它自己这一半**：本地 savedAt、本机 payload 指纹、
+     当前设备号、租约是不是本机的。云函数那一半（版本 / env / docId / 云端指纹）它自己会回，
+     这里把两边拼成**一张能直接对三台的表**：
+       · 绝不回 openid 本体（只有 `accountFingerprint`＝服务端算的那串哈希）；
+       · 绝不回 payload 全文（只有 12 位 sha1 前缀）。
+     三台各跑一次，把 `accountFingerprint / docId / cloudHash / cloudTs` 摊开比 ——
+     一样就是同一份档；不一样再往上看 version / env（云函数部署有没有跟上）。 */
   function probeCloud() {
+    const local = {
+      deviceId: deviceId(),
+      accountFingerprint: prefs().accountId || '',
+      localSavedAt: localTs(),
+      localHash: hash(currentRaw()),
+      superseded: superseded,
+      leaseIsMine: !!(leaseToken),          // 本机这一趟有没有拿到写入权
+      version: G.GAME_VER || '',
+    };
     return saveFn('probe').then(function (r) {
-      try { if (G.LOG && G.LOG.info) G.LOG.info('cloud', 'probe', { ok: !!(r && r.ok), stage: r && r.stage, errCode: r && r.errCode }); } catch (e) {}
-      return r;
+      const out = Object.assign({ local: local }, r || {});
+      /* 写入权的判据：服务端回的 lease 是不是本机 —— 不是就是"被别台占着"，
+         但**不再**等于内容新旧（内容新旧只看 savedAt，任务书 §14）。 */
+      out.leaseIsMine = !!(r && r.leaseId && r.leaseId === local.deviceId);
+      out.cloudIsNewer = !!(r && Number(r.cloudTs || 0) > Number(local.localSavedAt || 0));
+      try { if (G.LOG && G.LOG.info) G.LOG.info('cloud', 'probe', { ok: !!(r && r.ok), stage: r && r.stage, errCode: r && r.errCode, version: r && r.version }); } catch (e) {}
+      return out;
     });
   }
 
