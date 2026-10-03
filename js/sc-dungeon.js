@@ -601,11 +601,18 @@
     if (firstClear && isWorldBoss && G.Story && G.Story.autoOn && G.Story.autoOn() && G.Story.hasStory && G.Story.hasStory(wid) && !G.Story.seen(wid, 'post')) {
       postStoryAfterClose = { worldId: wid };
     }
-    if (firstClear) {
-      const firstEver = !S.celebratedFirst;
-      if (firstEver) { S.celebratedFirst = true; Core.save(); }
-      setTimeout(function () { CV.toast(firstEver ? '🎉 首通 —— 这一段路你走过去了' : '🎉 首通！'); }, 320);
-    }
+    /* ================= 2026-10-03（父亲大人：「结算还是没回来」）· **三块装饰各自隔离** =================
+     真现场：`settleRun` 跑到这里之后**抛了一次**，被 `onEnd` 的 catch 兜住 ⇒ 返回兜底面板
+     ⇒ 玩家看到的就是"结算数据不在了"（**奖励其实已经发了，但面板上的胶囊与道具全没了**）。
+     下面这三块（首通庆祝 / 线索行 / 战场变化）都是**锦上添花**，任何一块抛错都不许带走整张结算面板。
+     所以各自包一层 try —— 炸了就少那一行，**面板与奖励照旧**（并落一条账，便于以后定位）。 */
+    try {
+      if (firstClear) {
+        const firstEver = !S.celebratedFirst;
+        if (firstEver) { S.celebratedFirst = true; Core.save(); }
+        setTimeout(function () { CV.toast(firstEver ? '🎉 首通 —— 这一段路你走过去了' : '🎉 首通！'); }, 320);
+      }
+    } catch (e) { try { G.LOG.warn('dun', 'settle_deco1', { err: String(e && e.message) }); } catch (e2) {} }
     /* ================= 结算第 3 层：**「发现：一句线索」**（2026-10-01 二轮重做） =================
        父亲大人原话：「『剧情线索』不要做成普通业务提示卡。改成 `发现：一句线索 [查看]`，
        让它更像战斗结束后玩家发现了一件东西」。
@@ -613,11 +620,13 @@
        "轨道图上亮起 36 个点。"）—— 玩家读到的是"我发现了什么"，不是"这里有一段剧情"。
        不给奖励、不改流程；点「查看」才进剧情页。 */
     let lore = null, loreId = null;
-    if (G.Story && G.Story.hasStory && G.Story.hasStory(wid)) {
-      const unread = !G.Story.seen(wid, 'post');
-      if (unread) { lore = G.Story.clueOf(wid, 'post'); loreId = 'story_world_post:' + wid; }
-      else { lore = '这一段已经看过了'; loreId = 'story_world_post:' + wid; }
-    }
+    try {
+      if (G.Story && G.Story.hasStory && G.Story.hasStory(wid)) {
+        const unread = !G.Story.seen(wid, 'post');
+        if (unread) { lore = G.Story.clueOf(wid, 'post'); loreId = 'story_world_post:' + wid; }
+        else { lore = '这一段已经看过了'; loreId = 'story_world_post:' + wid; }
+      }
+    } catch (e) { try { G.LOG.warn('dun', 'settle_deco2', { err: String(e && e.message) }); } catch (e2) {} }
     /* ================= R1.6 叙事轮（§十三 / §二十八）· **你改变了什么** =================
        父亲大人：「战斗结束后不要只告诉玩家"你赢了"，要告诉他**你改变了什么**」。
        只在**守关 Boss 首通**那一次给（`firstClear` 已经是"这一关第一次通关"的唯一判据，
@@ -628,10 +637,12 @@
        另外**每张图第 1 关首通**也给一次「战场变化」——那是"你第一次动了这个地方"。
        中间那些关不给（§三十二：普通战斗就是"战斗→奖励"，别让结算页每关都长一截）。
        判据仍用现成的 `firstClear`，不新造条件。 */
-    if (firstClear && (stage === 12 || stage === 1) && G.BattleStory && G.BattleStory.changeOf) {
-      const ch = G.BattleStory.changeOf(wid);
-      if (ch && ch.after) changed = ch.after;
-    }
+    try {
+      if (firstClear && (stage === 12 || stage === 1) && G.BattleStory && G.BattleStory.changeOf) {
+        const ch = G.BattleStory.changeOf(wid);
+        if (ch && ch.after) changed = ch.after;
+      }
+    } catch (e) { try { G.LOG.warn('dun', 'settle_deco3', { err: String(e && e.message) }); } catch (e2) {} }
     return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''),
       rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed };
   }
