@@ -216,8 +216,15 @@ function minLevel(wid, diff) {
     for (const s of SEEDS) {
       seed = s;
       setup('B', wid, lv);
+      /* ================= 2026-10-03 余项收口 · **两把量尺必须走同一条随机流** =================
+         原来这里写的是 `stage <= 12 && ok` —— 一失败就 break，**少打的那几关也就少消耗随机数**；
+         而下面 `measure()` 是**无条件打满 12 关**的。于是同一个 (档案, 世界, 等级, 种子)
+         在"找推荐等级"和"在推荐等级上复测"里走的是**两条不同的随机流** ——
+         实测 W15 出现自相矛盾：minLevel 说 ≥2/3 能通，measure 在同一个等级上只有 1/3。
+         这条不是放松判据（改完 minLevel 只会找到**更高或相同**的等级），是让两把尺对同一个样本
+         给出同一个结论。 */
       let ok = true;
-      for (let stage = 1; stage <= 12 && ok; stage++) if (!fight(wid, stage, diff).win) ok = false;
+      for (let stage = 1; stage <= 12; stage++) { if (!fight(wid, stage, diff).win) ok = false; }
       if (ok) win++;
       if (win >= 2) return lv;
     }

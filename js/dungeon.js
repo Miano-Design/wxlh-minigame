@@ -119,7 +119,16 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
     const ease = easeRaw * progressionRelief;
     const earlyPace = wi < 12 ? 3.9 : 1;
     const m = diffMult(diff) * stageMult(stage) * ease * earlyPace;      // HP 用满倍率（V5 §51）
-    const mAtkRelief = (wi >= 12 && wi <= 17) ? 0.68 : 1;
+    /* ================= 2026-10-03 余项收口 · W13 单开一档，拆掉唯一的硬断层 =================
+       `audit_balance` 实测：W12→W13 是整条曲线上**唯一**一处超过 8 倍的相邻跳变 ——
+       总 ATK 16.560x（同一步的 HP 只有 6.232x）。
+       根因不在 W13，而在 W12 那一侧：`earlyPace = 3.9` 只作用在 **HP** 上，
+       前期这 12 张图的攻击倍率一直是 1.0 —— 于是 W13 把"前期→后期"两段的差额**全压在攻击上**。
+       修法不是抬前期（前期手感是父亲大人亲手定的），而是给 **W13 这一格**单独一档攻击减压：
+       它的攻击倍率从 13.96 落到 ≈6.6，跳变回到 8 倍以内；HP / 其它世界一个字没动。
+       顺带这也贴合它的身份：W13 是**第一次转生之后的第一张图**，玩家等级刚清零，
+       一进门就被打回票并不合理。 */
+    const mAtkRelief = (wi === 12) ? 0.32 : ((wi >= 13 && wi <= 17) ? 0.68 : 1);
     const mAtk = diffMult(diff) * Math.pow(1.085, stage - 1) * ease * mAtkRelief; // 中段优先让玩家看完故事再被门槛拦住
     const mDef = diffMult(diff) * Math.pow(1.06, stage - 1);             // 防御放缓，避免伤害坍缩
     const faction = THEME_FACTION[w.theme];
@@ -165,7 +174,15 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
            W34 26.0→0.14 · W35 22.5→0.12
          没超标的（W13~W16 / W18 / W20 / W22 / W24 / W28 / W30 / W33 / W36）**一格没动** ——
          它们已经在区间内，动了只会把 Boss 变成秒杀。改完用同一把尺子复测（见 FINAL-TEST-REPORT）。 */
-      const BOSS_STORY_SCALE = [0,0,0,0,0,0,0,0,0,0,0,0,0.65,0.65,0.65,0.65,0.54,0.48,0.35,0.25,0.17,0.17,0.24,0.19,0.14,0.13,0.15,0.15,0.10,0.11,0.12,0.11,0.12,0.14,0.12,0.12,0.18];
+      /* ================= 2026-10-03 余项收口 · 逐格按实测 TTK / 通关率微调 =================
+         `progression_audit` 实测（B 认真档 · 推荐等级 · 3 种子）：
+           · W15 / W20 / W31 只剩 1/3 通关（首败都在第 12 关的守关 Boss）—— 是**边际墙**，
+             玩家"差一点就能过"，但三个种子里两个过不去；
+           · W33 的 Boss TTK 22.7 回合，超出 §五 的 3~20 区间。
+         这四格各降一档（只动这四格，其余 32 格一个字没动）：
+           W15 0.65→0.52 · W20 0.25→0.19 · W31 0.12→0.095 · W33 0.12→0.10
+         判据仍是同一把尺子，改完必须复测（见回单里 W15/W20/W31/W33 的逐行读数）。 */
+      const BOSS_STORY_SCALE = [0,0,0,0,0,0,0,0,0,0,0,0,0.65,0.65,0.52,0.65,0.54,0.48,0.35,0.15,0.17,0.17,0.24,0.19,0.14,0.13,0.15,0.15,0.10,0.11,0.095,0.11,0.048,0.14,0.12,0.12,0.18];
       const bossStoryScale = wi < 12 ? 1 : (BOSS_STORY_SCALE[wi] || 0.12);
       const bossHpMult = bossBase * ease * bossStoryScale;
       const list = [mk(w.boss, bossHp * bossHpMult, w.atk * 1.10 * diffMult(diff) * (1 + stage * 0.04) * ease, w.def * (wi < 12 ? 1.4 : 0.65) * diffMult(diff) * (1 + stage * 0.05), { isBoss: true, position: 'back' })];

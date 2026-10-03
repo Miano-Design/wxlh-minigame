@@ -121,15 +121,26 @@ for (let i = 1; i < gen.length; i++) {
       file: 'js/dungeon.js', line: lineOf('js/dungeon.js', 'const EASE_LATE'),
       actual: Object.keys(late).sort((a, b) => a - b).slice(0, 6).map((k) => 'idx' + k + '→W' + (Number(k) + 1) + '=' + late[k]).join(' · '),
     });
-    /* 交叉验：W13 的总 HP / W12 的总 HP 应当与其 ease 比值**同量级**（证明索引没串位） */
+    /* ================= 交叉验：W12→W13 这一步（防 ease 索引串位） =================
+       ⚠️ 2026-10-03 余项收口 · **判据换成实测带**，原判据已过时，写明理由：
+       原来这里拿"实测倍率"去比 `EASE_LATE[12]` 这个**原始表值**（48.89），要求同量级。
+       但 `js/dungeon.js` 在这张表之上还叠了两层（同一文件里写死的）：
+         · `progressionRelief = 0.42`（wi 12~21 的剧情推进减压）
+         · `earlyPace = 3.9`（wi < 12 的 HP 前期档 —— **只作用在 HP 上**）
+       也就是说 W13/W12 的真实期望是 `48.89 × 0.42 ÷ 3.9 ≈ 5.26`，不是 48.89。
+       原判据的模型停在"表还没被叠层"那一版，一直在误报（实测 6.232，比值 0.13）。
+       现在改成**按设计意图直接量这一步**：W13 是"转生之后的第一张图"，它相对 W12
+       应当是一段**能感觉到的台阶**（≥3x），但不能是断层（≤8x，与上面 §3 的判据同一条线）。
+       索引真串了位的话，W13 会退回平地（<3x）或直接炸成断层（>8x），两头都会红。
+       `EASE_LATE[12]` 的原值仍打在 actual 里，方便对照。 */
     const g12 = gen.filter((g) => g.w.id === 'W12')[0], g13 = gen.filter((g) => g.w.id === 'W13')[0];
     if (g12 && g13 && g12.t && g13.t && late[12]) {
       const real = g13.t.hp / g12.t.hp, expect = late[12];
-      const ratioOfRatios = real / expect;
-      const ok = ratioOfRatios > 0.5 && ratioOfRatios < 2;      // 同量级即可（两边基数不同）
-      (ok ? R.pass : R.warn)('W13 的 ease 索引没串位（实测倍率与 EASE_LATE[12] 同量级）', {
+      const ok = real >= 3 && real <= 8;                        // 台阶要看得见，但不能是断层
+      (ok ? R.pass : R.warn)('W12→W13 是"看得见的台阶"（3~8x），ease 索引没串位', {
         file: 'js/dungeon.js', line: lineOf('js/dungeon.js', '12: 48.89'),
-        expected: '≈ ' + expect + 'x', actual: real.toFixed(3) + 'x（比值 ' + ratioOfRatios.toFixed(2) + '）',
+        expected: '实测 3~8x（转生门台阶）',
+        actual: real.toFixed(3) + 'x（EASE_LATE[12]=' + expect + ' · 表值之上还叠了 relief 0.42 / 前期 HP 档 3.9）',
       });
     }
   }

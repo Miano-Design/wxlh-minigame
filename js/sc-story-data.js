@@ -1224,7 +1224,12 @@
         { trigger: 'boss_hp50', type: 'mechanic', line: '它把三种将来同时摆出来。' },
         { trigger: 'battle_win', type: 'environment_change', line: '门开着。谁也没有催。' },
       ],
-      environmentChange: '新世界的门完全打开', clue: '最后不是击败谁。门开着，那个问题还空着', transition: '' },
+      /* ⑫「下一世界为什么成立」：W36 是**最后一个世界**，门外就是"下一个"本身 ——
+         原来这一格是空串（`transition: ''`），于是 story_battle_matrix 的 ⑫ 把 W36 记成缺项（35/36）。
+         填的不是新剧情：这句话就是这个世界自己的 premise（"出口外面不是废墟，是一个还没被写过的世界"）
+         收成的下一步 —— 门开了，下一个世界就是跨过门槛之后那一片。 */
+      environmentChange: '新世界的门完全打开', clue: '最后不是击败谁。门开着，那个问题还空着',
+      transition: '门开着——跨过去，那一片就是下一个世界' },
   };
 
   G.STORYDATA = {

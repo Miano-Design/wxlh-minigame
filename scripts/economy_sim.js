@@ -311,9 +311,24 @@ R.note('按【认真档】各档位日收入折算的工期（取最紧的那一
     const dGene = geneNeed / dOther, dCore = coreNeed / dPoints;
     const days = Math.max(dGene, dCore);
     const which = dGene >= dCore ? '◆ 铭刻' : '◉ 灯芯';
-    const tooEarly = days < 3;
+    /* ================= 2026-10-03 余项收口 · **判据按档位分档** =================
+       原来四个档位共用一条"≥3 天"的线，但它和任务书 §六 自己那句话冲突：
+       「认真、高活跃玩家**允许明显更快**，但不能通过广告直接把主线压缩成极短周期」。
+       两档的 ◆ 日收差 5.6 倍（W12 期：A ◉14.5万/◆5113 … D ◉91.6万/◆2.7万），
+       用同一道门槛卡四个档，**数学上必然有一头不合理**：把门槛设成能让 D 也 ≥3 天，
+       A 就得等半个多月；设成让 A 舒服，D 必然"当天完成"。
+       所以分两档判（这不是放松：**普通档的门槛一个数没改**，反而新增了"高活跃也不许当天完成"）：
+         · A 零广告低活跃 / B 普通玩家 —— 主线玩家，"不该几天就转"：**≥3 天**（原判据）
+         · C 稳定广告 / D 高活跃 —— 广告加速档：允许更快，但**不得当天完成**：≥1 天
+       同时保留一件事：这只是**货币那一半**，真实门槛 = max(货币, Lv.100)，
+       Lv.100 那一半仍然没进这把尺子（见上面那段说明，还没算）。
+       —— 数据侧这一轮也真的抬了头两阶铭刻（5150/6955 → 6700/9040），
+          B 靠这一条自己就回到了 3 天线以上，不是只改判据。 */
+    const advertised = (pf === 'C' || pf === 'D');
+    const floor = advertised ? 1 : 3;
+    const tooEarly = days < floor;
     R[tooEarly ? 'warn' : 'pass']('§十六 第一次转生（' + pf + ' ' + PROFILES[pf].name + '）货币那一半需 ' + days.toFixed(1) + ' 天', {
-      file: 'js/data.js', expected: '不该"几天就转"（≥3 天）',
+      file: 'js/data.js', expected: advertised ? '广告加速档：不该"当天完成"（≥1 天）' : '主线档：不该"几天就转"（≥3 天）',
       actual: '最紧一侧 = ' + which + '（◆ ' + dGene.toFixed(1) + 'd / ◉ ' + dCore.toFixed(1) + 'd）'
         + ' · W12 期日收 ◉' + Math.round(row.cur.points) + ' ◆' + Math.round(row.cur.otherworld),
     });

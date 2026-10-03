@@ -515,13 +515,19 @@
       if (left > 0) {
         const price = Core.gardenNextPrice();
         U.space(CV.SP[2]);
-        U.btnRow([{ label: '开新田 ◉' + price,
+        /* ================= 2026-10-03 余项收口 · 按钮文案收平 =================
+           原来这一颗写的是 `开新田 ◉2000` —— 按钮文字 9 个字，`ux_audit`（§三十四「按钮 2~5 字」）
+           当场报 WARN。价钱**照样要让玩家看见**（上一轮就是这么定的），所以不是删掉它，
+           而是把它从按钮里挪到**紧挨着的那行小字**上：按钮只留动作（"开新田"三个字），
+           价钱与"还能再开几块"并成一行，眼到、手到都在同一个位置。
+           ⚠️ 只动文案与摆放，不动价钱口径（`Core.gardenNextPrice()`）与按钮 id。 */
+        U.btnRow([{ label: '开新田',
                     style: 'primary', id: 'garden_buy', dis: !Core.canAfford({ points: price }) }]);
         U.space(CV.SP[1]);
         /* 文案只说玩家关心的事：还能开几块。**不写**"价钱按已开数量递增"这种实现口径
            （父亲大人 2026-10-02：「不要开发者自己看的文案」）——价钱就在上面那颗按钮上，
            玩家看得见"下一块多少钱"。 */
-        U.hint('已开 ' + Core.gardenPlots() + ' / ' + D.GARDEN_MAX + ' 块（还能再开 ' + left + ' 块）', 0);
+        U.hint('下一块 ◉' + price + ' · 已开 ' + Core.gardenPlots() + '/' + D.GARDEN_MAX + ' 块（还能再开 ' + left + ' 块）', 0);
       } else {
         U.space(CV.SP[2]);
         U.hint('灵田已经开满（' + D.GARDEN_MAX + ' 块）。', 0);
