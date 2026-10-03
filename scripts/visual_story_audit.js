@@ -150,6 +150,43 @@ function pngInfo(buf) {
     actual: leftovers.length ? ('还在：' + leftovers.join(' ')) : '0 个（旧图已清空，只剩 36 世界 + 深井）',
   });
 
+  /* ⑤-c 8 张**人物立绘**（R4.0 §2 / §9 / §10）：名单锁死 8 位、文件都在、9:16、真透明，
+         而且绘制路径（`Story.charImage` / `ensureChar`）真的读它。
+         做坏试验：把 `CHAR_FILE` 里任意一条删掉 → 第一条当场红；
+         把 `sc-story.js` 里人物层那两个调用去掉 → 第三条当场红。 */
+  {
+    const ROSTER = ['C059', 'C111', 'C112', 'C114', 'C115', 'C117', 'C119', 'C120'];
+    const cf = SD.CHAR_FILE || {};
+    const miss = ROSTER.filter((id) => !cf[id]);
+    const extra = Object.keys(cf).filter((id) => ROSTER.indexOf(id) < 0);
+    R[(miss.length || extra.length) ? 'fail' : 'pass']('⑤-c 人物立绘名单锁死 8 位（不多不少）', {
+      file: 'js/sc-story-data.js', expected: '8 条 CHAR_FILE',
+      actual: '缺 ' + (miss.join(' ') || '无') + ' ｜ 多 ' + (extra.join(' ') || '无'),
+    });
+    const bad = [], badFile = [];
+    ROSTER.forEach((id) => {
+      const rel = String(cf[id] || ''); const fp = path.join(ROOT, rel);
+      if (!rel || !fs.existsSync(fp)) { badFile.push(id); return; }
+      const info = pngInfo(fs.readFileSync(fp));
+      if (!info) { bad.push(id + '(不是 PNG)'); return; }
+      const alpha = info.colorType === 6 || info.colorType === 4 || (info.colorType === 3 && info.hasTrns);
+      if (!alpha) bad.push(id + '(没有 alpha 通道)');
+      if (Math.abs(info.w / info.h - 9 / 16) > 0.02 || info.w < 720) bad.push(id + '(' + info.w + 'x' + info.h + ' 不是 9:16 或宽不足 720)');
+    });
+    R[(bad.length || badFile.length) ? 'fail' : 'pass']('⑤-c 8 张人物立绘都在、都合规格（9:16 · 真透明 PNG）', {
+      file: 'story/char/', expected: '8 张 9:16 透明 PNG',
+      actual: (badFile.length ? ('缺文件 ' + badFile.join(' ')) : '8/8 在') + (bad.length ? (' ｜ 不合规格 ' + bad.join(' ')) : ''),
+    });
+    const wired = /Story\.charImage = function/.test(STORY_RAW) && /ensureChar\(act\)/.test(STORY_RAW);
+    R[wired ? 'pass' : 'fail']('⑤-c 人物层用的是正式立绘（`ensureChar` / `Story.charImage` 真的接上了）', {
+      file: 'js/sc-story.js', expected: '人物层调 ensureChar', actual: wired ? '已接线' : '没接线',
+    });
+    const noSilhouette = !/function silhouette\(/.test(STORY_RAW);
+    R[noSilhouette ? 'pass' : 'fail']('⑤-c 程序化几何人物剪影**没有回来**', {
+      file: 'js/sc-story.js', expected: '0 处 silhouette()', actual: noSilhouette ? '已删除' : '又出现了',
+    });
+  }
+
   /* ⑤-b 36 张世界场景图 + 深井：都在、都是 9:16、都在 story 分包里。
          ⚠️ 尺寸口径 2026-10-03 从"1080×1920"放宽到"**9:16 且宽 ≥ 720**" ——
             送来的原图合计 227MB，进包必须压；压完是 810×1440（场景）。只要还是 9:16、

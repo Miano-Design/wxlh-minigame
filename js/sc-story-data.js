@@ -101,6 +101,17 @@
         包内**不许中文文件名**（`visual_story_audit` ③ 与音频那条尺子都钉着），改名在
         `scripts/_imgpack.py` 一处完成，源码里不出现中文路径。 */
   WORLD_SCENE_FILE.corridor = 'story/scene/img_scene_corridor.jpg';
+  /* ================= 2026-10-03（R4.0 §2 / §9 / §10）· **人物立绘** =================
+     正式名单锁死 **8 位**（与 `CHARS` 里"推动过事件"的那 8 位一一对应），
+     一张一张按 `<id>.png` 落 `story/char/`；规格与 Boss 立绘同一套
+     （1080×1920 → 落包压到 720×1280、PNG 256 色、真透明、主体在右 60~70%）。
+     ⚠️ 名单是**锁死的**：要加人必须先在 `CHARS` 里给他写故事，再补图 —— 不许先加图。 */
+  const CHAR_FILE = {
+    C059: 'story/char/img_char_C059.png', C111: 'story/char/img_char_C111.png',
+    C112: 'story/char/img_char_C112.png', C114: 'story/char/img_char_C114.png',
+    C115: 'story/char/img_char_C115.png', C117: 'story/char/img_char_C117.png',
+    C119: 'story/char/img_char_C119.png', C120: 'story/char/img_char_C120.png',
+  };
   const BOSS_FILE = {};
   for (let i = 1; i <= 36; i++) BOSS_FILE['W' + (i < 10 ? '0' + i : i)] = 'story/boss/img_boss_W' + (i < 10 ? '0' + i : i) + '.png';
   /* 主视觉（1080×1920）：**在主包 `brand/`**（R1.9 起；更早的一版放剧情分包，已作废）。
@@ -1227,6 +1238,6 @@
        sc-story.js 直接按名字反查 id。**加新说话人时先看这里要不要补一条。** */
     WHO_ALIAS: { '代行': 'C120' },
     /* 正式资产清单（sceneId / Boss 世界号 → 分包内路径）：见上头那段注释 */
-    MASTER_WORLD: MASTER_WORLD, WORLD_SCENE_FILE: WORLD_SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
+    MASTER_WORLD: MASTER_WORLD, WORLD_SCENE_FILE: WORLD_SCENE_FILE, BOSS_FILE: BOSS_FILE, CHAR_FILE: CHAR_FILE, KV_FILE: KV_FILE,
   };
 })();

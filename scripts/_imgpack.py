@@ -90,9 +90,10 @@ def main():
     root = repo_root()
     scene_out = os.path.join(root, 'story/scene')
     boss_out = os.path.join(root, 'story/boss')
+    char_out = os.path.join(root, 'story/char')
 
     names = sorted(os.listdir(newdir))
-    n_scene = n_boss = 0
+    n_scene = n_boss = n_char = 0
     for f in names:
         p = os.path.join(newdir, f)
         if not os.path.isfile(p):
@@ -111,9 +112,17 @@ def main():
             enc_boss(p, os.path.join(boss_out, 'img_boss_W%s.png' % m.group(1)))
             n_boss += 1
             continue
+        # ================= 2026-10-03（R4.0 §9 / §10）· 人物立绘 =================
+        # 8 张角色立绘（img_char_C###.png）走**与 Boss 立绘同一套规格**：
+        # 720×1280、PNG 256 色带真透明。落 `story/char/`（与 story/boss 同为分包内容）。
+        m = re.match(r'^img_char_(C\d{3})\.png$', f, re.I)
+        if m:
+            enc_boss(p, os.path.join(char_out, 'img_char_%s.png' % m.group(1).upper()))
+            n_char += 1
+            continue
 
     print('新图目录：%s' % newdir)
-    print('  场景 %d 张 · Boss %d 张' % (n_scene, n_boss))
+    print('  场景 %d 张 · Boss %d 张 · 人物立绘 %d 张' % (n_scene, n_boss, n_char))
     print('  （12 张母版已在 2026-10-03 删除；人物/装备故事的底图改由 MASTER_WORLD 折到世界图）')
     tot = sum(r[1] for r in ROWS)
     print('落包：%d 个文件 · 合计 %.2f MB' % (len(ROWS), tot / 1048576.0))

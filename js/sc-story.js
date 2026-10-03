@@ -362,6 +362,29 @@
     return false;
   }
   Story.bossReady = function (id) { const r = BOSS_IMG[id]; return !!(r && r.ok); };
+  /* ================= 2026-10-03（R4.0 §10）· **人物立绘**（与 Boss 立绘同一套懒加载） =================
+     人物故事播放时：**正式透明立绘 + 它自己的世界场景**（场景那层早就按 `charScene` 走世界图了）。
+     以前没有立绘时那层是**程序化几何剪影** —— 已经整个删掉；现在是"有图就画、没图就不画人"。
+     只补最小必要接入：一个取图口 + 一个懒加载，不新造渲染系统（几何与 Boss 那层共用一份）。 */
+  const CHAR_IMG = {};
+  function charFile(id) { return ((SD.CHAR_FILE || {})[id]) || null; }
+  function ensureChar(id, onReady) {
+    const rec = CHAR_IMG[id];
+    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
+    const file = charFile(id);
+    if (!file || typeof wx === 'undefined' || !wx.createImage) { CHAR_IMG[id] = { fail: true }; return false; }
+    try {
+      const img = wx.createImage();
+      CHAR_IMG[id] = { loading: true };
+      img.onload = function () { CHAR_IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(CHAR_IMG); try { CV.render(); } catch (e) {} };
+      img.onerror = function () { CHAR_IMG[id] = { fail: true }; };
+      img.src = file;
+    } catch (e) { CHAR_IMG[id] = { fail: true }; }
+    return false;
+  }
+  Story.charReady = function (id) { const r = CHAR_IMG[id]; return !!(r && r.ok); };
+  Story.ensureChar = function (id) { try { return ensureChar(id); } catch (e) { return false; } };
+  Story.charImage = function (id) { const r = CHAR_IMG[id]; return (r && r.ok) ? r.img : null; };
   /* R1.6 叙事轮：战斗页的「Boss 出场序列」要拿同一张立绘（`sc-story-battle.js`）。
      只加一个**只读取图口**，剧情页那套懒加载/回落一个字没动。拿不到就返回 null（绝不画空框）。 */
   Story.bossImage = function (id) { const r = BOSS_IMG[id]; return (r && r.ok) ? r.img : null; };
@@ -834,15 +857,23 @@
       c.drawImage(img, CV.W - dw, bottom - dh, dw, dh);
       c.restore();
     }
-    /* ================= 2026-10-03（父亲大人：「这个几何形体不是删掉吗，现在不是有 boss 的图片吗」）=================
-     删的就是这一支：没有立绘时，原来会把角色画成一堆**多边形剪影**（图里那个淡绿色轮廓）。
-     它当年是"没有人物素材时的替身"，现在 Boss 有 36 张真立绘、场景有 37 张真图，
-     这一层只剩"给画面添一块塑料"。所以：
-       · Boss 拍 —— 有立绘就画，没有就**不画人**；
-       · 人物 / 装备故事拍 —— 也**不画**（它没有立绘素材）。
-     ⇒ 如果父亲大人希望人物故事里"人也站进场景"，那需要的是**角色立绘**这一套新素材
-       （像 Boss 那样：右侧 60~70% 构图、PNG 透明底、1080×1920）——
-       有了它我再接；在那之前，宁可不画，也不拿几何形冒充人。 */
+    /* ================= 2026-10-03（R4.0 §10）· **人物立绘** =================
+     这一层现在两条腿，几何尺寸**完全共用**（一处算式，不许各写一份）：
+       · Boss 拍：36 张 Boss 立绘（`ensureBoss`）；
+       · 人物 / 装备故事拍：8 张**正式人物立绘**（`ensureChar`，名单锁死在 `CHAR_FILE`）。
+     都没有就**不画人** —— 程序化几何剪影已经按父亲大人的要求整个删掉，永远不会再回来。
+     规格照 §9：1080×1920 / 9:16 / PNG 透明底 / 主体在右 60~70% ⇒ 按**高度 contain**、靠右贴底。 */
+    else if (act && ensureChar(act)) {
+      const img = CHAR_IMG[act].img;
+      const iw = img.width || 1080, ih = img.height || 1920;
+      let dh = bottom * 0.94, dw = dh * (iw / ih);
+      const maxW = CV.W * 0.96;
+      if (dw > maxW) { dw = maxW; dh = dw * (ih / iw); }
+      c.save();
+      c.globalAlpha = 0.98;
+      c.drawImage(img, CV.W - dw, bottom - dh, dw, dh);
+      c.restore();
+    }
     /* ④ 章节标题层 */
     const headY = top + 20 * CV.SCALE;
     if (cur.chNo) CV.text(cur.chNo, U.pad(), headY, { size: CV.FS.sm, color: C.gold, bold: true, ls: 1.2 });
