@@ -629,16 +629,18 @@
   function done() { return !cur || revealed() >= fullLen(); }
   /* ================= 角色层：这一拍该画谁的剪影 =================
      优先级：① 显式指定的 actor（人物故事那几条路直接给 id）；
-             ② 对白里的 `who` → 按**名字反查角色表**（山吹时雨 / 楚衍 / 黑田宗一 / 苍岚零 都是逐字同名，
-                「代行」这类短名走数据层的 `WHO_ALIAS` 别名表）；
+             ② 对白里的 `who` → 按**名字反查角色表**（`who` 一律是全称，与角色表逐字相同：
+                灯阁代行者 / 山吹时雨 / 楚衍 / 黑田宗一 / 苍岚零）；
              ③ Boss 线的对白 → 给一个**按世界定死的程序化剪影**（id 用 `@boss_世界号`，
                 `D.avatarSpec` 对任意 id 都是确定性映射 ⇒ 六个 Boss 六个不同的形，永不撞脸）。
+     ⚠️ 原来 ② 前面还有一条"短名 → id"的别名表（`SD.WHO_ALIAS`，只有「代行」一条）。
+        父亲大人 2026-10-03：「台词人名这些都用全称，不要用简称」—— 表已删、台词已改全称，
+        **不要再加回来**：别名一存在，台词就会一直用简称，而玩家在执灯者列表 / 卷宗里
+        看到的是全称，两边对不上。要盯这条看 `scripts/audit_story.js` ⑧-b。
      画不出人的时候**什么都不画**（不糊一个默认头像上去 —— 那比空着更像 bug）。 */
   let NAME2ID = null;
   function actorOf(b) {
     if (!b || b.k !== 'd' || !b.who) return null;
-    const alias = (SD.WHO_ALIAS || {})[b.who];
-    if (alias) return alias;
     if (!NAME2ID) {
       NAME2ID = {};
       ((D && D.characters) || []).forEach(function (c) { if (c && c.name) NAME2ID[c.name] = c.id; });

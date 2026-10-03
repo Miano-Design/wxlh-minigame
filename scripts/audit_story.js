@@ -118,6 +118,41 @@ t('⑧ 每一拍都是三种合法形态之一（n 旁白 / d 对白带 who / o 
   badBeat.length === 0, 'k ∈ {n,d,o} · 对白有名字 · 文字非空',
   badBeat.slice(0, 8).join(' ') || '全部合法');
 
+/* ---------- ⑧-b 说话人一律用**全称** ---------- */
+/* 父亲大人 2026-10-03：「台词人名这些都用全称，不要用简称」。
+   判据：每个 `who` 都要**逐字命中**一张真源表 —— 角色表的 `name`、或某个世界的 `boss` 名。
+   为什么不能靠别名表糊过去：别名一存在，台词就会一直用简称（原来「代行」就是这么来的），
+   而玩家在执灯者列表 / 卷宗里看到的是**全称**（「灯阁代行者」），两边对不上就会问"这是同一个人吗"。
+   `js/sc-story-data.js` 的 `WHO_ALIAS` 已删，这条断言就是它的替代品。 */
+const charNames = (function () {
+  const out = new Set(); const re = /\['(C\d{3})', '([^']+)'/g; let m;
+  const src = read('js/data.js');
+  while ((m = re.exec(src))) out.add(m[2]);
+  return out;
+})();
+const bossNames = (function () {
+  const out = new Set(); const re = /boss: '([^']+)'/g; let m;
+  const src = read('js/data.js');
+  while ((m = re.exec(src))) out.add(m[1]);
+  return out;
+})();
+/* 非角色、也非 Boss 的发言者：**只留这一个**，而且要写清为什么。
+   「灯主」是世界观里的那个存在（不在角色表里、也不是任何世界的 Boss，全仓只在 W36 战后说了一句）。
+   显式列出来，而不是把判据放宽 —— 以后真要再加一个，就得回来改这一行并说明理由。 */
+const NON_TABLE_SPEAKERS = ['灯主'];
+const whoAll = (function () {
+  const out = []; const re = /who: '([^']+)'/g; let m;
+  const src = read('js/sc-story-data.js');
+  while ((m = re.exec(src))) out.push(m[1]);
+  return out;
+})();
+const whoSet = Array.from(new Set(whoAll));
+const shortWho = whoSet.filter((n) => !charNames.has(n) && !bossNames.has(n) && NON_TABLE_SPEAKERS.indexOf(n) < 0);
+R.note('说话人 ' + whoSet.length + ' 个：' + whoSet.join(' / '));
+t('⑧-b 台词里的说话人一律用**全称**（与角色表 / Boss 表逐字同名，不许简称）',
+  shortWho.length === 0, '每个 who 都命中真源表（角色名 或 Boss 名）',
+  shortWho.length ? ('对不上的：' + shortWho.join(' / ')) : (whoAll.length + ' 处全部命中'));
+
 /* ---------- ⑨ 节奏红线 ---------- */
 const over = [];
 WIDS.forEach((id) => {

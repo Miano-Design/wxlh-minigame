@@ -84,8 +84,18 @@ R.note('命名表规模：' + Object.keys(bucket).map((c) => c + ' ' + bucket[c]
   const bossNames = bucket.Boss.concat(bucket.怪物, bucket.精英);
   const dianzhu = bossNames.filter((n) => /灯主/.test(n));
   const finalBoss = (D.WORLDS.find((w) => w.id === 'W36') || {}).boss || '';
-  const okFinal = /终焉·灯主|灯主/.test(finalBoss);
-  (okFinal ? R.pass : R.warn)('最终 Boss 身份＝灯主', { file: 'js/data.js', expected: 'W36 Boss 是灯主系', actual: finalBoss });
+  /* ⚠️ 2026-10-03 修正：这一条的**期望值过期了**（它一直报 WARN，不是数据错，是判据没跟着剧情改）。
+     旧 Boss「终焉·灯主」在剧情重构里**降为终章对白里的存在**（灯主只在 W36 战后说了一句），
+     W36 的 Boss 换成「选择者」——见 `docs/story/视觉资产驱动剧情终稿.md` §终局那一节。
+     新判据是两件事同时成立：
+       · W36 Boss ＝ 选择者（真源 `js/data.js`）；
+       · 灯主**不再**是任何一个 Boss / 精英怪（它只活在台词里）。
+     做坏试验：把 W36 的 boss 改回「终焉·灯主」、或给任意精英起个带「灯主」的名字 → 当场红。 */
+  const okFinal = finalBoss === '选择者' && dianzhu.length === 0;
+  (okFinal ? R.pass : R.fail)('终局身份：W36 Boss ＝ 选择者，灯主只在对白里（不再是任何 Boss/精英）', {
+    file: 'js/data.js', expected: 'W36 Boss = 选择者 · Boss/精英里没有灯主',
+    actual: 'W36 Boss = ' + finalBoss + ' · 灯主系 Boss/精英 ' + (dianzhu.join(' / ') || '无'),
+  });
   R.note('与「灯主」同族的名字（层级核对用）：' + (dianzhu.join(' · ') || '无'));
   const zhangdeng = find('掌灯者');
   R.note('「掌灯者」（灯阁执行者，允许存在）：' + (zhangdeng.map((x) => x.cat + '：' + x.n).join(' · ') || '暂无'));
