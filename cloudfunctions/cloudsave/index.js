@@ -35,6 +35,14 @@ const COLL = 'saves';
    排查时只需在任意一台上跑 `GameGlobal.CloudSync.probe()`，看 version / env 就能确认
    三台是不是同一版云函数。改这份文件时**必须**把这个字符串一起改（当天的日期 + 代号）。 */
 const CLOUDSAVE_VERSION = '2026-10-03-FINAL';
+/* ================= 2026-10-03 复检 · **再盖一个"代码戳"** =================
+   为什么非加不可：`CLOUDSAVE_VERSION` 这串从建起来到现在**一个字没改过**，
+   可这份代码已经改过两轮（先是"每个应答带 ver"，后是"NOT_FOUND ≠ DB_ERROR"）。
+   于是"三台 deck 的 ver 一样"只能证明"都部署过 FINAL 版"，
+   **证明不了"部署的是含 DB_ERROR 分离的那一版"** —— 而那一版正是本轮要收的 P0。
+   所以再加一个只表示"这份源码改到哪一步"的短戳：`ver` 一个字不动（任务书就是按它验收的），
+   `probe()` 会一起回 `code`。部署完跑一次 probe，`code=2026-10-03b` 才说明云端跑的是这一版。 */
+const CLOUDSAVE_CODE = '2026-10-03b';
 const ENV_TAG = String(process.env.TCB_ENV || process.env.SCF_NAMESPACE || 'dyn');
 const MAX_CHARS = 256 * 1024;
 
@@ -299,7 +307,7 @@ exports.main = async (event) => {
      哪一步炸、炸在什么码上，原样回给客户端 —— 以后不用再"猜 API"。 */
   if (action === 'probe') {
     const out = { ok: true, hasDoc: false, get: false, set: false, verify: false, clean: false,
-      version: CLOUDSAVE_VERSION, env: ENV_TAG };
+      version: CLOUDSAVE_VERSION, code: CLOUDSAVE_CODE, env: ENV_TAG };
     const r = await ensure(openid);
     if (r.err) return r.err;
     out.hasDoc = !!r.doc;

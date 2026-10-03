@@ -1051,7 +1051,11 @@
          但**不再**等于内容新旧（内容新旧只看 savedAt，任务书 §14）。 */
       out.leaseIsMine = !!(r && r.leaseId && r.leaseId === local.deviceId);
       out.cloudIsNewer = !!(r && Number(r.cloudTs || 0) > Number(local.localSavedAt || 0));
-      try { if (G.LOG && G.LOG.info) G.LOG.info('cloud', 'probe', { ok: !!(r && r.ok), stage: r && r.stage, errCode: r && r.errCode, version: r && r.version }); } catch (e) {}
+      /* `version` = 云函数那份的版本串（任务书要求验收 `2026-10-03-FINAL`）；
+         `fnCode`  = **代码戳**（同一次部署里"这份源码改到哪一步"）——
+         版本串从建起来就没变过，光看它分不清"部署的是不是含 DB_ERROR 分离那一版"。
+         两个一起看才作数（见云函数里 CLOUDSAVE_CODE 的注释）。 */
+      try { if (G.LOG && G.LOG.info) G.LOG.info('cloud', 'probe', { ok: !!(r && r.ok), stage: r && r.stage, errCode: r && r.errCode, version: r && r.version, fnCode: r && r.code }); } catch (e) {}
       return out;
     });
   }
