@@ -28,6 +28,14 @@ const src = (rel) => { try { return fs.readFileSync(path.join(E.ROOT, rel), 'utf
 
 if (!CV || !St) { R.blocked('界面层与剧情层都加载了', { expected: 'CV + Story', actual: '缺' }); R.finish(); return; }
 
+/* ================= 摘掉引导模态（**尺子一贯做法**，与 `sc-story.js` 里那条同源）=================
+   ⚠️ 不摘掉的话，下面②那一串派发会被引导吃掉：`uiw.js` 包了一层 `CV.dispatch` ——
+   引导期间"点高亮那一颗之外的东西"一律不执行（那是**产品要的行为**，防止玩家乱点，
+   实测：新档首页点 `ov_archive` 只会被吞掉，页面不动）。
+   可这把尺子量的是"**按钮本身有没有接对**"，不是"引导拦得对不对"（后者归 coach/guide 那几把）。
+   所以这里先摘掉，量完再说。 */
+G.coachFor = function () {};
+
 /* 与 `cv.js:hitHasHandler` 同一条判据（精确 id 或 `前缀:*`） */
 function hasHandler(id) {
   if (CV.onAct[id]) return true;

@@ -280,6 +280,22 @@
     const clue=storyLine(w);
     const stW=(G.Story&&G.Story.stateOf)?G.Story.stateOf(w.id):{cleared:false,epilogueSeen:false};
     if(clue&&stW.cleared&&!stW.epilogueSeen){ U.card(function(){U.h3('刚刚发现','');U.note(clue,2*CV.SCALE);U.space(CV.SP[1]);U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'打开故事','ghost','ov_story');U.y+=U.BTN_SM*CV.SCALE;}); }
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §六十）=================
+       「调查记录」在**首页也能进**：这一条线索读完（`epilogueSeen`）之后，
+       那张"刚刚发现"卡**不是干脆消失**，而是换成一张很短的【调查记录】卡
+       （已确认 / 矛盾 两个数 ＋ 一颗【翻阅卷宗】）—— 历史内容有个固定的落点，
+       首页也不因为多一张卡而变挤（新档根本不出这张卡：`found` 为 0 直接跳过）。 */
+    try{
+      if(stW.cleared&&stW.epilogueSeen&&G.Story&&G.Story.archiveStats){
+        const a=G.Story.archiveStats();
+        if(a.found>0) U.card(function(){
+          U.h3('调查记录','卷宗 '+a.found+' / '+a.total);
+          U.note('已确认 '+a.confirmed+' · 互相矛盾 '+a.conflict+' · 核心线索 '+a.core,2*CV.SCALE);
+          U.space(CV.SP[1]);
+          U.btn(U.ix(),U.y,U.iw(),U.BTN_SM*CV.SCALE,'翻阅卷宗','ghost','ov_archive');U.y+=U.BTN_SM*CV.SCALE;
+        });
+      }
+    }catch(e){}
     /* ================= R2.5 · 首页宫格重排（父亲大人 2026-10-02）=================
        原话：「今日板块能不能多加些常用功能？现在只有一个任务按钮，要么就把任务按钮跟下面的放一起，别单独」。
        而且这一轮的反查发现 **8 个页面入口没人能点到**（2.0 换首页时把这几个入口弄丢了）：
@@ -383,6 +399,8 @@
   }
   CV.on('ov_continue',function(){ const w=currentWorld(); if(!w)return; CV.dispatch('w:'+w.id); });
   CV.on('ov_story',function(){ const w=currentWorld(); if(G.Story&&G.Story.openWorld) G.Story.openWorld(w.id,'post'); else CV.dispatch('w:'+w.id); });
+  /* 首页那张【调查记录】卡的出口 —— 与世界页的「打开卷宗」是**同一个页面**（不另做一份）。 */
+  CV.on('ov_archive',function(){ CV.push('story_archive',{}); });
 
   CV.panels.grow=function(){
     const s=S(), r=Core.realmState(), au=Core.authorityInfo(); U.begin(); U.pageHead('成长');
