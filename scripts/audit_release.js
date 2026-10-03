@@ -32,7 +32,13 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   /* R2.5 新增：**入口反查**（注册过的页面入口有没有地方能点到）+ 新手指引锚点存在性。 */
   'entry_audit',
   /* R3.0 新增：**红点审计** —— 亮红点的地方，点进去 5 秒内必须真能完成那个动作。 */
-  'dot_audit'];
+  'dot_audit',
+  /* 2026-10-03 新增：**关卡结算页** —— 真打一关（第 1 关走真引擎、守关 Boss 走一帧假引擎），
+     盯"结算两次会不会退回兜底 / 会不会重复发奖"。
+     立这把尺子的当天就抓到：`settleRun` 里引用了一个不存在的 `win`
+     ⇒ **每一关打完都抛 `win is not defined`、结算页被兜底顶掉**（奖励已发、玩家看不见）。
+     以前没有任何尺子真跑过"打一关 → 拿结算面板"这条路，所以它能活好几个版本。 */
+  'settle_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

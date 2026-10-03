@@ -445,7 +445,7 @@
     S.party.filter(Boolean).forEach((id) => { run.hpPct[id] = 1; });
     Core.setPendingRun(run);
     lastPlayed = { worldId: worldId, diff: diff, stageIdx: stageIdx };
-    lastPanel = null;                    // ← 开新一场：上一场的"已结算"证据作废
+    settledRun = null; settledPanel = null;   // ← 开新一场：上一场的"已结算"凭据作废
     trace('start', { w: worldId, st: stage, waves: run.waves.length });
     fightWave();
   }
@@ -454,15 +454,24 @@
      原来只有一份 `afterSettle`，「再来一次」（重打本关）先写进去、紧接着被「下一关」覆盖，
      于是「↻ 再来一次」实际进的是下一关（想刷本关刷不到）。 */
   let againTarget = null, nextTarget = null;
-  /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
-     真现场：打完一场，结算页显示的是**兜底面板**「结算数据不在了 · 先回世界」——
-     只有一颗「返回世界」，**既没有「下一关」、也就没有自动下一关的倒计时**。
-     成因：`onEnd` 又跑了一次，而那时 `run` 已经被正常结算清空（`settleRun` 里 `run = null`），
-     于是走了 `if (!run) return lastResortPanel(win)` —— **把那份好面板顶掉了**。
-     （控制台那一笔 `battle · end` 里没有 `err=`，所以不是抛错，就是这一支。）
-     修法：`settleRun` 把它返回的面板记在这里；`onEnd` 再进来发现 `run` 空了，
-     就**把那一次真结算的面板还回去**（而不是拿兜底盖掉它）。兜底只在"从来没结算过"时才用。 */
-  let lastPanel = null;
+  /* ================= 2026-10-03（父亲大人：「兜底一定要有吗」）=================
+     兜底**要留一条** —— `onEnd` 是战斗页 `finish()` 的回调，它一抛，`finish()` 跟着抛，
+     那一场就停在战斗页上（busy 闸门不放，按什么都没用）。
+     **"任何路径都必须返回一个面板"这条契约不能拆。**
+     但兜底只能是最后的保险，不许出现在正常路径上：一张兜底顶掉真面板 =
+     奖励已经发了、玩家看不见（父亲大人连着报的那件事就是这么来的）。
+     所以这里只留**一个**判据：`settledRun`（"这一场已经结算过"的凭据，认**对象身份**）。
+     上一版用的是"记住上一张面板"（一个模块级 `lastPanel`）—— 它说不清那张面板是哪一场的，
+     于是晚到的收尾反而把真面板顶成了兜底。这一版把**凭据与面板一起绑在那一个 run 对象上**：
+     同一场再进来一次，还回的就是同一张面板，既不重算也不重发奖。
+
+     ⚠️ 立这把尺子时抓到的**真元凶**是另一件小事，记在这里免得再踩：
+        `settleRun` 里写了一句 `if (win && isWorldBoss …)` —— `win` 是 `onEnd` 的参数，
+        在 `settleRun` 这个函数里**根本不存在** ⇒ 每次结算都在 `run = null` 之后抛
+        `win is not defined` ⇒ 被 catch 兜住 ⇒ **所有关卡打完都是"结算数据不在了"**。
+        （所以它不是间歇性的：那一轮之后每个玩家的每场结算都在抛。）
+        盯这条的是 `scripts/settle_audit.js` ①。 */
+  let settledRun = null, settledPanel = null;
   /* ================= 2026-10-03（结算页取证）=================
      这条链每次战斗要打 3 波、每波都发好几条账，而 `get_simulator_console` 只能拿到最后 ~30 行 ——
      上一次排查里最关键的 `dun · resort` 那条账**很可能就是被后来的日志冲掉的**。
@@ -502,9 +511,9 @@
       c.fillRect(0, 0, CV.W, CV.H);
     } catch (e) { /* 拿不到图/尺寸异常：不铺底也照样能玩（与 bgFlat 那条保险同一个口径） */ }
   };
-  /* ⚠️ `lastPanel` **不在这里清** —— 它是"这一场真结算过"的证据。
+  /* ⚠️ `settledPanel` **不在这里清** —— 它是"这一场真结算过"的凭据。
      实测（控制台时序）：一场打完 `settleRun` 跑完、面板也出来了，紧接着还有几次
-     `battle · end` 进来（`run` 已空）→ 原来会被兜底面板**盖掉真面板**，于是
+     `battle · end` 进来（`run` 已空）→ 上一版会被兜底面板**盖掉真面板**，于是
      「奖励胶囊 + 下一关 + 自动倒计时」全没了（父亲大人报的"连获得的道具都没了"）。
      现在它只在**开新一场**（`startStage`）时才作废。 */
   function clearSettleTargets() { againTarget = null; nextTarget = null; }
@@ -514,8 +523,8 @@
   function lastResortPanel(win) {
     /* 兜底是"最后的保险"，本身很少走到 —— 走到就把**最近 8 条时序**一起打出来，
        这样一次 grep 就能看到"谁清空了 run / settleRun 有没有跑"，不受 console 缓冲大小影响。 */
-    trace('resort', { win: !!win, hadPanel: !!lastPanel, hasRun: !!run });
-    try { G.LOG.warn('dun', 'resort', { win: !!win, hadPanel: !!lastPanel, hasRun: !!run }); } catch (e1) {}
+    trace('resort', { win: !!win, hadSettled: !!settledRun, hasRun: !!run });
+    try { G.LOG.warn('dun', 'resort', { win: !!win, hadSettled: !!settledRun, hasRun: !!run }); } catch (e1) {}
     /* 时序**逐条**打出来（长字段会被日志格式化吃掉，一条一行最稳） */
     try { TRACE.slice(-8).forEach(function (l, i) { G.LOG.warn('dun', 'trace' + i, { l: l }); }); } catch (e2) {}
     /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
@@ -618,8 +627,13 @@
      于是 `S.story.b[wid]` 永远是空的，卷宗 → Boss 那一栏永远「未解锁 · 打到这里才会记下来」，
      计数也一直是 `Boss 0 / 36`。玩家明明打穿了守关 Boss，档案里却像没打过。
      这里补上：**打赢守关 Boss 就记下来**（与那句提示"打到这里才会记下来"同一个口径）。
-     ⚠️ 只补这一个调用；`seenBoss` 的读法、卷宗那一页、`BOSS_SEEN` 的语义一个字没动。 */
-    if (win && isWorldBoss && G.Story && G.Story.markBoss) {
+     ⚠️ 只补这一个调用；`seenBoss` 的读法、卷宗那一页、`BOSS_SEEN` 的语义一个字没动。
+     ⚠️⚠️ 这里原来写的是 `if (win && isWorldBoss && …)` —— **`win` 在这个函数里不存在**
+        （它是 `onEnd` 的参数，`settleRun` 拿不到）⇒ 每次结算都在这里抛
+        `win is not defined`，把整张结算面板换成兜底（奖励已发、玩家看不见）。
+        `settleRun` **只从"打赢最后一波"那一条路进来**，所以这里根本不需要判胜负 ——
+        去掉那个条件即可，不是补一个参数。盯这条的是 `scripts/settle_audit.js` ①。 */
+    if (isWorldBoss && G.Story && G.Story.markBoss) {
       try { G.Story.markBoss(wid); } catch (e) {}
     }
     if (firstClear && isWorldBoss && G.Story && G.Story.autoOn && G.Story.autoOn() && G.Story.hasStory && G.Story.hasStory(wid) && !G.Story.seen(wid, 'post')) {
@@ -717,15 +731,16 @@
           waves: (run && run.waves && run.waves.length), st: (run && run.stage) });
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
+          /* ① **这一场已经结算过** → 把那份真面板原样还回去（幂等：不重算、不重发奖）。
+             ⚠️ 这一句必须排在"认回 run"**前面**。上一版把顺序写反了：先 `run = myRun`、
+             再往下走完整套流程 ⇒ 晚到的那一次**又跑了一遍 `settleRun`**，
+             奖励发双份。盯这条的是 `scripts/settle_audit.js` ③。 */
+          if (settledRun && settledRun === myRun) return settledPanel;
           /* 晚到的收尾：模块级 `run` 已经被清（正常结算 / 别处清理），
              但闭包里这一场还在 ⇒ **认回来**，让结算拿到真数据（波次、阵亡、首通…）。 */
           if (!run && myRun) run = myRun;
-          if (!run) {
-            /* 这一场**已经正常结算过**（lastPanel 有值）⇒ 把那份真面板还回去，
-               别再拿兜底把「下一关 / 再来一次」顶掉（走这行的就是父亲大人看到的那次）。
-               真·从没结算过（lastPanel 空）才用兜底，那是最后的保险。 */
-            return lastPanel || lastResortPanel(win);
-          }
+          /* 到这儿既没结算过、`run` 又没了 —— 只剩"真的没有这一场"这一种可能，才给兜底。 */
+          if (!run) return lastResortPanel(win);
           /* F6（R6 #7）：**波与波交界处累加真实阵亡数** ——
              判据是"这一波结束时 hp<=0"，而且只记**这一波新倒下的**
              （上一波已经 0 血的人不算第二次，免得一颗星被扣两遍）。
@@ -779,8 +794,9 @@
               after() { fightWave(); },
             };
           }
-          lastPanel = settleRun(res, hpLeft);
-          return lastPanel;
+          settledRun = myRun;                 // ← 先立凭据，再拿面板（顺序反了会又结算一遍）
+          settledPanel = settleRun(res, hpLeft);
+          return settledPanel;
         } catch (e) {
           /* 兜底不许再抛：出错了就记一笔日志、返一个"能退出"的面板（玩家永远不会卡死）。 */
           try { if (G.LOG) G.LOG.info('battle', 'end', { win: !!win, world: (w && w.id) || '', err: String((e && e.message) || e) }); } catch (e2) {}

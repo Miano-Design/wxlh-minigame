@@ -70,7 +70,7 @@
   const B = {
     on: false, cfg: null, res: null, idx: 0, units: {}, log: [], floaters: [],
     speed: 1, timer: null, done: false, panel: null, energy: {}, tip: null,
-    autoT: null, autoLeft: 0, lastPanel: null,
+    autoT: null, autoLeft: 0,
     pausedByAd: false,      // 看广告期间挂起（见 pauseForAd / resumeAfterAd）
     tipAt: 0,                    // 波次卡：起始时间（V9.6.123；V1.0.4 起动画帧由 tipLoop 驱动，句柄不再存这儿）
     /* V9.6.90：防重入闸门**单独一个字段**。以前是拿 `B.on && B.res` 凑的 ——
@@ -123,7 +123,7 @@
        ③ 深井那条会当场变回"栈 corridor（根）· 点了没动"。 */
     const onBattlePage = CV.stack.length === 1 && CV.stack[0] && CV.stack[0].name === 'battle';
     if (!onBattlePage || !B.back) B.back = { stack: CV.stack.slice(), scroll: CV.scroll || 0 };
-    B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.lastPanel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
+    B.on = true; B.busy = true; B.cfg = cfg; B.done = false; B.panel = null; B.log = []; B.floaters = []; B.energy = {}; B.hitAt = {}; B.atkAt = {};
     B._bsBossHit = 0;                       // R1.6：残响的 first_hit 每场只算一次
     /* 2026-10-02（父亲大人：「现在副本战斗的背景也没改啊」）：
        战斗页是**整屏接管**（chromeless），之前我一刀把它排除在铺底之外了 ——
@@ -526,16 +526,15 @@
     const hpLeft = {};
     Object.keys(B.units).forEach((uid) => { const u = B.units[uid]; if (u.side === 'ally' && u.charId) hpLeft[u.charId] = Math.max(0, u.hp / u.maxHp); });
     const gotPanel = cfg.onEnd(res.win, res, hpLeft) || {};
-    /* ================= 2026-10-03（父亲大人：「结算页连获得的道具都没了」）=================
-     真现场（控制台时序）：一场打完，**真结算面板已经出来了**（发奖、胶囊、下一关都在），
-     紧接着还有几次晚到的 `finish()`（`battle · end`），它们拿到的 `run` 已经被正常结算清空
-     ⇒ 副本那边只能回一张**兜底面板**（"结算数据不在了"）⇒ 把好面板**盖掉**。
-     奖品其实已经发了，但玩家看到的是"没有奖励的空结算页"。
-     这里收一道闸：**晚到的那张如果比已经显示过的更"空"，就不认它** ——
-     真面板一旦出现就不会再被兜底盖掉（新开的战斗由 `run()` 把 `B.lastPanel` 清掉，不会串场）。 */
-    const rich = (x) => ((x && x.rewards || []).length) + Math.max(0, ((x && x.acts || []).length) - 1);
-    B.panel = (B.lastPanel && rich(gotPanel) < rich(B.lastPanel)) ? B.lastPanel : gotPanel;
-    B.lastPanel = B.panel;
+    /* ================= 2026-10-03（父亲大人：「兜底一定要有吗」）=================
+     这里原来还有一道"晚到的那张更空就不认它"的保险（比 rewards / acts 的条数，存进 `B.lastPanel`）。
+     立 `scripts/settle_audit.js` 时把它验掉了：`B.lastPanel` 只在 `finish()` 末尾写、
+     只在 `start()` 里清，而 `B.done` 保证**一场只会走一次 finish()** ⇒
+     走到这一行时 `B.lastPanel` 永远是 null、判据永远不成立 —— **它是死代码**。
+     真正要收口的是"这一场结算过没有"，那件事归副本那边（`settledRun` 认对象身份），
+     面板是**这一场**的产物，不该由战斗页拿一个"上一次的面板"去比大小。
+     所以：`onEnd` 给什么就用什么。 */
+    B.panel = gotPanel;
     /* V1.0.4 · R1（父亲大人 09-27 点单：「战斗结算（关卡、胜负）」要进线上日志）：
        胜负这一条**每一场都记**（含深井 / 斗法台 —— 它们走同一段 finish）；
        关卡号那一条在副本自己的 `settleRun` 里（那边才知道 world/diff/stage，
