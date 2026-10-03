@@ -147,6 +147,7 @@
     if (!w) { U.begin(); U.card(function () { U.h3('残域'); U.hint('这个世界不存在', 6 * CV.SCALE); }); return; }
     const st = S.worlds[w.id];
     const diff = view.diff;
+    curWorldId = w.id;          // ← 给 CV.veils.world 用（底图跟着这个世界走）
     U.begin();
     /* 返回世界列表 —— 父亲大人 09-27 深夜（派单 Z-B）：标题 + 返回**吸顶**
        （原来只有一颗「‹ 返回世界列表」，滚到下面就得先滑回顶上才点得到）。 */
@@ -463,6 +464,23 @@
   /* 这一场打的是哪一关（`startStage` 里落）。兜底面板要靠它才能给出「↻ 再来一次 / › 下一关」——
      没有它，"结算数据不在了"那张兜底就只剩一颗「返回世界」，玩家会以为**自动下一关没了**。 */
   let lastPlayed = null;
+  /* ================= 2026-10-03（父亲大人：「关卡的背景可以直接用对应世界的了，
+     毕竟我们是先发现了该世界，这个逻辑是通的」）=================
+     世界页原来走的是"没登记底图就用 `CV.defaultVeil`"那条路 ⇒ 铺的是**首页那张主视觉**。
+     现在它铺**这个世界自己的场景图**（`Story.bg`，与剧情页/战斗页同一张、同一套换算），
+     再压一道 62% 的暗：世界页上面全是卡片与关卡格，底图只负责回答"我在哪"，不抢读。
+     `curWorldId` 由世界页那一趟渲染写进来（veil 是按当前页名取的，拿不到页面的局部变量）。 */
+  let curWorldId = '';
+  CV.veils = CV.veils || {};
+  CV.veils.world = function (c) {
+    const St = G.Story;
+    if (!curWorldId || !St || !St.bg) return;
+    try {
+      St.bg(c, St.sceneOf(curWorldId), CV.W, CV.H, Date.now() / 1000, St.sceneKeyOf(curWorldId));
+      c.fillStyle = CV.a(CV.C.shade, .62);
+      c.fillRect(0, 0, CV.W, CV.H);
+    } catch (e) { /* 拿不到图/尺寸异常：不铺底也照样能玩（与 bgFlat 那条保险同一个口径） */ }
+  };
   function clearSettleTargets() { againTarget = null; nextTarget = null; lastPanel = null; }
   /* F2-1（抢修单 0928R3）：onEnd 的**兜底面板** —— 任何一条没走通的路径都必须返还一个
      能点、能退出的面板。onEnd 一抛，`finish()`（sc-battle.js）跟着抛 → 结算面板画不出来、
