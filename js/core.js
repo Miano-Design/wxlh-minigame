@@ -1010,7 +1010,20 @@ window.Core = (function () {
       const hiW = Math.min(D.WORLDS.length - 1, hi + 1);           // 通关第 hi 张 → 第 hi+1 张当年也解锁过
       let missing = 0;
       for (let i = 0; i <= hiW; i++) { const w = S.worlds[D.WORLDS[i].id]; if (!w || !w.unlocked) missing++; }
-      if (missing && !S.reincarnWorldRestored) {
+      /* ================= 2026-10-03（父亲大人：「删档重开还是直接第二个世界就显示出来了」）=================
+         这道补偿**必须先有凭据**，否则会误伤一张刚建档的空档：
+         `bestWorldIdx` 是**只涨不跌**的字段，它的 `0` 有**两种含义** —— ①从没通关过任何世界；②通关过 W01。
+         原来只看 `hi+1` 那个范围 ⇒ 一把 `hi = 0` 的**空档**也被读成"打过 W01" ⇒ 顺手把 **W02** 解锁，
+         玩家看到的就是"第一张图一关没打，第二张已经躺在列表里了"（R3.5 那一改只修了"当前旅程指哪儿"，
+         没有拦住列表这一列 —— 这次堵上）。
+         凭据只有一条：**`S.worlds` 被清空只可能来自"照旧规则转过生"** ——
+         现在转生**不再清残域**（见 reincarnate 的说明），所以只有下面两种档可能真的缺解锁：
+           · `reincarnations >= 1`（真的转过生，进度被那次旧规则清过）；
+           · `hi >= 1`（bestWorldIdx 非 0 ⇒ 至少打过 W02，那 W01 必定通关过 —— 老档没有 reincarnations 字段时的兜底）。
+         新档 / 从没转生过、也没打过 W02 的档，一律**不进这一支**；这一支本身照旧幂等（标记只写一次）。
+         ⚠️ 只改"什么时候补"，恢复的范围与"不补星、不补首通奖励"的口径一个字没动。 */
+      const reinc = Math.max(0, S.player.reincarnations || 0);
+      if (missing && (reinc >= 1 || hi >= 1) && !S.reincarnWorldRestored) {
         for (let i = 0; i <= hiW; i++) {
           const wid = D.WORLDS[i].id;
           unlockWorld(wid);                                    // 能进 / 已解锁（不受等级与星数影响）

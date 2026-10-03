@@ -99,6 +99,11 @@
   /* `leaseToken` ＝ 服务端发给本机的"在场凭证"（每次登陆换一个；只活这一次会话，不落盘）。
      它才是服务端认的那把钥匙：`push` 那边 `where({_id, 'lease.token': 本机token})`。 */
   let leaseTs = 0, superseded = false, noticeShown = false, noticeAt = 0, leaseToken = '';
+  /* `supersededTs` ＝ 判我们"被顶下线"那一刻**云上那条的时间戳**。
+     为什么要留它：判据必须是"**另一台更新** ⇒ 本机只读"（父亲大人 09-27 的口径），
+     不是"另一台开过一次 ⇒ 本机永远只读"。留了这个数，本机之后**真玩出了更新的进度**时
+     才能自己重新站起来（见 push 里"抢位重推"那一段），不用玩家去点「重新登录」。 */
+  let supersededTs = 0;
   const NOTICE_HOLD_MS = 3 * 60 * 1000;
 
   /** 偏好/账本：读出来一律**补齐默认值**（老版本写的对象里缺字段、或整段不存在，都按默认值走）。 */
@@ -328,15 +333,19 @@
          做坏试验：把下面那句 `superseded = true` 删掉 → `cloud_sync_audit` ⑪ 那条当场红。 */
       const sess = (doc && (doc.lease || (doc.act && doc.act.sess))) || null;
       if (sess && sess.id) {
-        if (String(sess.id) === deviceId()) { leaseTs = Math.max(leaseTs, Number(sess.ts) || 0); superseded = false; }
+        if (String(sess.id) === deviceId()) { leaseTs = Math.max(leaseTs, Number(sess.ts) || 0); superseded = false; supersededTs = 0; }
         /* 别人的租约：**不比本机这次占位早**、而且**还在有效期内**（＝那台确实还在线）才算顶下线。
            过期租约（那台早走了）不拦本机。
            ⚠️ 这里是 `>=` 不是 `>`：`Date.now()` 只有毫秒分辨率，而"另一台抢租约"与"本机记租约"
            完全可能落在**同一个毫秒**里（尺子上真的复现过：三次里错两次）。同刻且不是本机时，
            判对方持有才是安全的 —— 反正服务端那一道条件更新也会拒（本机不会因此被误写成"在线"）。 */
-        else if ((Number(sess.ts) || 0) >= leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) superseded = true;
-        else superseded = false;
-      } else superseded = false;
+        else if ((Number(sess.ts) || 0) >= leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) {
+          /* 2026-10-03：顺手记下"判只读那一刻云上那条的 ts" —— 本机之后真玩出更新的进度时，
+             `push` 要靠它决定"能不能自己站起来"（见 push 顶部与抢位重推那两段）。 */
+          superseded = true; supersededTs = doc ? (Number(doc.ts) || 0) : 0;
+        }
+        else { superseded = false; supersededTs = 0; }
+      } else { superseded = false; supersededTs = 0; }
       /* 顺手记住"云端那条里有没有更旧的备份"——设置页那行字（与一键取回）就看它。 */
       P.prevAt = doc ? (Number(doc.prevAt) || 0) : 0;
       P.prevTs = doc ? (Number(doc.prevTs) || 0) : 0;
@@ -371,7 +380,7 @@
       if (!r.ok) { noteErr('claim', r.why || 'fail'); return { ok: false, why: r.why || 'fail' }; }
       leaseToken = String(r.token || '');
       leaseTs = Number(r.ts) || Date.now();
-      superseded = false;
+      superseded = false; supersededTs = 0;
       return { ok: true };
     });
   }
@@ -399,11 +408,21 @@
     return sync('reclaim', { claim: true }).then(function (r) {
       const ok = !!(r && r.ok && !superseded);
       clog('reclaim', { ok: ok, why: String((r && (r.skip || r.took)) || '') });
-      const msg = ok ? '已在这台设备继续：之后这台推的进度就是云端那份。'
+      const msg = ok ? '已取回云端最新进度（这台设备的进度以云端那份为准）。\n点下面那颗，从主画面重新进入游戏。'
         : ((r && r.msg) || '还是没连上，稍后再试（切回前台会自动再试一次）。');
+      /* ================= 2026-10-03（父亲大人）=================
+         「被顶号重新登陆**必须是字面上的重新登陆**，而不是还停留在当前页面，
+          就是**重新拉取最新的档、从启动界面重新进入游戏**。」
+         ⇒ 成功之后**不留在当前页**：上面那一趟 sync 已经把云端那份换进内存（谁新听谁的），
+           这里把**页面栈整个清掉、回到开机主画面**（`gate`）—— 玩家从主画面重新进游戏，
+           看到的就一定是刚取回来的那份档。弹窗是"已经换好了"的回执，不是"继续玩"的按钮。
+         ⚠️ 失败时不回退页面（没拿到档就回主画面，等于把人晾在半路）；照旧只提示重试。 */
+      if (ok) {
+        try { if (G.CV && G.CV.reset) G.CV.reset('gate'); } catch (e) {}
+      }
       try {
         const U2 = G.U;
-        if (U2 && typeof U2.confirm === 'function') U2.confirm('重新登录', msg, null, { cancel: false, okLabel: '知道了' });
+        if (U2 && typeof U2.confirm === 'function') U2.confirm('已重新登录', msg, null, { cancel: false, okLabel: '进入游戏' });
       } catch (e) {}
       return { ok: ok, msg: msg, why: String((reason || '')) };
     });
@@ -461,7 +480,14 @@
     /* 双端单活：被顶下线期间**一个字都不许写回云端**（否则两台设备就会互相覆盖，
        正是父亲大人要防的"打架"）。这里再兜一道 —— 上面 sync 已经分流过一次，
        但这颗是**所有**写路径的唯一出口，兜在出口上才不怕以后从别处绕进来。 */
-    if (superseded) return Promise.resolve({ ok: false, skip: 'superseded' });
+    /* ================= 2026-10-03（父亲大人：「手机同步不到开发者工具的存档」）=================
+       挡在这一句上的**原来**是"只要 `superseded` 就别推"。可 `superseded` 的成因可能是
+       "另一台**只是开过一次**、租约在它手上"，而不是"另一台真的更新"——
+       于是一台设备只要被别的设备占过位，**之后打出来的所有进度全被扔掉**（云上永远是旧那份），
+       另一台自然怎么都同步不到（这正是父亲大人报的那条）。
+       现在按原口径收口：**只有"云上那份不比本机旧"才是真只读**；
+       本机已经比"判只读那一刻云上的那份"更新了 ⇒ 放行去推（推的时候服务端会让我们先抢回租约）。 */
+    if (superseded && !(supersededTs && localTs() > supersededTs)) return Promise.resolve({ ok: false, skip: 'superseded' });
     const raw = currentRaw();
     if (!raw) return Promise.resolve({ ok: false, skip: 'nodata' });
     const h = hash(raw);
@@ -477,23 +503,47 @@
     const act = actBlock(actTs);
     /* 没占到位就先占一次（老窗口 / 云函数刚部署时的那种会话）——
        `push` 那一步服务端要 token 对得上才写，所以这里不能省。 */
-    const path = (leaseToken ? Promise.resolve({ ok: true }) : claimLease(doc));
+    /* 把"把手上这份推上去"抽出来：'superseded' 那一支要**抢回租约后再推一次**，推的是同一份东西。 */
+    const sendPush = function () {
+      return saveFn('push', {
+        payload: raw, ts: ts, bytes: raw.length, ver: String(G.GAME_VER || ''),
+        act: act, token: leaseToken, device: deviceId(),
+      });
+    };
+    /* `superseded` 为真 ⇒ 手上那个 token 一定已经作废了（服务端早换给别人）：直接去占位，
+       别拿它白跑一趟（那一趟必定被拒，白多一次云函数调用）。 */
+    const path = ((leaseToken && !superseded) ? Promise.resolve({ ok: true }) : claimLease(doc));
     return path.then(function () {
       /* ⚠️ R1.2 实测抓到的：占位没成功时**不许硬推**。原来这里不看占位结果，
          一旦 claim 那一下没成（云函数刚部署 / 网络抖），就会拿空 token 去推 ——
          服务端照规矩回 `no_token`，玩家那行诊断变成"云函数调不通"，而其实只是"还没占上位"。
          现在停在这一步、报一句人话，等下一轮（开机 / 回前台 / 打关）自动再占一次。 */
       if (!leaseToken) return { ok: false, skip: 'notoken', why: 'no_token', msg: NET_MSG({ why: 'no_token' }) };
-      return saveFn('push', {
-        payload: raw, ts: ts, bytes: raw.length, ver: String(G.GAME_VER || ''),
-        act: act, token: leaseToken, device: deviceId(),
-      });
+      return sendPush();
+    }).then(function (r) {
+      /* ================= 2026-10-03 · **抢位重推**（同一条收口）=================
+         服务端按 token 拒了我们（`superseded`）。这一刻先分一次岔，判据与上面那句同源：
+           · **本机这份比云上那份新** ⇒ 这不是"被顶下线"，是"**这台才是刚在玩的那台**"
+             （`savedAt` 比云上那条的 `ts` 大就是证据）⇒ 当场把位占回来、用新 token 再推**一次**；
+           · 云上不比本机旧（或抢位没抢到）⇒ 真·被顶下线：转只读 ＋ 走那个"讲一次"的口。
+         ⚠️ 只重推一次（`reason === 'reclaim'` 时不重推）：两台设备不会无限互抢 ——
+            抢回来的那一推若再被拒，就落回只读，与原来一模一样。
+         ⚠️ 覆盖前留档那条一个字没动：这一推照旧把云上那份写进 `prev*`，两头的档都不丢。 */
+      if (r && !r.ok && String(r.why) === 'superseded' && reason !== 'reclaim'
+          && doc && Number(doc.ts || 0) < ts) {
+        return claimLease(doc).then(function (c) {
+          if (!c.ok || !leaseToken) return r;          // 没抢到：照原样走下面的只读那条
+          return sendPush();
+        });
+      }
+      return r;
     }).then(function (r) {
       if (!r.ok) {
         if (String(r.why) === 'superseded') {
           /* **服务端**判的下线：本机立刻转只读（本地那个 `superseded` 认成 false 也没用，
              因为写这一下已经被服务端按 token 拒了）。然后走同一个提示口。 */
           superseded = true; leaseToken = '';
+          supersededTs = Number((doc && doc.ts) || 0);
           maybeNotifySuperseded(true);
           clog('push_denied', { bytes: raw.length });
           return { ok: false, skip: 'superseded' };
@@ -502,7 +552,7 @@
         return { ok: false, skip: 'fail', why: r.why, msg: NET_MSG(r) };
       }
       /* 推上去了 ⇒ 这一趟也算一次"占位"（本机就是在场那一端），租约时间对齐同一个数。 */
-      leaseTs = actTs; superseded = false;
+      leaseTs = actTs; superseded = false; supersededTs = 0;
       P.pushes++;
       P.lastPushHash = h;
       P.lastPushAt = Date.now();
@@ -554,7 +604,15 @@
          （`publicDoc()` 特意不下发 `_id` / `_openid`）。 */
       const needClaim = wantClaim && !(sess && String(sess.id) === deviceId());
       return (needClaim ? claimLease(doc) : Promise.resolve(null)).then(function () {
-        if (superseded) {
+        /* ================= 2026-10-03（父亲大人：「手机同步不到开发者工具的存档」）=================
+           `superseded` 只说明"云上那条的租约在别的设备手里"，**不等于"对面更新"**。
+           对面可能只是开过一次 App（开机那一趟就占了位）—— 那就把本机**刚打出来的进度**白白拦住，
+           云上永远是旧那份，第三台设备自然怎么都同步不到（父亲大人报的就是这一条）。
+           收口成原口径：**只有"云上那份不比本机旧"才是真·被顶下线**（转只读 ＋ 讲一次）；
+           本机比云上更新 ⇒ 照常往下走，`push` 会先替我们把租约抢回来（见那里"抢位重推"）。
+           ⚠️ 这里比的是 `localAtStart`（本轮同步开始时取的那一份判据），不是取档之后的本机。 */
+        const reallyBehind = superseded && !(supersededTs && localAtStart > supersededTs);
+        if (reallyBehind) {
           maybeNotifySuperseded(true);
           if (doc && cloudTs > localAtStart) {
             const rr = applyCloudSave(doc.payload, doc.ts, 'cloud');
@@ -922,6 +980,7 @@
       initErr = ''; lastErr = null;          // F2 · 0930L：诊断状态也一起清（尺子要反复试各种岔路）
       absentLogged = false;
       leaseTs = 0; superseded = false; noticeShown = false; noticeAt = 0; leaseToken = '';   // 双端单活：租约状态也一起清
+      supersededTs = 0;
       if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
       if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     },
