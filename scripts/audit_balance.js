@@ -62,6 +62,7 @@ gen.forEach((g) => {
 
 /* ---------- 3. 相邻世界倍率（生成值的比值；异常报 WARN，结构错报 FAIL） ---------- */
 const WARN_JUMP = 8;          // 相邻世界总 HP 涨过 8 倍 ⇒ 值得报给人看（不是判定为 Bug）
+const dips = [];              // 单步局部回落（只记录，判错在 §4）
 for (let i = 1; i < gen.length; i++) {
   const a = gen[i - 1], b = gen[i];
   if (!a.t || !b.t) continue;
@@ -74,33 +75,88 @@ for (let i = 1; i < gen.length; i++) {
       reason: '**设计级异常候选，不自动判定为程序 Bug**（见 docs/archive/AUDIT-R1.3-阶段一.md）',
     });
   }
-  /* ================= 父亲大人 2026-10-01 裁定【甲】=================
-     「**不要**把 W01~W36 普通世界 HP/ATK 单调递增当成唯一正确标准。`EASE_LATE` 是上一轮按
-      真实玩家余量与战斗手感反解出来的难度调节曲线，部分后段世界允许 HP/ATK 下降 ——
-      只要**实际战斗体验**仍形成合理递进。」
-     ⇒ 生成值的反向 **只报 WARN**（钉事实，不判错）；判"曲线是否合理"的标准升级为
-       **真实战斗难度**（TTK / 生存时间 / 整波压力 / 不同配置档位）——那一层尺子按裁定"逐步增加"。
-     ⇒ **`EASE_LATE` 数据一个字不动。** */
+  /* ================= 2026-10-03 世界曲线重解 · **判据换成"最终有效战斗体验"** =================
+     父亲大人 2026-10-01 的【甲】裁定 + 2026-10-03《下一次数值裁决任务书》§三/§五/§十一 情况 A：
+       · 世界数值**允许局部下降**，不要求 HP/ATK/EASE 逐格递增；
+       · 「只有当**最终有效战斗体验**出现明显反向，才进入重标定」；
+       · 只有"**连续多个世界明显变弱**"才算体验倒退（单步小幅回落允许）。
+     所以这里**单步下降只记录、不判错**；真正判错的是 §4 那两条：
+       ① 一场守关的**收益**不能倒退（收益是真金白银的那一侧，比 HP 更能说明"值不值得推"）；
+       ② 不能出现"连降 ≥2 段且累计跌到 75% 以下"这种**连续明显变弱**。
+     （`EASE_LATE` 是**反向补偿曲线** —— 它要抵消世界里基准值的增长，所以它自己必须递减。
+       拿"它是否递增"当判据，本身就是一个错的测量模型。） */
   if (rh < 0.95 || ra < 0.95) {
-    R.warn(a.w.id + ' → ' + b.w.id + '：生成值反向（后一个世界更弱）', {
-      file: 'js/dungeon.js', line: lineOf('js/dungeon.js', 'const EASE_LATE'),
-      expected: '按【甲】裁定：允许存在（以真实战斗体验为准）',
-      actual: 'HP ' + rh.toFixed(3) + 'x · ATK ' + ra.toFixed(3) + 'x',
-      reason: 'EASE_LATE 是"满配余量"曲线，非单调是设计意图；**仅记录，不判错**',
-    });
+    dips.push(a.w.id + '→' + b.w.id + ' ' + (rh < 0.95 ? 'HP ' + rh.toFixed(3) + 'x' : 'ATK ' + ra.toFixed(3) + 'x'));
+  }
+  if (rh < 0.95 || ra < 0.95) {
+    /* 只记一笔，不报 WARN —— 判错在下面 §4（连续明显变弱 / 收益倒退）。 */
   }
 }
 
-/* ---------- 4. W29 → W30 单列（任务书点名） ---------- */
+/* ---------- 4. 最终有效战斗体验：收益不倒退 ＋ 不许"连续多个世界明显变弱" ---------- */
 {
-  const a = gen.filter((g) => g.w.id === 'W29')[0], b = gen.filter((g) => g.w.id === 'W30')[0];
-  if (a && b && a.t && b.t) {
-    const rh = b.t.hp / a.t.hp, ra = b.t.atk / a.t.atk;
-    const rev = rh < 1 || ra < 1;
-    const ev = { file: 'js/data.js', expected: 'W30 ≥ W29（不反向）', actual: 'HP ' + rh.toFixed(3) + 'x · ATK ' + ra.toFixed(3) + 'x' };
-    if (rev) R.warn('W29 → W30 反向下降（已钉住事实，本轮不改）', Object.assign(ev, { reason: 'unexpected reverse progression' }));
-    else R.pass('W29 → W30 没有反向下降', ev);
-  } else R.blocked('W29 / W30 读不到生成值', { reason: '世界表或生成函数缺项' });
+  /* 收益口径：**这一世界守关 Boss 那一场**能拿到多少（◉ 直接计，◆ 按 3 点折算 —— 与商店的
+     换算口径同源）。用 `Dungeon.battleRewards`（真源），不另抄一份公式。 */
+  const valOf = (wid) => {
+    let r = null;
+    try { r = E.G.Dungeon.battleRewards(wid, 'normal', 12, 'boss') || {}; } catch (e) { r = null; }
+    if (!r) return null;
+    return { pts: Number(r.points) || 0, other: Number(r.otherworld) || 0,
+      v: (Number(r.points) || 0) + (Number(r.otherworld) || 0) * 3 };
+  };
+  const vals = gen.map((g) => valOf(g.w.id));
+  const badVal = [];
+  for (let i = 1; i < vals.length; i++) {
+    if (!vals[i] || !vals[i - 1]) continue;
+    if (vals[i].v < vals[i - 1].v) badVal.push(gen[i - 1].w.id + '→' + gen[i].w.id + ' ' + (vals[i].v / vals[i - 1].v).toFixed(3) + 'x');
+  }
+  (badVal.length ? R.fail : R.pass)('推进收益不倒退（后一个世界的守关收益不低于前一个）', {
+    file: 'js/dungeon.js', line: lineOf('js/dungeon.js', 'function battleRewards'),
+    expected: '每一格 ≥ 前一格', actual: badVal.length ? badVal.join(' ; ') : 'W01→W36 逐格不降',
+  });
+
+  /* "连续多个世界明显变弱"：连降 ≥2 段、且累计跌到 75% 以下 —— 两条同时成立才判错。
+     单步小幅回落（比如 W13→W14）是设计允许的局部下降，不算。 */
+  const RUN_MIN = 2, CUM_MIN = 0.75;
+  const runs = [];
+  let start = 0, len = 1;
+  for (let i = 1; i < gen.length; i++) {
+    const a = gen[i - 1].t, b = gen[i].t;
+    if (!a || !b) { len = 1; start = i; continue; }
+    if (b.hp < a.hp) { if (len === 1) start = i - 1; len++; }
+    else { if (len >= 2) runs.push({ a: start, b: i - 1, len: len - 1, cum: gen[i - 1].t.hp / gen[start].t.hp }); len = 1; }
+  }
+  if (len >= 2) runs.push({ a: start, b: gen.length - 1, len: len - 1, cum: gen[gen.length - 1].t.hp / gen[start].t.hp });
+  const badRun = runs.filter((r) => r.len >= RUN_MIN && r.cum <= CUM_MIN);
+  const desc = (r) => gen[r.a].w.id + '→' + gen[r.b].w.id + '（连降 ' + r.len + ' 段 · 累计 ' + (r.cum * 100).toFixed(1) + '%）';
+  (badRun.length ? R.warn : R.pass)('没有"连续多个世界明显变弱"（连降 ≥2 段且累计 ≤75% 才判错）', {
+    file: 'js/dungeon.js', line: lineOf('js/dungeon.js', 'const EASE_LATE'),
+    expected: '不允许连续明显变弱；单步局部回落允许',
+    actual: badRun.length ? badRun.map(desc).join(' ; ') : ('通过的连降段：' + (runs.length ? runs.map(desc).join(' ; ') : '无')),
+  });
+  R.note('有效强度曲线上的**全部**连降段（含允许的）：' + (runs.length ? runs.map(desc).join(' · ') : '（无）'));
+  if (dips.length) R.note('单步局部回落（设计允许，不计错）：' + dips.join(' · '));
+
+  /* ================= 真实有效曲线整表（任务书 §二：**叠层之后**的最终值）=================
+     这一张就是"玩家实际吃到的东西"：`Dungeon.makeEnemies` 生成之后的总 HP / 总 ATK（已经含
+     EASE_LATE × progressionRelief × earlyPace × mAtkRelief × diffMult × stageMult 全部叠层），
+     加上守关 Boss 的 HP 与那一场的收益。**不要拿 EASE_LATE 原始表值去和它对**（那是两回事，
+     本文件 §5 的"索引没串位"那条就是为这个踩过的坑）。 */
+  R.note('');
+  R.note('真实有效曲线（normal · 第 1 关 · 普通波 → 总 HP/ATK；第 12 关守关 → BossHP/收益）：');
+  gen.forEach((g, i) => {
+    const v = vals[i];
+    if (!g.t) return;
+    let bhp = '—';
+    try {
+      const list = E.G.Dungeon.makeEnemies(g.w.id, 'normal', 12, 'boss') || [];
+      const boss = list.filter((e) => e && e.isBoss)[0];
+      if (boss) bhp = boss.hp;
+    } catch (e) {}
+    R.note('  ' + g.w.id + ' ' + (g.w.name || '') + ' · Σhp=' + g.t.hp + ' · Σatk=' + g.t.atk
+      + ' · BossHP=' + bhp
+      + ' · 守关收益 ◉' + (v ? v.pts : '?') + ' + ◆' + (v ? v.other : '?') + '（折 ◉' + (v ? v.v : '?') + '）');
+  });
 }
 
 /* ---------- 5. EASE / EASE_LATE 的实际映射（防"索引错位"） ---------- */

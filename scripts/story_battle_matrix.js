@@ -19,6 +19,8 @@ try { E = boot(); } catch (e) { R.blocked('加载游戏运行环境', { reason: 
 const { Core, D, G } = E;
 const Dun = E.G.Dungeon, Battle = E.G.Battle;
 const St = G.Story, BS = G.BattleStory;
+/* 稀有度排序：与 `progression_audit` 用**同一张表**（别各写一份）。 */
+const RARITY_ORDER = { UR: 0, SSR: 1, SR: 2, R: 3, N: 4 };
 if (!BS) { R.blocked('BattleStory 没加载（js/sc-story-battle.js）', { expected: '叙事层可用', actual: '缺失' }); R.finish(); return; }
 
 /* 固定种子：这一场要可复现（不然"有没有二阶段"每次读数都可能不同） */
@@ -41,20 +43,51 @@ function teamAt(wid, mul) {
   const wi = Math.max(0, D.WORLDS.findIndex((w) => w.id === wid));
   const lv = Math.max(5, Math.min(D.PLAYER_MAX_LV, Math.round((8 + wi * 2.6) * mul)));
   const rarity = wi >= 10 ? 'UR' : wi >= 4 ? 'SSR' : 'SR';
-  S.player.level = lv; S.player.bloodlineLv = Math.round(D.BLOODLINE_MAX * 0.3); S.player.geneLock = 2;
+  /* ================= 2026-10-03 世界曲线轮 · **阵容口径与真实世界档位对齐** =================
+     原来这里用的是 `D.characters.slice(0, 4)` —— 角色表**最前面的四个**（也就是最弱的一批），
+     而且不点铭刻 / 没有坐骑法宝 / 不强化。后果实测过：这 10 个世界的守关 Boss，
+     把档位从 mul 0.7 一路加到 3.0（Lv 顶到 100）**照样打不过**（win=false）——
+     连 30% 血线都摸不到，自然永远没有二阶段/狂暴帧，尺子就报"跑不到阶段帧"。
+     那是**测试队的账，不是游戏本体的账**：`progression_audit` 用世界档位正常阵容
+     （满编最高稀有度 + 本档装备 + 按世界给的铭刻 + 坐骑法宝 + 强化）跑同一批 Boss，
+     36/36 世界都能过关、TTK 全在区间内。
+     所以这里改成**与 `progression_audit` 的 B（认真）档同源**的阵容口径 ——
+     不重新发明一套队伍，按那套已成熟的规格来（稀有度排序取前 4、星级/血统/技能按档、
+     铭刻按该世界的转生门、坐骑法宝买齐、按世界给强化等级）。
+     ⚠️ 只改**测试 fixture**，一个 Boss 数值都没动。 */
+  const REAL_N = 4;
+  const BEST = D.characters.slice()
+    .sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9))
+    .map((c) => c.id);
+  let gate = 0;
+  for (let i = 0; i <= wi; i++) gate = Math.max(gate, D.WORLDS[i].reincarn || 0);
+  S.player.level = lv;
+  S.player.bloodlineLv = Math.min(D.BLOODLINE_MAX, Math.round(lv * 0.5));
+  S.player.geneLock = Math.min(D.GENE_LOCK_MAX, gate + 2);
   S.player.attrPoints = lv * 3;
   D.ATTR_META.forEach((a) => Core.allocateAttr(a.id, Math.floor(S.player.attrPoints / (D.ATTR_META.length * 10)) * 10));
-  D.characters.slice(0, 4).forEach((c) => {
-    Core.addChar(c.id);
-    S.chars[c.id].lv = lv; S.chars[c.id].star = 3;
-    S.chars[c.id].bloodlineLv = Math.round(D.BLOODLINE_MAX * 0.3);
-    S.chars[c.id].skillLv = D.SKILL_MAX_BY_INDEX.map((m) => Math.round(m * 0.3));
+  BEST.slice(0, REAL_N).forEach((id) => {
+    Core.addChar(id);
+    const maxStar = D.RARITY_MAXSTAR[D.charById[id].rarity] || 5;
+    S.chars[id].lv = lv;
+    S.chars[id].star = Math.min(maxStar, 3);
+    S.chars[id].bloodlineLv = Math.min(D.BLOODLINE_MAX, Math.round(lv * 0.5));
+    S.chars[id].skillLv = D.SKILL_MAX_BY_INDEX.map((m) => Math.min(m, Math.round(lv * 0.4)));
   });
-  S.party = ['@player'].concat(D.characters.slice(0, 4).map((c) => c.id));
+  S.party = ['@player'].concat(BEST.slice(0, REAL_N));
   S.bag.eqCap = 900;
   ['points', 'otherworld', 'holy', 'rp'].forEach((k) => Core.addCur(k, 1e9));
+  D.MOUNTS.forEach((m) => Core.buyMount(m.id));
+  D.FABAO.forEach((f) => Core.buyFabao(f.id));
+  for (let i = 0; i < 4; i++) Core.upgradeAuthority();
   for (let i = 0; i < 60; i++) Core.grantEquip(wid, rarity, null);
   Core.autoEquipBest();
+  /* 按世界给强化：与 progression_audit 的 B 档同一口径（`en = round(lv/8)`，上限 20）。 */
+  const en = Math.min(20, Math.round(lv / 8));
+  if (en > 0) Object.values(S.equips).forEach((eq) => {
+    const worn = Object.values(S.equipped).some((sl) => Object.values(sl).indexOf(eq.uid) >= 0);
+    if (worn) eq.enhance = en;
+  });
   return S;
 }
 

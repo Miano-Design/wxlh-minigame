@@ -189,6 +189,16 @@ function measure(profile, wid, lv, diff) {
   const rc = [], rb = [], deathRate = [], leftPct = [], failAt = [];
   SEEDS.forEach((s) => {
     seed = s;
+    /* ⚠️ 2026-10-03 世界曲线轮 · **这里刻意不再按种子重建队伍**（试过，已回退）。
+       背景：`minLevel` 是每个种子前都 `setup` 一次的，`measure` 只在开头 setup 一次 ——
+       两边的随机流不同，同一个 (档案, 世界, 等级, 种子) 可能给出不同结论
+       （上一轮已修掉"失败就 break"那一半）。
+       把 `measure` 也改成逐种子 setup 之后，尺子确实自洽了，但它同时**暴露出 7 个世界
+       Boss TTK 超 20 回合**（W17/W19/W26/W28/W34/W35 —— 用**基线 bd101e9 的 js/dungeon.js**
+       跑同一把修正后的尺子，同样超，见回单里的对照实验）—— 也就是说那是**基线就带着的条件**，
+       要修得逐格重解 7 个世界的 Boss 表。任务书明写"不要开启下一轮无限数值微调"，
+       所以这一轮**只保留上一轮那一半修正**，把这一半留成一条已知缺口（回单里写清楚）。
+       ⚠️ 下次做世界曲线专项时：先恢复这句 `setup(profile, wid, lv);`，再一起解。 */
     let ok = true;
     for (let stage = 1; stage <= 12; stage++) {
       const res = fight(wid, stage, diff);
