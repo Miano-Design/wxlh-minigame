@@ -208,7 +208,10 @@ window.BattleStory = (function () {
     return {
       worldId,
       name: name,
-      say: say,                                                     // Boss 台词 / 出场那一刻（角色层）
+        say: say,                                                     // Boss 台词 / 出场那一刻（角色层）
+        /* §四十三：六个核心 Boss 的"记忆台词·首次见面"（其余世界是空串）。
+           出场序列会把它接在 `say` 后面画一行（见 `sc-battle.js:drawEntrance`）。 */
+        say2: (boss && boss.lines && boss.lines.meet) || '',
       inner: inner,                                                 // 它为什么挡在这里（身份/目的层）
       mech: w.mechanic ? ('【残域机制】' + w.mechanic) : '',        // 系统层：本世界的规则
       ms: ENTRANCE_MS,
@@ -227,8 +230,13 @@ window.BattleStory = (function () {
     const arc = (SD().ARC || {})[worldId] || {};
     const clue = arc.clue || (St.clueOf && St.clueOf(worldId, 'post')) || '';
     const after = (boss && boss.after) || arc.environmentChange || '';
+    /* R2.x（NARRATIVE-UX-FINAL §四十四）：六个核心 Boss 还有一句**记忆台词·战后**
+       （`lines.after`，如"这次少了一件。"）—— 它跟在"战场变化"那句后面，
+       由**结算页**画出来（`sc-dungeon` 传给面板，`sc-battle` 落在同一块里）。
+       没有 `lines` 的世界这里就是空串，结算页那一行不出现。 */
+    const after2 = (boss && boss.lines && boss.lines.after) || '';
     if (!after && !clue) return null;
-    return { after: after, clue: clue, mystery: (boss && boss.mystery) || arc.transition || '' };
+    return { after: after, after2: after2, clue: clue, mystery: (boss && boss.mystery) || arc.transition || '' };
   }
 
   /* ---------- 尺子用的只读投影（不参与运行） ---------- */

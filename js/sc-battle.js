@@ -499,7 +499,19 @@
         break;
       /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
          等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
-      case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text);
+      case 'phase': { floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text);
+        /* ================= 2026-10-03（NARRATIVE-UX-FINAL §四十四）=================
+           "战斗转折"那一句（`BOSS[wid].lines.turn`）挂在**二阶段**这一刻：
+           Boss 血量掉到 70% 时，先出引擎那句（进入第二阶段），紧跟着它自己说一句
+           （"上一轮，你没有打开这扇门。"）。这是**战斗里真实发生的事**驱动的一句，
+           不是定时弹的；重刷也照样会出现（它描述的是这一场，不是首通演出）。
+           ⚠️ 只在六个核心 Boss 上有；其余世界没有 `lines`，这一行就不会出现。 */
+        if (f.phase === 70) {
+          const BL = (G.STORYDATA && G.STORYDATA.BOSS && B.cfg && G.STORYDATA.BOSS[B.cfg.worldId]);
+          const tl = BL && BL.lines && BL.lines.turn;
+          if (tl) pushLog('　「' + tl + '」');
+        }
+        break; }
         break;
       case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻️ 复活', CV.C.green, 1500); snd('revive'); pushLog('♻️ ' + f.text);
         break; }
@@ -1044,22 +1056,28 @@
       c.drawImage(img, CV.W - dw - 6 * CV.SCALE, top + 10 * CV.SCALE, dw, dh);
       c.restore();
     }
-    /* ③ 三行字：Boss 名（最大）→ 台词 → 它为什么挡在这里 */
+    /* ③ 几行字：Boss 名（最大）→ 台词 → **记忆台词** → 它为什么挡在这里
+       ================= 2026-10-03（NARRATIVE-UX-FINAL §四十三 / §四十四）=================
+       六个核心 Boss 多一句"记忆台词"（`BOSS[wid].lines.meet`，如"你比记录里晚了六分钟。"）——
+       它就是"首次见面"那一句，挂在**出场序列**里给（不是塞进剧情段，也不是只在数据里躺着）。
+       ⚠️ 行数从 3 行变 4 行，原来的写法是"从 `bottom-116` 往下推"——
+          多一行就会把最后那行顶出画面（320×568 上实测）。所以这里改成
+          **先把所有行折出来、算总高，再自下而上排**：行数怎么变都落得回画面里。 */
     const pad = U.pad();
-    let y = bottom - 116 * CV.SCALE;
-    if (e.name) {
-      CV.text(CV.fit(e.name, CV.W - pad * 2, CV.FS.d3, true), pad, y, { size: CV.FS.d3, bold: true, color: CV.C.gold });
-      y += 30 * CV.SCALE;
-    }
-    if (e.say) {
-      const ls = CV.wrap(e.say, CV.W - pad * 2, CV.FS.lg, 2);
-      ls.forEach(function (ln) { CV.text(ln, pad, y, { size: CV.FS.lg, color: CV.C.text }); y += CV.FS.lg * 1.5; });
-    }
-    if (e.inner) {
-      y += 2 * CV.SCALE;
-      const ls = CV.wrap(e.inner, CV.W - pad * 2, CV.FS.sm, 2);
-      ls.forEach(function (ln) { CV.text(ln, pad, y, { size: CV.FS.sm, color: CV.C.dim }); y += CV.FS.sm * 1.55; });
-    }
+    const w = CV.W - pad * 2;
+    const rows = [];
+    if (e.name) rows.push({ t: CV.fit(e.name, w, CV.FS.d3, true), s: CV.FS.d3, c: CV.C.gold, bold: true });
+    if (e.say) CV.wrap(e.say, w, CV.FS.lg, 2).forEach(function (ln) { rows.push({ t: ln, s: CV.FS.lg, c: CV.C.text }); });
+    if (e.say2) CV.wrap(e.say2, w, CV.FS.lg, 2).forEach(function (ln) { rows.push({ t: ln, s: CV.FS.lg, c: CV.C.text2 }); });
+    if (e.inner) CV.wrap(e.inner, w, CV.FS.sm, 2).forEach(function (ln, i) { rows.push({ t: ln, s: CV.FS.sm, c: CV.C.dim, gap: i ? 0 : 2 * CV.SCALE }); });
+    let th = 0;
+    rows.forEach(function (r) { th += r.s * 1.5 + (r.gap || 0); });
+    let y = Math.max(top + 44 * CV.SCALE, bottom - 22 * CV.SCALE - th);
+    rows.forEach(function (r) {
+      y += r.gap || 0;
+      CV.text(r.t, pad, y, { size: r.s, color: r.c, bold: !!r.bold });
+      y += r.s * 1.5;
+    });
     /* ④ 世界机制那一行**走系统层**（§二十四：系统提示与角色台词彻底分开）：
          放在最上面、带方括号、颜色与台词不同。玩家第一眼看机制，再看人说话。 */
     if (e.mech) CV.text(CV.fit(e.mech, CV.W - pad * 2, CV.FS.sm), pad, top + 16 * CV.SCALE, { size: CV.FS.sm, color: CV.C.text2 });
@@ -1117,7 +1135,14 @@
        原来结算里有一行「发现：一句线索 [查看]」，现在**整行不再渲染**，高度也不再占。
        要看剧情走世界页那张「本章」卡（那是主入口）。去掉之后结算是：
        大标题 → 回合/副题 →（败因）→ 奖励胶囊 →（战场变化）→ 三颗按钮。 */
-    if (p.changed) total += 40 * CV.SCALE;    // R1.6：「战场变化」那一行（只在 Boss 首通出现）
+    /* R1.6：「战场变化」那一行（只在 Boss 首通出现）。
+       2026-10-03（§四十四）：核心 Boss 会在它后面再接一句"记忆台词·战后" → 折行数变 2~3 行，
+       所以**先按真实行数算高**（与下面画画用的是同一个 `wrap` 口径，不许两处各算一份 ——
+       两处各算一次正是"按钮压上去"那类毛病的老根）。 */
+    if (p.changed) {
+      const cl = CV.wrap(p.changed + (p.changed2 ? ('　「' + p.changed2 + '」') : ''), U.iw() - 20 * CV.SCALE, CV.FS.md, 3);
+      total += 16 * CV.SCALE + Math.max(1, cl.length) * CV.FS.md * 1.5 + 10 * CV.SCALE;
+    }
     if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
     let y = Math.max(CV.TOP + 20 * CV.SCALE, (CV.H - total) / 2);
@@ -1173,11 +1198,13 @@
     if (p.changed) {
       const cw2 = U.iw();
       CV.text('战场变化', cx - cw2 / 2 + 10 * CV.SCALE, y, { size: CV.FS.sm, color: CV.C.gold });
-      const ls = CV.wrap(p.changed, cw2 - 20 * CV.SCALE, CV.FS.md, 2);
+      /* §四十四：核心 Boss 的"记忆台词·战后"跟在那一句后面 —— **同一个标签块里的第二行**，
+         不新起一节（结算页每多一节就多一次"这是什么"的犹豫）。 */
+      const ls = CV.wrap(p.changed + (p.changed2 ? ('　「' + p.changed2 + '」') : ''), cw2 - 20 * CV.SCALE, CV.FS.md, 3);
       ls.forEach(function (ln, i) {
         CV.text(ln, cx - cw2 / 2 + 10 * CV.SCALE, y + 16 * CV.SCALE + i * CV.FS.md * 1.5, { size: CV.FS.md, color: CV.C.text2 });
       });
-      y += 40 * CV.SCALE;
+      y += 16 * CV.SCALE + Math.max(1, ls.length) * CV.FS.md * 1.5 + 10 * CV.SCALE;
     }
     /* 新增记录：紧跟在「战场变化」后面 —— 玩家读到的是"我改变了什么 + 我拿到了什么"。
        与「战场变化」同一个排版口径（小标签 + 折行的正文）。 */

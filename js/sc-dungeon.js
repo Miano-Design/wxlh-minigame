@@ -699,7 +699,7 @@
        只在**守关 Boss 首通**那一次给（`firstClear` 已经是"这一关第一次通关"的唯一判据，
        不新造条件）：一句战场变化（`BOSS[wid].after`）+ 已有的那条线索。
        为什么只给首通：§二十 明写"第二次快速进入战斗"——重刷不该再看一遍演出。 */
-    let changed = null;
+    let changed = null, changed2 = null;
     /* R1.7（§三 的 ⑧⑨ 要每世界都成立）：**守关 Boss 首通**给完整的一行；
        另外**每张图第 1 关首通**也给一次「战场变化」——那是"你第一次动了这个地方"。
        中间那些关不给（§三十二：普通战斗就是"战斗→奖励"，别让结算页每关都长一截）。
@@ -707,7 +707,7 @@
     try {
       if (firstClear && (stage === 12 || stage === 1) && G.BattleStory && G.BattleStory.changeOf) {
         const ch = G.BattleStory.changeOf(wid);
-        if (ch && ch.after) changed = ch.after;
+        if (ch && ch.after) { changed = ch.after; changed2 = ch.after2 || null; }
       }
     } catch (e) { try { G.LOG.warn('dun', 'settle_deco3', { err: String(e && e.message) }); } catch (e2) {} }
     /* ================= 2026-10-03（NARRATIVE-UX-FINAL §三十三 / §六十二）=================
@@ -728,7 +728,7 @@
     } catch (e) { try { G.LOG.warn('dun', 'settle_records', { err: String(e && e.message) }); } catch (e2) {} }
     trace('settled', { st: stage, rewards: (rewards || []).length, acts: (acts || []).length });
     return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''),
-      rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed, records: records,
+      rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed, changed2: changed2, records: records,
       /* `survey` ＝ 这一场属于"调查残域"（世界内的关），结算页因此说「记录完成 / 调查中止」；
          深井 / 斗法台 / 扫荡那些**不是调查**的场次不传它，仍然说「胜利 / 失败」。
          （§三十二 / §三十三：文案要归位，但不能把"打擂台"也叫成调查。） */

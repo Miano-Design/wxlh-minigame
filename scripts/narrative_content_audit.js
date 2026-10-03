@@ -72,8 +72,40 @@ const badLines = CORE.filter((id) => {
   const l = (BOSS[id] || {}).lines || {};
   return !String(l.meet || '').trim() || !String(l.turn || '').trim() || !String(l.after || '').trim();
 });
-t('⑦ 6/6 核心 Boss 三句齐（meet 首次见面 / turn 战斗转折 / after 战后）',
-  badLines.length === 0, '6 个都齐', badLines.length ? '缺：' + badLines.join(',') : '都齐');
+  t('⑦ 6/6 核心 Boss 三句齐（meet 首次见面 / turn 战斗转折 / after 战后）',
+    badLines.length === 0, '6 个都齐', badLines.length ? '缺：' + badLines.join(',') : '都齐');
+
+  /* ---------- ⑦-b 三句要**真的接上运行时**（§七十三：只增加几句台词不算落地） ----------
+     每一句都点名它落到哪个槽，而且这里**真调产品的接口**验一遍：
+       meet  → `BattleStory.entranceOf(wid).say2`  → 出场序列那一行（sc-battle:drawEntrance）
+       turn  → `占位…` 不在这里量（它由战斗帧触发，见下面 ⑦-c 的源码判据）
+       after → `BattleStory.changeOf(wid).after2` → 结算页「战场变化」那一块
+     非核心世界这两处必须是空串（否则就是"所有 Boss 都硬塞同一句"）。 */
+  const BS = E.G.BattleStory || {};
+  const wiring = [];
+  CORE.forEach((id) => {
+    const want = (BOSS[id].lines || {});
+    const got1 = (BS.entranceOf && BS.entranceOf(id) || {}).say2;
+    const got2 = (BS.changeOf && BS.changeOf(id) || {}).after2;
+    if (got1 !== want.meet) wiring.push(id + ':meet(' + JSON.stringify(got1) + ')');
+    if (got2 !== want.after) wiring.push(id + ':after(' + JSON.stringify(got2) + ')');
+  });
+  t('⑦-b 那三句真的接上了运行时（meet → 出场序列 · after → 结算页），不是躺在数据里',
+    wiring.length === 0, '6 个都对得上', wiring.length ? wiring.join(' ') : 'meet 走 entranceOf().say2 · after 走 changeOf().after2');
+  /* 非核心世界不许被硬塞（否则 36 个 Boss 的出场会变成同一套） */
+  const leaked = ['W01', 'W07', 'W20'].filter((id) => {
+    const e = (BS.entranceOf && BS.entranceOf(id) || {}), c = (BS.changeOf && BS.changeOf(id) || {});
+    return e.say2 || c.after2;
+  });
+  t('⑦-c 非核心世界不会被硬塞记忆台词（那两句只属于六个核心 Boss）',
+    leaked.length === 0, '泄漏 0 个', leaked.length ? leaked.join(',') : '没泄漏');
+
+  /* ---------- ⑦-d "战斗转折"那一句落在**二阶段**那个真实战斗事件上 ---------- */
+  const btSrc = (() => { try { return require('fs').readFileSync(require('path').join(E.ROOT, 'js', 'sc-battle.js'), 'utf8'); } catch (e) { return ''; } })();
+  t('⑦-d 战斗转折那一句挂在**二阶段**事件上（玩家在战斗里看得到，不是定时弹的）',
+    /case 'phase'/.test(btSrc) && /f\.phase === 70/.test(btSrc) && /lines && BL\.lines\.turn/.test(btSrc),
+    "phase 70 → pushLog('　「' + lines.turn + '」')",
+    'phase=' + /case 'phase'/.test(btSrc) + ' · 70=' + /f\.phase === 70/.test(btSrc) + ' · turn=' + /lines\.turn/.test(btSrc));
 
 /* ---------- ⑧ W29 九碑 ---------- */
 {
