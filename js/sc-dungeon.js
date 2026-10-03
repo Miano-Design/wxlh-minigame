@@ -445,6 +445,7 @@
     S.party.filter(Boolean).forEach((id) => { run.hpPct[id] = 1; });
     Core.setPendingRun(run);
     lastPlayed = { worldId: worldId, diff: diff, stageIdx: stageIdx };
+    lastPanel = null;                    // ← 开新一场：上一场的"已结算"证据作废
     fightWave();
   }
 
@@ -481,11 +482,18 @@
       c.fillRect(0, 0, CV.W, CV.H);
     } catch (e) { /* 拿不到图/尺寸异常：不铺底也照样能玩（与 bgFlat 那条保险同一个口径） */ }
   };
-  function clearSettleTargets() { againTarget = null; nextTarget = null; lastPanel = null; }
+  /* ⚠️ `lastPanel` **不在这里清** —— 它是"这一场真结算过"的证据。
+     实测（控制台时序）：一场打完 `settleRun` 跑完、面板也出来了，紧接着还有几次
+     `battle · end` 进来（`run` 已空）→ 原来会被兜底面板**盖掉真面板**，于是
+     「奖励胶囊 + 下一关 + 自动倒计时」全没了（父亲大人报的"连获得的道具都没了"）。
+     现在它只在**开新一场**（`startStage`）时才作废。 */
+  function clearSettleTargets() { againTarget = null; nextTarget = null; }
   /* F2-1（抢修单 0928R3）：onEnd 的**兜底面板** —— 任何一条没走通的路径都必须返还一个
      能点、能退出的面板。onEnd 一抛，`finish()`（sc-battle.js）跟着抛 → 结算面板画不出来、
      busy 闸门不放 → 玩家卡死在战斗页上（上一轮探针抓到的 `reading 'wave'` 就是这么卡住的）。 */
   function lastResortPanel(win) {
+    /* 兜底是"最后的保险"，本身很少走到 —— 走到就落一条账（不看调用栈，免得日志里全是噪声）。 */
+    try { G.LOG.warn('dun', 'resort', { win: !!win, hadPanel: !!lastPanel, hadRun: !!run, stage: (lastPlayed && lastPlayed.stageIdx) }); } catch (e1) {}
     /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
      兜底面板原来只有一颗「返回世界」——一旦走到这里（`run` 空 / 结算抛错），
      **「再来一次 / 下一关」全没了，自动下一关的倒计时自然也不会启动**。
@@ -630,6 +638,19 @@
 
   function fightWave() {
     if (!run) return;
+    /* ================= 2026-10-03（父亲大人：「结算页连获得的道具都没了」）· **真根因** =================
+     控制台时序实测（一场打完）：
+       battle · end → battle · clear → dungeon_clear → dun · null@settleRun（真结算跑完）
+       → 又来了几次 `battle · end`，而那时 `run` 已经被清空
+       → `onEnd` 的 `if (!run) return lastResortPanel(win)` 生效 ⇒ **真面板被兜底盖掉**，
+         奖励胶囊与「下一关」全没了（父亲大人看到的"结算数据不在了 / 连道具都没了"就是它）。
+     为什么 `run` 会被清空：`settleRun` 正常结束时 `run = null`（这是对的），
+     但这一类"晚到的收尾"再进来时读的是**模块级** `run`，于是认不出来"这一场已经结算过了"。
+     修法：**开打时就把这一场钉进闭包**（`myRun`）。`onEnd` 里只要发现模块级 `run` 空了、
+     而这一场还在，就把它认回来 —— 于是晚到的那几次收尾拿到的仍是**同一份真数据**，
+     不会再把好面板顶成兜底。（`B.done` 那道闸只管"同一场只 finish 一次"，
+     挡不住"另一场/另一次 onEnd"，所以要在数据这一层认回来。） */
+    const myRun = run;
     const kind = run.waves[run.wave];
     const w = D.WORLDS.find((x) => x.id === run.worldId);
     const allies = BattleUI.buildAllies(run.hpPct, null);
@@ -658,6 +679,9 @@
       onEnd(win, res, hpLeft) {
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
+          /* 晚到的收尾：模块级 `run` 已经被清（正常结算 / 别处清理），
+             但闭包里这一场还在 ⇒ **认回来**，让结算拿到真数据（波次、阵亡、首通…）。 */
+          if (!run && myRun) run = myRun;
           if (!run) {
             /* 这一场**已经正常结算过**（lastPanel 有值）⇒ 把那份真面板还回去，
                别再拿兜底把「下一关 / 再来一次」顶掉（走这行的就是父亲大人看到的那次）。
