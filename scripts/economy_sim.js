@@ -283,6 +283,43 @@ R.note('按【认真档】各档位日收入折算的工期（取最紧的那一
   });
 }
 
+/* ================= 2026-10-03（《长期留存型成长生态重平衡》§十五 / §十六 · 转生放进 180 天曲线）===
+   §十五 要求把转生的三个门（Lv.100 / 铭刻 N 阶 / 灯芯 Lv.X）**放进完整模拟**看节奏；
+   §十六 要求查出"第一次转生是不是几天就来了"。
+   这里先算**货币那一半**（可实测、可复跑）：
+     第一道门 = 铭刻 1→2 阶的 ◆  +  灯芯 1→20 的 ◉（价一律读数据层 `D.GENE_LOCKS` / `D.buildingCost`）
+     天数 = 取两侧最紧的那个（一个钱包、两个出口）
+   玩家档位取 **W12**（书里说的"W12 → 第一次转生 → W13 开放"就发生在这个收支水平）。
+   ⚠️ **Lv.100 那一半**（经验曲线 × 四类玩家的日经验收入）还没进这把尺子 ——
+      它要先把"日经验"也做成实测口径（现在的 economy_sim 量的是材料与货币，不量玩家经验）。
+      这是下一步，不在这儿假装算过。
+   ⚠️ 只报数、不改数（§一）。 */
+{
+  const R1 = (D.REINCARN_REQS || [])[0] || { lv: 100, geneLock: 2, core: 20 };
+  let geneNeed = 0;
+  for (let i = 0; i < (R1.geneLock || 2); i++) geneNeed += ((D.GENE_LOCKS[i] || {}).cost || {}).otherworld || 0;
+  let coreNeed = 0;
+  for (let lv = 0; lv < (R1.core || 20); lv++) coreNeed += D.buildingCost('core', lv) || 0;
+  R.note('');
+  R.note('§十五 第一次转生的门槛（' + JSON.stringify(R1) + '）：◆' + Math.round(geneNeed)
+    + '（铭刻 1→' + R1.geneLock + '） + ◉' + Math.round(coreNeed) + '（灯芯 1→' + R1.core + '） —— 以上为**货币那一半**；Lv.100 待补。');
+  Object.keys(PROFILES).forEach((pf) => {
+    const row = rows.find((r) => r.pf === pf && r.anchor === 'W12') || rows.filter((r) => r.pf === pf).pop();
+    if (!row) return;
+    const dOther = Math.max(1, row.cur.otherworld || 0);
+    const dPoints = Math.max(1, row.cur.points || 0);
+    const dGene = geneNeed / dOther, dCore = coreNeed / dPoints;
+    const days = Math.max(dGene, dCore);
+    const which = dGene >= dCore ? '◆ 铭刻' : '◉ 灯芯';
+    const tooEarly = days < 3;
+    R[tooEarly ? 'warn' : 'pass']('§十六 第一次转生（' + pf + ' ' + PROFILES[pf].name + '）货币那一半需 ' + days.toFixed(1) + ' 天', {
+      file: 'js/data.js', expected: '不该"几天就转"（≥3 天）',
+      actual: '最紧一侧 = ' + which + '（◆ ' + dGene.toFixed(1) + 'd / ◉ ' + dCore.toFixed(1) + 'd）'
+        + ' · W12 期日收 ◉' + Math.round(row.cur.points) + ' ◆' + Math.round(row.cur.otherworld),
+    });
+  });
+}
+
 /* ================= 2026-10-03（《长期留存型成长生态重平衡》§九 · MYTH 获得节奏）=================
    书里要求把"第一个 / 第 2 / 第 6 / 第 12 / 第 36 件 MYTH 分别落在第几天"算出来，
    并且检查两件坏事：① 前期就大量冒出来；② 到第 60 天已经半身神话。
