@@ -54,6 +54,17 @@
   const SAVE_KEY = 'wxlh_save_v5';           // 与 core 同一把钥匙（**只读它、只往 _bak 里写留档**）
   const SAVE_BAK = SAVE_KEY + '_bak';
   const PUSH_CAP_PER_DAY = 20;               // 每天推送记账上限（防异常刷）
+  /* ================= 2026-10-03（任务书 §15/§16 实测抓到的真凶之一）=================
+     真机实测：开发者工具这一天推档数到了 20，`push` 直接回 `skip:'cap'` ——
+     于是**这台设备当天后来的所有新进度都上不了云**，另外两台看到的永远是旧档。
+     玩家/开发者在标题上看到的就是"三端不一致"，而云函数、账号、租约全都正常。
+     改法：上限从"**硬停机**"改成"**限流**" ——
+       · 前 20 次照旧（防的是"异常刷"：一秒钟推几十次那种）；
+       · 超过 20 次之后**不是不能推，而是压到最慢 1 分钟一次**。
+     为什么是 1 分钟而不是更久：玩家/开发者的真实动作是"这台打完 → 切另一台"，
+     等 1 分钟可以接受；等 10 分钟就又变成"三端不一致"了。
+     而失控的循环仍然被摁住：最多 1 分钟一次（一天上限 1440 次），不可能回到"每帧一次"。 */
+  const PUSH_CAP_RELIEF_MS = 60 * 1000;
   const MERGE_MS = 60 * 1000;                // 打关/结算后的推送：同一分钟内合并成一次
   const RETRY_WAIT = [30 * 1000, 2 * 60 * 1000, 5 * 60 * 1000];
   /* 双端单活：另一台设备的租约**多久不算数**。超过这个时长没动静 = 那台已经走了，
@@ -286,6 +297,10 @@
       万一集合权限被设成"所有人可读"，这里**也绝不乱挑一条** —— 见下面 myDoc 的守卫。
       ⚠️ 空条件 `where({})` 在某些基础库上会被判"参数不合法"—— 真被拒了就退到不带条件那条。 */
   /** 调一次 `cloudsave` 云函数：`{ok, ...}`；异常一律收成 `{ok:false, why:'net'|'sdk'}`。 */
+  /* `cloudVer` ＝ 最近一次云调用带回来的**云函数版本戳**（任务书 §17）。
+     云函数现在每个应答都盖 `ver` 章，所以只要有一次成功的调用，客户端就知道自己调的是哪一版。
+     三台设备比这个字段，就能判"云端部署有没有跟上" —— 不用再靠 probe。 */
+  let cloudVer = '';
   function saveFn(action, data) {
     const c = cloud();
     if (!c || !c.callFunction) return Promise.resolve({ ok: false, why: 'unsupported' });
@@ -297,6 +312,7 @@
       Promise.resolve(req).then(function (res) {
         const r = (res && res.result) || null;
         if (!r) { noteErr('fn', 'empty'); resolve({ ok: false, why: 'empty' }); return; }
+        if (r.ver) cloudVer = String(r.ver);          // ← 云端部署的是哪一版（§17）
         if (r.ok) resolve(r);
         else {
           /* ⚠️ `superseded` 是**服务端**给的下线判决（不是网络错误）：不许当成"没连上"去重试 ——
@@ -407,7 +423,7 @@
     superseded = false;                        // 先放开：占位这一趟才有资格写
     return sync('reclaim', { claim: true }).then(function (r) {
       const ok = !!(r && r.ok && !superseded);
-      clog('reclaim', { ok: ok, why: String((r && (r.skip || r.took)) || '') });
+      clog('reclaim', { ok: ok, why: String((r && (r.skip || r.took)) || ''), ver: cloudVer });
       const msg = ok ? '已取回云端最新进度（这台设备的进度以云端那份为准）。\n点下面那颗，从主画面重新进入游戏。'
         : ((r && r.msg) || '还是没连上，稍后再试（切回前台会自动再试一次）。');
       /* ================= 2026-10-03（父亲大人）=================
@@ -494,7 +510,12 @@
     /* 脏标记对**所有**入口一视同仁：本机这份跟云上那份一模一样就不传（手动那颗也省着来，
        页面会说一句"本机和云端已经一样了"）。`reason` 留着只为将来区分口径用。 */
     if (h === P.lastPushHash) return Promise.resolve({ ok: true, skip: 'clean' });
-    if (P.pushes >= PUSH_CAP_PER_DAY) return Promise.resolve({ ok: false, skip: 'cap' });
+    /* 超上限之后：**距上一次推档 ≥10 分钟**就再放一次（限流，不停机）。 */
+    if (P.pushes >= PUSH_CAP_PER_DAY
+      && (Date.now() - (P.lastPushAt || 0)) < PUSH_CAP_RELIEF_MS) {
+      clog('push_capped', { n: P.pushes, span: Math.round((Date.now() - (P.lastPushAt || 0)) / 1000) });
+      return Promise.resolve({ ok: false, skip: 'cap' });
+    }
     /* V1.1.20（F1-1）：这一条记录的 `ts`（对面那台设备比新旧的唯一依据）＝ **这份档自己**的
        `savedAt`（玩家最后一次真在玩的时刻）。整条链（本地判据 / 推上去的 ts / prev* 的 ts）同一个口径。 */
     const ts = localTs() || Date.now();
@@ -638,8 +659,10 @@
       /* 一次静默结算的最后取值（R1）：local ＝ 本地新推上去 / cloud ＝ 云端新换下来 /
          none ＝ 两边一样 / fallback ＝ 云端那份读不出来、改推本地 / fail ＝ 没通 /
          superseded ＝ 本机被另一台设备顶下线（只读那一趟） */
+      /* `ver` ＝ 云端那份**云函数**的版本戳（任务书 §17）：三台对不上就是部署没跟上。 */
       clog(r && r.ok ? 'sync' : 'sync_fail', {
         from: String((r && (r.took || r.skip)) || '?'), bytes: (r && r.bytes) || 0, ok: !!(r && r.ok),
+        ver: cloudVer,
       });
       /* 通了就把"最近一次失败"擦掉 —— 设置页那行诊断会自己回到「已连」 */
       if (r && r.ok) { lastErr = null; retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
@@ -886,6 +909,12 @@
       bound: !!P.accountId, env: ENV_ID,
       /* 双端单活：本机是否已被另一台设备顶下线（设置页那行字读它）。 */
       superseded: superseded,
+      /* 今天推档是不是已经超过 20 次、并且还在 10 分钟的放慢窗口里（§15/§16 实测抓到的）：
+         这一档必须让玩家看得见 —— 否则"本机明明更新了却没上云"会被当成"同步坏了"。 */
+      capped: (Number(P.pushes) || 0) >= PUSH_CAP_PER_DAY
+        && (Date.now() - (Number(P.lastPushAt) || 0)) < PUSH_CAP_RELIEF_MS,
+      pushesToday: Number(P.pushes) || 0,
+      cloudFnVer: cloudVer,
     };
     if (miss) { out.state = 'nocloud'; out.why = miss; }
     else if (initErr) { out.state = 'initerr'; out.why = 'init'; out.detail = initErr; }
@@ -906,6 +935,8 @@
     if (d.state === 'idle') return '云端：还没连过 · ' + last;
     /* 双端单活：被顶下线时这一行必须自己说出来 —— 玩家才不会把"本机下线"当成"存档又没同步"。 */
     if (d.state === 'superseded') return '云端：本机已下线（另一台设备在玩）· ' + last;
+    /* 超上限那阵子要自己说出来（不然玩家只会觉得"又没同步"）：10 分钟一到就会自己恢复。 */
+    if (d.capped) return '云端：今日推档较频繁，已放慢到 1 分钟一次（会自动恢复）· ' + last;
     const why = WHY_TEXT[d.why] || (d.why || '未知原因');
     const tail = (d.detail && d.state !== 'nocloud') ? ('｜' + d.detail) : '';
     return '云端：未连（' + why + tail + '）· ' + last;
@@ -994,6 +1025,7 @@
       superseded: superseded,
       leaseIsMine: !!(leaseToken),          // 本机这一趟有没有拿到写入权
       version: G.GAME_VER || '',
+      cloudFnVer: cloudVer,          // 最近一次云调用带回来的**云函数**版本戳（§17）
     };
     return saveFn('probe').then(function (r) {
       const out = Object.assign({ local: local }, r || {});

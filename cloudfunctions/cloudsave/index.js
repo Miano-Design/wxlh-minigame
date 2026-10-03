@@ -290,3 +290,16 @@ exports.main = async (event) => {
 
   return { ok: false, msg: 'unknown_action', stage: 'dispatch' };
 };
+
+/* ================= 2026-10-03（任务书 §17）=================
+   **每一个应答都盖版本戳** —— 客户端只要有一次成功的云调用（开机那次 pull 就够），
+   日志里就会带上 `ver=CLOUDSAVE_VERSION`。这样"云端部署的是哪一版"不必再靠 probe：
+   三台的 `[wxlh] cloud · sync …` 里 ver 不一样，就是其中一台的部署没跟上。
+   ⚠️ 只加一个字段，不改任何既有字段的语义（老客户端读不读它都不受影响）。 */
+const __rawMain = exports.main;
+exports.main = function (event, context) {
+  return Promise.resolve(__rawMain(event, context)).then(function (r) {
+    if (r && typeof r === 'object') { r.ver = CLOUDSAVE_VERSION; }
+    return r;
+  });
+};
