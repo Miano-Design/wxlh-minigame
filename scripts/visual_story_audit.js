@@ -237,7 +237,15 @@ function pngInfo(buf) {
     || /Object\.keys\(WORLD_SCENE_FILE\)[\s\S]{0,120}ensureScene/.test(src);
   t('⑥-b 没有"进游戏就把 36 场景 + 36 Boss 全解进内存"的批量预载', !bulk,
     '只按当前世界 / 下一世界懒加载', bulk ? '发现批量预载' : '没有批量预载');
-  const cap = /const CACHE_MAX = \d+/.test(src) && /trimCache\(IMG\)/.test(src) && /trimCache\(BOSS_IMG\)/.test(src);
+  /* ⚠️ 2026-10-03 剧情深化轮：判据跟着实现改（**不是放松**）。
+     原来这里找的是 `trimCache(IMG)` / `trimCache(BOSS_IMG)` 这两句字面写法 ——
+     那时三类素材是三份几乎逐字重复的实现。这一轮把三份收成**一个** `ensureAsset(kind, …)`，
+     于是 `trimCache()` 变成在共用函数里对**传进来的 map** 调用一次（场景 / Boss / 人物共用同一份）。
+     语义一点没变、覆盖面反而从两张扩到三张，所以判据改成"**有上限、且共用那一份在调它**"：
+       · `CACHE_MAX` 还在；· `trimCache(` 被调；· 三类走同一个 `ensureAsset`。 */
+  const cap = /const CACHE_MAX = \d+/.test(src)
+    && /trimCache\(map\)/.test(src)
+    && /ensureAsset\('scene'/.test(src) && /ensureAsset\('boss'/.test(src) && /ensureAsset\('char'/.test(src);
   t('⑥-b 场景 / Boss 缓存**有上限**（超了丢最久没用过的那张，不是只增不减）', cap,
     'IMG 与 BOSS_IMG 各自 trim', cap ? '两处都有 trim' : '缺 trim 或上限');
 }

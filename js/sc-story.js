@@ -294,7 +294,74 @@
        ④ 加载失败 / 文件不在 / 平台没有 createImage → 铺**主题平底**（永不黑屏、永不抛错）。
      换图 = 往 `story/scene/` 丢同名文件；**不改任何剧情代码**。 */
   const IMG = {};                 // key（sceneId **或世界 id**）→ {ok:true,img} | {fail:true} | {loading:true}
-  let subpkgTried = false;
+  /* ================= 2026-10-03 剧情深化轮 · **素材加载时序收口**（任务书 §十七–§二十三）=================
+     原来是三处各自为政：`trySubpackage()` 只在 `Story.play()` 里跑、失败一次就 `subpkgTried=true`
+     永不重试、成功之后**只清 `IMG`**（Boss / 人物那两张失败缓存留着），而且每张图 `onerror` 一次就
+     永久 `{fail:true}` —— 于是"早一步请求、恰好在分包就绪前失败"会被**判死一整个会话**：
+        · 直接点关卡开打（不走 `Story.play()`）→ 分包压根没被触发 → 世界图 / Boss 图全走平底；
+        · 分包后来了，可失败缓存还在 → 正式图永远不显影。
+     现在收成一份状态机（不新增存档字段、不新增资源管理器，就是三个小对象）：
+       SUBPKG        分包：idle / loading / ready / failed，最多试 SUBPKG_MAX 次，指数退避 0.5s/1s/2s
+       ASSET_TRIES   每一张图试过几次（最多 ASSET_MAX 次，同样是退避重试）
+       ASSET_STATS   给尺子读的账：三类素材各自的 ok / fail / retry（`Story.assetStats()`）
+     ⚠️ 全部**非阻塞**：这些函数只负责"把请求发出去"，拿不到图就继续铺主题平底。 */
+  const SUBPKG = { state: 'idle', tries: 0, timer: null };
+  const SUBPKG_MAX = 3, ASSET_MAX = 3;
+  const ASSET_TRIES = { scene: {}, boss: {}, char: {} };
+  const ASSET_STATS = {
+    scene: { ok: 0, fail: 0, retry: 0 },
+    boss: { ok: 0, fail: 0, retry: 0 },
+    char: { ok: 0, fail: 0, retry: 0 },
+  };
+  function assetLog(kind, id, file, attempt) {
+    try {
+      if (G.LOG && G.LOG.warn) G.LOG.warn('story', 'asset_load_fail', { kind: kind, id: id, path: file, attempt: attempt });
+    } catch (e) {}
+  }
+  /* 分包成功后**三张缓存一起清**（任务书 §二十一）：早先的失败/半成品记录一律不算数，
+     清完 `CV.render()` 重走一遍真实加载。 */
+  function clearAssetCaches() {
+    [IMG, BOSS_IMG, CHAR_IMG].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { if (!m[k] || !m[k].ok) delete m[k]; });
+    });
+    Object.keys(ASSET_TRIES).forEach(function (k) { ASSET_TRIES[k] = {}; });
+  }
+  function loadSubpackage() {
+    if (SUBPKG.state === 'ready' || SUBPKG.state === 'loading') return;
+    if (typeof wx === 'undefined' || !wx.loadSubpackage) { SUBPKG.state = 'failed'; return; }  // 平台没有这个 API：主包继续跑
+    if (SUBPKG.tries >= SUBPKG_MAX) { SUBPKG.state = 'failed'; return; }
+    SUBPKG.tries++;
+    SUBPKG.state = 'loading';
+    try {
+      wx.loadSubpackage({
+        name: 'story',
+        success: function () {
+          SUBPKG.state = 'ready';
+          clearAssetCaches();
+          try { CV.render(); } catch (e) {}
+        },
+        fail: function () { SUBPKG.state = 'failed'; retrySubpackage(); },
+      });
+    } catch (e) { SUBPKG.state = 'failed'; retrySubpackage(); }
+  }
+  function retrySubpackage() {
+    if (SUBPKG.state === 'ready' || SUBPKG.tries >= SUBPKG_MAX || SUBPKG.timer) return;
+    const wait = 500 * Math.pow(2, SUBPKG.tries - 1);        // 0.5s / 1s / 2s
+    SUBPKG.timer = setTimeout(function () { SUBPKG.timer = null; loadSubpackage(); }, wait);
+  }
+  /* **统一素材入口**（任务书 §十九）—— Story / Battle / Dungeon / Home 都只调它，
+     谁也不再自己判断"story 分包有没有好"。返回值只是当前状态，**绝不阻塞页面**。 */
+  Story.ensureStoryAssets = function () {
+    if (SUBPKG.state === 'idle') loadSubpackage();
+    return SUBPKG.state;
+  };
+  Story.subpackageState = function () { return SUBPKG.state; };
+  Story.assetStats = function () { return ASSET_STATS; };
+  Story.resetAssetRuntime = function () {      // 只给尺子用（模拟开机）
+    SUBPKG.state = 'idle'; SUBPKG.tries = 0;
+    if (SUBPKG.timer) { clearTimeout(SUBPKG.timer); SUBPKG.timer = null; }
+    clearAssetCaches();
+  };
   /* ================= 2026-10-03（任务书 §34 / §36）· **轻量缓存上限** =================
      场景 37 张 + Boss 36 张，如果全留在内存里，等于一直摁着十几 MB 的解码位图
      （而且玩家根本不需要同时看它们）。这里做一个**极简 LRU**，不引任何资源管理器：
@@ -334,35 +401,45 @@
     return m || Story.sceneOf(id);
   };
   Story.sceneFileOf = function (worldId) { return sceneFile(Story.sceneKeyOf(worldId)); };
-  function trySubpackage() {
-    if (subpkgTried) return;
-    subpkgTried = true;
-    try {
-      if (typeof wx === 'undefined' || !wx.loadSubpackage) return;
-      wx.loadSubpackage({
-        name: 'story',
-        success: function () { Object.keys(IMG).forEach(function (k) { delete IMG[k]; }); try { CV.render(); } catch (e) {} },
-        fail: function () { /* 没有这个分包：正在用主包/占位，什么都不做 */ },
-      });
-    } catch (e) { /* 老基础库没有这个 API：一样什么都不做 */ }
-  }
-  function ensureScene(id, onReady) {
-    const rec = IMG[id];
-    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
-    const file = sceneFile(id);
-    if (!file || typeof wx === 'undefined' || !wx.createImage) { IMG[id] = { fail: true }; return false; }
+  /* ================= 三类素材**同一套懒加载**（任务书 §十九：一处收口）=================
+     场景 / Boss / 人物以前是三份几乎逐字重复的实现，于是"重试 / 诊断 / 统计"只补到其中一两处
+     就出现分叉（分包成功只清 IMG 就是分叉的后果）。现在只有这一个函数，三类都走它：
+       ① 已经 ok → 直接回调；② 已达重试上限 → 认输（铺平底）；③ 否则发一次请求，
+       失败时**落一条诊断 + 退避重试**（0.5s/1s/2s，`ASSET_MAX` 次封顶）。
+     ⚠️ 进函数先喊一句 `ensureStoryAssets()` —— 谁第一个来取图，谁就顺手把分包请求发出去
+        （幂等、非阻塞），于是"直接点关卡开打"这条路也拿得到正式图（任务书 §二十四 路径 A）。 */
+  function ensureAsset(kind, id, file, map, onReady) {
+    try { Story.ensureStoryAssets(); } catch (e) {}
+    const rec = map[id];
+    if (rec && rec.ok) { markUsed(id); if (onReady) onReady(rec.img); return true; }
+    if (rec && rec.fail && (ASSET_TRIES[kind][id] || 0) >= ASSET_MAX) return false;
+    if (!file || typeof wx === 'undefined' || !wx.createImage) { map[id] = { fail: true }; return false; }
     /* R3.3 曾经在这里做"专属图失败 → 再试一次所属母版"的两级兜底；2026-10-03 母版图删掉之后
        这一级没有第二张可试了 —— 取图那一步（`sceneFile` + `sceneKeyOf`）已经把世界/母版/深井
        三路折成**同一个文件**，落到这里就只剩"成 / 不成"两种结果，成了画图、不成就铺平底。 */
+    const n = (ASSET_TRIES[kind][id] || 0) + 1;
+    ASSET_TRIES[kind][id] = n;
     try {
       const img = wx.createImage();
-      IMG[id] = { loading: true };
-      img.onload = function () { IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(IMG); try { CV.render(); } catch (e) {} };
-      img.onerror = function () { IMG[id] = { fail: true }; };
+      map[id] = { loading: true };
+      img.onload = function () {
+        map[id] = { ok: true, img: img }; markUsed(id); trimCache(map);
+        ASSET_STATS[kind].ok++;
+        try { CV.render(); } catch (e) {}
+      };
+      img.onerror = function () {
+        map[id] = { fail: true };
+        assetLog(kind, id, file, n);
+        if (n < ASSET_MAX) {
+          ASSET_STATS[kind].retry++;
+          setTimeout(function () { delete map[id]; ensureAsset(kind, id, file, map); }, 500 * Math.pow(2, n - 1));
+        } else ASSET_STATS[kind].fail++;
+      };
       img.src = file;
-    } catch (e) { IMG[id] = { fail: true }; }
+    } catch (e) { map[id] = { fail: true }; }
     return false;
   }
+  function ensureScene(id, onReady) { return ensureAsset('scene', id, sceneFile(id), IMG, onReady); }
   Story.sceneReady = function (id) { const r = IMG[id]; return !!(r && r.ok); };
   /* ================= Boss 立绘（人物前景层 · 懒加载） =================
      §六：Boss 图是**竖屏剧情视觉资产**，不是头像 —— 保持完整纵向构图、不拉伸、不裁头、
@@ -371,18 +448,7 @@
   const BOSS_IMG = {};
   function bossFile(id) { return ((SD.BOSS_FILE || {})[id]) || null; }
   function ensureBoss(id, onReady) {
-    const rec = BOSS_IMG[id];
-    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
-    const file = bossFile(id);
-    if (!file || typeof wx === 'undefined' || !wx.createImage) { BOSS_IMG[id] = { fail: true }; return false; }
-    try {
-      const img = wx.createImage();
-      BOSS_IMG[id] = { loading: true };
-      img.onload = function () { BOSS_IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(BOSS_IMG); try { CV.render(); } catch (e) {} };
-      img.onerror = function () { BOSS_IMG[id] = { fail: true }; };
-      img.src = file;
-    } catch (e) { BOSS_IMG[id] = { fail: true }; }
-    return false;
+    return ensureAsset('boss', id, bossFile(id), BOSS_IMG, onReady);
   }
   Story.bossReady = function (id) { const r = BOSS_IMG[id]; return !!(r && r.ok); };
   /* ================= 2026-10-03（R4.0 §10）· **人物立绘**（与 Boss 立绘同一套懒加载） =================
@@ -391,20 +457,7 @@
      只补最小必要接入：一个取图口 + 一个懒加载，不新造渲染系统（几何与 Boss 那层共用一份）。 */
   const CHAR_IMG = {};
   function charFile(id) { return ((SD.CHAR_FILE || {})[id]) || null; }
-  function ensureChar(id, onReady) {
-    const rec = CHAR_IMG[id];
-    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
-    const file = charFile(id);
-    if (!file || typeof wx === 'undefined' || !wx.createImage) { CHAR_IMG[id] = { fail: true }; return false; }
-    try {
-      const img = wx.createImage();
-      CHAR_IMG[id] = { loading: true };
-      img.onload = function () { CHAR_IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(CHAR_IMG); try { CV.render(); } catch (e) {} };
-      img.onerror = function () { CHAR_IMG[id] = { fail: true }; };
-      img.src = file;
-    } catch (e) { CHAR_IMG[id] = { fail: true }; }
-    return false;
-  }
+  function ensureChar(id, onReady) { return ensureAsset('char', id, charFile(id), CHAR_IMG, onReady); }
   Story.charReady = function (id) { const r = CHAR_IMG[id]; return !!(r && r.ok); };
   Story.ensureChar = function (id) { try { return ensureChar(id); } catch (e) { return false; } };
   Story.charImage = function (id) { const r = CHAR_IMG[id]; return (r && r.ok) ? r.img : null; };
@@ -463,6 +516,12 @@
   /* 进世界 / 开打前预热：把这一张图（和它的 Boss 图）先挂上去 —— 不阻塞、不返回 Promise。 */
   Story.preloadWorld = function (worldId) {
     if (!worldId) return;
+    /* ================= 2026-10-03 · 名字叫 preload，就先真的把分包拉起来（任务书 §二十）=================
+       原来这里**没有**保证分包已加载：直接点关卡开打（不走 `Story.play()`）时，
+       分包请求压根没发出去，于是"预热"预的是一个还不存在的文件 —— 必然失败、而且旧版失败即判死。
+       现在：先过统一入口（幂等、非阻塞），再发场景 / Boss 的请求。
+       ⚠️ 仍然**不阻塞页面**：这里只是把请求提前发出去。 */
+    Story.ensureStoryAssets();
     /* R3.3：预热的 key 与真正取图时**同一个**（`sceneKeyOf`）—— 有专属图就预热专属图，
        没有就预热那 12 张母版里的那张。两处用一把尺子算，避免"预热的是 A、画的是 B"。 */
     ensureScene(Story.sceneKeyOf(worldId));
@@ -547,9 +606,10 @@
 
   Story.play = function (o) {
     if (!o || !o.beats || !o.beats.length) return false;
-    /* 第一次真的要看剧情时才去拉"剧情分包"（12 场景 + 6 Boss + 主视觉都在里面）。
+    /* 第一次真的要看剧情时才去拉"剧情分包"（36 张世界场景 + 1 张深井 + 36 张 Boss + 8 张人物 + 主视觉都在里面）。
        没有这个分包 / 拉失败都**静默忽略** —— 场景与 Boss 会各自回落程序化占位。 */
-    trySubpackage();
+    /* 统一入口（§十九）：它内部会判断分包状态、必要时发起加载并处理重试 —— 这里不再自己判断。 */
+    Story.ensureStoryAssets();
     cur = {
       beats: o.beats, i: 0, reveal: 0, t0: Date.now() / 1000, ts: Date.now() / 1000, autoAt: 0, choiceLocked: false,
       scene: o.scene || 'god_hall', title: o.title || '', chNo: o.chNo || '',
