@@ -1,17 +1,18 @@
 /* 云同步「反向破坏测试」（2026-10-03 任务书 §二十）：node scripts/cloud_authoritative_breaktest.js
    ==============================================================================
    一把尺子**绿了**不等于它**能盯住东西** —— 绿也可能是因为它压根没测到。
-   所以这一把专门干一件事：**把任务书点名要消灭的 6 种旧行为，一个一个塞回源码**，
+   所以这一把专门干一件事：**把任务书点名要消灭的 7 种旧行为，一个一个塞回源码**，
    每塞回一个就跑一次 `cloud_authoritative_regression`，**要求它变红**。
    塞回去还是绿的 ⇒ 说明那把尺子没盯住这条，当场判 FAIL。
 
-   6 个破坏点（与任务书 §二十 一一对应）：
+   7 个破坏点（与任务书 §二十 一一对应）：
      ① 恢复 `cloudTs > localTs` 才允许自动 pull
      ② `onShow` 不拉（切回前台拿不到云端最新）
      ③ 被顶号设备**自动 reclaim**（抢回写权）
      ④ 把 `DB_ERROR` 当成"没有存档"
      ⑤ `busy` 直接吞掉待提交的 push
      ⑥ 手动「找回存档」另走一条路（与自动同步不同逻辑）
+     ⑦ `onShow` 顺手 claim（把"回前台"当成一次重新登录）
 
    ⚠️ 做法是**就地改 js/sc-cloud.js → 跑回归 → 无论成败都还原**（还原写在 finally 里），
       并且开头先确认"没破坏时回归是绿的"（控制组）——不然"破坏后红了"可能只是本来就红。
@@ -57,6 +58,11 @@ const BREAKS = [
   { name: '⑥ 手动「找回存档」另走一条路（与自动同步不同逻辑）',
     find: '    if (preDoc) return Promise.resolve(use(preDoc));       // 调用方已经拿到那份 doc（找回存档那个选择器）',
     repl: '    if (reason === \'manual\') return Promise.resolve({ ok: true, hasDoc: true, took: \'cloud\', ts: 0, bytes: 0 });\n    if (preDoc) return Promise.resolve(use(preDoc));' },
+  { name: '⑦ onShow 顺手 claim（把"回前台"当成一次重新登录）',
+    /* §七 点名：回了前台**不是**重新登录，只许拉。旧行为是"开机 / 回前台都占一次位"。
+       破坏打在触发口那一句上 —— 回归第 4 条现在同时盯"拉到了没有"和"claim 有没有发生"。 */
+    find: "    const opts2 = (raw === 'boot') ? { claim: true }",
+    repl: "    const opts2 = (raw === 'boot' || raw === 'show') ? { claim: true }" },
 ];
 
 const orig = fs.readFileSync(FILE, 'utf8');

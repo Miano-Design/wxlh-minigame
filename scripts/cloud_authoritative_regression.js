@@ -7,14 +7,15 @@
      1 本地 W03 / 云端 W08           → 自动同步之后是 **W08**
      2 本地 savedAt 比云端 ts 还大   → 仍然是 **W08**（savedAt 退出决策）
      3 自动同步与手动「找回存档」     → **同一条代码路径、同一个结果**
-     4 回前台（onShow）              → 自动拉 W08
+     4 回前台（onShow）              → 自动拉 W08，而且**不 claim**（回前台不是重新登录）
      5 被顶号设备**不能 push**
      6 被顶号设备**仍能 pull**
      7 被顶号设备**不会自动 reclaim**
      8 显式「重新登录」              → claim + pull + 回 gate
      9 云端没有档（NOT_FOUND）        → 允许用本地建首份
     10 云端数据库报错（DB_ERROR）      → **绝不建空档、绝不覆盖**
-    11 busy 期间产生的 push           → **最终一定执行**（不许被吞）
+    11 云端连不上（NETWORK_ERROR）    → **同样绝不建空档、绝不覆盖**
+    12 busy 期间产生的 push           → **最终一定执行**（不许被吞）
 
    真跑方式：客户端那一侧是**产品自己的 `js/sc-cloud.js`**；服务端那一侧是
    **仓库里那一份 `cloudfunctions/cloudsave/index.js`**（把 `wx-server-sdk` 换成桩、
@@ -123,17 +124,27 @@ async function putCloudDoc(payload, ts, lease) {
     lease: lease || null, prevPayload: '', prevTs: 0, prevBytes: 0, prevAt: 0 });
   return id;
 }
-const resetAll = () => {
+/* ⚠️ `toggle()`（下面那句）会把产品自己的"**开机 300ms 就拉一次**"排上
+   （`boot()` 里那个 `unref(setTimeout(..., triggerAuto('boot'), 300))`）——
+   而 `boot` 那一趟**是要 claim 的**（开机＝一次登录，§七）。它会**在 +300ms 时自己跑掉**，
+   把 `fnCalls.claim / push` 抬一下：尺子上量"夹缝里那一次 claim/push 有没有发生"时，
+   量到的就可能是"开机那一趟"而不是被测的那一下（假红 / 假绿都由此而来）。
+   ⇒ 重置之后**先把开机那一趟等出去**，再进被测场景。（这也是它必须 `await` 的原因。） */
+const resetAll = async () => {
+  /* 先把上一代挂着的计时器（开机那一趟 / 重试）放开、跑完，**再清场** ——
+     顺序反了的话，清完场那一趟又自己写回来，"云端没有档"这种前置条件当场就没了。 */
+  try { CS._reset(); } catch (e) {}
+  try { CS.toggle && CS.toggle(true); } catch (e) {}
+  await wait(350);
   saves.clear(); cloudId = null; dbMode = 'ok'; failNext = 0;
   fnCalls = { pull: 0, push: 0, claim: 0, probe: 0 };
   openid = 'oRegressionA';
-  try { CS._reset(); } catch (e) {}
-  try { CS.toggle && CS.toggle(true); } catch (e) {}
+  try { CS._reset(); } catch (e) {}     // 收干净：busy / 租约 / 脏标记 / 计时器一起归零
 };
 
 (async function () {
   /* ---------- 1 / 2：本地 W03、云端 W08（连 savedAt 都比云端新）→ 自动同步必须拿到 W08 ---------- */
-  resetAll();
+  await resetAll();
   await putCloudDoc(saveAt(88), 1000, { id: 'dOther', ts: Date.now(), token: 'tok-other' });
   const cloudRaw = saves.get(cloudId).payload;
   Core.newGame(); Core.setPlayerName('本地那份'); saveAt(3);
@@ -164,9 +175,22 @@ const resetAll = () => {
   /* ⚠️ 这里必须走 `triggerAuto('show')`（产品里 onShow 真正调的那个口），**不是** `sync('show')`：
      第一版写的是 `sync('show')` —— 于是"onShow 不拉"这种破坏（塞在 triggerAuto 里）**照样绿**，
      破坏测试当场把这条揪出来了（尺子测的不是玩家走的那条路）。 */
+  /* 顺带把"**回了前台也不许抢号**"（§七）一起钉住：只许拉，`claim` 一次都不能发。
+     反例就是旧行为"开机 / 回前台都当一次登录"（破坏测试第 ⑦ 条专门把它塞回去验这条）。
+     ⚠️ 计量之前**必须把租约重新放回"别的设备手里"** —— 前面几条（尤其破坏版里开机那一趟）
+     可能已经把租约拿到本机了，那时 `needClaim` 恒假、抢号也量不出来（假绿）；
+     再看**两个通道**：`claim` 调用计数 **和** 云端那条的 `lease` 有没有被本机换走。 */
+  saves.get(cloudId).lease = { id: 'dOtherDevice', ts: Date.now(), token: 'tok-other' };
+  const leaseBefore4 = JSON.stringify(saves.get(cloudId).lease);
+  const claimBefore4 = fnCalls.claim;
   r = await CS.triggerAuto('show');
-  t('4 回前台（onShow）自动拉到云端最新那份', lvNow() === 77 && r.took === 'cloud',
-    'lv77', 'lv' + lvNow() + ' · ' + JSON.stringify(r));
+  const leaseAfter4 = JSON.stringify(saves.get(cloudId).lease);
+  t('4 回前台（onShow）自动拉到云端最新那份、并且**不 claim**（回前台不是重新登录）',
+    lvNow() === 77 && r.took === 'cloud'
+      && fnCalls.claim === claimBefore4 && leaseAfter4 === leaseBefore4,
+    'lv77 · claim 次数不变 · 云端租约没被换走',
+    'lv' + lvNow() + ' · claim ' + claimBefore4 + '→' + fnCalls.claim
+      + ' · 租约' + (leaseAfter4 === leaseBefore4 ? '没动' : '**被本机换走了**') + ' · ' + JSON.stringify(r));
 
   /* ---------- 5 / 6 / 7：被顶号 = 不能写、能读、且不自动 reclaim ---------- */
   {
@@ -196,7 +220,7 @@ const resetAll = () => {
 
   /* ---------- 9：云端没有档（NOT_FOUND）→ 允许用本地建首份 ---------- */
   {
-    resetAll();
+    await resetAll();
     Core.newGame(); Core.setPlayerName('首份'); saveAt(11);
     const pushBefore = fnCalls.push;
     r = await CS.sync('boot');
@@ -207,7 +231,7 @@ const resetAll = () => {
 
   /* ---------- 10：DB_ERROR → 绝不建空档、绝不覆盖 ---------- */
   {
-    resetAll();
+    await resetAll();
     await putCloudDoc(saveAt(44), 2000, null);
     const before = saves.get(cloudId).payload;
     Core.newGame(); Core.setPlayerName('本地'); saveAt(7);
@@ -233,9 +257,40 @@ const resetAll = () => {
         + ' · lv' + lvNow());
   }
 
-  /* ---------- 11：busy 期间产生的 push，最终一定执行 ---------- */
+  /* ---------- 11：NETWORK_ERROR（连不上 / 云函数调用直接炸）→ 绝不覆盖云端 ----------
+     与第 10 条（DB_ERROR）是**两条不同的岔路**，任务书 §六 分开点名：
+       · DB_ERROR   ＝ 云函数回得来、但数据库那一步炸了（`ok:false, code:'DB_ERROR'`）；
+       · NETWORK_ERROR ＝ 云函数压根没回来（SDK 抛异常 / 超时）。
+     两者的正确反应是同一条：**不许把它当成"没有存档"、不许去建一份**，保留本地等下次同步。 */
   {
-    resetAll();
+    await resetAll();
+    await putCloudDoc(saveAt(43), 4000, null);
+    const before = saves.get(cloudId).payload;
+    Core.newGame(); Core.setPlayerName('断网'); saveAt(6);
+    const pushBefore11 = fnCalls.push, claimBefore11 = fnCalls.claim;
+    /* 让 SDK 这一侧直接抛（真实世界里对应"云函数调不通 / 超时"）。 */
+    const origNetCall = wx.cloud.callFunction;
+    let netFail = true;
+    wx.cloud.callFunction = function () {
+      if (netFail) return Promise.reject(new Error('ERR_NETWORK'));
+      return origNetCall.apply(this, arguments);
+    };
+    r = await CS.sync('progress');
+    netFail = false;
+    wx.cloud.callFunction = origNetCall;
+    const after = saves.get(cloudId).payload;
+    t('11 云端连不上（NETWORK_ERROR）→ 不当成"没有存档"：写路径一次都不碰、云端原文不动',
+      r.ok === false && after === before && lvNow() === 6
+        && fnCalls.push === pushBefore11 && fnCalls.claim === claimBefore11,
+      'ok=false · 云端原文不动 · claim/push 一次都没发 · 本地照常玩',
+      'ok=' + r.ok + ' · 云端' + (after === before ? '没动' : '**被改了**')
+        + ' · push ' + pushBefore11 + '→' + fnCalls.push + ' · claim ' + claimBefore11 + '→' + fnCalls.claim
+        + ' · lv' + lvNow());
+  }
+
+  /* ---------- 12：busy 期间产生的 push，最终一定执行 ---------- */
+  {
+    await resetAll();
     await putCloudDoc(saveAt(20), 3000, { id: 'dSomebody', ts: Date.now(), token: 'tok-x' });
     Core.newGame(); Core.setPlayerName('忙'); saveAt(30);
     /* 先把写权拿到手（显式重新登录那一路 = claim）—— 不然这台是"被顶号"的只读端，
@@ -280,13 +335,16 @@ const resetAll = () => {
     await wait(400);                               // 等补跑那一趟（它是 setTimeout(0) 排的，跑完还要过一次网络）
     wx.cloud.callFunction = origCall;
     CS.sync = origSync;
+    /* ⚠️ 判据必须在**探针之前**取：下面那句"手动同口径"是诊断用的，
+       它自己也会推一次 —— 拿"含探针"的计数去判，破坏版（压根没补跑）**照样能凑够 2 次**（假绿）。 */
+    const pushAfterCatchup = fnCalls.push;
     /* 诊断：万一自动补跑没成，手动来一次同口径的 `pending` 看它到底卡在哪（写进 actual 里）。 */
     const probe = await CS.sync('pending', { push: true });
     /* ⚠️ 判据必须是"**至少两次**"（第一趟 + 补跑那一趟）：第一版只写 `> pushBefore` ——
        于是"busy 那次被吞掉、只留下第一趟"这种破坏照样能过（破坏测试揪出来的第二条）。 */
-    t('11 busy 期间产生的 push **最终一定执行**（脏标记补跑，不吞进度）',
-      fnCalls.push >= pushBefore + 2, 'push 至少 2 次（第一趟 + 补跑）',
-      '起始=' + pushBefore + ' · 收工后=' + fnCalls.push
+    t('12 busy 期间产生的 push **最终一定执行**（脏标记补跑，不吞进度）',
+      pushAfterCatchup >= pushBefore + 2, '补跑收工时 push 至少 2 次（第一趟 + 补跑）',
+      '起始=' + pushBefore + ' · 补跑收工后=' + pushAfterCatchup + ' · 含探针=' + fnCalls.push
         + ' · first=' + JSON.stringify(firstR) + ' · second=' + JSON.stringify(secondR)
         + ' · 自动补跑=' + JSON.stringify(catchup) + ' · 手动同口径=' + JSON.stringify(probe));
   }
