@@ -1,12 +1,13 @@
 {
-  "generatedFor": "R1.7",
-  "sceneCount": 12,
-  "bossCount": 6,
+  "generatedFor": "R1.7 / 2026-10-03 换 36 世界正式图",
+  "sceneCount": 37,
+  "bossCount": 36,
+  "masterCount": 0,
   "kv": "brand/kv-main.jpg",
   "rows": [
     {
-      "asset": "story/scene/img_scene_bio_lab.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W01.jpg",
+      "kind": "scene-master",
       "id": "bio_lab",
       "references": [
         "js/sc-story-data.js",
@@ -18,8 +19,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_bio_swamp.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W09.jpg",
+      "kind": "scene-master",
       "id": "bio_swamp",
       "references": [
         "js/sc-story-data.js",
@@ -31,8 +32,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_bio_sea.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W16.jpg",
+      "kind": "scene-master",
       "id": "bio_sea",
       "references": [
         "js/sc-story-data.js",
@@ -44,8 +45,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_ghost_house.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W03.jpg",
+      "kind": "scene-master",
       "id": "ghost_house",
       "references": [
         "js/sc-story-data.js",
@@ -57,8 +58,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_ghost_town.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W08.jpg",
+      "kind": "scene-master",
       "id": "ghost_town",
       "references": [
         "js/sc-story-data.js",
@@ -70,8 +71,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_ghost_env.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W05.jpg",
+      "kind": "scene-master",
       "id": "ghost_env",
       "references": [
         "js/sc-story-data.js",
@@ -83,8 +84,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_ghost_wall.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W27.jpg",
+      "kind": "scene-master",
       "id": "ghost_wall",
       "references": [
         "js/sc-story-data.js",
@@ -96,8 +97,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_tech_waste.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W06.jpg",
+      "kind": "scene-master",
       "id": "tech_waste",
       "references": [
         "js/sc-story-data.js",
@@ -109,8 +110,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_tech_base.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W19.jpg",
+      "kind": "scene-master",
       "id": "tech_base",
       "references": [
         "js/sc-story-data.js",
@@ -122,8 +123,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_mystic_ruins.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W04.jpg",
+      "kind": "scene-master",
       "id": "mystic_ruins",
       "references": [
         "js/sc-story-data.js",
@@ -135,8 +136,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_mystic_throne.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W12.jpg",
+      "kind": "scene-master",
       "id": "mystic_throne",
       "references": [
         "js/sc-story-data.js",
@@ -148,8 +149,8 @@
       "status": "ok"
     },
     {
-      "asset": "story/scene/img_scene_god_hall.jpg",
-      "kind": "scene",
+      "asset": "story/scene/img_scene_W14.jpg",
+      "kind": "scene-master",
       "id": "god_hall",
       "references": [
         "js/sc-story-data.js",
@@ -161,9 +162,149 @@
       "status": "ok"
     },
     {
+      "asset": "story/boss/img_boss_W01.png",
+      "kind": "boss",
+      "id": "W01",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W02.png",
+      "kind": "boss",
+      "id": "W02",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W03.png",
+      "kind": "boss",
+      "id": "W03",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W04.png",
+      "kind": "boss",
+      "id": "W04",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W05.png",
+      "kind": "boss",
+      "id": "W05",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
       "asset": "story/boss/img_boss_W06.png",
       "kind": "boss",
       "id": "W06",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W07.png",
+      "kind": "boss",
+      "id": "W07",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W08.png",
+      "kind": "boss",
+      "id": "W08",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W09.png",
+      "kind": "boss",
+      "id": "W09",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W10.png",
+      "kind": "boss",
+      "id": "W10",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W11.png",
+      "kind": "boss",
+      "id": "W11",
       "references": [
         "js/sc-story.js",
         "js/sc-battle.js",
@@ -189,9 +330,149 @@
       "status": "ok"
     },
     {
+      "asset": "story/boss/img_boss_W13.png",
+      "kind": "boss",
+      "id": "W13",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W14.png",
+      "kind": "boss",
+      "id": "W14",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W15.png",
+      "kind": "boss",
+      "id": "W15",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W16.png",
+      "kind": "boss",
+      "id": "W16",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W17.png",
+      "kind": "boss",
+      "id": "W17",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
       "asset": "story/boss/img_boss_W18.png",
       "kind": "boss",
       "id": "W18",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W19.png",
+      "kind": "boss",
+      "id": "W19",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W20.png",
+      "kind": "boss",
+      "id": "W20",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W21.png",
+      "kind": "boss",
+      "id": "W21",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W22.png",
+      "kind": "boss",
+      "id": "W22",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W23.png",
+      "kind": "boss",
+      "id": "W23",
       "references": [
         "js/sc-story.js",
         "js/sc-battle.js",
@@ -217,9 +498,149 @@
       "status": "ok"
     },
     {
+      "asset": "story/boss/img_boss_W25.png",
+      "kind": "boss",
+      "id": "W25",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W26.png",
+      "kind": "boss",
+      "id": "W26",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W27.png",
+      "kind": "boss",
+      "id": "W27",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W28.png",
+      "kind": "boss",
+      "id": "W28",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W29.png",
+      "kind": "boss",
+      "id": "W29",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
       "asset": "story/boss/img_boss_W30.png",
       "kind": "boss",
       "id": "W30",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W31.png",
+      "kind": "boss",
+      "id": "W31",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W32.png",
+      "kind": "boss",
+      "id": "W32",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W33.png",
+      "kind": "boss",
+      "id": "W33",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W34.png",
+      "kind": "boss",
+      "id": "W34",
+      "references": [
+        "js/sc-story.js",
+        "js/sc-battle.js",
+        "js/sc-story.js"
+      ],
+      "worlds": 1,
+      "normalPath": true,
+      "fallbackOnly": false,
+      "status": "ok"
+    },
+    {
+      "asset": "story/boss/img_boss_W35.png",
+      "kind": "boss",
+      "id": "W35",
       "references": [
         "js/sc-story.js",
         "js/sc-battle.js",

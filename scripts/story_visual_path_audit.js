@@ -44,32 +44,95 @@ const refsOf = (needle) => ALL.filter((x) => x.t.indexOf(needle) >= 0).map((x) =
 
 const rows = [];
 const missingFile = [], unmapped = [], unused = [];
+/* 12 个"场景气质"（母版）的 id —— 2026-10-03 起它们的**图**已删，但 id 仍在用
+   （人物故事 / 装备故事按它取名与色调，图则由 `MASTER_WORLD` 折到代表世界）。 */
+const SCENE_IDS = ['bio_lab', 'bio_swamp', 'bio_sea', 'ghost_house', 'ghost_town', 'ghost_env',
+  'ghost_wall', 'tech_waste', 'tech_base', 'mystic_ruins', 'mystic_throne', 'god_hall'];
 
-/* ---------- ① 12 张场景图 ---------- */
-Object.keys(SD.SCENE_FILE || {}).forEach((sceneId) => {
-  const rel = SD.SCENE_FILE[sceneId];
-  const full = path.join(ROOT, rel);
-  const exists = fs.existsSync(full);
-  const users = Object.keys(SD.SCENE || {}).filter((w) => SD.SCENE[w] === sceneId);
-  const refs = refsOf(sceneId);
-  const drawn = refs.indexOf('js/sc-story.js') >= 0;      // 画它的是 Story.bg / veils.battle
-  if (!exists) missingFile.push(sceneId);
-  if (!users.length) unused.push(sceneId);
-  rows.push({
-    asset: rel, kind: 'scene', id: sceneId, references: refs, worlds: users.length,
-    normalPath: !!(exists && users.length && drawn), fallbackOnly: false,
-    status: exists ? (users.length && drawn ? 'ok' : 'partly') : 'missing',
+/* ---------- ① 12 个"场景气质"（母版）：**图已删，折到代表世界** ----------
+   2026-10-03（父亲大人：「12 母版 + 6 Boss 可以删了」）：那 12 张母版**文件**删掉了，
+   但"母版 id"这条链还在 —— 人物故事 / 装备故事按它取图（`charScene` / `itemScene`）。
+   所以这里查的不是"文件在不在"，而是三条**更硬**的：
+     · 12 个母版 id 都还在 `SCENE_INFO`（名字/色调没丢）与 `MASTER_WORLD`（有代表世界）；
+     · 代表世界真的存在，而且那张世界图真的在盘上；
+     · 老母版文件**确实已经不在**（留着就是白占包体）。
+   做坏试验：把 `MASTER_WORLD` 里任意一条删掉 → 第一条当场红；
+             往 `story/scene/` 里放回一张 `img_scene_ghost_house.jpg` → 第三条当场红。 */
+{
+  const mw = SD.MASTER_WORLD || {};
+  const info = SD.SCENE_INFO || {};
+  const noInfo = SCENE_IDS.filter((id) => !info[id]);
+  const noWorld = SCENE_IDS.filter((id) => !mw[id]);
+  const empty = SCENE_IDS.filter((id) => mw[id] && !(SD.WORLD_SCENE_FILE || {})[mw[id]]);
+  const noFile = SCENE_IDS.filter((id) => {
+    const rel = mw[id] && (SD.WORLD_SCENE_FILE || {})[mw[id]];
+    return rel && !fs.existsSync(path.join(ROOT, rel));
   });
-});
-(missingFile.length ? R.fail : R.pass)('12 张场景图的文件都在', {
-  file: 'js/sc-story-data.js', expected: '12 个文件存在', actual: missingFile.length ? missingFile.join(',') : '12/12 在',
-});
-(unused.length ? R.fail : R.pass)('每张场景图至少被一个世界用到', {
-  file: 'js/sc-story-data.js', expected: '没有"画不出去"的母版', actual: unused.length ? unused.join(',') : '12/12 都有世界用',
-});
+  SCENE_IDS.forEach((id) => {
+    const world = mw[id] || '';
+    const rel = world ? String((SD.WORLD_SCENE_FILE || {})[world] || '') : '';
+    rows.push({
+      asset: rel || '(母版已删 · 折到 ' + world + ')', kind: 'scene-master', id: id,
+      references: refsOf('MASTER_WORLD'), worlds: Object.keys(SD.SCENE || {}).filter((w) => SD.SCENE[w] === id).length,
+      normalPath: !!(world && rel && fs.existsSync(path.join(ROOT, rel))), fallbackOnly: false,
+      status: (world && rel && fs.existsSync(path.join(ROOT, rel))) ? 'ok' : 'missing',
+    });
+  });
+  ((noInfo.length || noWorld.length || empty.length || noFile.length) ? R.fail : R.pass)
+    ('12 个母版 id 都折到了真实存在的世界图（母版文件本身已删）', {
+      file: 'js/sc-story-data.js',
+      expected: '12 条 SCENE_INFO + 12 条 MASTER_WORLD → 都在盘上的 img_scene_W##.jpg',
+      actual: (noInfo.length ? ('SCENE_INFO 缺 ' + noInfo.join(' ')) : '名字齐')
+        + ' · ' + (noWorld.length ? ('MASTER_WORLD 缺 ' + noWorld.join(' ')) : '映射齐')
+        + ' · ' + (empty.length ? ('指空 ' + empty.join(' ')) : '不指空')
+        + ' · ' + (noFile.length ? ('图不在 ' + noFile.join(' ')) : '图都在'),
+    });
+  const back = SCENE_IDS.filter((id) => fs.existsSync(path.join(ROOT, 'story/scene/img_scene_' + id + '.jpg')));
+  (back.length ? R.fail : R.pass)('12 张母版文件确实已删（没有被"顺手留一份"）', {
+    file: 'story/scene/', expected: '0 个 img_scene_<母版名>.jpg',
+    actual: back.length ? ('还在：' + back.join(' ')) : '0 个',
+  });
+}
 
-/* ---------- ② 6 张 Boss 立绘 ---------- */
-const ANCHORS = ['W06', 'W12', 'W18', 'W24', 'W30', 'W36'];
+/* ---------- ①-b / ② 世界专属图：**36 个世界各一张 ＋ 深井一张 ＋ 36 张立绘** ----------
+   2026-10-03（父亲大人送图）：口径从"12 张母版 + 6 个卷末 Boss"扩成
+   "36 个世界各一张场景 ＋ 各一张立绘 ＋ 深井一张"。
+   判据与 ① 同源：**文件在 → 表里有 → 拿它的那条绘制路径真的读它**（不是"文件存在就算数"）。
+   母版（12 张）单独保留在 ①：它们现在服务的是**人物故事 / 装备故事**那条链，不是世界。 */
+const WORLD_IDS = [];
+for (let i = 1; i <= 36; i++) WORLD_IDS.push('W' + (i < 10 ? '0' + i : i));
+{
+  const wMiss = [], wUnused = [];
+  WORLD_IDS.forEach((wid) => {
+    const rel = String((SD.WORLD_SCENE_FILE || {})[wid] || '');
+    const exists = !!(rel && fs.existsSync(path.join(ROOT, rel)));
+    const usedBy = Object.keys(SD.SCENE || {}).filter((w) => w === wid).length > 0;
+    if (!exists) wMiss.push(wid);
+    if (!usedBy) wUnused.push(wid);
+  });
+  /* 深井那张不在 36 编号里，单独查（它由 `CV.veils.battle` 在"没有世界号"时取用） */
+  const cor = String((SD.WORLD_SCENE_FILE || {}).corridor || '');
+  const corExists = !!(cor && fs.existsSync(path.join(ROOT, cor)));
+  const corWired = /'corridor'/.test(SRC['js/sc-story.js'] || '');
+  (wMiss.length || !corExists ? R.fail : R.pass)('36 个世界的场景图 ＋ 深井那张都在', {
+    file: 'js/sc-story-data.js',
+    expected: '37 个文件存在（img_scene_W01..W36.jpg + img_scene_corridor.jpg）',
+    actual: (wMiss.length ? ('缺 ' + wMiss.join(' ')) : '36/36 在')
+      + ' · 深井 ' + (corExists ? '在' : '缺') + '（' + cor + '）',
+  });
+  (corWired ? R.pass : R.fail)('深井那张图**真的被绘制路径取用**（不是丢在包里没人读）', {
+    file: 'js/sc-story.js', expected: "CV.veils.battle 在没有 CV.battleWorld 时取 'corridor'",
+    actual: corWired ? '已接线' : '没找到 corridor 的取图点',
+  });
+  /* 每一张世界图都要有**它自己的**那个世界在用（拿母版顶替不算） */
+  (wUnused.length ? R.fail : R.pass)('每个世界图都有对应的世界在用', {
+    file: 'js/sc-story-data.js', expected: '36/36 有主',
+    actual: wUnused.length ? wUnused.join(' ') : '36/36',
+  });
+}
+
+/* ---------- ② Boss 立绘：**36 个世界各一张**（原来只有 6 个卷末锚点） ---------- */
+const ANCHORS = WORLD_IDS.slice();
 ANCHORS.forEach((wid) => {
   const rel = (SD.BOSS_FILE || {})[wid];
   const full = rel ? path.join(ROOT, rel) : '';
@@ -82,9 +145,10 @@ ANCHORS.forEach((wid) => {
     status: exists ? 'ok' : 'missing',
   });
 });
-(missingFile.filter((x) => /^W\d\d$/.test(x)).length ? R.fail : R.pass)('6 张 Boss 立绘都在，且接入路径存在', {
-  file: 'js/sc-story-data.js', expected: '6/6',
-  actual: missingFile.filter((x) => /^W\d\d$/.test(x)).join(',') || '6/6（剧情页 + 战斗出场序列两处都读它）',
+(missingFile.filter((x) => /^W\d\d$/.test(x)).length ? R.fail : R.pass)('36 张 Boss 立绘都在，且接入路径存在', {
+  file: 'js/sc-story-data.js', expected: '36/36',
+  actual: missingFile.filter((x) => /^W\d\d$/.test(x)).join(',')
+    || '36/36（剧情页 + 战斗出场序列两处都读它）',
 });
 
 /* ---------- ③ 主 KV：**首页真的用它** ---------- */
@@ -129,8 +193,9 @@ ANCHORS.forEach((wid) => {
   (hit.length ? R.warn : R.pass)('正常路径里没有占位/调试残留字串', {
     file: 'js/*.js', expected: '0 处（注释里提到不算）', actual: hit.length ? hit.slice(0, 8).join(' ; ') : '0 处',
   });
-  R.note('（`bgBase`/`bgStructure` 这类程序化底仍然存在，但**只在场景图加载失败时**才画 —— '
-    + '判据见 `sc-story.js` 的 `Story.sceneState()`：ready→真图 / loading→主题平底 / failed→程序化保险。）');
+  R.note('（2026-10-03：程序化那两层占位（`bgBase`/`bgStructure`）已按父亲大人要求**整个删掉** —— '
+    + '现在 `Story.sceneState()` 只有两条路：ready→真图 / 其余→主题平底（`bgFlat`，无几何）。'
+    + 'Boss 拍也不再退成几何剪影：立绘没到就**不画人**。）');
 }
 
 /* ---------- 产出 JSON ---------- */
@@ -138,7 +203,8 @@ try {
   const outDir = path.join(ROOT, 'docs', 'story');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'story_visual_reference_audit.json'),
-    JSON.stringify({ generatedFor: 'R1.7', sceneCount: 12, bossCount: 6, kv: SD.KV_FILE, rows }, null, 2), 'utf8');
+    JSON.stringify({ generatedFor: 'R1.7 / 2026-10-03 换 36 世界正式图', sceneCount: 37, bossCount: 36,
+      masterCount: Object.keys(SD.SCENE_FILE || {}).length, kv: SD.KV_FILE, rows }, null, 2), 'utf8');
   R.note('已产出 docs/story/story_visual_reference_audit.json（' + rows.length + ' 条资源记录）');
 } catch (e) { R.warn('写 JSON 失败（不影响判据）', { actual: String(e && e.message) }); }
 

@@ -43,6 +43,9 @@
     mystic_ruins:  { theme: 'mystic', name: '石质遗迹' },
     mystic_throne: { theme: 'mystic', name: '冰雪王座' },
     god_hall:      { theme: 'god',    name: '灯阁大厅' },
+    /* 深井（2026-10-03）：它没有"母版"，但要跟别处一样有一份**色调 + 名字** ——
+       载入中/加载失败时的平底用它取色，剧情页眉与卷宗用它的名字。 */
+    corridor:      { theme: 'tech',   name: '深井' },
   };
 
   /* ==========================================================================
@@ -55,21 +58,21 @@
      ⚠️ 文件名一律 ASCII 小写 + 下划线，**不许中文名**（音频尺子有一条"包内不许中文文件名"）。
      ⚠️ 尺寸 1080×1920（9:16）；720 版只作真机性能降级备用，不默认使用。
      ========================================================================== */
-  /* ⚠️ 2026-10-01：正式素材到位，文件名就是**投递时的原名**（契约 = 文件名，不改名）。
-     `scripts/build-visual-assets.js` 按这些名字把图从 RESYU_VISUAL_ASSETS 复制进 `story/scene/`。 */
-  const SCENE_FILE = {
-    bio_lab:       'story/scene/img_scene_bio_lab.jpg',
-    bio_swamp:     'story/scene/img_scene_bio_swamp.jpg',
-    bio_sea:       'story/scene/img_scene_bio_sea.jpg',
-    ghost_house:   'story/scene/img_scene_ghost_house.jpg',
-    ghost_town:    'story/scene/img_scene_ghost_town.jpg',
-    ghost_env:     'story/scene/img_scene_ghost_env.jpg',
-    ghost_wall:    'story/scene/img_scene_ghost_wall.jpg',
-    tech_waste:    'story/scene/img_scene_tech_waste.jpg',
-    tech_base:     'story/scene/img_scene_tech_base.jpg',
-    mystic_ruins:  'story/scene/img_scene_mystic_ruins.jpg',
-    mystic_throne: 'story/scene/img_scene_mystic_throne.jpg',
-    god_hall:      'story/scene/img_scene_god_hall.jpg',
+  /* ================= 母版 → **代表世界**（2026-10-03 · 父亲大人：「12 母版 + 6 Boss 可以删了」）===
+     那 12 张母版图（`img_scene_bio_lab.jpg` …）**已经删除** —— 36 个世界每个都有自己那张了。
+     但"母版"这个概念**还活着，而且是必需的**：**人物故事 / 装备故事**的底图是按母版 id 取的
+     （`sc-story.js` 的 `charScene` / `itemScene` → 'ghost_house' / 'tech_base' …），
+     全项目两百多段故事共用这 12 个"场景气质"，删了它们等于把那条链的背景一起删掉。
+     所以这里把每个母版**各自指向一个代表世界**：
+       · 图  → 那个世界的正式场景图（`img_scene_W##.jpg`，不另存一份、不占包体）；
+       · 名字 / 色调 → 仍走 `SCENE_INFO`（"旧宅内厅"还是"旧宅内厅"），一个字不变。
+     代表世界 = **`SCENE` 表里第一个用这个母版的世界**（与世界自己的映射同源，不是随便挑的）。
+     ⇒ 删掉的是 12 个**文件**，不是那条链；`sceneFile()` 会把母版 id 解析成这张世界图。 */
+  const MASTER_WORLD = {
+    bio_lab: 'W01', bio_swamp: 'W09', bio_sea: 'W16',
+    ghost_house: 'W03', ghost_town: 'W08', ghost_env: 'W05', ghost_wall: 'W27',
+    tech_waste: 'W06', tech_base: 'W19',
+    mystic_ruins: 'W04', mystic_throne: 'W12', god_hall: 'W14',
   };
   /* 六个核心 Boss 立绘（1080×1920 · **真透明 RGBA** ⇒ 当"人物前景层"用，不当背景贴）。
      也是按投递原名（`img_boss_W06.png` …）。 */
@@ -89,6 +92,15 @@
      新图到位后同名覆盖即可。 */
   const WORLD_SCENE_FILE = {};
   for (let i = 1; i <= 36; i++) WORLD_SCENE_FILE['W' + (i < 10 ? '0' + i : i)] = 'story/scene/img_scene_W' + (i < 10 ? '0' + i : i) + '.jpg';
+  /* ================= 深井（2026-10-03 · 父亲大人单独补的一张）=================
+     「我还另外加了一张深井的场景图，把它替换进去吧」——深井（斗法台）**不在 36 个世界的编号里**，
+     所以给它一个自己的 slot：`corridor`（深井那个页面的 handler id，全项目同一套叫法）。
+     `sc-story.js` 的 `CV.veils.battle` 在**没有 `CV.battleWorld`**（＝深井那种无世界号的战斗）
+     时取这个 key —— 以前那里就是一片程序化底，现在换成这张正式图。
+     ⚠️ 送来的文件名是 `img_scene_深井.jpg`（中文）。落包时按契约改名 `img_scene_corridor.jpg`：
+        包内**不许中文文件名**（`visual_story_audit` ③ 与音频那条尺子都钉着），改名在
+        `scripts/_imgpack.py` 一处完成，源码里不出现中文路径。 */
+  WORLD_SCENE_FILE.corridor = 'story/scene/img_scene_corridor.jpg';
   const BOSS_FILE = {};
   for (let i = 1; i <= 36; i++) BOSS_FILE['W' + (i < 10 ? '0' + i : i)] = 'story/boss/img_boss_W' + (i < 10 ? '0' + i : i) + '.png';
   /* 主视觉（1080×1920）：**在主包 `brand/`**（R1.9 起；更早的一版放剧情分包，已作废）。
@@ -1123,6 +1135,6 @@
        sc-story.js 直接按名字反查 id。**加新说话人时先看这里要不要补一条。** */
     WHO_ALIAS: { '代行': 'C120' },
     /* 正式资产清单（sceneId / Boss 世界号 → 分包内路径）：见上头那段注释 */
-    SCENE_FILE: SCENE_FILE, WORLD_SCENE_FILE: WORLD_SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
+    MASTER_WORLD: MASTER_WORLD, WORLD_SCENE_FILE: WORLD_SCENE_FILE, BOSS_FILE: BOSS_FILE, KV_FILE: KV_FILE,
   };
 })();

@@ -176,8 +176,18 @@ function cp(from, toRel) {
   fs.copyFileSync(path.join(SRC, from), to);
   copies.push(toRel + '  (' + Math.round(fs.statSync(to).size / 1024) + ' KB)');
 }
-files.filter((f) => /^img_scene_.+\.jpg$/.test(f)).forEach((f) => cp(f, 'story/scene/' + f));
-files.filter((f) => /^img_boss_W\d\d\.png$/.test(f)).forEach((f) => cp(f, 'story/boss/' + f));
+/* ================= 2026-10-03：图片**不再原样复制，一律先压再落包** =================
+   父亲大人送来的 36 世界场景 + 36 Boss + 深井，原图合计 **227 MB** ——
+   小游戏主包 4 MB、分包也有总上限，原样复制等于传不上去。
+   压缩这一步收口在 `scripts/_imgpack.py`（尺寸/质量/为什么 Boss 必须留透明 PNG 都写在它的文件头），
+   这里只负责**调它**：源目录就是本次的素材目录，产物落 `story/scene/` 与 `story/boss/`。
+   ⚠️ 它按**文件名**认图（img_scene_W##.jpg / img_boss_W##.png / img_scene_深井.jpg），
+      不认识的一律不动 —— 不会把不相干的东西塞进分包。 */
+if (files.some((f) => /^img_(scene|boss)_/.test(f))) {
+  const r = require('child_process').spawnSync('python3',
+    [path.join(ROOT, 'scripts/_imgpack.py'), SRC], { stdio: 'inherit' });
+  if (r.status !== 0) { console.error('图片压缩入库失败（见上面 python 的报错）'); process.exit(1); }
+}
 /* 主视觉：现有 mv-main-lamp.jpg 留着当兜底，新图另存一个名字（页面自己挑） */
 /* ================= 主视觉 + 题字（2026-10-02 · 父亲大人） =================
    「主画面和主题字**要放在主包**，该压就压……确保开机就能看到」。
@@ -208,7 +218,14 @@ const head = '/* 自动生成，不要手改 —— 由 `node scripts/build-visu
   + '   "矢量 op + 运行时着色"的图标体系，编译进来才既能改色、又不吃包体、也不怕平台差异。 */\n';
 const body = '(function () {\n  const G = (typeof GameGlobal !== \'undefined\') ? GameGlobal : globalThis;\n'
   + '  G.ICON_ASSETS = ' + JSON.stringify(table) + ';\n})();\n';
-fs.writeFileSync(path.join(ROOT, 'js/assets-icons.js'), head + body);
+/* ⚠️ 只在**真的有 SVG 源**时才重写图标表。2026-10-03：本脚本现在也会被拿图片当参数调用
+   （`node scripts/build-visual-assets.js "…/游戏素材/新图"`，那里一张 SVG 都没有）——
+   不设这道闸就会把 `js/assets-icons.js` 覆盖成一张**空表**，全站图标当场全没。 */
+if (svgFiles.length) {
+  fs.writeFileSync(path.join(ROOT, 'js/assets-icons.js'), head + body);
+} else {
+  console.log('⚠️ 素材目录里没有 SVG —— 跳过图标编译（js/assets-icons.js 保持原样，没被动过）');
+}
 
 console.log('素材目录：' + SRC);
 console.log('复制图片 ' + copies.length + ' 个：');

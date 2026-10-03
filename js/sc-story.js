@@ -62,7 +62,12 @@
   Story.hasStory = function (worldId) { return !!WORLDS[worldId]; };
   Story.titleOf = function (worldId) { return (WORLDS[worldId] && WORLDS[worldId].title) || ''; };
   Story.sceneOf = function (worldId) { return SCENE[worldId] || 'god_hall'; };
-  Story.sceneName = function (id) { return (SCENE_INFO[id] && SCENE_INFO[id].name) || '残域'; };
+  /* 场景名：`id` 可能是母版（'ghost_house'）也可能是**世界 id**（'W20'，人物/装备故事那条链
+     2026-10-03 起直接回世界）—— 世界 id 先折到它的场景气质再取名，别让页眉掉成"残域"。 */
+  Story.sceneName = function (id) {
+    const key = SCENE_INFO[id] ? id : (SCENE[id] || id);
+    return (SCENE_INFO[key] && SCENE_INFO[key].name) || '残域';
+  };
   /* ================= 人物 / 装备的**场景归属**（2026-10-01 二轮） =================
      父亲大人：「人物故事不能全部使用 ghost_house」「装备故事不能全部使用 tech_base」
      —— 全挤在一个场景里，十几段故事看起来像同一张壁纸。
@@ -89,7 +94,11 @@
   };
   function charScene(id, ch) {
     ch = ch || CHARS[id] || {};
-    if (ch.fw && SCENE[ch.fw]) return SCENE[ch.fw];            // ① 首次出现世界
+    /* ① 有"首次出现世界"→ **直接回那个世界**（2026-10-03 · 父亲大人：「人物故事 / 装备故事
+       可以对应到新的世界图」）。原来回的是那张母版 id，而现在每个世界都有自己**独有**的图了 ——
+       再折成母版，等于人物站在别人的世界里。回世界 id，`sceneKeyOf` 认得它，取的就是 W## 那张。 */
+    if (ch.fw && (SD.WORLD_SCENE_FILE || {})[ch.fw]) return ch.fw;
+    if (ch.fw && SCENE[ch.fw]) return SCENE[ch.fw];
     const list = FAC_SCENE[ch.fac];                             // ② 阵营方向
     if (list && list.length) return list[0];
     return 'god_hall';
@@ -98,7 +107,8 @@
   function itemScene(key) {
     if (!key) return 'god_hall';
     const s = String(key);
-    if (/^SET_(W\d\d)$/.test(s)) return Story.sceneOf(RegExp.$1);        // 世界套装 → 那个世界
+    /* 世界套装 → **那个世界自己那张图**（同上：图按世界出，不再折成母版） */
+    if (/^SET_(W\d\d)$/.test(s)) return RegExp.$1;
     if (/^SIG_(C\d{3})$/.test(s)) return charScene(RegExp.$1);           // 专属 → 主人的场景
     if (/^GOD_(.+)$/.test(s)) return BL_SCENE[RegExp.$1] || 'god_hall';  // 神装 → 该血统
     if (MAT_SCENE[s]) return MAT_SCENE[s];                              // 核心道具 → 来源世界
@@ -192,115 +202,24 @@
      （`visual_audit` ②-1 会当场报出来）。三个分量：底 / 深处 / 强调（光源与灯焰）。 */
   const SCENE_TONE = (CV.C && CV.C.scene) || {};
   function toneOf(sceneId) {
-    const info = SCENE_INFO[sceneId];
+    /* 2026-10-03：`sceneId` 现在**可能是世界 id**（人物/装备故事已经直接取那个世界的图了）。
+       色调要按"这个世界属于哪个场景气质"算 —— 否则会掉进 god 兜底，雾/尘/光束的颜色跟画面对不上。 */
+    const key = SCENE_INFO[sceneId] ? sceneId : (SCENE[sceneId] || sceneId);
+    const info = SCENE_INFO[key];
     const t = SCENE_TONE[(info && info.theme) || 'god'] || SCENE_TONE.god;
     if (!t) return { a: CV.C.bg, b: CV.C.bg2, acc: CV.C.gold };
     return { a: t[0], b: t[1], acc: t[2] };
   }
-  /* 底：竖向渐变 + 一层"地平线" */
-  function bgBase(c, sceneId, w, h) {
-    const t = toneOf(sceneId);
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, t.a); g.addColorStop(0.62, t.b); g.addColorStop(1, SCENE_TONE.deep || CV.C.bg);
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-    /* 地平线那一口光（母版规格：地平线在 62% 高度） */
-    const hy = h * 0.62;
-    const lg = c.createRadialGradient(w * 0.5, hy, 0, w * 0.5, hy, w * 0.9);
-    lg.addColorStop(0, CV.a(t.acc, .22)); lg.addColorStop(1, CV.a(t.acc, 0));
-    c.fillStyle = lg; c.fillRect(0, 0, w, h);
-  }
-  /* 结构：按母版给一组"透视纵深"的剪影（不用位图，纯多边形） */
-  function bgStructure(c, sceneId, w, h, t) {
-    const tone = toneOf(sceneId), ink = SCENE_TONE.ink || CV.C.shade;
-    const hy = h * 0.62;
-    c.save();
-    if (sceneId === 'god_hall') {
-      /* 万灯大厅：**一排落地巨柱** + 柱间挂灯（灯焰会呼吸）。
-         ⚠️ 第一版把柱子画成"从 18% 到 62% 的悬空黑条"—— 模拟器上实测像七根竖杠，
-           不像建筑（柱子不落地就没有透视锚点）。现在柱子**穿出画面上沿、落到地平线**，
-           近大远小（中间的最近、最宽），柱间挂一排灯焰当光源。 */
-      /* ⚠️ 近远关系**必须反着来**：单点透视里，画面中间的柱子是**最远**的那根（最窄、最浅），
-         两边的才是最近的（最宽、最低、最先出画）。第一版写成"中间最近"，
-         模拟器上量出来像一排等宽的黑色条形码 —— 这个 `near` 就是那一处的唯一真源。 */
-      const n = 6;
-      for (let i = 0; i < n; i++) {
-        const k = i / (n - 1);
-        const x = w * 0.02 + k * (w * 0.96);
-        const near = Math.abs(k - 0.5) * 2;                  // 0（正中·最远）→ 1（两侧·最近）
-        const dw = w * (0.030 + 0.055 * near);
-        const base = hy + h * (0.01 + 0.10 * near);          // 越近，柱脚落得越低
-        c.fillStyle = CV.a(ink, .92);
-        c.fillRect(x - dw / 2, -h * 0.06, dw, base + h * 0.06);      // 穿出画面顶部
-        /* 柱身靠中那一侧一条极窄的受光边（光从地平线正中来）—— 越近越亮，拉开前后 */
-        if (near > 0.3) {
-          c.fillStyle = CV.a(tone.acc, .06 + 0.10 * near);
-          c.fillRect(x + dw / 2 - Math.max(1, w * 0.004), -h * 0.06, Math.max(1, w * 0.004), base + h * 0.06);
-        }
-        /* 柱间挂灯：挂在高处，比柱子略靠前（呼吸） */
-        const flick = 0.75 + 0.25 * Math.sin(t * 1.4 + i);
-        const lx = x + (w * 0.96 / (n - 1)) / 2, ly = h * (0.19 + 0.13 * near);
-        c.fillStyle = CV.a(ink, .8);
-        c.fillRect(lx - Math.max(1, w * 0.0015), h * 0.05, Math.max(1, w * 0.003), ly - h * 0.05);  // 灯绳
-        c.fillStyle = CV.a(tone.acc, .55 * flick);
-        c.beginPath(); c.arc(lx, ly, w * (0.009 + 0.006 * near) * (0.85 + 0.15 * flick), 0, Math.PI * 2); c.fill();
-      }
-      /* 地面：从地平线往下的一层反光（柱子才"站在地上"）＋ 地平线本身一条极淡的亮带 */
-      const fg = c.createLinearGradient(0, hy, 0, h);
-      fg.addColorStop(0, CV.a(tone.acc, .18)); fg.addColorStop(1, CV.a(tone.acc, 0));
-      c.fillStyle = fg; c.fillRect(0, hy, w, h - hy);
-      c.fillStyle = CV.a(tone.acc, .22);
-      c.fillRect(0, hy - Math.max(1, h * 0.0015), w, Math.max(1, h * 0.003));
-    } else if (sceneId === 'mystic_throne' || sceneId === 'mystic_ruins') {
-      /* 石质：远处一道拱门 + 近处地面反光 */
-      c.fillStyle = CV.a(ink, .85);
-      const aw = w * 0.34, ah = h * 0.3, ax = w * 0.33, ay = hy - ah;
-      c.beginPath();
-      c.moveTo(ax, hy); c.lineTo(ax, ay + aw / 2);
-      c.arc(ax + aw / 2, ay + aw / 2, aw / 2, Math.PI, 0);
-      c.lineTo(ax + aw, hy); c.closePath(); c.fill();
-      c.fillStyle = CV.a(tone.acc, .14); c.fillRect(0, hy, w, h - hy);
-    } else if (sceneId === 'tech_base' || sceneId === 'tech_waste') {
-      /* 机械纵深：横梁 + 管线 */
-      c.fillStyle = CV.a(ink, .9);
-      for (let i = 0; i < 4; i++) {
-        const y = hy - i * (h * 0.11);
-        c.fillRect(0, y, w, h * (0.02 + 0.008 * i));
-      }
-      c.strokeStyle = CV.a(tone.acc, .28); c.lineWidth = Math.max(1, 2 * CV.SCALE);
-      for (let i = 0; i < 5; i++) {
-        const x = w * (0.12 + i * 0.19);
-        c.beginPath(); c.moveTo(x, 0); c.lineTo(x, hy); c.stroke();
-      }
-    } else if (sceneId === 'bio_lab' || sceneId === 'bio_swamp' || sceneId === 'bio_sea') {
-      /* 生化：培养舱柱 / 巨骨 / 柱廊 */
-      c.fillStyle = CV.a(ink, .86);
-      const cols = sceneId === 'bio_sea' ? 6 : 4;
-      for (let i = 0; i < cols; i++) {
-        const x = w * (0.1 + i * (0.8 / (cols - 1 || 1)));
-        c.fillRect(x - w * 0.022, h * 0.2, w * 0.044, hy - h * 0.2);
-      }
-      c.fillStyle = CV.a(tone.acc, .1); c.fillRect(0, hy, w, h - hy);
-    } else {
-      /* ghost 一族：一排窗 / 一道长廊 */
-      c.fillStyle = CV.a(ink, .88);
-      if (sceneId === 'ghost_wall') {
-        c.fillRect(0, 0, w, h * 0.18); c.fillRect(0, hy, w, h - hy);
-        for (let i = 0; i < 5; i++) {
-          const x = w * (0.08 + i * 0.21);
-          const fl = 0.7 + 0.3 * Math.sin(t * 1.1 + i * 2);
-          c.fillStyle = CV.a(tone.acc, .5 * fl);
-          c.beginPath(); c.arc(x, h * 0.26, w * 0.014 * fl, 0, Math.PI * 2); c.fill();
-          c.fillStyle = CV.a(ink, .88);
-        }
-      } else {
-        for (let i = 0; i < 4; i++) {
-          const x = w * (0.09 + i * 0.23);
-          c.fillRect(x, h * 0.22, w * 0.12, h * 0.4);
-        }
-      }
-    }
-    c.restore();
-  }
+  /* ================= 2026-10-03（父亲大人：「把之前占位用的图形删掉」）=================
+     这里原来有两层**程序化占位**：`bgBase`（渐变 + 地平线那一口光）与 `bgStructure`
+     （按母版画一排柱子 / 拱门 / 横梁 / 窗格的纯多边形）。它们是"还没有真图"时期的替身，
+     父亲大人当时的原话就是"程序化背景只作为开发占位，不能继续作为最终视觉"。
+     现在 36 个世界 + 深井 + 12 张母版**全部有正式图**，这两层再也不会走到画面上了 ——
+     整个删掉（约 100 行）。
+     ⚠️ 删的是"**占位画面**"，不是"**永不黑屏**"那条保险：图还在飞 / 加载失败时，
+        `Story.bg` 一律铺 `bgFlat`（只取本场景主题色 + 一点垂直明暗的平底，**没有任何几何**），
+        它看起来就是"画还没显影"，而不是"另一张粗糙的画"。
+     ⚠️ 氛围层（`bgAir`：雾 / 尘 / 光束）**保留** —— 它不是占位，是叠在正式图上的那层气氛。 */
   /* 雾 / 尘 / 光束（三层里最上面那层"氛围"）：全部按时间连续运动 */
   function bgAir(c, w, h, t, sceneId) {
     const tone = toneOf(sceneId), cxp = w * 0.5;
@@ -340,28 +259,34 @@
     c.restore();
   }
   /* 整屏底图（挂到 CV.veilPage）：背景 + 结构 + 氛围，带一点"镜头推移" */
-  /* ================= 正式场景图接入（2026-10-01 二轮） =================
+  /* ================= 正式场景图接入（2026-10-01 二轮 → 2026-10-03 换 36 世界正式图） =================
      父亲大人：「程序化背景只作为开发占位，不能继续作为最终视觉」「正式素材独立分包」
      「素材审核通过后才接入」。
-     所以这里是一条**可插拔**的管线，图没到位时行为与今天完全一样：
+     所以这里是一条**可插拔**的管线：
        ① 第一次进剧情 → 试着 `wx.loadSubpackage({name:'story'})`（分包没配 / 失败都**静默忽略**）；
-       ② 取 `STORYDATA.SCENE_FILE[sceneId]` 的那张图（默认 `story/scene/<id>.jpg`）；
-       ③ 加载成功 → cover 铺满 + 原有的雾/光/尘/压暗（**层不变，只换底**）；
-       ④ 加载失败 / 文件不在 / 平台没有 createImage → **回落程序化占位**（永不黑屏、永不抛错）。
-     换图 = 往 `story/scene/` 丢 12 张同名文件；**不改任何剧情代码**。 */
+       ② 按 key 取图 —— 世界/深井取自己那张（`WORLD_SCENE_FILE`），母版 id 折到代表世界
+          （`MASTER_WORLD`，见 `sc-story-data.js`）；
+       ③ 加载成功 → cover 铺满 + 雾/光/尘 + 上下压暗（**层不变，只换底**）；
+       ④ 加载失败 / 文件不在 / 平台没有 createImage → 铺**主题平底**（永不黑屏、永不抛错）。
+     换图 = 往 `story/scene/` 丢同名文件；**不改任何剧情代码**。 */
   const IMG = {};                 // key（sceneId **或世界 id**）→ {ok:true,img} | {fail:true} | {loading:true}
   let subpkgTried = false;
   /* R3.3（父亲大人："36 个世界的场景和 boss 图片…到时你可以分别替换进去"）：
      取图的**文件名**允许按世界来 —— `WORLD_SCENE_FILE['W07'] = 'story/scene/img_scene_W07.jpg'`。
-     命中就用专属图；没配/没这张文件 → 回落 12 张母版（`SCENE_FILE[sceneId]`）→ 再回落程序化占位。
      于是"换图"永远只是**丢文件**，不改代码（这条是 B 批立的规矩）。 */
+  /* 取图：世界 id（含 `corridor`）用自己那张；**母版 id**（人物/装备故事用的那 12 个）
+     经 `MASTER_WORLD` 折到它的代表世界 —— 母版**文件**在 2026-10-03 已删，那条链靠这一步活着。 */
   function sceneFile(id) {
     const byWorld = (SD.WORLD_SCENE_FILE || {})[id];
-    return byWorld || ((SD.SCENE_FILE || {})[id]) || null;
+    if (byWorld) return byWorld;
+    const m = (SD.MASTER_WORLD || {})[id];
+    return (m && (SD.WORLD_SCENE_FILE || {})[m]) || null;
   }
-  /* 这个世界该用哪把取图 key：有专属图 → 用世界 id；没有 → 用那 12 个母版里的 sceneId。 */
-  Story.sceneKeyOf = function (worldId) {
-    return (SD.WORLD_SCENE_FILE || {})[worldId] ? worldId : Story.sceneOf(worldId);
+  /* 这个世界该用哪把取图 key：世界/深井 → 它自己；母版 id → 代表世界那张。 */
+  Story.sceneKeyOf = function (id) {
+    if ((SD.WORLD_SCENE_FILE || {})[id]) return id;
+    const m = (SD.MASTER_WORLD || {})[id];
+    return m || Story.sceneOf(id);
   };
   Story.sceneFileOf = function (worldId) { return sceneFile(Story.sceneKeyOf(worldId)); };
   function trySubpackage() {
@@ -381,29 +306,14 @@
     if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
     const file = sceneFile(id);
     if (!file || typeof wx === 'undefined' || !wx.createImage) { IMG[id] = { fail: true }; return false; }
-    /* ================= R3.3：**先专属图、后母版**的两级兜底 =================
-       插槽铺满之后（36 个世界都声明了 `img_scene_W##.jpg`），如果只按"声明了就用专属图"，
-       那么**图还没到的世界会连现成的 12 张主题母版一起丢掉**，整片掉回程序化占位 ——
-       等于"为了等新图，把旧图先撕了"。所以这里加一级：专属图加载失败 → **同一把 key 上
-       再试一次它所属的那张母版**（`SCENE[wid]` → `SCENE_FILE`）。
-       玩家看到的结果：新图到了就是新图；没到就还是原来那张；都没有才程序化（永不黑屏）。 */
-    const master = (function () {
-      const m = (SD.SCENE_FILE || {})[(SCENE || {})[id]];
-      return (m && m !== file) ? m : null;
-    })();
+    /* R3.3 曾经在这里做"专属图失败 → 再试一次所属母版"的两级兜底；2026-10-03 母版图删掉之后
+       这一级没有第二张可试了 —— 取图那一步（`sceneFile` + `sceneKeyOf`）已经把世界/母版/深井
+       三路折成**同一个文件**，落到这里就只剩"成 / 不成"两种结果，成了画图、不成就铺平底。 */
     try {
       const img = wx.createImage();
       IMG[id] = { loading: true };
       img.onload = function () { IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
-      img.onerror = function () {
-        if (!master) { IMG[id] = { fail: true }; return; }
-        try {
-          const fb = wx.createImage();
-          fb.onload = function () { IMG[id] = { ok: true, img: fb }; try { CV.render(); } catch (e) {} };
-          fb.onerror = function () { IMG[id] = { fail: true }; };
-          fb.src = master;
-        } catch (e) { IMG[id] = { fail: true }; }
-      };
+      img.onerror = function () { IMG[id] = { fail: true }; };
       img.src = file;
     } catch (e) { IMG[id] = { fail: true }; }
     return false;
@@ -468,7 +378,10 @@
        ① 三种状态分清楚：`ready`（有图）/ `loading`（在飞）/ `failed`（废了）；
        ② **loading 期间不许画程序化场景** —— 只铺一层"本场景主题色的平底"（`bgFlat`，无几何、无暖灯），
           图到了是一次**淡入**，不是换一张画；
-       ③ 程序化那两层（`bgBase` + `bgStructure`）**只在 failed 时**才画 —— 它是保险，不是表现路径。
+       ③ （2026-10-03 更新）原来 failed 还要补画 `bgBase` + `bgStructure` 那两层程序化占位；
+          父亲大人确认"正式图都到位了，把占位用的图形删掉"之后，那两层**整个删掉** ——
+          loading 与 failed 现在**同一条路**（都是 `bgFlat`），少一条分支、也少一套观感。
+          "永不黑屏"的保险仍然成立：平底不是黑屏。
      配套：`Story.preloadWorld()` 在**进世界页 / 开打前**就把图挂上（见 dungeon 的调用点），
      让"loading"这段尽量发生在玩家还没看到这一页的时候。 */
   Story.sceneState = function (sceneId) {
@@ -522,14 +435,14 @@
          页面里那些短小的 save/restore 对（画一行字、画一个图形）不涉及整屏位移，保持原样。 */
     try {
     c.translate(w / 2 + ox, h / 2); c.scale(zoom, zoom); c.translate(-w / 2, -h / 2);
-    /* 底：ready → 正式图；loading → 主题平底（**不画旧场景**）；failed → 才走程序化保险 */
+    /* 底：ready → 正式图；loading / failed → 主题平底（`bgFlat`）。
+       2026-10-03：原来 failed 走的是 `bgBase + bgStructure` 那两层程序化占位 —— 删掉了，
+       两种状态现在**长得一样**（都是"画还没显影"的平底），对玩家来说是同一种观感，
+       对代码来说是少一条分支。 */
     const st = Story.sceneState(scKey);
     if (st === 'ready') {
       try { drawSceneCover(c, IMG[scKey].img, w, h); }
       catch (e) { bgFlat(c, sceneId, w, h); }
-    } else if (st === 'failed') {
-      bgBase(c, sceneId, w, h);
-      bgStructure(c, sceneId, w, h, t);
     } else {
       bgFlat(c, sceneId, w, h);
     }
@@ -561,7 +474,10 @@
       scene: o.scene || 'god_hall', title: o.title || '', chNo: o.chNo || '',
       /* R3.3：取图 key 与"色调 sceneId"分开（见 `Story.bg` 那段）——
          从 `meta.worldId` 算一次，**只有这里算**，后面全都读它。 */
-      sceneKey: (o.meta && o.meta.worldId) ? Story.sceneKeyOf(o.meta.worldId) : (o.scene || 'god_hall'),
+      /* `scene`（这一拍属于哪个"场景气质"）与 `sceneKey`（**取哪张图**）分开：
+         · 世界段落 → 世界自己的图；
+         · 人物 / 装备故事 → `o.scene` 是母版 id，经 `sceneKeyOf` 折到它的代表世界（母版图已删）。 */
+      sceneKey: Story.sceneKeyOf((o.meta && o.meta.worldId) || o.scene || 'god_hall'),
       actor: o.actor || null,               // 说话人 charId（画剪影）
       obj: o.obj || '',                     // 关键物件名（物件层）
       chapter: o.chapter || null,           // 章节转场（卷首第一次进入才带）
@@ -888,10 +804,17 @@
       cur.chapter = null;                  // 放完就卸掉，后面几拍不再走这条路
     }
     /* ③ 角色剪影层：说话人有 charId 就画他的程序剪影，站在画布右侧 1/3 */
-    /* ③ 角色层：**正式 Boss 立绘优先**，没有才回落程序剪影。
+    /* ③ 角色层：**正式 Boss 立绘优先**；人物故事那种没有立绘的，才画程序剪影。
        Boss 图的规格是"人物在画面右 1/3、上半身到大腿、左侧留白"（§六），
        所以整张按**高度 contain**（绝不拉伸、绝不裁头）后靠右贴底 ——
-       人物自然落在屏幕右侧，左边那块透明区正好留给标题。 */
+       人物自然落在屏幕右侧，左边那块透明区正好留给标题。
+       ================= 2026-10-03（父亲大人：「把之前占位用的图形删掉」）=================
+       ⚠️ 下面那个 `else if (act)` 原来**把 Boss 也接住了**：立绘没到位时，Boss 会退成
+          一个程序剪影 —— 父亲大人看到的"Boss 用几何形体画的、有点粗糙"就是它。
+          36 张正式立绘到位之后这条退路不该再出现在 Boss 身上，改成：
+            · **Boss 拍**：有立绘就画；没有就**不画人**（场景照旧，绝不拿几何形冒充 Boss）；
+            · **人物/装备故事拍**（`act` 有值、`bossId` 为空）：剪影**保留** ——
+              那不是占位，是这类故事自己的画法（"一个人站在光里"）。 */
     const bossId = (cur.kind === 'boss' && cur.meta && cur.meta.worldId) ? cur.meta.worldId : null;
     const act = cur.actor || actorOf(b);
     if (bossId && ensureBoss(bossId)) {
@@ -904,7 +827,7 @@
       c.globalAlpha = 0.98;
       c.drawImage(img, CV.W - dw, bottom - dh, dw, dh);
       c.restore();
-    } else if (act) {
+    } else if (!bossId && act) {
       /* 站位照母版规格：人物站画布**右 1/3**、脚踩在地平线附近（62% 高）；
          别顶到台词区（下 26% 是安全区）。 */
       const size = Math.min(CV.W * 0.62, bottom * 0.52);
@@ -1007,21 +930,22 @@
      战斗页是整屏接管（chromeless），之前被我一刀排除在铺底之外 —— 别处是一张画，一进战斗就纯黑。
      现在它也有 veil：**这一场打的是哪个世界，就用那个世界的正式场景图**（`CV.battleWorld`
      由 sc-battle 在开打时写）。底下压 62% 的暗，战场上的头像/血条/日志照样读得清。
-     图没到位 / 深井那种没有世界号的战斗 ⇒ 回落程序化底（sky + 那盏暖光），不黑屏。 */
+     图还在飞 ⇒ 铺主题平底（不黑屏）；深井那种**没有世界号**的战斗 ⇒ 用它自己那张图
+     （`WORLD_SCENE_FILE.corridor`，父亲大人 2026-10-03 单独补的一张）。 */
   CV.veils.battle = function (c) {
     const wid = CV.battleWorld || '';
     const scene = wid && SCENE[wid] ? SCENE[wid] : null;
-    /* R3.3：图按世界取（有专属图就用它），色调仍按那 12 个母版 —— 两者分开算。 */
-    const scKey = (wid && Story.sceneKeyOf) ? Story.sceneKeyOf(wid) : scene;
+    /* R3.3：图按世界取（有专属图就用它），色调仍按那 12 个母版 —— 两者分开算。
+       2026-10-03：没有世界号（深井）时**不再是"没图"**，改成取 `corridor` 那一张 ——
+       深井现在也有自己的正式场景图了。 */
+    const scKey = (wid && Story.sceneKeyOf) ? Story.sceneKeyOf(wid) : 'corridor';
     /* R1.7 闪屏修法（与 `Story.bg` 同一份口径，**一处判断不许各写一份**）：
-       ready → 正式场景图；loading → 主题平底；failed → 才回落程序化。 */
+       ready → 正式场景图；loading / failed → 主题平底（程序化那两层已按父亲大人要求删掉）。 */
     const st = Story.sceneState(scKey);
     if (st === 'ready') {
-      try { drawSceneCover(c, IMG[scKey].img, CV.W, CV.H); } catch (e) { bgFlat(c, scene, CV.W, CV.H); }
-    } else if (st === 'failed') {
-      bgBase(c, scene || 'tech_base', CV.W, CV.H);
+      try { drawSceneCover(c, IMG[scKey].img, CV.W, CV.H); } catch (e) { bgFlat(c, scene || 'corridor', CV.W, CV.H); }
     } else {
-      bgFlat(c, scene, CV.W, CV.H);
+      bgFlat(c, scene || 'corridor', CV.W, CV.H);
     }
     c.fillStyle = CV.a(CV.C.shade, .62);
     c.fillRect(0, 0, CV.W, CV.H);

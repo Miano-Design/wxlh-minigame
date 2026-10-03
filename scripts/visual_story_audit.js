@@ -38,38 +38,74 @@ function stripComments(s) {
 const SD = loadStoryData();
 const SCENE_IDS = ['bio_lab', 'bio_swamp', 'bio_sea', 'ghost_house', 'ghost_town', 'ghost_env',
   'ghost_wall', 'tech_waste', 'tech_base', 'mystic_ruins', 'mystic_throne', 'god_hall'];
-const BOSS_IDS = ['W06', 'W12', 'W18', 'W24', 'W30', 'W36'];
+/* ================= 2026-10-03（父亲大人送图）=================
+   口径从"**12 张母版 + 6 个卷末 Boss**"变成"**36 个世界各一张 + 深井一张 + 12 张母版**"：
+     · 每个世界都有**自己**的场景图（`img_scene_W01..W36.jpg`）与 Boss 立绘（`img_boss_W01..W36.png`）；
+     · 12 张母版**留着**（`SCENE_FILE`）—— 它们不是占位，是**人物故事 / 装备故事**的底图
+       （那条链按 sceneId 取图，见 `sc-story.js` 的 `charScene` / `itemScene`）；
+     · 深井单独一张（`img_scene_corridor.jpg`），它不在 36 的编号里。
+   所以 `SCENE_INFO` 现在是 **12 + 1（深井）**，Boss 是 **36**。*/
+const SCENE_EXTRA = ['corridor'];
+const WORLD_IDS = [];
+for (let i = 1; i <= 36; i++) WORLD_IDS.push('W' + (i < 10 ? '0' + i : i));
+const BOSS_IDS = WORLD_IDS.slice();
 const STORY_SRC = stripComments(read('js/sc-story.js'));
 const DUN_SRC = stripComments(read('js/sc-dungeon.js'));
 const BATTLE_SRC = stripComments(read('js/sc-battle.js'));
 const STORY_RAW = read('js/sc-story.js');
 
-/* ---------- ①②③ 12 个 sceneId：一处不多、一处不少 ---------- */
+/* ---------- ①②③ 12 个母版 + 深井：一处不多、一处不少 ---------- */
 {
   const have = Object.keys(SD.SCENE_INFO || {});
-  const miss = SCENE_IDS.filter((id) => have.indexOf(id) < 0);
-  const extra = have.filter((id) => SCENE_IDS.indexOf(id) < 0);
-  t('① 场景表正好是那 12 个母版（不多不少）', miss.length === 0 && extra.length === 0,
-    '12 个 sceneId 与规格逐字一致',
+  const allow = SCENE_IDS.concat(SCENE_EXTRA);
+  const miss = allow.filter((id) => have.indexOf(id) < 0);
+  const extra = have.filter((id) => allow.indexOf(id) < 0);
+  t('① 场景表正好是那 12 个母版 ＋ 深井（不多不少）',
+    miss.length === 0 && extra.length === 0,
+    '12 个母版 + corridor（深井）',
     '缺 ' + (miss.join(' ') || '无') + ' ｜ 多出来的 ' + (extra.join(' ') || '无'));
-  const files = Object.keys(SD.SCENE_FILE || {});
-  const fmiss = SCENE_IDS.filter((id) => files.indexOf(id) < 0);
-  t('② 每个场景都登记了正式图路径（SCENE_FILE）', fmiss.length === 0, '12 条映射',
-    fmiss.length ? ('缺 ' + fmiss.join(' ')) : (files.length + ' 条'));
-  const badName = files.filter((id) => {
-    const v = String(SD.SCENE_FILE[id] || '');
-    return /[^\x00-\x7F]/.test(v) || v !== v.toLowerCase();
-  });
-  t('③ 场景图文件名全是 ASCII 小写（包内不许中文名/大写）', badName.length === 0,
-    'base name /[a-z0-9_]+\\.jpg/', badName.length ? badName.join(' ') : '全部合规');
+  /* ② 母版**文件**已按父亲大人 2026-10-03 的要求删除；每个母版改由
+        `MASTER_WORLD` 折到一个**代表世界**（人物故事 / 装备故事那条链靠它活着）。
+        判据三条：12 个母版都有代表世界 · 代表世界都是真世界 · 它指的图真的在磁盘上。 */
+  const mw = SD.MASTER_WORLD || {};
+  const mwMiss = SCENE_IDS.filter((id) => !mw[id]);
+  const mwBad = Object.keys(mw).filter((id) => !(SD.WORLD_SCENE_FILE || {})[mw[id]]
+    || !fs.existsSync(path.join(ROOT, String((SD.WORLD_SCENE_FILE || {})[mw[id]] || ''))));
+  t('② 12 个母版都折到"代表世界"、且那张世界图真的在',
+    mwMiss.length === 0 && mwBad.length === 0, '12 条 MASTER_WORLD → img_scene_W##.jpg',
+    (mwMiss.length || mwBad.length)
+      ? ('缺 ' + (mwMiss.join(' ') || '无') + ' ｜ 指空的 ' + (mwBad.join(' ') || '无'))
+      : (Object.keys(mw).length + ' 条，全部指到在盘上的世界图'));
+  const files = Object.keys(SD.WORLD_SCENE_FILE || {});
+  /* ③ 文件名契约：把 `WORLD_SCENE_FILE`（36 世界 + 深井）整张表过一遍 ——
+         送来的深井图原名是中文，落包时由 `_imgpack.py` 改名为 `img_scene_corridor.jpg`，
+         这条尺子就是钉"改名真的做了"的那一处。 */
+  const allPaths = files.map((id) => [id, String(SD.WORLD_SCENE_FILE[id] || '')]);
+  /* 文件名契约（2026-10-03 收口成一条正则）：
+       · **不许非 ASCII**（中文名一律不行——送来的 `img_scene_深井.jpg` 就是反例，落包时改名）；
+       · **不许空格**；
+       · 形状只有两种：`img_scene_W##.jpg`（世界的，**大写 W 是唯一被允许的大写**）
+         与 `img_scene_<小写英文/数字/下划线>.jpg`（深井 corridor 这一类）。 */
+  const NAME_RE = /^story\/(scene|boss)\/img_(scene|boss)_(W\d\d|[a-z0-9_]+)\.(jpg|png)$/;
+  const badName = allPaths.filter((kv) => !NAME_RE.test(kv[1])).map((kv) => kv[0] + '(' + kv[1] + ')');
+  t('③ 场景图文件名合规（无中文 / 无空格 / 只有 W## 一处大写）', badName.length === 0,
+    'img_scene_W##.jpg 或 img_scene_<a-z0-9_>.jpg',
+    badName.length ? badName.join(' ') : (allPaths.length + ' 条全部合规'));
 }
 
-/* ---------- ④ 六个卷末 Boss 齐 ---------- */
+/* ---------- ④ 36 个世界的 Boss 都在表里（＋深井场景在场景表里） ---------- */
 {
-  const have = Object.keys(SD.BOSS || {});
+  const have = Object.keys(SD.BOSS_FILE || {});
   const miss = BOSS_IDS.filter((id) => have.indexOf(id) < 0);
-  t('④ 六个核心 Boss（W06/W12/W18/W24/W30/W36）都在 Boss 表里',
-    miss.length === 0, '6 个', miss.length ? ('缺 ' + miss.join(' ')) : have.join(' '));
+  t('④ 36 个世界的 Boss 立绘都登记了路径（BOSS_FILE）',
+    miss.length === 0, '36 条映射', miss.length ? ('缺 ' + miss.join(' ')) : (have.length + ' 条'));
+  const smiss = WORLD_IDS.filter((id) => !(SD.WORLD_SCENE_FILE || {})[id]);
+  const cmiss = SCENE_EXTRA.filter((id) => !(SD.WORLD_SCENE_FILE || {})[id]);
+  t('④-b 36 个世界的场景图 ＋ 深井都登记了路径（WORLD_SCENE_FILE）',
+    smiss.length === 0 && cmiss.length === 0, '36 张世界图 + 1 张深井',
+    (smiss.length || cmiss.length)
+      ? ('缺 ' + smiss.concat(cmiss).join(' '))
+      : (Object.keys(SD.WORLD_SCENE_FILE || {}).length + ' 条'));
 }
 
 /* ---------- 图片元数据（JPEG 扫 SOF / PNG 读 IHDR） ---------- */
@@ -89,51 +125,71 @@ function jpegSize(buf) {
 function pngInfo(buf) {
   const sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
   for (let i = 0; i < 8; i++) if (buf[i] !== sig[i]) return null;
-  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), colorType: buf[25] };
+  /* 透明不止一种背法（2026-10-03）：真彩色带 alpha 是 colorType 6 / 4，
+     但**调色板 + tRNS**（colorType 3）一样是真透明 —— 720p 量化的立绘就是这一种。
+     判"有没有透明"必须把 tRNS 也算进来，否则会把合规的图判成"没有 alpha 通道"。 */
+  let hasTrns = false;
+  for (let i = 8; i + 8 <= buf.length;) {
+    const len = buf.readUInt32BE(i);
+    const typ = buf.toString('ascii', i + 4, i + 8);
+    if (typ === 'tRNS') { hasTrns = true; break; }
+    if (typ === 'IEND' || typ === 'IDAT') break;
+    i += 12 + len;
+  }
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), colorType: buf[25], hasTrns: hasTrns };
 }
 
 /* ---------- ⑤⑥ 素材接入状态：**报数，不假装绿** ---------- */
 {
-  const sceneMissing = [], sceneBad = [], sceneOk = [];
-  SCENE_IDS.forEach((id) => {
-    const rel = String((SD.SCENE_FILE || {})[id] || '');
-    const p = path.join(ROOT, rel);
-    if (!rel || !fs.existsSync(p)) { sceneMissing.push(id); return; }
-    const buf = fs.readFileSync(p);
-    const info = rel.toLowerCase().endsWith('.png') ? pngInfo(buf) : jpegSize(buf);
-    if (!info) { sceneBad.push(id + '(不是有效图片)'); return; }
-    const ar = info.w / info.h;
-    if (Math.abs(ar - 9 / 16) > 0.02) sceneBad.push(id + '(' + info.w + 'x' + info.h + ' 不是 9:16)');
-    else sceneOk.push(id);
+  /* ⑤ 母版那 12 个**文件**必须真的删干净（父亲大人 2026-10-03：「把旧的删掉吧」）——
+        删了才有意义：留着就是 12 × ~140 KB 的白占包体，而且没人再读它们。
+        它们各自代表的图由 ② 保证"折到的世界图真的在"。 */
+  const leftovers = SCENE_IDS.filter((id) => fs.existsSync(path.join(ROOT, 'story/scene/img_scene_' + id + '.jpg')));
+  (leftovers.length ? R.fail : R.pass)('⑤ 12 张母版文件已删除（不许留旧文件白占包体）', {
+    file: 'story/scene/', expected: '0 个 img_scene_<母版名>.jpg',
+    actual: leftovers.length ? ('还在：' + leftovers.join(' ')) : '0 个（旧图已清空，只剩 36 世界 + 深井）',
   });
-  if (sceneBad.length) {
-    R.fail('⑤ 已接入的场景图必须合规格（9:16）',
-      { expected: '1080×1920（9:16）', actual: sceneBad.join(' ') });
-  } else if (sceneMissing.length) {
-    /* 2026-10-01：正式素材已交付 ⇒ 缺一张就是**真的没接好**，按 FAIL 报（不再 WARN 放过）。 */
-    R.fail('⑤ 12 张正式场景图必须全部就位',
-      { expected: '12 张 story/scene/img_scene_<sceneId>.jpg（1080×1920）',
-        actual: '缺 ' + sceneMissing.length + ' 张：' + sceneMissing.join(' ') });
-  } else {
-    R.pass('⑤ 正式场景图 12 / 12 已接入且合规格', { expected: '12 张 9:16', actual: '全部就位' });
-  }
 
-  /* Boss：**规格 2026-10-01 改为 1080×1920 / PNG（不再 1024×1536）**，且必须真透明 */
+  /* ⑤-b 36 张世界场景图 + 深井：都在、都是 9:16、都在 story 分包里。
+         ⚠️ 尺寸口径 2026-10-03 从"1080×1920"放宽到"**9:16 且宽 ≥ 720**" ——
+            送来的原图合计 227MB，进包必须压；压完是 810×1440（场景）。只要还是 9:16、
+            宽不低于 720，就是"能铺满且不糊"的那一档。 */
+  const wsMissing = [], wsBad = [];
+  WORLD_IDS.concat(SCENE_EXTRA).forEach((id) => {
+    const rel = String((SD.WORLD_SCENE_FILE || {})[id] || '');
+    const p = path.join(ROOT, rel);
+    if (!rel || !fs.existsSync(p)) { wsMissing.push(id); return; }
+    const info = jpegSize(fs.readFileSync(p));
+    if (!info || Math.abs(info.w / info.h - 9 / 16) > 0.02 || info.w < 720) {
+      wsBad.push(id + (info ? ('(' + info.w + 'x' + info.h + ')') : '(不是有效 JPEG)'));
+    }
+  });
+  t('⑤-b 36 张世界场景图 ＋ 深井都就位、都是 9:16（宽 ≥ 720）',
+    wsMissing.length === 0 && wsBad.length === 0, '37 张 9:16 JPEG',
+    (wsMissing.length || wsBad.length)
+      ? ('缺 ' + (wsMissing.join(' ') || '无') + ' ｜ 不合规格 ' + (wsBad.join(' ') || '无'))
+      : '37/37 就位');
+
+  /* Boss：**规格 2026-10-01 改为 1080×1920 / PNG**；2026-10-03 起量化的 720×1280 也算合规
+     （同样 9:16、同样真透明，见 `pngInfo` 的 tRNS 说明）。 */
   const bossMissing = BOSS_IDS.filter((id) => !fs.existsSync(path.join(ROOT, 'story/boss/img_boss_' + id + '.png')));
   if (bossMissing.length) {
-    R.fail('⑥ 六个核心 Boss 立绘必须全部就位',
-      { expected: '6 张 story/boss/img_boss_<W##>.png（1080×1920 · 透明 PNG）',
+    R.fail('⑥ 36 张 Boss 立绘必须全部就位',
+      { expected: '36 张 story/boss/img_boss_<W##>.png（9:16 · 透明 PNG）',
         actual: '缺 ' + bossMissing.join(' ') });
   } else {
     const bad = [];
     BOSS_IDS.forEach((id) => {
       const info = pngInfo(fs.readFileSync(path.join(ROOT, 'story/boss/img_boss_' + id + '.png')));
       if (!info) { bad.push(id + '(不是 PNG)'); return; }
-      if (info.colorType !== 6 && info.colorType !== 4) bad.push(id + '(没有 alpha 通道)');
-      if (info.w !== 1080 || info.h !== 1920) bad.push(id + '(' + info.w + 'x' + info.h + ' ≠ 1080x1920)');
+      const alpha = info.colorType === 6 || info.colorType === 4 || (info.colorType === 3 && info.hasTrns);
+      if (!alpha) bad.push(id + '(没有 alpha 通道)');
+      if (Math.abs(info.w / info.h - 9 / 16) > 0.02 || info.w < 720) {
+        bad.push(id + '(' + info.w + 'x' + info.h + ' 不是 9:16 或宽不足 720)');
+      }
     });
-    t('⑥ 六个核心 Boss 立绘都合规格（1080×1920 · 透明 PNG）', bad.length === 0,
-      '1080×1920 · colorType 6/4', bad.length ? bad.join(' ') : '6/6');
+    t('⑥ 36 张 Boss 立绘都合规格（9:16 · 真透明 PNG）', bad.length === 0,
+      '9:16 · colorType 6/4 或 3+tRNS', bad.length ? bad.join(' ') : '36/36');
   }
 }
 

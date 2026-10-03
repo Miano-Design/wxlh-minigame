@@ -16,31 +16,42 @@
 
 | 资源 | 数量 | 路径规则 | 真实使用点 |
 |---|---|---|---|
-| 场景母版 | **12** | `story/scene/img_scene_<sceneId>.jpg` | `Story.bg()`（剧情页）/ `CV.veils.battle()`（战斗页）——**同一张图**，所以剧情→战斗视觉连续 |
-| Boss 立绘 | **6** | `story/boss/img_boss_W<nn>.png` | 剧情页 Boss 层 + **战斗出场序列** `Story.bossImage()` |
+| 世界场景图 | **36** | `story/scene/img_scene_W<nn>.jpg` | `Story.bg()`（剧情页）/ `CV.veils.battle()`（战斗页）——**同一张图**，所以剧情→战斗视觉连续 |
+| 深井场景图 | **1** | `story/scene/img_scene_corridor.jpg` | `CV.veils.battle()` 在没有 `CV.battleWorld`（深井那种无世界号的战斗）时取它 |
+| Boss 立绘 | **36** | `story/boss/img_boss_W<nn>.png` | 剧情页 Boss 层 + **战斗出场序列** `Story.bossImage()` |
 | 图标源 SVG | 60 | `story/icons-src/`（`packOptions.ignore` 排除，不进包） | 由 `scripts/build-visual-assets.js` 编译 |
 
-### 12 场景 ↔ 世界映射（`STORYDATA.SCENE`，一处真源）
+> **2026-10-03 换图**：父亲大人送来 36 个世界的场景 + Boss ＋ 深井一张。
+> 原图合计 **227 MB** —— 落包前一律先压（`scripts/_imgpack.py`）：
+> 场景 810×1440 JPEG q74（~139 KB/张）、Boss 720×1280 PNG 256 色带真透明（~200 KB/张）。
+> 剧情分包 **20.9 MB → 13.3 MB**，整包 24.5 MB → **16.8 MB**。
+> 同时删掉 12 张旧场景母版（**文件**），"母版 id"那条链改由 `STORYDATA.MASTER_WORLD` 折到代表世界。
 
-| 场景 id | 母版名 | 用在哪些世界 |
+### "场景气质" ↔ 世界映射（`STORYDATA.SCENE`，一处真源）
+
+| 场景气质 | 名字（页眉用） | 用在哪些世界 | 代表世界（`MASTER_WORLD`，取图用） |
 |---|---|---|
-| `bio_lab` | 培养舱走廊 | W01 W02 W23 |
-| `bio_swamp` | 瘴气荒原 | W09 W10 W28 W33 |
-| `bio_sea` | 沉海柱廊 | W16 |
-| `ghost_house` | 旧宅内厅 | W03 W07 W15 |
-| `ghost_town` | 雾中小镇 | W08 |
-| `ghost_env` | 客轮内舱 | W05 W18 W21 |
-| `ghost_wall` | 长明高墙 | W27 W31 |
-| `tech_waste` | 轨道废土 | W06 W17 |
-| `tech_base` | 机械纵深 | W19 W22 W26 W30 W34 |
-| `mystic_ruins` | 石质遗迹 | W04 W11 W24 W29 W35 |
-| `mystic_throne` | 冰雪王座 | W12 W13 |
-| `god_hall` | 灯阁大厅 | W14 W20 W25 W32 W36 |
+| `bio_lab` | 培养舱走廊 | W01 W02 W23 | W01 |
+| `bio_swamp` | 瘴气荒原 | W09 W10 W28 W33 | W09 |
+| `bio_sea` | 沉海柱廊 | W16 | W16 |
+| `ghost_house` | 旧宅内厅 | W03 W07 W15 | W03 |
+| `ghost_town` | 雾中小镇 | W08 | W08 |
+| `ghost_env` | 客轮内舱 | W05 W18 W21 | W05 |
+| `ghost_wall` | 长明高墙 | W27 W31 | W27 |
+| `tech_waste` | 轨道废土 | W06 W17 | W06 |
+| `tech_base` | 机械纵深 | W19 W22 W26 W30 W34 | W19 |
+| `mystic_ruins` | 石质遗迹 | W04 W11 W24 W29 W35 | W04 |
+| `mystic_throne` | 冰雪王座 | W12 W13 | W12 |
+| `god_hall` | 灯阁大厅 | W14 W20 W25 W32 W36 | W14 |
 
-### 6 Boss ↔ 世界（六卷锚点）
+### Boss ↔ 世界
+
+> 2026-10-03 起 **36 个世界的守关 Boss 全部有专属立绘**（原来只有六个卷末锚点）。
+
 
 | 世界 | Boss | 文件 |
 |---|---|---|
+| **W01…W36（全部 36 个）** | 取 `WORLDS[].boss` | `story/boss/img_boss_W<nn>.png` |
 | W06 轨道废土带 | 轨道主控 | `story/boss/img_boss_W06.png` |
 | W12 蚀环远征 | 蚀冠之王 | `img_boss_W12.png` |
 | W18 白墙疗养院 | 白衣院长 | `img_boss_W18.png` |
@@ -48,8 +59,9 @@
 | W30 熔芯之炉 | 熔芯核心 | `img_boss_W30.png` |
 | W36 灯阁王座 | 终焉·灯主 | `img_boss_W36.png` |
 
-> 其余 30 个世界的守关 Boss **没有专属立绘**（原素材就没有），出场序列照常走：
-> 名字取 `WORLDS[].boss`，台词/身份取 `STORYDATA.ARC[wid].bossTrigger / bossRole` —— **不画空框**。
+> 名字取 `WORLDS[].boss`，台词/身份取 `STORYDATA.ARC[wid].bossTrigger / bossRole`。
+> 立绘没到位时**不再退成程序几何剪影**——不画人，场景照旧
+> （父亲大人：「把之前占位用的图形删掉」）。
 
 ## 三、图标（程序化，不进包体）
 
@@ -87,4 +99,3 @@ failed  → 才走程序化保险（bgBase + bgStructure）
 | Boss 立绘 | 出场序列只演文字（名字 + 台词 + 身份 + 机制行） |
 | 主 KV | 首页回落 `CV.defaultVeil` 平色底 |
 | 图标 op | 回落老表（`NAV_ICONS` 等）或 emoji 兜底 |
-
