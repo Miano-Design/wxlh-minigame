@@ -443,6 +443,7 @@
     };
     S.party.filter(Boolean).forEach((id) => { run.hpPct[id] = 1; });
     Core.setPendingRun(run);
+    lastPlayed = { worldId: worldId, diff: diff, stageIdx: stageIdx };
     fightWave();
   }
 
@@ -450,18 +451,45 @@
      原来只有一份 `afterSettle`，「再来一次」（重打本关）先写进去、紧接着被「下一关」覆盖，
      于是「↻ 再来一次」实际进的是下一关（想刷本关刷不到）。 */
   let againTarget = null, nextTarget = null;
+  /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
+     真现场：打完一场，结算页显示的是**兜底面板**「结算数据不在了 · 先回世界」——
+     只有一颗「返回世界」，**既没有「下一关」、也就没有自动下一关的倒计时**。
+     成因：`onEnd` 又跑了一次，而那时 `run` 已经被正常结算清空（`settleRun` 里 `run = null`），
+     于是走了 `if (!run) return lastResortPanel(win)` —— **把那份好面板顶掉了**。
+     （控制台那一笔 `battle · end` 里没有 `err=`，所以不是抛错，就是这一支。）
+     修法：`settleRun` 把它返回的面板记在这里；`onEnd` 再进来发现 `run` 空了，
+     就**把那一次真结算的面板还回去**（而不是拿兜底盖掉它）。兜底只在"从来没结算过"时才用。 */
+  let lastPanel = null;
+  /* 这一场打的是哪一关（`startStage` 里落）。兜底面板要靠它才能给出「↻ 再来一次 / › 下一关」——
+     没有它，"结算数据不在了"那张兜底就只剩一颗「返回世界」，玩家会以为**自动下一关没了**。 */
+  let lastPlayed = null;
+  function clearSettleTargets() { againTarget = null; nextTarget = null; lastPanel = null; }
   /* F2-1（抢修单 0928R3）：onEnd 的**兜底面板** —— 任何一条没走通的路径都必须返还一个
      能点、能退出的面板。onEnd 一抛，`finish()`（sc-battle.js）跟着抛 → 结算面板画不出来、
      busy 闸门不放 → 玩家卡死在战斗页上（上一轮探针抓到的 `reading 'wave'` 就是这么卡住的）。 */
   function lastResortPanel(win) {
+    /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
+     兜底面板原来只有一颗「返回世界」——一旦走到这里（`run` 空 / 结算抛错），
+     **「再来一次 / 下一关」全没了，自动下一关的倒计时自然也不会启动**。
+     现在：只要还记得这一场打的是哪一关，就把那两颗照常给出来（与真结算同一套目标），
+     兜底退回"保险"，而不是"把主按钮没收"。 */
+    const acts = [];
+    const lp = lastPlayed;
+    if (win && lp) {
+      const nx = lp.stageIdx >= 11 ? null : Core.nextStage(lp.worldId, lp.diff, lp.stageIdx);
+      acts.push({ label: '↻ 再来一次', style: 'ghost', id: 'dun_again' });
+      if (nx) {
+        const nw = D.WORLDS.find((x) => x.id === nx.worldId);
+        acts.push({ label: '› 下一关（' + (nw ? nw.name : nx.worldId) + ' ' + (nx.stageIdx + 1) + '/12）', style: 'primary', id: 'dun_next' });
+      }
+    }
+    acts.push({ label: '返回世界', style: 'ghost', id: 'battle_close' });
     return {
       title: win ? '这一场已结束' : '战斗失败',
       sub: win ? '结算数据不在了 · 先回世界' : '先练一练，再来。',
-      rewards: [],
-      acts: [{ label: '返回世界', style: 'ghost', id: 'battle_close' }],
+      rewards: [], acts: acts,
     };
   }
-  function clearSettleTargets() { againTarget = null; nextTarget = null; }
   function settleRun(res, hpLeft) {
     const S = Core.S;
     const wid = run.worldId, df = run.diff, si = run.stageIdx, stage = run.stage;
@@ -535,6 +563,15 @@
     /* V9.6.69（资料 §4「让玩家觉得自己成功」）：首通给一次**看得见**的庆祝 ——
        只加表现、不加资源；"人生第一次通关"那一次更明显，而且只放一次（落盘）。 */
     const firstClear = !!(comp && comp.firstClearReward);
+    /* ================= 2026-10-03（父亲大人：「我普通通关了第一个世界的 boss，这里也没有解锁」）=================
+     真 bug：`Story.markBoss(wid)` **全项目没有任何地方调用** ——
+     于是 `S.story.b[wid]` 永远是空的，卷宗 → Boss 那一栏永远「未解锁 · 打到这里才会记下来」，
+     计数也一直是 `Boss 0 / 36`。玩家明明打穿了守关 Boss，档案里却像没打过。
+     这里补上：**打赢守关 Boss 就记下来**（与那句提示"打到这里才会记下来"同一个口径）。
+     ⚠️ 只补这一个调用；`seenBoss` 的读法、卷宗那一页、`BOSS_SEEN` 的语义一个字没动。 */
+    if (win && isWorldBoss && G.Story && G.Story.markBoss) {
+      try { G.Story.markBoss(wid); } catch (e) {}
+    }
     if (firstClear && isWorldBoss && G.Story && G.Story.autoOn && G.Story.autoOn() && G.Story.hasStory && G.Story.hasStory(wid) && !G.Story.seen(wid, 'post')) {
       postStoryAfterClose = { worldId: wid };
     }
@@ -603,7 +640,12 @@
       onEnd(win, res, hpLeft) {
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
-          if (!run) return lastResortPanel(win);      // 已经在别处收掉的极端情况：不碰 run、只收尾
+          if (!run) {
+            /* 这一场**已经正常结算过**（lastPanel 有值）⇒ 把那份真面板还回去，
+               别再拿兜底把「下一关 / 再来一次」顶掉（走这行的就是父亲大人看到的那次）。
+               真·从没结算过（lastPanel 空）才用兜底，那是最后的保险。 */
+            return lastPanel || lastResortPanel(win);
+          }
           /* F6（R6 #7）：**波与波交界处累加真实阵亡数** ——
              判据是"这一波结束时 hp<=0"，而且只记**这一波新倒下的**
              （上一波已经 0 血的人不算第二次，免得一颗星被扣两遍）。
@@ -657,7 +699,8 @@
               after() { fightWave(); },
             };
           }
-          return settleRun(res, hpLeft);
+          lastPanel = settleRun(res, hpLeft);
+          return lastPanel;
         } catch (e) {
           /* 兜底不许再抛：出错了就记一笔日志、返一个"能退出"的面板（玩家永远不会卡死）。 */
           try { if (G.LOG) G.LOG.info('battle', 'end', { win: !!win, world: (w && w.id) || '', err: String((e && e.message) || e) }); } catch (e2) {}

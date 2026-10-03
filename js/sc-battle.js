@@ -1093,7 +1093,10 @@
     if (hintLines.length) total += 10 * CV.SCALE + hintLines.length * HINTLH;   // 与下面真正推进的量一致
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
     /* 剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
-    if (p.lore) total += 44 * CV.SCALE;
+    /* 2026-10-03（父亲大人：「战斗结算不需要有这个看过的提示吧，想看剧情不是在本章卡片那里看吗」）：
+       原来结算里有一行「发现：一句线索 [查看]」，现在**整行不再渲染**，高度也不再占。
+       要看剧情走世界页那张「本章」卡（那是主入口）。去掉之后结算是：
+       大标题 → 回合/副题 →（败因）→ 奖励胶囊 →（战场变化）→ 三颗按钮。 */
     if (p.changed) total += 40 * CV.SCALE;    // R1.6：「战场变化」那一行（只在 Boss 首通出现）
     if (acts.length) total += acts.length * (44 * CV.SCALE + 10 * CV.SCALE);   // V9.6.128：动作按钮改成上下排列
     total += 44 * CV.SCALE;
@@ -1148,26 +1151,6 @@
         CV.text(ln, cx - cw2 / 2 + 10 * CV.SCALE, y + 16 * CV.SCALE + i * CV.FS.md * 1.5, { size: CV.FS.md, color: CV.C.text2 });
       });
       y += 40 * CV.SCALE;
-    }
-    if (p.lore) {
-      const lw = Math.min(320 * CV.SCALE, U.iw());
-      const lh = 34 * CV.SCALE;
-      const lx = cx - lw / 2;
-      CV.round(lx, y, lw, lh, CV.RADIUS_SM, CV.a(CV.C.panel2, .50), CV.C.line2);
-      const tagW = CV.measure('发现', CV.FS.sm) + 14 * CV.SCALE, tagH = 18 * CV.SCALE;
-      const tagX = lx + 8 * CV.SCALE, tagY = y + (lh - tagH) / 2;
-      CV.round(tagX, tagY, tagW, tagH, tagH / 2, CV.a(CV.C.gold, .16), CV.C.gold);
-      CV.text('发现', tagX + tagW / 2, tagY + tagH / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
-      const tw = lw - tagW - (p.loreId ? 74 * CV.SCALE : 16 * CV.SCALE) - 16 * CV.SCALE;
-      CV.text(CV.fit(p.lore, tw, CV.FS.md), tagX + tagW + 8 * CV.SCALE, y + lh / 2, { size: CV.FS.md, color: CV.C.text2 });
-      if (p.loreId) {
-        const bw2 = 58 * CV.SCALE, bh2 = 22 * CV.SCALE;
-        const bx = lx + lw - bw2 - 6 * CV.SCALE, by = y + (lh - bh2) / 2;
-        CV.round(bx, by, bw2, bh2, bh2 / 2, CV.a(CV.C.gold, .16), CV.C.gold);
-        CV.text('查看', bx + bw2 / 2, by + bh2 / 2, { size: CV.FS.sm, align: 'center', color: CV.C.gold });
-        CV.hit(p.loreId, bx, by, bw2, bh2);
-      }
-      y += lh + 10 * CV.SCALE;
     }
     /* V9.6.128（父亲大人："把继续下一关的按钮放上面，收下奖励并返回放下面，
        上下排列、长度一致不就好了"）：

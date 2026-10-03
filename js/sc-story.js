@@ -232,19 +232,11 @@
   /* 雾 / 尘 / 光束（三层里最上面那层"氛围"）：全部按时间连续运动 */
   function bgAir(c, w, h, t, sceneId) {
     const tone = toneOf(sceneId), cxp = w * 0.5;
-    /* 光束：一点透视，从地平线往上散 */
-    c.save(); c.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 3; i++) {
-      const sway = Math.sin(t * 0.22 + i * 1.7) * w * 0.05;
-      const g = c.createLinearGradient(cxp + sway, h * 0.62, cxp + sway * 2, -h * 0.1);
-      g.addColorStop(0, CV.a(tone.acc, .10)); g.addColorStop(1, CV.a(tone.acc, 0));
-      c.fillStyle = g;
-      const bw = w * (0.05 + i * 0.035);
-      c.beginPath(); c.moveTo(cxp + sway - bw, h * 0.62); c.lineTo(cxp + sway + bw, h * 0.62);
-      c.lineTo(cxp + sway * 2 + bw * 2.2, 0); c.lineTo(cxp + sway * 2 - bw * 2.2, 0);
-      c.closePath(); c.fill();
-    }
-    c.restore();
+    /* ================= 2026-10-03（父亲大人：「这里会有这些光束，这个不是之前残留的吗」）=================
+     是的，是残留：这三条"从地平线往上散的梯形光束"是**程序化占位时代**给空场景补纵深用的，
+     当年没有真图，靠它撑起"这是个大空间"。现在每个世界都有正式场景图了，
+     它只是**在画面上糊了三块半透明梯形**（父亲大人圈的就是它）。
+     删掉 —— 雾 / 尘那两层留着：那才是"叠在真图上的气氛"，不抢画面结构。 */
     /* 尘：少量颗粒慢慢上浮（用确定性伪随机，不调 Math.random —— 尺子要可复现） */
     c.save();
     for (let i = 0; i < 22; i++) {
@@ -493,6 +485,19 @@
   let cur = null;               // { beats, i, reveal, t0, scene, title, chNo, actor, obj, kind, meta }
   let lastTs = 0;
   const REVEAL_CPS = 42;        // 每秒显字（正文节奏，不是"打字机表演"）
+  /* ================= 2026-10-03（父亲大人：「战斗剧情跳的太快了，不符合正常阅读速度」）=================
+     原来是**固定 0.72 秒**一拍 —— 二十来个字根本读不完就翻页了。
+     现在按**这一拍自己的字数**算停留：中文默读约 5~6 字/秒，取 5.5 字/秒；
+     再加 0.8 秒起步停顿（眼睛落上去需要一点时间）。
+     下限 2.6 秒 / 上限 9 秒：短句不会一闪而过，长句也不会把人晾在那儿。
+     一句 20 字的旁白 ≈ 4.4 秒 —— 这就是"正常阅读速度"。
+     ⚠️ 手动模式（玩家点屏幕翻页）不受影响：这一条只在**自动阅读**那条路上生效。 */
+  const READ_CPS = 5.5;
+  function beatReadSec() {
+    const t = (cur && cur.beats && cur.beats[cur.i]) || {};
+    const n = String(t.s || '').length;
+    return Math.max(2.6, Math.min(9, 0.8 + n / READ_CPS));
+  }
 
   Story.play = function (o) {
     if (!o || !o.beats || !o.beats.length) return false;
@@ -619,39 +624,9 @@
     if (cur && cur.kind === 'boss' && cur.meta && cur.meta.worldId) return '@boss_' + cur.meta.worldId;
     return null;
   }
-  /* 把"一个人"画成**站在场景里的剪影**（不是圆形头像徽章）。
-     形状数据仍然是 `D.avatarParts` 那一份（与头像、列表、编队同一个形，不另造一套），
-     只是**不画圆盘、不做圆形裁剪** —— 圆盘是列表里那个容器的形状，
-     剧情页这里要的是"一个人站在光里"，套个圆圈秒变徽章（模拟器上实测过）。
-     做法：同一批多边形填成近黑剪影，再按场景强调色描一道极淡的边（把轮廓从暗底里拉出来）。 */
-  function silhouette(id, cx, cy, size) {
-    const DD = D;
-    if (!DD || !DD.avatarParts) return;
-    const info = { bloodline: '', faction: '' };
-    if (id && id.charAt(0) === '@' && DD.charById && DD.charById[id]) {
-      const ch = DD.charById[id];
-      info.bloodline = ch.bloodline; info.faction = ch.faction;
-    }
-    const parts = DD.avatarParts(id, info) || [];
-    if (!parts.length) return;
-    const c = CV.ctx;
-    const tone = toneOf(cur && cur.scene);
-    c.save();
-    c.beginPath();
-    parts.forEach(function (p) {
-      p.pts.forEach(function (q, i) {
-        const px = cx - size / 2 + q[0] * size, py = cy - size / 2 + q[1] * size;
-        if (i) c.lineTo(px, py); else c.moveTo(px, py);
-      });
-      c.closePath();
-    });
-    c.fillStyle = CV.a(CV.C.bg, .86);
-    c.fill();
-    c.strokeStyle = CV.a(tone.acc, .34);
-    c.lineWidth = Math.max(1, 1.2 * CV.SCALE);
-    c.stroke();
-    c.restore();
-  }
+  /* `silhouette()`（把角色画成多边形剪影）已按父亲大人 2026-10-03 的要求删除：
+     正式 Boss 立绘到位之后，这一层只是给画面添一块塑料。要让人物也站进场景，
+     需要的是**角色立绘**素材（与 Boss 同规格），不是几何形。 */
 
   function advance() {
     if (!cur) return;
@@ -711,7 +686,8 @@
     /* 转场期间不推进显字，但自动阅读要在卷名卡结束后自动进入正文。 */
     if (cur.chapter) {
       if (Story.autoOn() && !cur.choiceLocked) {
-        if (!cur.autoAt) cur.autoAt = now + 0.35;
+        /* 卷名卡：看一眼就够，但也不是"闪一下"—— 1.6 秒。 */
+        if (!cur.autoAt) cur.autoAt = now + 1.6;
         if (now >= cur.autoAt) advance();
       }
       return;
@@ -720,7 +696,7 @@
       cur.reveal = Math.min(fullLen(), cur.reveal + dt * REVEAL_CPS);
       cur.autoAt = 0;
     } else if (!cur.chapter && Story.autoOn() && !cur.choiceLocked) {
-      if (!cur.autoAt) cur.autoAt = now + 0.72;
+      if (!cur.autoAt) cur.autoAt = now + beatReadSec();     // ← 按这一拍的字数算（见 beatReadSec）
       if (now >= cur.autoAt) advance();
     }
   }
@@ -857,12 +833,16 @@
       c.globalAlpha = 0.98;
       c.drawImage(img, CV.W - dw, bottom - dh, dw, dh);
       c.restore();
-    } else if (!bossId && act) {
-      /* 站位照母版规格：人物站画布**右 1/3**、脚踩在地平线附近（62% 高）；
-         别顶到台词区（下 26% 是安全区）。 */
-      const size = Math.min(CV.W * 0.62, bottom * 0.52);
-      silhouette(act, CV.W * 0.70, bottom * 0.54, size);
     }
+    /* ================= 2026-10-03（父亲大人：「这个几何形体不是删掉吗，现在不是有 boss 的图片吗」）=================
+     删的就是这一支：没有立绘时，原来会把角色画成一堆**多边形剪影**（图里那个淡绿色轮廓）。
+     它当年是"没有人物素材时的替身"，现在 Boss 有 36 张真立绘、场景有 37 张真图，
+     这一层只剩"给画面添一块塑料"。所以：
+       · Boss 拍 —— 有立绘就画，没有就**不画人**；
+       · 人物 / 装备故事拍 —— 也**不画**（它没有立绘素材）。
+     ⇒ 如果父亲大人希望人物故事里"人也站进场景"，那需要的是**角色立绘**这一套新素材
+       （像 Boss 那样：右侧 60~70% 构图、PNG 透明底、1080×1920）——
+       有了它我再接；在那之前，宁可不画，也不拿几何形冒充人。 */
     /* ④ 章节标题层 */
     const headY = top + 20 * CV.SCALE;
     if (cur.chNo) CV.text(cur.chNo, U.pad(), headY, { size: CV.FS.sm, color: C.gold, bold: true, ls: 1.2 });
