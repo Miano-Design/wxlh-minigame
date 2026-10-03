@@ -8,6 +8,16 @@
 
 ## 一、最近四轮的报告（倒序，最新在最上）
 
+### ⭐ 要给外部（GPT）评审的两份 —— 先看这两份
+
+| 文档 | 里面有什么 |
+|---|---|
+| [docs/story/剧情总览-给GPT评审.md](story/剧情总览-给GPT评审.md) | **一份装完剧情**：核心设定三句话 · 六卷大纲（每卷回答什么问题）· **展示内容与时机**（哪段话什么时候上屏）· **卷宗详细内容**（四个标签页各收什么、什么时候解锁）· W01–W36 逐世界完整内容（地点/物件/视觉核心/事件/敌人/Boss 的那句话/线索/下一钩子 + 全部台词） |
+| [docs/audit/当前问题卡点.md](audit/当前问题卡点.md) | **卡点清单**：每条写清"现象 / 证据 / 我查到哪一步 / 下一步从哪下手"。P0 是关卡结算页（真奖励面板被晚到的收尾盖成兜底）；另有角色立绘缺素材、W33 TTK、docs 旧名、`visual_audit` 1 条红、三端实测与加固等待办 |
+
+> 这两份都是**从实装数据生成的**（`node scripts/build_story_docs.js` / 手写维护卡点），
+> 所以文档与代码不会分叉。
+
 > ⚠️ **先看这份**：最终整合版（2.1.0）的交接与账目 ——
 > [CODEX-HANDOFF-FINAL.md](CODEX-HANDOFF-FINAL.md) · [FINAL-CHANGELOG.md](FINAL-CHANGELOG.md) ·
 > [FINAL-TEST-REPORT.md](FINAL-TEST-REPORT.md) · [ASSET-MAP.md](ASSET-MAP.md)

@@ -4563,6 +4563,32 @@ window.Core = (function () {
     const w = D.WORLDS.find(x => x.id === id);
     return (w && w.reincarn) || 0;
   }
+  /* ================= 2026-10-03（《长期留存型成长生态重平衡》§十三 / §十四）=================
+     世界解锁**只有一条规则**，由这一个函数重算：
+       世界 W 解锁  ⇔  **上一张图的普通难度 12/12 通关**  ∧  `玩家转生次数 >= W.reincarn`（没门槛＝0）。
+     所有入口都调它，谁也不许再自己写一套（原来 stageComplete 一处、迁移一处、兜底一处）。
+     为什么必须"重算"而不是"通关时顺手开下一个"：**转生门**。
+       W12 普通通关那一刻会去开 W13，但那时 reincarnations 还不够 ⇒ 被门挡住；
+       玩家**转生之后**如果没有一处再算一次，W13 就永远开不了
+       —— 这正是父亲大人说的「转生后世界解锁没刷新」。
+     ⚠️ 只动 unlocked 这一个布尔：星数 / 首通奖励 / bestWorldIdx 一律不碰。
+     ⚠️ 只**开**不**关**：已解锁的不回收（老档里"当年解锁过"没法证伪，关掉就是毁档）。 */
+  function refreshWorldUnlocks() {
+    const unlockedNow = [];
+    D.WORLDS.forEach(function (w, i) {
+      const st = S.worlds && S.worlds[w.id];
+      if (st && st.unlocked) return;
+      const need = w.reincarn || 0;
+      if (need && (S.player.reincarnations || 0) < need) return;
+      if (i === 0) { unlockWorld(w.id); unlockedNow.push(w.id); return; }
+      const pv = S.worlds && S.worlds[D.WORLDS[i - 1].id];
+      const arr = pv && pv.stages && pv.stages.normal;
+      if (Array.isArray(arr) && arr.length >= 12 && arr.every(function (x) { return x > 0; })) {
+        unlockWorld(w.id); unlockedNow.push(w.id);
+      }
+    });
+    return unlockedNow;
+  }
   function worldCleared(id, diff) {
     const w = S.worlds[id];
     return w && w.stages[diff].every(s => s > 0);
@@ -4576,7 +4602,7 @@ window.Core = (function () {
     if (stageIdx === 11 && w.stages[diff].every(s => s > 0)) {
       // 全难度通关 → 解锁下一世界 / 下一难度提示
       const wi = D.WORLDS.findIndex(x => x.id === worldId);
-      if (diff === 'normal' && wi < D.WORLDS.length - 1) unlockWorld(D.WORLDS[wi + 1].id);
+      if (diff === 'normal' && wi < D.WORLDS.length - 1) refreshWorldUnlocks();   // §十四：统一规则（转生门挡住的下次转生再算）
       // ⚠️ 通关奖励只能领一次：之前这里缺了"第一次"判断，
       // 重复刷已满进度的第 12 关会一次次重发（等于无限刷高级货币），V9.2 修。
       const fcKey = worldId + '_' + diff;
@@ -5289,6 +5315,9 @@ window.Core = (function () {
     const rp = Math.floor(100 * Math.pow(n, 1.15));
     S.player.reincarnations = n;
     addCur('rp', rp);
+    /* §十三：转生跨过了转生门，所以这一下必须把世界解锁**重算一遍** ——
+       W12 通关时开不了 W13（那时次数不够），转生完这里就把它开出来。 */
+    try { refreshWorldUnlocks(); } catch (e) {}
     /* 重置只动"等级"这一条线：等级 / 经验 / 按等级重算的可用点数（六维与技能点）。
        V9.5.78（自审）：这里原来写的是 level = 1 —— 等级改 0 基之后，转生会把玩家"送"到 Lv.1。
        改成回 Lv.0（和新建档同一个起点）。
@@ -5308,7 +5337,10 @@ window.Core = (function () {
          当年 V1.0.1 那三行是一次**收益修正** —— 世界进度清了、首通也跟着重开，转生后重练期间
          靠"重打首通"回一波钱。现在进度与首通都保留 ⇒ **转生不再带来任何"重打首通"的收益**。
        ⚠️ 已经转过生的老档（进度真被清过）由 migrate() 里 `bestWorldIdx` 那一段补偿。 */
-    unlockWorld('W01');   // 兜底：万一是空档也保证第一张进得去（正常档早解锁了，这行是无操作）
+    /* 兜底 + **全量重算**：万一是空档也保证第一张进得去；
+       同时把「上一世界普通通关 + 转生次数」这条规则重新过一遍 ——
+       开机 / 老档迁移 / 云档拉下来 / 备份恢复，走的都是这一处（§十三/§十四）。 */
+    refreshWorldUnlocks();
     save();
     return  getProxied({ ok: true, rp, count: n });
   }
@@ -5727,7 +5759,7 @@ window.Core = (function () {
 
   return  getProxied({
     get S() { return S; },
-    save, load, newGame, wipeSave, ensureState, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate,
+    save, load, newGame, wipeSave, ensureState, exportSave, importSave, saveSlot, loadSlot, slotInfo, migrate, refreshWorldUnlocks,
     /* V1.1.15（P0 存档）：读档诊断 / 从备份恢复（设置页用） */
     saveDiag, backupInfo, restoreFromBackup, loadIssue,
     /* V1.1.20（F1-5）：读档失败/更高版本 → **救援态**（禁写）＋ 玩家显式"继续新档"才解闸 */
