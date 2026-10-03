@@ -33,10 +33,16 @@ let seed = 20261002;
 Math.random = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
 
 /* ---------- 三类玩家 ---------- */
+/* ================= 2026-10-03（《长期留存型成长生态重平衡》§三）=================
+   玩家模型从原来的三类扩成书里点名的**四类**（差别仍然是"行为"，不是"战力"）：
+     A 零广告低活跃 · B 普通玩家 · C 稳定广告玩家 · D 高活跃玩家
+   ⚠️ 原来 C 那一档是"高效（带广告）"，现在拆成 **C 稳定广告（中活跃 + 每日广告）**
+      与 **D 高活跃（几乎拉满）** —— 分开才看得出"广告到底把曲线抬了多少"（§四 的定位问题）。 */
 const PROFILES = {
-  A: { name: '普通', sweep: 10, idleFrac: 0.5, ads: false, corridor: 5, gardenCycles: 1, arenaWin: 3 },
-  B: { name: '认真', sweep: 14, idleFrac: 0.8, ads: false, corridor: 12, gardenCycles: 2, arenaWin: 5 },
-  C: { name: '高效', sweep: 40, idleFrac: 1.0, ads: true, corridor: 25, gardenCycles: 3, arenaWin: 5 },
+  A: { name: '零广告低活跃', sweep: 6,  idleFrac: 0.35, ads: false, corridor: 3,  gardenCycles: 1, arenaWin: 2 },
+  B: { name: '普通玩家',     sweep: 10, idleFrac: 0.5,  ads: false, corridor: 5,  gardenCycles: 1, arenaWin: 3 },
+  C: { name: '稳定广告玩家', sweep: 18, idleFrac: 0.8,  ads: true,  corridor: 14, gardenCycles: 2, arenaWin: 5 },
+  D: { name: '高活跃玩家',   sweep: 40, idleFrac: 1.0,  ads: true,  corridor: 25, gardenCycles: 3, arenaWin: 5 },
 };
 /* 每档进度对应的玩家等级（按 progression_audit 的推荐档取整） */
 const LV_AT = { W01: 8, W06: 20, W12: 40, W19: 60, W25: 75, W31: 90, W36: 100 };
@@ -246,6 +252,35 @@ R.note('按【认真档】各档位日收入折算的工期（取最紧的那一
   R.note('  铭刻分段（认真档 W12 · ◆' + per + '/天）：1→5 阶 ' + (seg(0, 5) / per).toFixed(1)
     + ' 天 · 5→10 阶 ' + (seg(5, 10) / per).toFixed(1) + ' 天 · 10→15 阶 ' + (seg(10, 15) / per).toFixed(1)
     + ' 天 · 15→20 阶 ' + (seg(15, 20) / per).toFixed(1) + ' 天');
+}
+
+/* ================= 2026-10-03（《长期留存型成长生态重平衡》§二 · 180 天验收）=================
+   这一轮的最高优先级指标：**四类玩家能不能在 180 天里把"核心成长"走完**。
+   "核心成长"＝铭刻 + 血统 + 强化（单件必成口径）+ 秘术阁 + 灯阁权限 + 境界 —— 就是上面那几条线。
+   算法：把这几条线**同一货币加起来**（一个钱包、多个出口），除以该档 **W36 期日收入**，
+        取**最紧的那一侧货币** ⇒ 需要多少天。日收入是实测的（不是公式估算）。
+   判据：≤180 天 = PASS；>180 = WARN（把最紧的是哪一侧、完成度差多少写出来）。
+   ⚠️ 只报数、不改数（§一「先建尺子先不要改」）；要调就调数据层，然后重跑本尺子看这条曲线。 */
+{
+  const CORE = ['geneLock', 'bloodline', 'enhanceOne', 'kejiAll', 'authority', 'realm'];
+  R.note('');
+  R.note('180 天验收（§二 · 四类玩家 · 核心成长一整包 ÷ 该档 W36 期日收入）：');
+  Object.keys(PROFILES).forEach((pf) => {
+    const row = rows.find((r) => r.pf === pf && r.anchor === 'W36') || rows.filter((r) => r.pf === pf).pop();
+    if (!row) return;
+    const need = {};
+    CORE.forEach((k) => {
+      const c = (lines[k] && lines[k].cur) || {};
+      Object.keys(c).forEach((x) => { need[x] = (need[x] || 0) + Math.max(0, c[x]); });
+    });
+    const r2 = daysFor({ cur: need }, row.cur);
+    const days = r2.days;
+    const ok = days <= 180;
+    R[ok ? 'pass' : 'warn']('§二 180 天 · ' + pf + ' ' + PROFILES[pf].name + ' 走完核心成长需 ' + (days === Infinity ? '∞' : days.toFixed(0)) + ' 天', {
+      file: 'js/data.js', expected: '≤ 180 天',
+      actual: '最紧一侧 = ' + (r2.which || '-') + ' · 完成度 ' + (isFinite(days) ? Math.round(180 / days * 100) + '%' : '∞'),
+    });
+  });
 }
 
 /* ---------- 库存趋势（1/3/7/…/180 天）：按各档日收入线性积分 ---------- */
