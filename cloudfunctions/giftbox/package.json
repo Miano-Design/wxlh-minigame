@@ -1,0 +1,9 @@
+{
+  "name": "giftbox",
+  "version": "1.0.0",
+  "description": "礼包发货：收微信 minigame_deliver_goods 推送 → 落工单；客户端 pull/ack 取件",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "4.0.2"
+  }
+}

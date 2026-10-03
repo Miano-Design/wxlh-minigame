@@ -780,6 +780,35 @@
      码表在 `js/data.js` 的 `GIFT_CODES`，判据在 `Core.claimGift()`，界面在 `js/sc-last.js`——
      **一次网络请求都不发**（这条链上客户端与服务端都没有它）。第一版曾做成云函数校验，
      那支 `cloudfunctions/gift` 已整个删除；将来要发限时码 / 抽奖码再把它建回来。 */
+
+  /* ================= 信匣 · 平台礼包那条腿（2026-10-02）=================
+     与上面那条**方向相反**：平台礼包是**微信推给我们的**（`minigame_deliver_goods`），
+     云函数 `giftbox` 把发货单落成工单，客户端这一页只做两件事：
+       · `pullGiftbox()` 拉待取的信（拿到就交给 `Core.mailMergeCloud` 存进存档）
+       · `ackGiftbox(ods)` 报告"这几封我取走了" —— **服务端才会盖 `done`**，
+         微信日后重试同一单时就不会重复发（这条护的是玩家的奖品，别省）
+     ⚠️ 与云同步同一条口径：**失败静默**（不弹窗、不阻塞画面），只落一条账给设置页那行诊断看。 */
+  const GIFT_FN = 'giftbox';
+  function giftFn(data) {
+    const c = cloud();
+    if (!c || !c.callFunction) return Promise.resolve({ ok: false, why: 'unsupported' });
+    return new Promise(function (resolve) {
+      let req = null;
+      try { req = c.callFunction({ name: GIFT_FN, data: data || {} }); }
+      catch (e) { noteErr('giftbox', (e && e.message) || 'sdk'); resolve({ ok: false, why: 'sdk' }); return; }
+      Promise.resolve(req).then(function (res) {
+        const r = (res && res.result) || null;
+        if (!r) { resolve({ ok: false, why: 'empty' }); return; }
+        if (r.ok) resolve({ ok: true, pending: r.pending || [], left: r.left });
+        else resolve({ ok: false, why: String(r.msg || 'fail') });
+      }).catch(function (e) {
+        noteErr('giftbox', (e && (e.errMsg || e.message)) || '未知错误');
+        resolve({ ok: false, why: 'net' });
+      });
+    });
+  }
+  function pullGiftbox() { return giftFn({ action: 'pull' }); }
+  function ackGiftbox(orders) { return giftFn({ action: 'ack', orders: orders || [] }); }
   /* ---------- 手动两颗（**只有玩家自己点的那两下才说话**，自动那条路一个字都不弹） ---------- */
   /** 手动「从云端下载存档」（L1 点名要的那颗，六个月后救档用）：只读回云端**现在那条**，
       要不要覆盖由页面那一问决定（本机那份在覆盖时照旧先留档）。 */
@@ -963,6 +992,8 @@
        `reclaim()` ＝ 那颗「重新登录」；`isSuperseded()` 给尺子与排查读状态。 */
     reclaim: reclaim, isSuperseded: function () { return superseded; },
     makeCode: makeCode, claimCode: claimCode, normCode: normCode,
+    /* 信匣 · 平台礼包那条腿（2026-10-02）：拉待取的信 / 报告已取走 */
+    pullGiftbox: pullGiftbox, ackGiftbox: ackGiftbox,
     wrapExport: wrapExport, checkImport: checkImport, applyExternal: applyExternal,
     applyCloudSave: applyCloudSave, info: info, toggle: toggle,
     /* F2 · 0930L：诊断（设置页那一行 ＋ 尺子读它）。口径一个字没改，只是把静默变可见。 */

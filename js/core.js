@@ -181,6 +181,17 @@ window.Core = (function () {
          ⚠️ 已知取舍：本机记的账挡得住重复点，**挡不住改档的人** —— 这一批码本来就是公开送的
             新手礼包，所以接受（见 data.js 那张表上的两条说明）；将来发限时码要搬去服务端。 */
       gifts:  getProxied({}),
+      /* ================= V1.1.x · 信匣（2026-10-02 · 父亲大人提案）=================
+         一个字段装四样东西（**刻意保持扁平**，信匣不是新系统，是"官方发给你的东西"的收口）：
+           · `read`    已读的纯公告     { 信id: 时间戳 }
+           · `claimed` 已领的奖励信     { 信id: 时间戳 }
+           · `done`    这封信"处理完了" 的时刻（读完或领完）—— **30 天清除**的判据就是它
+           · `cloud`   从云函数 `giftbox` 拉下来的平台礼包（发货单的本地镜像）
+         口径（父亲大人定的，别改）：
+           · 信**永不过期**（未处理的信一直在）；
+           · **领完 / 读完 30 天后自动清掉那封信**；
+           · 红点「有的领就亮，没得领就不亮」—— 不许骗玩家点。 */
+      mail:  getProxied({ read:  getProxied({}), claimed:  getProxied({}), done:  getProxied({}), cloud:  getProxied([]) }),
       // bonus：额外扫荡额度（由玩法自行发放的临时加次数；网页版不发，恒为 0，跨天清零）
       /* V1.1.8（B6）：`bonus` ＝ 灯阁权限的额外额度；`adBonus` ＝ 广告买来的额度（两本账分开记） */
       sweep:  getProxied({ date: '', count: 0, bonus: 0, adBonus: 0 }),
@@ -4079,6 +4090,118 @@ window.Core = (function () {
     return  getProxied({ ok: true, code: c, goods: goods, stashed: (got && got.stashed) ||  getProxied([]) });
   }
 
+  /* ================= V1.1.x · 信匣（2026-10-02 · 父亲大人提案）=================
+     全项目**唯一**的信匣出口（界面只管画，判据一条都不许留在界面里）。
+     三种来源在这里合流：**随版本走的信**（`D.MAIL`）＋ **平台礼包发货单**（云函数拉下来的 `S.mail.cloud`）。
+
+     口径（父亲大人 2026-10-02 定的三条，写死在判据里）：
+       · 信**永不过期** —— 没处理的信一直在，不会"忘了就没了"；
+       · **处理完（读完 / 领完）30 天后自动清掉那封信** —— 东西早入账了，信只是壳；
+       · 红点「**有的领就亮，没得领就不亮**」—— `mailNewCount()` 只数"真有事可做"的信，
+         绝不为了让你点而点亮（他把这条单独拎出来说过：不许骗玩家点击）。
+
+     ⚠️ 顺序：**先记账再发奖**（与兑换码同一套道理）—— 中途抛错也不会变成"奖没给、信还留着"
+        或者更糟的"能无限领"。 */
+  const MAIL_TTL = 30 * 24 * 3600 * 1000;        // 处理完之后再留 30 天
+  function mailBox() {
+    if (!S.mail) S.mail =  getProxied({ read:  getProxied({}), claimed:  getProxied({}), done:  getProxied({}), cloud:  getProxied([]) });
+    ['read', 'claimed', 'done'].forEach(function (k) { if (!S.mail[k]) S.mail[k] =  getProxied({}); });
+    if (!Array.isArray(S.mail.cloud)) S.mail.cloud =  getProxied([]);
+    return S.mail;
+  }
+  /* 「处理完超过 30 天」→ 那封信**不再出现**（读档/进信匣时顺手跑一次，不弹任何提示）。
+     ⚠️ 这里踩过一个坑，**别把墓碑删掉**（2026-10-02，被 `mail_audit` 当场抓住）：
+        第一版是 `delete m.done[id]` —— 于是本地信**又冒出来了**（`D.MAIL` 里那一条一直在，
+        判断"还在不在"的依据就是 `done`）。云端信同理会重新进箱子。
+        正确做法：**`done` 留作墓碑**（一条时间戳，几字节），只在 `mailList` 里把它滤掉；
+        顺手的清理只清 `read/claimed`（那两个没用之后就是纯占位）。 */
+  function mailPurged(m, id) {
+    const d = Number((m && m.done && m.done[id]) || 0);
+    return d > 0 && (Date.now() - d > MAIL_TTL);
+  }
+  function mailSweep() {
+    const m = mailBox(), now = Date.now();
+    let cut = 0;
+    Object.keys(m.done).forEach(function (id) {
+      if (now - Number(m.done[id] || 0) > MAIL_TTL) {
+        if (m.read[id] || m.claimed[id]) cut++;
+        delete m.read[id]; delete m.claimed[id];        // 墓碑 `done[id]` **留着**
+      }
+    });
+    if (cut) save();
+    return cut;
+  }
+  /** 合并一次"从云函数拉回来的发货单"（按 `od` 去重，已处理过的不再进来）。 */
+  function mailMergeCloud(list) {
+    const m = mailBox();
+    let added = 0;
+    (Array.isArray(list) ? list : []).forEach(function (x) {
+      if (!x || !x.od || !x.goods) return;
+      if (m.done[x.od] || m.claimed[x.od]) return;
+      if (m.cloud.some(function (y) { return y && y.od === x.od; })) return;
+      /* `gt` = 官方发货单里的 `GiftTypeId`、`gid` = `GiftId`（云函数带过来）——
+         信匣拿它查名字（`D.GIFT_TYPE_NAME`），一封一个说法，不再全是「礼包已送达」。 */
+      m.cloud.push({ od: String(x.od), goods: x.goods, at: Number(x.at) || Date.now(),
+        gt: Number(x.gt) || 0, gid: String(x.gid || '') });
+      added++;
+    });
+    if (added) save();
+    return added;
+  }
+  /** 信匣里现在能看到的所有信（新的在前）。本地信按 `since` 生效。 */
+  function mailList() {
+    mailSweep();
+    const m = mailBox(), now = Date.now(), out =  getProxied([]);
+    (D.MAIL ||  getProxied([])).forEach(function (def) {
+      if (!def || !def.id) return;
+      if (Number(def.since || 0) > now) return;                 // 还没到生效时间：**根本不出现**
+      if (mailPurged(m, def.id)) return;                        // 处理完超过 30 天：**已清除，不再出现**
+      const claimed = !!m.claimed[def.id], read = !!m.read[def.id], hasReward = !!def.reward;
+      out.push({ id: def.id, kind: def.kind || 'notice', title: def.title || '', body: def.body ||  getProxied([]),
+        reward: def.reward || null, hasReward: hasReward, claimed: claimed, read: read,
+        done: !!m.done[def.id], at: Number(def.since || 0) });
+    });
+    m.cloud.forEach(function (x) {
+      if (!x || !x.od || mailPurged(m, x.od)) return;            // 同上：清掉的不再列出来
+      const tn = (D.GIFT_TYPE_NAME ||  getProxied({}))[Number(x.gt) || 0] || '礼包已送达';
+      out.push({ id: x.od, kind: 'gift', title: tn, body:  getProxied(['这一份是官方送的礼包，收下吧。']),
+        reward: x.goods, hasReward: true, claimed: !!m.claimed[x.od], read: !!m.read[x.od],
+        done: !!m.done[x.od], at: Number(x.at) || 0 });
+    });
+    out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    return out;
+  }
+  /** 红点用：**真的有事可做**才计数（① 有奖没领；② 没奖的公告还没读）。没得做 = 0 = 不亮。 */
+  function mailNewCount() {
+    let n = 0;
+    mailList().forEach(function (x) {
+      if (x.hasReward) { if (!x.claimed) n++; } else if (!x.read) n++;
+    });
+    return n;
+  }
+  /** 读一封**没有奖励**的信（有奖的信要走 `mailClaim`）。 */
+  function mailRead(id) {
+    const m = mailBox(); const it = mailList().filter(function (x) { return x.id === id; })[0];
+    if (!it) return  getProxied({ ok: false, why: 'missing' });
+    if (it.hasReward && !it.claimed) return  getProxied({ ok: false, why: 'needClaim' });
+    m.read[id] = Date.now();
+    if (!m.done[id]) m.done[id] = Date.now();                   // 读完就开始算 30 天
+    save();
+    return  getProxied({ ok: true, id: id });
+  }
+  /** 领一封带奖励的信：**先记账再发奖**，发奖走全项目唯一的 `applyRewardObj`。 */
+  function mailClaim(id) {
+    const m = mailBox(); const it = mailList().filter(function (x) { return x.id === id; })[0];
+    if (!it) return  getProxied({ ok: false, why: 'missing' });
+    if (!it.hasReward) return  getProxied({ ok: false, why: 'noReward' });
+    if (it.claimed) return  getProxied({ ok: false, why: 'used' });
+    const now = Date.now();
+    m.claimed[id] = now; m.read[id] = now; m.done[id] = now;     // 领了＝也读了，并开始算 30 天
+    const got = applyRewardObj(it.reward);
+    save();
+    return  getProxied({ ok: true, id: id, goods: it.reward, stashed: (got && got.stashed) ||  getProxied([]) });
+  }
+
   /* ================= 药园（对标《道友修仙》洞府里的"药园"） ================= */
   // 种下去等时间，回来收材料——给"点数"开一个稳定出口，也给强化材料一条不用刷副本的路。
   function gardenState() {
@@ -5612,6 +5735,8 @@ window.Core = (function () {
     addCur, canAfford, spend, addItem, removeItem, canAddItem, setCurListener, applyRewardObj, sweepCap, sortEquips, equipScore,
     /* V1.0.5：兑换码 / 新手礼包 —— 全项目唯一的兑换出口（码表在 data.js 的 GIFT_CODES） */
     claimGift,
+    /* V1.1.x：信匣 —— 全项目唯一的信匣出口（随版本走的信在 data.js 的 MAIL，平台礼包在 S.mail.cloud） */
+    mailList, mailNewCount, mailRead, mailClaim, mailMergeCloud, mailSweep,
     shardPoolOf, addShardPool, addShardsToPool, shardsOf, starInfo,
     setNoticeListener, stashItem, stashCount, stashList, stashNeedCells, claimStash,
     /* V1.1.15：装备待领箱（满格时掉的/开出来的装备先存这儿，扩容后领回） */
