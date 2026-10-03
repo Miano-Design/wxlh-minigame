@@ -52,12 +52,7 @@
 | 世界 | Boss | 文件 |
 |---|---|---|
 | **W01…W36（全部 36 个）** | 取 `WORLDS[].boss` | `story/boss/img_boss_W<nn>.png` |
-| W06 轨道废土带 | 轨道主控 | `story/boss/img_boss_W06.png` |
-| W12 蚀环远征 | 蚀冠之王 | `img_boss_W12.png` |
-| W18 白墙疗养院 | 白衣院长 | `img_boss_W18.png` |
-| W24 灰烬圣所 | 灰袍祭司 | `img_boss_W24.png` |
-| W30 熔芯之炉 | 熔芯核心 | `img_boss_W30.png` |
-| W36 灯阁王座 | 终焉·灯主 | `img_boss_W36.png` |
+| **W01…W36（全部 36 个）** | 取 `WORLDS[].boss`（例：W01 黏液母巢 · W12 镜像管理者 · W36 选择者） | `story/boss/img_boss_W<nn>.png` |
 
 > 名字取 `WORLDS[].boss`，台词/身份取 `STORYDATA.ARC[wid].bossTrigger / bossRole`。
 > 立绘没到位时**不再退成程序几何剪影**——不画人，场景照旧

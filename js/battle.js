@@ -316,7 +316,7 @@ window.Battle = (function () {
           : rule === 'spdUp' ? { kind: 'buff', buff: { spdPct: 0.15 } }
             : { kind: 'debuff', buff: { defPct: -0.2 } };
         pool.forEach(u => { if (u.hp > 0) addStatus(u, st.kind, 2, st.buff); });
-        const ruleWho = mech.ruleName || '灯阁规则';   // 镜界法庭、万灯之座说的不是同一句话
+        const ruleWho = mech.ruleName || '灯阁规则';   // 逆流区域、创造者核心说的不是同一句话
         frames.push({ type: 'rule', text: rule === 'atkUp' ? `${ruleWho}：敌方攻击提升` : rule === 'defDown' ? `${ruleWho}：我方防御下降` : `${ruleWho}：敌方速度提升` });
       }
       // 回合开始：DOT / 恢复
@@ -436,7 +436,7 @@ window.Battle = (function () {
         }
         /* 2026-09-23（文案策划 · 提审合规；创意总监《三维度审核》H2 点名，父亲大人在案）：
            这里原来叫「被召唤的亡灵」——"亡灵"是冥界语汇，而这行字**玩家每场都看得见**
-           （会召唤的 Boss 有三张图：W11 幽帆船坞 / W23 巢母孵化间 / W27 长明夜行）。
+           （会召唤的 Boss 有三张图：W11 记忆档案区 / W23 残域意识层 / W27 创造者墓场）。
            召唤物是**世界无关**的：船坞召的是旧船员、孵化间召的是幼体、夜行召的是夜影，
            所以名字必须中性 —— 改成「爪牙」。同轮 W35 那句死亡描写一起清（见 data.js 的同名注释）。 */
         if (mech.bossSummon && !boss.summoned && ratio <= 0.5) {
