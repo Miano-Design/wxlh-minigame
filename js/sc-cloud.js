@@ -560,21 +560,14 @@
       if (!leaseToken) return { ok: false, skip: 'notoken', why: 'no_token', msg: NET_MSG({ why: 'no_token' }) };
       return sendPush();
     }).then(function (r) {
-      /* ================= 2026-10-03 · **抢位重推**（同一条收口）=================
-         服务端按 token 拒了我们（`superseded`）。这一刻先分一次岔，判据与上面那句同源：
-           · **本机这份比云上那份新** ⇒ 这不是"被顶下线"，是"**这台才是刚在玩的那台**"
-             （`savedAt` 比云上那条的 `ts` 大就是证据）⇒ 当场把位占回来、用新 token 再推**一次**；
-           · 云上不比本机旧（或抢位没抢到）⇒ 真·被顶下线：转只读 ＋ 走那个"讲一次"的口。
-         ⚠️ 只重推一次（`reason === 'reclaim'` 时不重推）：两台设备不会无限互抢 ——
-            抢回来的那一推若再被拒，就落回只读，与原来一模一样。
-         ⚠️ 覆盖前留档那条一个字没动：这一推照旧把云上那份写进 `prev*`，两头的档都不丢。 */
-      if (r && !r.ok && String(r.why) === 'superseded' && reason !== 'reclaim'
-          && doc && Number(doc.ts || 0) < ts) {
-        return claimLease(doc).then(function (c) {
-          if (!c.ok || !leaseToken) return r;          // 没抢到：照原样走下面的只读那条
-          return sendPush();
-        });
-      }
+      /* ================= 2026-10-03 云同步最终回归 §九 · **删掉"自动 reclaim"** =================
+         原来这里有一段"抢位重推"：服务端按 token 拒了之后，如果本地 `savedAt` 比云上 `ts` 大，
+         就当场把租约抢回来再推一次。任务书点名要删（§九：自动同步**绝不**因为本地
+         savedAt 更新而重新抢写权限）—— 否则 A 顶 B、B 顶 A，两台设备会一直互抢：
+           A 登录 → B 登录 → A 被顶 → A 自动 reclaim → B 被顶 → B 自动 reclaim → …
+         现在：**被拒就是被拒**，本机转只读 + 讲一次；想拿回写权只能玩家显式点「重新登录」
+         （那条路走 `reclaim()` → `sync('reclaim',{claim:true})`，是**人的动作**，不是自动行为）。
+         ⚠️ 覆盖前留档那条一个字没动（被拒这一趟压根没写，云端那份更没动）。 */
       return r;
     }).then(function (r) {
       if (!r.ok) {
@@ -605,9 +598,52 @@
 
   /* ---------- 静默结算（**唯一的一处收口**：读一次云端 → 谁新听谁的） ---------- */
  let busy = false, retryTimer = null, retryTries = 0, progressTimer = null;
+ /* ================= 2026-10-03 云同步最终回归 §十二 · **busy 不许吞掉新进度** =================
+      开机正在拉云档 → 玩家马上打完一关 → 那个 push 撞上 `busy` 被 skip 掉 ⇒ 这一次进度就没再推。
+      最简做法（任务书原话"不要做复杂队列"）：忙的时候记一个脏标记，这一趟收工后补跑一次 push。 */
+ let pendingPush = false;
   /** @param opts {claim} 开机 / 回前台那一趟要**先占位**（＝一次"登陆"，见 claimLease） */
+  /* ================= 2026-10-03 云同步最终回归 · **云端唯一正式权威**（任务书 §二–§十一）=================
+     这一版把同步从"本地与云端谁新听谁的（冲突裁判）"收回到"**云端是唯一正式权威**"：
+       · 本地 = 运行缓存 / 离线临时数据 / 故障恢复备份（`savedAt` 只留给诊断，不再参与任何同步决策）；
+       · 有云档 ⇒ 自动同步**直接换上它**，不看本地 `savedAt`、不看 `cloudTs > localTs`；
+       · **只有"云端确实没有这份档"**（`hasDoc === false`）才允许用本地创建第一份；
+       · 自动同步**绝不**因为"本地看起来更新"就把本地推回云端（那是"旧电脑覆盖新手机"的成因）；
+       · 被顶号的设备**能读不能写**，而且**不再自动 reclaim**（否则 A/B 会互相抢位打架）。
+
+     为什么要有 `pullAuthoritativeCloud` 这个出口：改之前"自动同步"和"找回存档"是**两份代码** ——
+     自动那条先拿 `savedAt / ts / superseded` 判一圈才决定拉不拉，手动那条直接 `applyCloudSave`。
+     结果就是玩家看到的怪现象：**自动同步同步不动，点「找回存档」却可以**。
+     现在两条路调的是同一个函数（任务书 §四）。 */
+  function pullAuthoritativeCloud(reason, preDoc) {
+    const use = function (doc) {
+      if (!doc || !doc.payload) return { ok: true, hasDoc: false, skip: 'nodoc' };
+      const r = applyCloudSave(String(doc.payload), Number(doc.ts) || 0, 'cloud');
+      if (!r.ok) return { ok: false, skip: 'badcloud', msg: r.msg || '云端那份读不出来' };
+      return { ok: true, hasDoc: true, took: 'cloud', ts: Number(r.ts) || 0, bytes: String(doc.payload).length };
+    };
+    if (preDoc) return Promise.resolve(use(preDoc));       // 调用方已经拿到那份 doc（找回存档那个选择器）
+    const P = prefs();
+    if (!P.on) return Promise.resolve({ ok: false, skip: 'off', msg: '云同步是关着的：先点上面那一行打开' });
+    if (!WX || !WX.cloud) { logAbsent(cloudAbsent()); return Promise.resolve({ ok: false, skip: 'unsupported', msg: '这台设备没有云开发能力' }); }
+    if (G.Core && G.Core.rescueInfo && G.Core.rescueInfo()) return Promise.resolve({ ok: false, skip: 'rescue' });
+    return readOwn().then(function (got) {
+      if (!got.ok) return { ok: false, skip: 'fail', why: got.why, code: got.code, msg: NET_MSG(got) };
+      return use(got.doc);
+    });
+  }
   function sync(reason, opts) {
-    const wantClaim = !!(opts && opts.claim);
+    opts = opts || {};
+    /* `push:true` ＝ "玩家刚产生了进度 / 显式点了同步" → 这一趟**可能**要推；
+       `claim:true` ＝ **只有开机那次登录与设置页「重新登录」**才占位（§七：回前台不再抢号）。 */
+    /* 哪些"理由"本身就是在说"玩家刚产生了进度 / 他要推一份上去"：
+         progress ＝ 打关 / 结算之后；hide ＝ 切后台（也是收尾的好时机）；manual ＝ 显式同步；
+         pending  ＝ 上一趟忙的时候被挡下的那一次补跑。
+       `boot`（开机）/`show`（回前台）/`retry`/`reclaim` **都不是** —— 它们的语义是"以云档为准"，
+       再叠 `opts.push` 作为显式覆盖。 */
+    const PUSH_REASONS = { progress: 1, hide: 1, manual: 1, pending: 1 };
+    const wantPush = !!opts.push || !!PUSH_REASONS[reason];
+    const wantClaim = !!opts.claim;
     const P = rollDay();
     if (!P.on) return Promise.resolve({ ok: false, skip: 'off' });
     if (!WX || !WX.cloud) {
@@ -616,7 +652,10 @@
       logAbsent(cloudAbsent());
       return Promise.resolve({ ok: false, skip: 'unsupported' });
     }
-    if (busy) return Promise.resolve({ ok: false, skip: 'busy' });
+    if (busy) {
+      if (wantPush) pendingPush = true;                    // §十二：忙也不许把新进度吞掉
+      return Promise.resolve({ ok: false, skip: 'busy' });
+    }
     /* V1.1.20（F1-5）：**救援态（本机存档读不出来、主键禁写）期间云同步也停** ——
        那一刻内存里是"空新档"，推上去等于把玩家云上那份真进度顶掉（还会顺手覆盖
        读档失败时留的那份原样备份）；拉下来又会把救援现场换掉。等玩家显式选择之后再说。 */
@@ -650,17 +689,26 @@
            收口成原口径：**只有"云上那份不比本机旧"才是真·被顶下线**（转只读 ＋ 讲一次）；
            本机比云上更新 ⇒ 照常往下走，`push` 会先替我们把租约抢回来（见那里"抢位重推"）。
            ⚠️ 这里比的是 `localAtStart`（本轮同步开始时取的那一份判据），不是取档之后的本机。 */
-        const reallyBehind = superseded && !(supersededTs && localAtStart > supersededTs);
+        /* §八 / §九：**被顶号 = 只读**（能拉、不能推），而且**不再自动 reclaim**。
+           旧判据 `superseded && !(supersededTs && localAtStart > supersededTs)` 是在拿本地
+           `savedAt` 去争"到底谁被顶" —— 那正是这一轮要拆掉的冲突裁判（§十一：savedAt 退出决策）。 */
+        const reallyBehind = !!superseded;
         if (reallyBehind) {
           maybeNotifySuperseded(true);
-          if (doc && cloudTs > localAtStart) {
+          /* 被顶号也**照样读云端**（旧版这里还夹着一层 ts 比较，会把"拉"也拦掉） */
+          if (doc) {
             const rr = applyCloudSave(doc.payload, doc.ts, 'cloud');
             return { ok: true, took: 'cloud', ts: rr.ok ? rr.ts : 0, skip: 'superseded' };
           }
           return { ok: true, took: 'none', skip: 'superseded' };
         }
-        if (doc && cloudTs > localAtStart) {
-          /* 云端更新 → **直接换上**（不弹窗、不提示）；万一那份读不出来（比如来自更新的版本），
+        /* ================= §三 / §五：**有云档就以云档为准** =================
+           不再比 `cloudTs > localAtStart`（本地 savedAt 彻底退出决策）。
+           唯一的例外：**玩家刚产生进度、而且这台确实握着写权** —— 那一趟应当把自己的新进度推上去。
+           其余情况（开机 / 回前台 / 被顶号 / 没有写权）一律把云档换下来。 */
+        const leaseMine = !!(sess && String(sess.id) === deviceId());
+        if (doc && (!wantPush || !leaseMine)) {
+          /* 换上云端那份（不弹窗、不提示）；万一那份读不出来（比如来自更新的版本），
              退到"用本地推上去"——推的时候旧云端会进 `prev*`，两头都不丢。 */
           const r = applyCloudSave(doc.payload, doc.ts, 'cloud');
           if (r.ok) return { ok: true, took: 'cloud', ts: r.ts };
@@ -686,9 +734,18 @@
       if (r && r.ok) { lastErr = null; retryTries = 0; if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; } }
       /* `notoken`（还没占上位）也算"这一趟没成"—— 排一次静默重试，别干等下一轮开机。 */
       else if (r && (r.skip === 'fail' || r.skip === 'notoken')) scheduleRetry();
+      /* ================= 2026-10-03 云同步最终回归 §十二 · **补跑被 busy 挡下的那次 push** =================
+         开机正在拉云档时玩家打完一关 → 那个 push 撞上 `busy` 被 skip ⇒ 这次进度就没了。
+         这里收工后补跑一次（只补一次，不做队列）。`sync('pending', {push:true})` 的语义是
+         "玩家刚产生过进度"，所以它会走"有写权就推、没写权就拉"那条正常分支。 */
+      if (pendingPush) {
+        pendingPush = false;
+        try { setTimeout(function () { try { sync('pending', { push: true }); } catch (e2) {} }, 0); } catch (e3) {}
+      }
       return r;
     }, function (e) {
       busy = false; scheduleRetry();
+      if (pendingPush) { pendingPush = false; try { setTimeout(function () { try { sync('pending', { push: true }); } catch (e2) {} }, 0); } catch (e3) {} }
       return { ok: false, skip: 'fail', err: String(e && e.message) };
     });
   }
@@ -716,8 +773,17 @@
       scheduleMergedPush();
       return Promise.resolve({ ok: true, skip: 'merged' });
     }
-    /* 开机 / 回前台 → 这一趟**先占位**（双端单活：以晚登陆的为主）；其余口子照旧。 */
-    return sync(mode, { claim: (raw === 'boot' || raw === 'show') });
+    /* ================= 2026-10-03 云同步最终回归 §七 / §十 · **谁占位、谁只拉** =================
+         · `boot`（开机）＝ 一次**登录** ⇒ 占位 + 以云档为准（双端单活：后登录的拥有写权）；
+         · `show`（切回前台）＝ **只拉**，不再抢号（§七 点名：回前台不是重新登录）；
+         · `progress`（打关 / 结算）＝ 玩家刚产生进度 ⇒ 允许推（**但 push 之前先看租约是不是本机**）；
+         · 其余（hide / retry）＝ 只拉。
+       拿回写权只有一条路：设置页「重新登录」（`reclaim()`），那是**人的动作**。 */
+    /* `hide`（切后台）也是"玩家刚玩过"的一次机会 —— 推一份上去，别等下一次打关。 */
+    const opts2 = (raw === 'boot') ? { claim: true }
+      : (raw === 'progress' || raw === 'hide') ? { push: true }
+        : {};
+    return sync(mode, opts2);
   }
   function scheduleMergedPush() {
     if (progressTimer) return;
@@ -882,7 +948,7 @@
     const P = prefs();
     if (!P.on) return Promise.resolve({ ok: false, msg: '云同步是关着的：先点上面那一行打开' });
     if (!WX || !WX.cloud) return Promise.resolve({ ok: false, msg: '这台设备没有云开发能力' });
-    return sync('manual').then(function (r) {
+    return sync('manual', { push: true }).then(function (r) {   // 玩家显式点"同步" ⇒ 允许推
       if (r.ok && r.skip === 'superseded') return { ok: false, msg: '本机已下线（另一台设备在玩）：先点「重新登录」再同步' };
       if (r.ok && r.took === 'cloud') return { ok: true, msg: '云端那份更新：已经换成云端那份了' };
       if (r.ok && r.pushed) return { ok: true, msg: '已同步到微信（' + kb(r.bytes || 0) + '）' };
@@ -1064,6 +1130,11 @@
     ENV_ID: ENV_ID, COLL: COLL, CODE_FN: CODE_FN, SAVE_FN: SAVE_FN, PREF_KEY: PREF_KEY,
     boot: boot, triggerAuto: triggerAuto, noteProgress: noteProgress, sync: sync,
     manualPush: manualPush, pullCloud: pullCloud, takeCloudPrev: takeCloudPrev,
+    /* ================= 2026-10-03 云同步最终回归 §四 · **唯一的那一个拉云出口** =================
+       自动同步（开机 / 回前台 / 被顶号 / 重试）与设置页「找回存档」里选"云端那份"，
+       调的都是它 —— 不再维护两套"拉云"逻辑（那正是"自动同步同步不动、手动找回却可以"的成因）。
+       参数：`pullAuthoritativeCloud(reason)`；已拿到 doc 的调用方可以传第二个参数省一次网络。 */
+    pullAuthoritativeCloud: pullAuthoritativeCloud,
     /* 双端单活（父亲大人 10-01：「只有一端能在线……以晚登陆的为主」）：
        `reclaim()` ＝ 那颗「重新登录」；`isSuperseded()` 给尺子与排查读状态。 */
     reclaim: reclaim, isSuperseded: function () { return superseded; },

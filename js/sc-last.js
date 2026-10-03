@@ -1098,9 +1098,15 @@
           return;
         }
         if (pick.key === 'cloud') {
-          const r = CS.applyCloudSave(cloud.doc.payload, cloud.doc.ts, 'recover');
-          done(!!(r && r.ok),
-            (r && !r.ok) ? (r.msg || '没恢复成') : (r && r.same ? '本机就是最新的这份，没有改动' : '已恢复到云端那份'));
+          /* ================= 2026-10-03 云同步最终回归 §四 =================
+             这一颗"云端那份"原来直接调 `CS.applyCloudSave(...)` —— 而自动同步那边走的是另一条路
+             （先比 savedAt/ts/租约再决定拉不拉）。两条路各写一份 = "自动同步同步不动、手动找回却可以"。
+             现在改调**同一个出口** `pullAuthoritativeCloud`（把已经读到的 doc 传进去，不多走一次网络）；
+             两边的差别只剩"谁触发"——行为完全一致。 */
+          Promise.resolve(CS.pullAuthoritativeCloud('recover', cloud.doc)).then(function (r) {
+            done(!!(r && r.ok),
+              (r && !r.ok) ? (r.msg || '没恢复成') : '已恢复到云端那份');
+          });
           return;
         }
         CS.takeCloudPrev().then(function (r) {
