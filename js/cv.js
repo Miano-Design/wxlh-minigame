@@ -1917,6 +1917,13 @@
   };
 
   /* ---------- 触摸 ---------- */
+  /* ================= 2026-10-03（任务书 §38）· 命中查询的**只读出口** =================
+     弹窗模态不能只靠"看源码里有没有那句 `continue`"来证明 —— 要能真的问一句
+     "这一点现在命中的是谁"。bindTouch 里那个 `hitAt` 只在真机跑得到，所以它算出来存进 `_hitAtRef`，
+     这里挂成一个正式出口给尺子（`scripts/modal_block_audit.js` 逐点验证"弹窗打开后下层点不到"）。
+     ⚠️ 只多一个只读出口，不改任何派发逻辑；没绑过触摸时回 null。 */
+  let _hitAtRef = null;
+  CV.hitAt = function (x, y) { try { return _hitAtRef ? (_hitAtRef({ x: x, y: y }) || null) : null; } catch (e) { return null; } };
   /* 手指是不是"正在拖动"（见 bindTouch 里的说明）—— 默认 false，
      没绑触摸时（尺子的假环境）读它也不会是 undefined。 */
   CV.dragging = false;
@@ -2029,6 +2036,9 @@
       return fallback;
     };
     const hitAt = (p, ignoreCoach) => scanHit(p, ignoreCoach);
+    /* 2026-10-03（任务书 §38）：这一层算出来的 `hitAt` 顺手存到模块级，
+       由外面那个 `CV.hitAt` 出口转发给尺子（bindTouch 只在真机被调用，尺子跑不到这里）。 */
+    _hitAtRef = hitAt;
     /* V9.6.111：手指这一点压在哪一格"能拿起的那格"上？不是就 null。
        （长按抓起与"拿着东西点目标格"都要用它，口径和 hitAt 完全一致） */
     const grabSlotAt = (p) => {

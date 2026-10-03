@@ -193,6 +193,18 @@ function pngInfo(buf) {
   }
 }
 
+/* ---------- ⑥-b 资源加载：**不许批量预载**，且缓存有上限（任务书 §34 / §36） ---------- */
+{
+  const src = STORY_RAW;
+  const bulk = /for \(let i = 1; i <= 36[\s\S]{0,200}ensure(Scene|Boss)/.test(src)
+    || /Object\.keys\(WORLD_SCENE_FILE\)[\s\S]{0,120}ensureScene/.test(src);
+  t('⑥-b 没有"进游戏就把 36 场景 + 36 Boss 全解进内存"的批量预载', !bulk,
+    '只按当前世界 / 下一世界懒加载', bulk ? '发现批量预载' : '没有批量预载');
+  const cap = /const CACHE_MAX = \d+/.test(src) && /trimCache\(IMG\)/.test(src) && /trimCache\(BOSS_IMG\)/.test(src);
+  t('⑥-b 场景 / Boss 缓存**有上限**（超了丢最久没用过的那张，不是只增不减）', cap,
+    'IMG 与 BOSS_IMG 各自 trim', cap ? '两处都有 trim' : '缺 trim 或上限');
+}
+
 /* ---------- ⑦ 素材不能混进主包 ---------- */
 {
   const storyDir = fs.existsSync(path.join(ROOT, 'story'));

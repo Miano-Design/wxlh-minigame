@@ -381,10 +381,15 @@
       /* 材料 / 概率都用**整行说明**（`U.note` 独占一行、能自己折行）——
          kv 的值列只有一小半宽，四档材料名或四个百分号一定被 `CV.fit` 砍成「基础金属 / 强化合金 / 异界…」
          （第一版就是这么被砍的）。稀有掉落**去重**：下品与中品都会掉兽魂石，不去重就是"兽魂石 / 兽魂石"。 */
-      U.note('可收：' + D.GARDEN.map(function (g) { return D.gardenItemName(g.out.item); }).join(' / '), 1 * CV.SCALE);
-      const rare = [];
-      D.GARDEN.forEach(function (g) { const nm = g.extra && D.gardenItemName(g.extra.item); if (nm && rare.indexOf(nm) < 0) rare.push(nm); });
-      U.note('可收稀有：' + rare.join(' / '), 1 * CV.SCALE);
+      /* ================= 2026-10-03（`page_text_audit` 抓到的**内容缺口**）=================
+         原来这里只写了两行"可收：基础金属 / 强化合金…"与"可收稀有：兽魂石 / SR装备箱…"——
+         **"哪个品阶收什么"没写**。父亲大人点单的原话是「上面的大卡片就写种田的价格、
+         可以获得什么东西、以及各个品阶灵田的概率」（药园 3.0），少的就是这一格：
+         玩家掷到下品还是极品，收货差在哪，页面上得能看出来。
+         现在逐档写清楚（`D.gardenYieldText` 是唯一真源，与「一键收」结算的是同一份数据）。 */
+      D.GARDEN.forEach(function (g) {
+        U.note(g.name.replace('灵田', '') + '：' + D.gardenYieldText(g), 1 * CV.SCALE);
+      });
       /* 品阶概率：四档排成一条**按品阶上色**的梯子（下品暗灰 → 极品金），
          与地列表里那颗品阶名同一套颜色（`CV.tierColor`）—— 玩家扫一眼就知道"哪个是好的"。
          一行放不下（320 小屏四个百分号挤不下）就自动折到下一行。
@@ -510,7 +515,7 @@
       if (left > 0) {
         const price = Core.gardenNextPrice();
         U.space(CV.SP[2]);
-        U.btnRow([{ label: '新增灵田（第 ' + (Core.gardenPlots() + 1) + ' 块）◉ ' + price,
+        U.btnRow([{ label: '开新田 ◉' + price,
                     style: 'primary', id: 'garden_buy', dis: !Core.canAfford({ points: price }) }]);
         U.space(CV.SP[1]);
         /* 文案只说玩家关心的事：还能开几块。**不写**"价钱按已开数量递增"这种实现口径

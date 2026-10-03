@@ -30,48 +30,48 @@ window.Battle = (function () {
        **曲线在第 5/6 世界倒挂**（越往后越容易），玩家看到的"卡关"和数值曲线对不上。
        改法按策划建议取最省的一种：**每个单位每场最多触发一次**。
        标记打在单位对象上（`t._ndUsed`），而单位是每场新建的 → 天然随场重置，不用额外的开场钩子。 */
-    W05: { onEnemyHit(t, frames) {
+    W05: { note: '迷失：每场最多一次，你会在雾里丢掉方向（打到剩 1 点血）', onEnemyHit(t, frames) {
       if (t._ndUsed || t.hp <= 1) return;
       if (Math.random() < 0.03) { t._ndUsed = 1; t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); }
     }, note: '迷失：每场最多一次，你会在雾里丢掉方向（打到剩 1 点血）' },
     W06: { enemyShield: 0.2, note: '沉眠：开场升起水幕护盾；远程水压冲击' },
-    W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠：概率无法行动；幻觉' },
-    W08: { allyHitMod: -0.15, note: '浓雾：命中-15%' },
-    W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂：裂伤；群体攻击' },
-    W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '中毒：持续掉血；缠绕' },
-    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '召唤旧船员；汲取' },
-    W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '腐化：降低防御；群体增益' },
-    W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '冰冻：无法行动；王权强化' },
-    W14: { randomRule: true, note: '随机规则：每回合变化' },
+    W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '晶化：受伤后反光；塌方眩晕' },
+    W08: { allyHitMod: -0.15, note: '黑潮：命中-15%；甲板打滑' },
+    W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '灰烬：裂伤；范围清除' },
+    W10: { onEnemyHit(t, fr) { if (Math.random() < 0.35) applyStatus(t, fr, 'poison', 3); }, note: '失衡：飘浮平台位移；坠落伤害' },
+    W11: { bossSummon: true, enemyLifesteal: 0.2, note: '记忆读取：抽取目标；档案封锁' },
+    W12: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, note: '重播：复制目标；镜像反伤' },
+    W13: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, note: '不稳定：随机增益；核心过载' },
+    W14: { randomRule: true, note: '封锁：护盾；灯塔火力覆盖' },
     /* W15~W20 的机制以前只写在世界表里、战斗引擎里根本没有（`MECHANICS[worldId] || {}` 直接落空），
        等于最后 6 个世界（180 关）是纯数值怪，但世界详情页照常写着"吸血 / 水压 / 幻觉…"。
        这里按世界表上的文案逐条补齐（V9.5）。 */
-    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '绯月高悬：敌方攻击提升', note: '汲取：敌人攻击回复自身；绯月强化' },
-    W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '水压：每回合全队掉血；触手缠绕' },
-    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '无人机群：群体攻击；电磁干扰' },
-    W18: { confuseChance: 0.15, bossRevive: true, note: '幻觉：概率攻击队友；死亡复活' },
-    W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '星骸护盾；轨道扫射' },
-    W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写：每 3 回合变换；全场压制' },
+    W15: { enemyLifesteal: 0.25, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '绯月高悬：敌方攻击提升', note: '观测：锁定目标；结构重组' },
+    W16: { allyDotPct: 0.04, allyDebuffChance: 0.30, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '触手缠住了', note: '回溯：状态回退；时间锁定' },
+    W17: { enemyAoeEvery: 3, enemyAoeMult: 1.2, enemyAoeName: '无人机群', onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'weak', 2); }, note: '遗忘：削去增益；记录剥离' },
+    W18: { confuseChance: 0.15, bossRevive: true, note: '祈航：跨区打击；信标强化' },
+    W19: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.5, enemyAoeName: '轨道扫射', note: '仪式：周期性强化；灯火回响' },
+    W20: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '核心权限：改写规则；数据流冲刷' },
     /* W21~W36（V9.6.76 世界扩到 36 张时补的）。
        规矩照旧：**世界表上写什么，战斗引擎里就得真有什么** —— W15~W20 当年就是这个坑
        （文案写着吸血/水压，引擎里落空，180 关纯数值怪）。这里 16 条逐条对上，
        规则名也改成可配置的（镜界/灯阁说的不是同一句话）。 */
-    W21: { onEnemyHit(t, fr) { if (Math.random() < 0.28) applyStatus(t, fr, 'weak', 2); }, enemyShield: 0.15, note: '静默：攻击附带恐惧；护幕' },
-    W22: { enemyShield: 0.22, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '锈壳护盾；电磁干扰' },
-    W23: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, bossSummon: true, note: '感染：攻击附带中毒；召唤幼体' },
-    W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '腐化：降低防御；焚香灼烧' },
-    W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '规则轮转：每 4 回合换一条；镜面幻觉' },
-    W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '培养护盾；轨道扫射' },
-    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '召唤夜影；汲取' },
-    W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '中毒：持续掉血；藤蔓缠绕' },
-    W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '诅咒：降低防御；碑纹苏醒' },
-    W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '灼烧：持续掉血；炉温强化' },
-    W31: { confuseChance: 0.18, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '幻觉：概率攻击队友；诅咒' },
-    W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '规则改写：每 3 回合变换；灯影压制' },
-    W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.20, note: '撕裂：裂伤；吞噬护盾' },
-    W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '冰冻：无法行动；时序加速' },
-    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '汲取：敌人攻击回复自身；摆渡' },
-    W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '规则改写：每 3 回合变换；全场压制' },
+    W21: { onEnemyHit(t, fr) { if (Math.random() < 0.28) applyStatus(t, fr, 'weak', 2); }, enemyShield: 0.15, note: '回忆：抽取记忆；片段错位' },
+    W22: { enemyShield: 0.22, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '保存：状态锁定；残响回放' },
+    W23: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, bossSummon: true, note: '意识：全场侵蚀；世界叠影' },
+    W24: { onEnemyHit(t, fr) { if (Math.random() < 0.25) applyStatus(t, fr, 'sunder', 2); }, enemyRageEvery: 5, enemyRage: 1.08, rageNote: '焚香燃起：敌方攻击提升', note: '断光：熄灭增益；执行关闭' },
+    W25: { randomRule: true, ruleEvery: 4, ruleName: '镜界法则', confuseChance: 0.12, note: '逆流：方向改写；空间错位' },
+    W26: { enemyShield: 0.25, enemyAoeEvery: 5, enemyAoeMult: 1.4, enemyAoeName: '轨道扫射', note: '守护协议：强制回笼；护罩强化' },
+    W27: { bossSummon: true, enemyLifesteal: 0.22, note: '表决：多重意识；裁决锁定' },
+    W28: { onEnemyHit(t, fr) { if (Math.random() < 0.32) applyStatus(t, fr, 'poison', 3); }, allyDebuffChance: 0.25, allyDebuffId: 'weak', allyDebuffTurns: 2, debuffNote: '藤蔓缠住了', note: '边界：门压推进；外部风蚀' },
+    W29: { onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'sunder', 2); }, bossRevive: true, note: '回望：残影共鸣；指引强化' },
+    W30: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'poison', 3); }, enemyRageEvery: 4, enemyRage: 1.08, rageNote: '炉温升高：敌方攻击提升', note: '三择：未来模拟；仲裁锁定' },
+    W31: { confuseChance: 0.18, onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'weak', 2); }, note: '初令：守护舱体；原始护持' },
+    W32: { randomRule: true, ruleEvery: 3, suppressAllies: 0.12, note: '观测全记录：状态解析；印记封锁' },
+    W33: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, enemyShield: 0.10, note: '最优方案：环境改写；模拟压制' },
+    W34: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'freeze', 1); }, enemySpd: 1.15, note: '汇流：全属性强化；选择回响' },
+    W35: { enemyLifesteal: 0.25, onEnemyHit(t, fr) { if (Math.random() < 0.22) applyStatus(t, fr, 'weak', 2); }, note: '终焉：消散侵蚀；关闭推进' },
+    W36: { randomRule: true, ruleEvery: 3, suppressAllies: 0.15, allyDotPct: 0.02, note: '选择：三重试炼；终局回响' },
   };
 
   let uidSeq = 0;

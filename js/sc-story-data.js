@@ -423,7 +423,7 @@
 
     W19: { title: '灯不是用来照路的', place: '地下圣所', obj: '灯柱上的刻文',
       in: [
-        { k: 'n', s: '顺着编号往下走，是一座圣所。一具尸体都没有。' },
+        { k: 'n', s: '顺着编号往下走，是一座圣所。里面一个人都没有。' },
         { k: 'o', s: '中央那根灯柱还亮着，柱身上刻满了字。' },
       ],
       pre: [
@@ -722,7 +722,7 @@
     W02: { name: '潜影母虫', inner: '我不占这块地方。我只是等灯灭。',
       say: '把灯放下。我们都省事。',
       after: '它退回去的地方，墙上排着编号——从 001 开始。', mystery: '编号是谁编的，从 001 到几？' },
-    W03: { name: '怨声核心', inner: '我不是鬼。我是这栋房子里没说完的话。',
+    W03: { name: '怨声核心', inner: '我不是那种东西。我是这栋房子里没说完的话。',
       say: '……你先听我说完。',
       after: '门合上之前，里面漏出最后半句——“别关。”', mystery: '那句"别关"，是说给谁听的？' },
     W04: { name: '封门石卫', inner: '我不是守宝物。我守的是一条没人解除的规则。',
@@ -969,13 +969,13 @@
         { trigger: 'battle_win', type: 'environment_change', line: '黑退到墙角，不动了。' },
       ],
       environmentChange: '走廊尽头的那盏灯，被人修好了', clue: '有人曾从里面撬门出去', transition: '往档案编号指向的下一个区' },
-    W03: { premise: '顺着编号，走进一栋还亮过的旧宅', anomaly: '所有门都开着，只有最深的那扇关着', conflict: '屋里的声音不让任何人把那扇门打开', playerGoal: '看看那扇门后面是什么', enemyPurpose: '它们只是重复没说完的那半句', battleMechanic: '恐惧：降低攻击；诅咒', bossRole: '怨声核心——它不是一个鬼，是这栋房子没说完的话', bossTrigger: '玩家把手放在那扇门上',
+    W03: { premise: '顺着编号，走进一栋还亮过的旧宅', anomaly: '所有门都开着，只有最深的那扇关着', conflict: '屋里的声音不让任何人把那扇门打开', playerGoal: '看看那扇门后面是什么', enemyPurpose: '它们只是重复没说完的那半句', battleMechanic: '恐惧：降低攻击；诅咒', bossRole: '怨声核心——它不是那种东西，是这栋房子没说完的话', bossTrigger: '玩家把手放在那扇门上',
       battleEvents: [
         { trigger: 'first_hit', type: 'narrative', line: '它没有脸。它只有很多句没说完的话。' },
         { trigger: 'boss_hp50', type: 'mechanic', line: '它开始重复同一句了。' },
         { trigger: 'battle_win', type: 'environment_change', line: '整栋房子安静下来。那扇门自己合上了。' },
       ],
-      environmentChange: '屋里那些亮着的灯，一盏盏灭了', clue: '怨声是没说完的话，不是鬼', transition: '屋契背面记着下一个地址' },
+      environmentChange: '屋里那些亮着的灯，一盏盏灭了', clue: '怨声是没说完的话，不是别的什么', transition: '屋契背面记着下一个地址' },
     W04: { premise: '按地址找过来，是一座封着石门的地下墓室', anomaly: '石门不是锁着的，是被一条规则封着的', conflict: '石卫按程序醒来，把所有人当成违规者', playerGoal: '找到"谁封的门"这件事的答案', enemyPurpose: '它们只是执行同一条没有解除的规则', battleMechanic: '陷阱：随机眩晕；复活', bossRole: '封门石卫——它守的不是宝物，是一条没人解除的规则', bossTrigger: '玩家碰到门上的封印锁扣',
       battleEvents: [
         { trigger: 'first_hit', type: 'narrative', line: '它念的还是那句判决词。' },
@@ -1084,7 +1084,7 @@
       ],
       environmentChange: '深空遗址的归航信号停止', clue: '有一批人真的走了，而且没有回来', transition: '发射记录背面写着下一站的编号' },
     /* ---------- 第三卷《第二次醒来》：你以前来过 ---------- */
-    W19: { premise: '发射记录背面的编号，指向一座地下圣所', anomaly: '这里没有尸体，只有一套刻在墙上的规矩', conflict: '它要一个回答：恢复过去，还是往前走', playerGoal: '读懂灯柱上的刻文', enemyPurpose: '它们是仪式的值守，负责让这套规矩继续成立', battleMechanic: '仪式：周期性强化；灯火回响', bossRole: '灯火祭司核心——它守的是"灯火＝文明延续计划"这条教义', bossTrigger: '玩家读完灯柱最下面那一段刻文',
+    W19: { premise: '发射记录背面的编号，指向一座地下圣所', anomaly: '这里一个人都没有，只有一套刻在墙上的规矩', conflict: '它要一个回答：恢复过去，还是往前走', playerGoal: '读懂灯柱上的刻文', enemyPurpose: '它们是仪式的值守，负责让这套规矩继续成立', battleMechanic: '仪式：周期性强化；灯火回响', bossRole: '灯火祭司核心——它守的是"灯火＝文明延续计划"这条教义', bossTrigger: '玩家读完灯柱最下面那一段刻文',
       battleEvents: [
         { trigger: 'first_hit', type: 'narrative', line: '它一直在念同一段仪轨。' },
         { trigger: 'boss_hp50', type: 'mechanic', line: '灯柱亮了一档，全场的影子多了一层。' },

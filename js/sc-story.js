@@ -280,6 +280,27 @@
      换图 = 往 `story/scene/` 丢同名文件；**不改任何剧情代码**。 */
   const IMG = {};                 // key（sceneId **或世界 id**）→ {ok:true,img} | {fail:true} | {loading:true}
   let subpkgTried = false;
+  /* ================= 2026-10-03（任务书 §34 / §36）· **轻量缓存上限** =================
+     场景 37 张 + Boss 36 张，如果全留在内存里，等于一直摁着十几 MB 的解码位图
+     （而且玩家根本不需要同时看它们）。这里做一个**极简 LRU**，不引任何资源管理器：
+       · 每个缓存最多留 `CACHE_MAX` 张；
+       · 超了就把**最久没用过**的那张丢掉（只丢引用，让 GC 去回收）。
+     为什么是 6：页面结构是"按住一个世界读"——当前世界 + 它那张 Boss + 刚走过的两三处，
+     6 张足够覆盖；多出来的都是过去式。`Story.preloadWorld()` 预热的下一世界也在这个额度内。
+     做坏试验：把 `trimCache` 调用删掉 → 连走 8 个世界后 IMG 会积到 8 条（上限形同不存在）。 */
+  const CACHE_MAX = 6;
+  const usedSeq = {};             // key → 最近一次用到它的序号（越大越新）
+  let useTick = 0;
+  function markUsed(key) { usedSeq[key] = ++useTick; }
+  function trimCache(map) {
+    const keys = Object.keys(map).filter(function (k) { return map[k] && map[k].ok; });
+    if (keys.length <= CACHE_MAX) return;
+    keys.sort(function (a, b) { return (usedSeq[a] || 0) - (usedSeq[b] || 0); });  // 最久没用在前
+    keys.slice(0, keys.length - CACHE_MAX).forEach(function (k) {
+      try { delete map[k]; } catch (e) {}
+      delete usedSeq[k];
+    });
+  }
   /* R3.3（父亲大人："36 个世界的场景和 boss 图片…到时你可以分别替换进去"）：
      取图的**文件名**允许按世界来 —— `WORLD_SCENE_FILE['W07'] = 'story/scene/img_scene_W07.jpg'`。
      于是"换图"永远只是**丢文件**，不改代码（这条是 B 批立的规矩）。 */
@@ -312,7 +333,7 @@
   }
   function ensureScene(id, onReady) {
     const rec = IMG[id];
-    if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
+    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
     const file = sceneFile(id);
     if (!file || typeof wx === 'undefined' || !wx.createImage) { IMG[id] = { fail: true }; return false; }
     /* R3.3 曾经在这里做"专属图失败 → 再试一次所属母版"的两级兜底；2026-10-03 母版图删掉之后
@@ -321,7 +342,7 @@
     try {
       const img = wx.createImage();
       IMG[id] = { loading: true };
-      img.onload = function () { IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
+      img.onload = function () { IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(IMG); try { CV.render(); } catch (e) {} };
       img.onerror = function () { IMG[id] = { fail: true }; };
       img.src = file;
     } catch (e) { IMG[id] = { fail: true }; }
@@ -336,13 +357,13 @@
   function bossFile(id) { return ((SD.BOSS_FILE || {})[id]) || null; }
   function ensureBoss(id, onReady) {
     const rec = BOSS_IMG[id];
-    if (rec) { if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
+    if (rec) { if (rec.ok) markUsed(id); if (rec.ok && onReady) onReady(rec.img); return !!rec.ok; }
     const file = bossFile(id);
     if (!file || typeof wx === 'undefined' || !wx.createImage) { BOSS_IMG[id] = { fail: true }; return false; }
     try {
       const img = wx.createImage();
       BOSS_IMG[id] = { loading: true };
-      img.onload = function () { BOSS_IMG[id] = { ok: true, img: img }; try { CV.render(); } catch (e) {} };
+      img.onload = function () { BOSS_IMG[id] = { ok: true, img: img }; markUsed(id); trimCache(BOSS_IMG); try { CV.render(); } catch (e) {} };
       img.onerror = function () { BOSS_IMG[id] = { fail: true }; };
       img.src = file;
     } catch (e) { BOSS_IMG[id] = { fail: true }; }
@@ -904,10 +925,10 @@
     if (cur.meta && cur.meta.worldId === 'W36' && cur.meta.part === 'post' && done() && !(Core.S && Core.S.story && Core.S.story.choice)) {
       const bh = 44 * CV.SCALE, gap = 10 * CV.SCALE, bw = (boxW - gap) / 2;
       const by = bottom - 8 * CV.SCALE - bh;
-      CV.round(U.pad(), by, bw, bh, 12 * CV.SCALE, CV.a(C.gold, .16), C.gold);
+      CV.round(U.pad(), by, bw, bh, CV.RADIUS_SM, CV.a(C.gold, .16), C.gold);
       CV.text('让灯熄灭', U.pad()+bw/2, by+bh/2, {size:CV.FS.md,align:'center',color:C.gold,bold:true});
       CV.hit('story_choice:1',U.pad(),by,bw,bh);
-      CV.round(U.pad()+bw+gap, by, bw, bh, 12 * CV.SCALE, CV.a(C.panel2,.72), C.line2);
+      CV.round(U.pad()+bw+gap, by, bw, bh, CV.RADIUS_SM, CV.a(C.panel2,.72), C.line2);
       CV.text('继续点燃', U.pad()+bw+gap+bw/2, by+bh/2, {size:CV.FS.md,align:'center',color:C.text});
       CV.hit('story_choice:2',U.pad()+bw+gap,by,bw,bh);
       cur.choiceLocked = true;
