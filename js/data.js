@@ -603,11 +603,11 @@ window.DATA = (function () {
      换掉它等于把 W01 / W02 / W23 三个世界的设定一起推翻，收益为零。
      数值、id、机制一个字没动。 */
   const WORLDS = [
-    { id: 'W01', ico: '🦠', name: '黏液巢穴', theme: 'bio',    desc: '泄漏事故封了这家研究所，感染体把走廊筑成了蜂巢。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '黏液母巢', bossHp: [92111, 165799, 294754],
+    { id: 'W01', ico: '🦠', name: '黏液巢穴', theme: 'bio',    desc: '研究所在漏水。十年的水，还在墙上往外长。', hp: 900,  atk: 120, def: 70,  mechanic: '感染：敌人攻击附带中毒', boss: '黏液母巢', bossHp: [92111, 165799, 294754],
       enemies: ['感染研究员', '裂舌兽', '捕食体α'], elite: '变异捕食体', unlock: null },
-    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '废弃空间站被甲壳生物占据，黑暗里全是黏液与尾刺。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；裂伤', boss: '潜影母虫', bossHp: [112580, 202644, 360255],
+    { id: 'W02', ico: '🕷', name: '潜影窟', theme: 'bio',    desc: '黑会动，但它停在灯的外面。', hp: 1100, atk: 150, def: 85,  mechanic: '突袭：敌人速度+20%；裂伤', boss: '潜影母虫', bossHp: [112580, 202644, 360255],
       enemies: ['伏面虫', '工蜂甲虫', '战甲虫'], elite: '禁卫甲虫', unlock: 'W01' },
-    { id: 'W03', ico: '🚪', name: '怨声旧宅', theme: 'ghost',  desc: '踏入这栋房子的人，都会被怨念缠上。', hp: 1250, atk: 135, def: 110, mechanic: '恐惧：降低攻击；诅咒', boss: '怨声核心', bossHp: [133049, 239488, 425756],
+    { id: 'W03', ico: '🚪', name: '怨声旧宅', theme: 'ghost',  desc: '宅子所有的门都开着，只有最深的那扇关着。', hp: 1250, atk: 135, def: 110, mechanic: '恐惧：降低攻击；诅咒', boss: '怨声核心', bossHp: [133049, 239488, 425756],
       enemies: ['怨念残影', '白衣游影', '黑猫游影'], elite: '阁楼怨影', unlock: 'W02' },
     /* 2026-09-23（创意总监《三维度审核》第三轮定案，父亲大人在案）：
     /* 2026-09-23（合规岗体检报告 R6 · 文案策划落地；父亲大人已同意）：
@@ -629,22 +629,22 @@ window.DATA = (function () {
        ⚠️ 仍留两处**待父亲大人拍板**（都不在合规岗的 13 处清单里，动了要连带 theme→阵营映射 /
          全库引用 / 法宝表）：「九幽渡口」（W35 的世界名）、「九幽幡」（法宝 fb18）
          与阵营名「幽都」—— 九幽＝冥界别称，与黄泉同类。 */
-    { id: 'W04', ico: '🏺', name: '机关地宫', theme: 'mystic', desc: '黄沙之下的法老墓室，守墓石卫永不眠。', hp: 1500, atk: 180, def: 130, mechanic: '陷阱：随机眩晕；复活', boss: '地宫石卫', bossHp: [163752, 294754, 524008],
-      enemies: '木乃伊战士|沙暴游影|圣甲虫群'.split('|'), elite: '祭司残影', unlock: 'W03' },
-    { id: 'W05', ico: '🚢', name: '无归客轮', theme: 'ghost',  desc: '这艘船的旅客名单上，全是没能下船的人。', hp: 1750, atk: 205, def: 150, mechanic: '濒死判定：每场最多一次，把你打到剩 1 点血', boss: '终结舵手', bossHp: [194456, 350021, 622259],
-      enemies: '沉船游影|甲板幻影|船舱幽影'.split('|'), elite: '终结使者', unlock: 'W04' },
-    { id: 'W06', ico: '🛰', name: '轨道废土带', theme: 'tech',   desc: '轨道战争打到最后一刻，机械军团仍在这条带上巡游。', hp: 2200, atk: 260, def: 190, mechanic: '护盾：开场获得护盾；远程炮击', boss: '轨道主控', bossHp: [235394, 423710, 753261],
-      enemies: '机械步兵|悬浮炮台|歼灭机甲'.split('|'), elite: '轨道毁灭者', unlock: 'W05' },
-    { id: 'W07', ico: '💤', name: '酣眠迷境', theme: 'ghost',  desc: '在梦里被留下的人，现实里也没醒过来。', hp: 2500, atk: 240, def: 220, mechanic: '睡眠：概率无法行动；幻觉', boss: '酣眠之主', bossHp: [286567, 515820, 917014],
-      enemies: '梦境傀儡|锈爪梦魔|呓语游影'.split('|'), elite: '噩梦编织者', unlock: 'W06' },
-    { id: 'W08', ico: '🌫', name: '哑雾小镇', theme: 'ghost',  desc: '浓雾中的小镇，雾界随时降临。', hp: 2900, atk: 280, def: 250, mechanic: '浓雾：命中-15%', boss: '雾猎者', bossHp: [347974, 626353, 1113517],
-      enemies: '雾中人影|钩索巨影|白面护工'.split('|'), elite: '雾界裁决者', unlock: 'W07' },
-    { id: 'W09', ico: '🐉', name: '巨兽孤屿', theme: 'bio',  desc: '被唤醒的史前霸主，视人类为猎物。', hp: 3400, atk: 320, def: 270, mechanic: '撕裂：裂伤；群体攻击', boss: '暴君巨兽', bossHp: [419616, 755308, 1342770],
-      enemies: '迅猛龙|双脊龙|翼龙'.split('|'), elite: '棘背龙', unlock: 'W08' },
-    { id: 'W10', ico: '🧫', name: '瘴沼深处', theme: 'bio',    desc: '沼泽深处的巨蟒已变异成灾厄。', hp: 3800, atk: 350, def: 300, mechanic: '中毒：持续掉血；缠绕', boss: '瘴沼巨口', bossHp: [501492, 902685, 1604774],
-      enemies: '瘴沼蟒|沼泽鳄|沼泽水蛭'.split('|'), elite: '变异森蚺', unlock: 'W09' },
-    { id: 'W11', ico: '⛵', name: '幽帆船坞', theme: 'mystic', desc: '月光下，那批船员的船始终没能靠岸。', hp: 4300, atk: 390, def: 330, mechanic: '召唤旧船员；汲取', boss: '幽帆船长', bossHp: [603837, 1086907, 1932279],
-      enemies: '幽帆水手|铁壳炮手|锈帆船员'.split('|'), elite: '幽帆大副', unlock: 'W10' },
+    { id: 'W04', ico: '🏺', name: '机关地宫', theme: 'mystic', desc: '石门封着。锁扣是机械的，封条是石头的。', hp: 1500, atk: 180, def: 130, mechanic: '陷阱：随机眩晕；复活', boss: '封门石卫', bossHp: [163752, 294754, 524008],
+      enemies: '守墓石卒|机关游影|封印守卫'.split('|'), elite: '执令石卫', unlock: 'W03' },
+    { id: 'W05', ico: '🌫', name: '迷雾林海', theme: 'ghost',  desc: '门外的树都朝着灯长。只有那一棵，绕开了。', hp: 1750, atk: 205, def: 150, mechanic: '迷失：每场最多一次，你会在雾里丢掉方向（打到剩 1 点血）', boss: '迷雾守林者', bossHp: [194456, 350021, 622259],
+      enemies: '雾蚀藤影|迷失行者|锈蚀探机'.split('|'), elite: '林海巡守', unlock: 'W04' },
+    { id: 'W06', ico: '🏙', name: '沉眠水城', theme: 'tech',   desc: '城市沉在地下，塔尖还露在水面上。灯塔还在转。', hp: 2200, atk: 260, def: 190, mechanic: '沉眠：开场升起水幕护盾；远程水压冲击', boss: '沉眠城主', bossHp: [235394, 423710, 753261],
+      enemies: '沉水巡卫|晶化仆从|锈蚀管道机'.split('|'), elite: '残塔守卫', unlock: 'W05' },
+    { id: 'W07', ico: '⛏', name: '裂隙矿坑', theme: 'ghost',  desc: '坑是一层一层往下挖的。挖到会发光那一层，就停了。', hp: 2500, atk: 240, def: 220, mechanic: '晶化：受伤后反光；塌方眩晕', boss: '裂晶巨兽', bossHp: [286567, 515820, 917014],
+      enemies: '矿洞掘兽|晶化工蚁|塌方游影'.split('|'), elite: '深层掘进机', unlock: 'W06' },
+    { id: 'W08', ico: '⚓', name: '黑潮港湾', theme: 'ghost',  desc: '港里停着四十七艘船。一艘都没开出去。', hp: 2900, atk: 280, def: 250, mechanic: '黑潮：命中-15%；甲板打滑', boss: '潮汐监察者', bossHp: [347974, 626353, 1113517],
+      enemies: '港务巡卫|泡水装卸机|航标残影'.split('|'), elite: '撤离维护机', unlock: 'W07' },
+    { id: 'W09', ico: '🌋', name: '灰烬平原', theme: 'bio',  desc: '不像是打毁的。楼是齐的，只是被埋了。', hp: 3400, atk: 320, def: 270, mechanic: '灰烬：裂伤；范围清除', boss: '灰烬执行官', bossHp: [419616, 755308, 1342770],
+      enemies: '灰烬巡检机|残骸守卫|清除单元'.split('|'), elite: '区域清理终端', unlock: 'W08' },
+    { id: 'W10', ico: '🛰', name: '天穹废墟', theme: 'tech',  desc: '城市浮在云上。桥都断了，楼还连着。', hp: 3800, atk: 350, def: 300, mechanic: '失衡：飘浮平台位移；坠落伤害', boss: '天穹守望者', bossHp: [501492, 902685, 1604774],
+      enemies: '浮空维护机|断桥游卫|失重残骸'.split('|'), elite: '天空灯塔残核', unlock: 'W09' },
+    { id: 'W11', ico: '🗄', name: '记忆档案区', theme: 'mystic', desc: '档案厅是环形的。大部分柜子已经停了。', hp: 4300, atk: 390, def: 330, mechanic: '记忆读取：抽取目标；档案封锁', boss: '档案守护核心', bossHp: [603837, 1086907, 1932279],
+      enemies: '档案巡检械|封存守卫|读取残影'.split('|'), elite: '索引管理终端', unlock: 'W10' },
     /* 2026-09-23（AI 视觉工程师 · 图标时代自查，本轮第二次收紧）：
        原来是"Emoji 12+ 必须登记"（登记＝允许上屏，提审前拿老机看一眼）。本轮把口径推到**不允许**：
        **画布上的图标一律只用 Emoji 1.0（Unicode 6.0，2010）就有的字符** ——
@@ -657,21 +657,21 @@ window.DATA = (function () {
          tv20 灵石碎块 🪨→🔹 · tv33 古镜照心 🪞→📀 · tv34 仙禽遗羽 🪶→🐦
        另有"点灯"那颗功能图标 🪔→🔆、幽魂兜底 🪞→🌚（都在界面层，见 ui.js / sc-*.js）。
        尺子在 wxlh-minigame/scripts/icon_unique_audit.js 第 ⑨ 条：**全库扫一遍，一个 Emoji 12+ 都不许有**。 */
-    { id: 'W12', ico: '☄️', name: '蚀环远征', theme: 'mystic', desc: '黑色的潮水从环带那头压过来，地图正在一寸寸褪色。', hp: 5000, atk: 450, def: 380, mechanic: '腐化：降低防御；群体增益', boss: '蚀冠之王', bossHp: [742003, 1335606, 2374411],
-      enemies: '蛮荒兵|巨狼骑士|蚀环侍从'.split('|'), elite: '蚀环游影', unlock: 'W11' },
+    { id: 'W12', ico: '🪞', name: '镜像城市', theme: 'tech',  desc: '街道很干净，灯全亮着，一个人都没有。', hp: 4900, atk: 430, def: 360, mechanic: '重播：复制目标；镜像反伤', boss: '镜像管理者', bossHp: [726598, 1307925, 2324772],
+      enemies: '镜像巡卫|复刻仆从|重播残影'.split('|'), elite: '街区控制器', unlock: 'W11' },
     /* ---- 第二巡：转生 1 次开启 ---- */
-    { id: 'W13', ico: '❄️', reincarn: 1, name: '寒冠王座', theme: 'mystic', desc: '坐上去的人把整个王国冻住了，春天再没到过。', hp: 5800, atk: 510, def: 430, mechanic: '冰冻：无法行动；王权强化', boss: '寒冠女王', bossHp: [910873, 1639572, 2914794],
-      enemies: '冰狼|雪魔|霜冻武士'.split('|'), elite: '冰宫禁卫', unlock: 'W12' },
-    { id: 'W14', ico: '🏯', name: '灯阁试炼场', theme: 'god', desc: '灯阁亲自设下的试炼，规则由它书写。', hp: 7000, atk: 600, def: 500, mechanic: '随机规则：每回合变化', boss: '试炼裁决者', bossHp: [1125798, 2026437, 3602554],
-      enemies: '试炼傀儡|规则执行体|灯阁幻影'.split('|'), elite: '灯阁代行者', unlock: 'W13' },
-    { id: 'W15', ico: '🏰', name: '绯月旧堡', theme: 'ghost', desc: '每逢绯月，古堡的宴会就会重新开始。', hp: 8500, atk: 680, def: 570, mechanic: '汲取：敌人攻击回复自身；绯月强化', boss: '绯月侯爵', bossHp: [1350958, 2431724, 4323065],
-      enemies: '绯仆|蝙蝠群|猎魔者残影'.split('|'), elite: '古堡管家', unlock: 'W14' },
-    { id: 'W16', ico: '🌊', name: '沉海废墟', theme: 'bio', desc: '海底沉睡着不该被唤醒的东西。', hp: 10200, atk: 770, def: 650, mechanic: '水压：每回合全队掉血；触手缠绕', boss: '沉海之主', bossHp: [1621150, 2918069, 5187678],
-      enemies: '深渊潜者|巨型章鱼|珊瑚傀儡'.split('|'), elite: '遗迹祭司', unlock: 'W15' },
-    { id: 'W17', ico: '🔔', name: '蜂群主控', theme: 'tech', desc: '所有联网的东西，现在只听它一个。', hp: 12200, atk: 870, def: 740, mechanic: '无人机群：群体攻击；电磁干扰', boss: '蜂群主脑', bossHp: [1945380, 3501683, 6225214],
-      enemies: '哨戒机兵|电磁猎犬|数据游影'.split('|'), elite: '核心守卫', unlock: 'W16' },
-    { id: 'W18', ico: '🏚', name: '白墙疗养院', theme: 'ghost', desc: '这间医院的病历上，写满了你的名字。', hp: 14600, atk: 980, def: 840, mechanic: '幻觉：概率攻击队友；死亡复活', boss: '白衣院长', bossHp: [2334456, 4202019, 7470257],
-      enemies: '白衣护工|手术残响|病房幻影'.split('|'), elite: '重症监护者', unlock: 'W17' },
+    { id: 'W13', ico: '🧪', reincarn: 1, name: '禁忌实验区', theme: 'mystic', desc: '门后面是一条实验通道。最里面那扇锁着。', hp: 5800, atk: 510, def: 430, mechanic: '不稳定：随机增益；核心过载', boss: '初代实验体', bossHp: [910873, 1639572, 2914794],
+      enemies: '实验残体|失控器械|编号样本'.split('|'), elite: '封存实验体', unlock: 'W12' },
+    { id: 'W14', ico: '🧱', name: '灯火边境', theme: 'god', desc: '墙横在那儿。远处一排灯塔，连成一条光带。', hp: 7000, atk: 600, def: 500, mechanic: '封锁：护盾；灯塔火力覆盖', boss: '边境守卫零号', bossHp: [1125798, 2026437, 3602554],
+      enemies: '边境巡械|灯列炮台|墙体残影'.split('|'), elite: '闸门控制体', unlock: 'W13' },
+    { id: 'W15', ico: '⭕', name: '残域核心外环', theme: 'ghost', desc: '见过的东西全在这儿聚了一遍。像有人搬来的。', hp: 8500, atk: 680, def: 570, mechanic: '观测：锁定目标；结构重组', boss: '核心观察者', bossHp: [1350958, 2431724, 4323065],
+      enemies: '外环巡械|拼接残体|观测单元'.split('|'), elite: '门侧记录体', unlock: 'W14' },
+    { id: 'W16', ico: '🕰', name: '循环之城', theme: 'bio', desc: '城市还在转。灯亮着，机器在扫地，没有人。', hp: 10200, atk: 770, def: 650, mechanic: '回溯：状态回退；时间锁定', boss: '时间维护者', bossHp: [1621150, 2918069, 5187678],
+      enemies: '循环巡械|重演仆从|钟楼守卫'.split('|'), elite: '时间刻度体', unlock: 'W15' },
+    { id: 'W17', ico: '🗑', name: '遗忘荒原', theme: 'tech', desc: '楼在变淡。地上的门牌，字正在退掉。', hp: 12200, atk: 870, def: 740, mechanic: '遗忘：削去增益；记录剥离', boss: '遗忘记录者', bossHp: [1945380, 3501683, 6225214],
+      enemies: '擦除单元|无名残影|数据空壳'.split('|'), elite: '删改执行体', unlock: 'W16' },
+    { id: 'W18', ico: '📡', name: '深空遗址', theme: 'ghost', desc: '轨道悬在黑里。发射名单上三十七个名字，其中一个你认得。', hp: 14600, atk: 980, def: 840, mechanic: '祈航：跨区打击；信标强化', boss: '归航信标', bossHp: [2334456, 4202019, 7470257],
+      enemies: '发射台巡械|轨道维护机|信标残影'.split('|'), elite: '归航值守体', unlock: 'W17' },
     /* ---- 第三巡：转生 2 次开启 ---- */
     { id: 'W19', ico: '🌌', reincarn: 2, name: '星骸遗址', theme: 'tech', desc: '无数文明在这里终结，星骸还在呼吸。', hp: 17500, atk: 1110, def: 960, mechanic: '星骸护盾；轨道扫射', boss: '星骸巨兽', bossHp: [2801347, 5042423, 8964308],
       enemies: '星舰残响|虚空掠夺者|机械残壳'.split('|'), elite: '遗址拾荒者', unlock: 'W18' },

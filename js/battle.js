@@ -33,8 +33,8 @@ window.Battle = (function () {
     W05: { onEnemyHit(t, frames) {
       if (t._ndUsed || t.hp <= 1) return;
       if (Math.random() < 0.03) { t._ndUsed = 1; t.hp = 1; frames.push({ type: 'nearDeath', target: t.uid }); }
-    }, note: '濒死判定：每场最多一次，把你打到剩 1 点血' },
-    W06: { enemyShield: 0.2, note: '护盾：开场获得护盾；远程炮击' },
+    }, note: '迷失：每场最多一次，你会在雾里丢掉方向（打到剩 1 点血）' },
+    W06: { enemyShield: 0.2, note: '沉眠：开场升起水幕护盾；远程水压冲击' },
     W07: { onEnemyHit(t, fr) { if (Math.random() < 0.20) applyStatus(t, fr, 'stun', 1); }, note: '睡眠：概率无法行动；幻觉' },
     W08: { allyHitMod: -0.15, note: '浓雾：命中-15%' },
     W09: { onEnemyHit(t, fr) { if (Math.random() < 0.30) applyStatus(t, fr, 'bleed', 3); }, note: '撕裂：裂伤；群体攻击' },

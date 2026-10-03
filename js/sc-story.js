@@ -68,6 +68,15 @@
     const key = SCENE_INFO[id] ? id : (SCENE[id] || id);
     return (SCENE_INFO[key] && SCENE_INFO[key].name) || '残域';
   };
+  /* ================= 「这个地方叫什么」（2026-10-03 · 视觉资产驱动剧情重构）=================
+     12 张母版那套"场景气质"名字（培养舱走廊 / 客轮内舱…）是**旧图的名字**，一张母版要套三个世界，
+     所以世界页写「场景：客轮内舱」而画面上是一片森林的情况一定会出现。
+     现在每个世界在 `STORYDATA.WORLDS[wid].place` 里写**它自己**的地点名（图像说什么就叫什么），
+     世界页取这个；没有 place 的老世界才退回气质名 —— 一处收口，页面不自己拼。 */
+  Story.placeName = function (worldId) {
+    const w = WORLDS[worldId];
+    return (w && w.place) || Story.sceneName(Story.sceneOf(worldId));
+  };
   /* ================= 人物 / 装备的**场景归属**（2026-10-01 二轮） =================
      父亲大人：「人物故事不能全部使用 ghost_house」「装备故事不能全部使用 tech_base」
      —— 全挤在一个场景里，十几段故事看起来像同一张壁纸。

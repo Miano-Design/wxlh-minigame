@@ -326,7 +326,7 @@
         U.card(function () {
           const un = St.unreadEntries(w.id);
           U.h3('本章', '《' + (SDw.title || '') + '》');
-          U.note('场景：' + St.sceneName(St.sceneOf(w.id)));
+          U.note('场景：' + (St.placeName ? St.placeName(w.id) : St.sceneName(St.sceneOf(w.id))));
           U.space(CV.SP[1]);
           U.btn(U.ix(), U.y, U.iw(), U.BTN_H * CV.SCALE, St.entryLabel(w.id),
             un > 0 ? 'primary' : 'ghost', 'story_main:' + w.id);
