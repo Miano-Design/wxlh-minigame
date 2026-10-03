@@ -179,8 +179,24 @@
       U.y = top + box + 10 * CV.SCALE;
       U.note(w.desc, 2 * CV.SCALE);                 // 网页版这一行是 0.75rem（12px）
       U.space(CV.SP[2]);                            // V9.6.122：网页版 .kv mt2 = 10（原来 4，太挤）
+      /* ================= 2026-10-03（NARRATIVE-UX-FINAL §二十六）=================
+       世界卡要把"这个世界现在是什么状态"说全：编号 / 现状 / 机制 / 卷宗 / Boss。
+       · **世界现状**读的是 ARC 的 `anomaly`（这个世界到底哪里不对）——那是已经写好的那份，
+         不新造字段、也不重写一句话；
+       · **卷宗**＝这个世界已经捡到的记录 / 总数（`Story.recordsFound` 与 `Story.recordsOf`
+         同一个口径，两处不会各算一套）。 */
+      const ARC=(G.STORYDATA&&G.STORYDATA.ARC)||{};
+      const idx=(D.WORLDS||[]).findIndex(function(y){return y.id===w.id;})+1;
+      U.kv('世界编号', 'W'+String(idx).padStart(2,'0'));
+      if(ARC[w.id]&&ARC[w.id].anomaly) U.kv('世界现状', ARC[w.id].anomaly, CV.C.accent2);
       U.kv('世界机制', w.mechanic, CV.C.accent);     // 整句照抄，别只留冒号前半截
       U.kv('守关 Boss', w.boss);
+      try{
+        if(G.Story&&G.Story.recordsOf){
+          const all=G.Story.recordsOf(w.id)||[], got=G.Story.recordsFound(w.id)||[];
+          if(all.length) U.kv('卷宗', got.length+' / '+all.length, got.length?'':CV.C.dim);
+        }
+      }catch(e){}
     });
     // 难度页签
     /* V1.0.5（UI 设计师 1.0.2 复审 · 两端对表第 4 条）：三态照网页版 .diff-tabs。
@@ -694,9 +710,29 @@
         if (ch && ch.after) changed = ch.after;
       }
     } catch (e) { try { G.LOG.warn('dun', 'settle_deco3', { err: String(e && e.message) }); } catch (e2) {} }
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §三十三 / §六十二）=================
+       "结算页要能说出这次留下了什么记录"。记录**在这一刻收进卷宗**（＝打完了守关 Boss），
+       卷宗页立刻查得到；而"发现感"那张卡仍然只在**战后剧情读完**那一刻弹
+       （`sc-story.js` 的 findCard 只在 part==='post' && done() 时画，顺序不会反）。
+       收卷是幂等的（`collectArchive` 第二次返回 null），所以重刷不会再报"新增记录"。 */
+    let records = null;
+    try {
+      if (G.Story && G.Story.collectArchive) {
+        const before = {}; 
+        (G.Story.recordsOf(wid) || []).forEach(function (r) { if (G.Story.archiveSeen(r.id)) before[r.id] = 1; });
+        G.Story.collectArchive(wid);
+        records = (G.Story.recordsOf(wid) || []).map(function (r) { return r.id; })
+          .filter(function (id) { return !before[id]; });
+        if (!records.length) records = null;
+      }
+    } catch (e) { try { G.LOG.warn('dun', 'settle_records', { err: String(e && e.message) }); } catch (e2) {} }
     trace('settled', { st: stage, rewards: (rewards || []).length, acts: (acts || []).length });
     return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''),
-      rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed };
+      rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed, records: records,
+      /* `survey` ＝ 这一场属于"调查残域"（世界内的关），结算页因此说「记录完成 / 调查中止」；
+         深井 / 斗法台 / 扫荡那些**不是调查**的场次不传它，仍然说「胜利 / 失败」。
+         （§三十二 / §三十三：文案要归位，但不能把"打擂台"也叫成调查。） */
+      survey: true };
   }
 
   function fightWave() {
@@ -809,7 +845,8 @@
             }
             /* `closeLabel` 是给底部那一颗用的（失败时它才要写清"回哪儿"；
                胜利那条路底下是「收下奖励并返回」，不用换）。 */
-            return { title: '战斗失败', sub: '先练一练，再来。', rewards: [], acts: acts, closeLabel: '返回世界' };
+            return { title: '战斗失败', sub: '先练一练，再来。', rewards: [], acts: acts, closeLabel: '返回世界',
+              worldId: run.worldId, survey: true };
           }
           const isLast = run.wave === run.waves.length - 1;
           if (!isLast) {

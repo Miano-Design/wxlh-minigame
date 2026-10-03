@@ -55,7 +55,12 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
      要求上面那把回归尺子当场变红（绿了说明它没盯住），塞完逐字节还原。 */
   'cloud_authoritative_breaktest',
   /* 2026-10-03 落盘时机（A）：界面层改档必须紧跟保存 + 逻辑层动作"改了就必须落盘"。 */
-  'save_timing_audit'];
+  'save_timing_audit',
+  /* 2026-10-03 NARRATIVE-UX-FINAL-2026-10（成品级叙事与体验升级）新增四支 ——
+     任务书 §六十四 点名要加的那四把：内容齐不齐 / 卷宗连不连得上 / 机制真不真进入战斗 /
+     交互点得动点得准。它们和前面那些一样进发布总闸。 */
+  'narrative_content_audit', 'archive_relationship_audit',
+  'world_mechanic_audit', 'ui_interaction_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

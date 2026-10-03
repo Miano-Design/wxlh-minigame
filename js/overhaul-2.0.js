@@ -176,7 +176,14 @@
          现在改用全站统一的卡内标题通用件 `U.h3` —— 它自己管"标签行 → 标题"的间距与行高，
          和别的卡片（队伍/成长/法宝…）完全一致，不会再各写一套。 */
       U.hint('当前旅程');
-      U.h3(w.name);
+      /* ================= 2026-10-03（NARRATIVE-UX-FINAL §二十三）=================
+         首页要能回答"我现在在残域的什么位置"：**世界编号 + 名字 + 一句世界现状**。
+         那句现状读的是 `ARC[wid].anomaly`（"这个世界到底哪里不对"）——
+         和世界页/战斗里说的**同一句话**，不另写、不概括（§六十三：剧情说一套、游戏做一套 是 FAIL）。 */
+      const ARC=(G.STORYDATA&&G.STORYDATA.ARC)||{};
+      const widx=(D.WORLDS||[]).findIndex(function(y){return y.id===w.id;})+1;
+      U.h3('W'+String(widx).padStart(2,'0')+' '+w.name);
+      if(ARC[w.id]&&ARC[w.id].anomaly) U.note(ARC[w.id].anomaly,4*CV.SCALE);
       U.note(stage>=0?'第 '+(stage+1)+'/12 关 · '+String(w.mechanic).split('：')[0]:'普通难度 12/12 已完成',4*CV.SCALE);
       const bw=U.iw(),by=U.y+8*CV.SCALE; CV.round(U.ix(),by,bw,5*CV.SCALE,3*CV.SCALE,CV.a(CV.C.line,.8),null);
       const pp=stage>=0?prog/12:1; CV.round(U.ix(),by,bw*Math.max(0,Math.min(1,pp)),5*CV.SCALE,3*CV.SCALE,CV.RADIUS_SM,CV.C.gold,null); U.y=by+14*CV.SCALE;
@@ -464,7 +471,19 @@
     }
     U.sectionTitle('世界线');
     const ws=unlockedWorlds().slice().reverse();
-    ws.forEach(function(x){ const q=(s.worlds[x.id].stages.normal||[]).filter(Boolean).length; U.card(function(){
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §二十五）=================
+       世界线不再是"一串 36 张按钮"，而是**六卷 → 卷内世界**：
+       每当从一卷跨到下一卷（列表是倒序，所以是往前一卷跨），插一行卷名。
+       ⚠️ 卷名与区间**只读 `STORYDATA.VOLS` 那一份真源**，本文件一个字都不另写；
+       卷号用中文数字（和世界页 / 卷首转场同一个写法）。 */
+    const VOLS=(G.STORYDATA&&G.STORYDATA.VOLS)||[];
+    const CN=['一','二','三','四','五','六'];
+    const volOf=function(id){ const i=(D.WORLDS||[]).findIndex(function(w){return w.id===id;})+1;
+      return VOLS.filter(function(v){return i>=v.from&&i<=v.to;})[0]||null; };
+    let lastVol=null;
+    ws.forEach(function(x){ const v=volOf(x.id);
+      if(v&&v!==lastVol){ lastVol=v; U.sectionTitle((CN[v.n-1]||v.n)+' · 《'+v.name+'》'); }
+      const q=(s.worlds[x.id].stages.normal||[]).filter(Boolean).length; U.card(function(){
       const ico=D.iconOpsOf&&D.iconOpsOf('world',x.id); if(ico) CV.drawIcon(ico,CV.ctx,U.ix()+18*CV.SCALE,U.y+24*CV.SCALE,CV.AICO.worldSm*CV.SCALE,CV.worldIconColor(x.theme,x.id===w.id?'current':'idle'));
       CV.text(x.name,U.ix()+46*CV.SCALE,U.y+12*CV.SCALE,{size:CV.FS.f1,bold:true});
       CV.text(q+'/12',U.ix()+U.iw(),U.y+12*CV.SCALE,{size:CV.FS.md,color:q>=12?CV.C.gain:CV.C.dim,align:'right'});

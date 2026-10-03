@@ -1098,8 +1098,19 @@
     const HINTW = Math.min(340 * CV.SCALE, U.iw());
     const hintLines = hint ? CV.wrap(hint, HINTW, CV.FS.md, 3) : [];
     const HINTLH = CV.FS.md * 1.6;                       // 行距：比字号宽一点，长句才不挤
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §三十三）· **新增记录那一行** =================
+       结算页要说清"这一场留下了什么"：新增卷宗 ×N ＋ 编号。
+       高度必须在 `total` 里先算（与败因那一行同一条纪律：不先算，按钮就会压上去）。
+       ⚠️ 只列前两条编号，后面折成省略号 —— 320 小屏放不下六个 W##-NNN。 */
+    const recIds = (p.records || []).slice(0, 6);
+    const recText = recIds.length
+      ? ('新增记录 ×' + recIds.length + '　' + recIds.slice(0, 2).join('、') + (recIds.length > 2 ? ' …' : ''))
+      : '';
+    const recLines = recText ? CV.wrap(recText, HINTW, CV.FS.md, 2) : [];
+    const RECLH = CV.FS.md * 1.6;
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
     if (hintLines.length) total += 10 * CV.SCALE + hintLines.length * HINTLH;   // 与下面真正推进的量一致
+    if (recLines.length) total += 18 * CV.SCALE + recLines.length * RECLH;
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
     /* 剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
     /* 2026-10-03（父亲大人：「战斗结算不需要有这个看过的提示吧，想看剧情不是在本章卡片那里看吗」）：
@@ -1114,7 +1125,14 @@
        扫荡没有"胜负/回合"，所以大标题与第二行都允许外面直接给（不给就还是老样子）。
        `res` 也允许为空（扫荡那条路传 `null`）。 */
     const R = res || {};
-    const big = p.bigTitle || (R.win ? '胜 利' : '战 败');
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §三十二 / §三十三）=================
+       世界里的战斗**不是"打赢/打输"**，是"这次调查有没有查下去"：
+         · 胜利 → 【记录完成】（这一场留下了记录）
+         · 失败 → 【调查中止】（下一段见 `defeatHint`：为什么停、下一步怎么办）
+       ⚠️ 只有**调查场次**（`p.survey`，由 `sc-dungeon.js` 的结算面板给）这么叫 ——
+          深井 / 斗法台 / 扫荡那几路不传，仍说「胜 利 / 战 败」。
+          （把打擂台也叫成"调查"是错的，§二十二 也要求功能按钮照样看得懂。） */
+    const big = p.bigTitle || (R.win ? (p.survey ? '记录完成' : '胜 利') : (p.survey ? '调查中止' : '战 败'));
     CV.text(big, cx, y + 26 * CV.SCALE,
       { size: CV.DISP.d3 * CV.SCALE, bold: true, align: 'center', color: p.bigTitleColor || (R.win ? CV.C.gold : CV.C.accent) });
     y += 52 * CV.SCALE;
@@ -1160,6 +1178,16 @@
         CV.text(ln, cx - cw2 / 2 + 10 * CV.SCALE, y + 16 * CV.SCALE + i * CV.FS.md * 1.5, { size: CV.FS.md, color: CV.C.text2 });
       });
       y += 40 * CV.SCALE;
+    }
+    /* 新增记录：紧跟在「战场变化」后面 —— 玩家读到的是"我改变了什么 + 我拿到了什么"。
+       与「战场变化」同一个排版口径（小标签 + 折行的正文）。 */
+    if (recLines.length) {
+      const rw = U.iw();
+      CV.text('卷宗', cx - rw / 2 + 10 * CV.SCALE, y, { size: CV.FS.sm, color: CV.C.gold });
+      recLines.forEach(function (ln, i) {
+        CV.text(ln, cx - rw / 2 + 10 * CV.SCALE, y + 16 * CV.SCALE + i * RECLH, { size: CV.FS.md, color: CV.C.text2 });
+      });
+      y += 18 * CV.SCALE + recLines.length * RECLH;
     }
     /* V9.6.128（父亲大人："把继续下一关的按钮放上面，收下奖励并返回放下面，
        上下排列、长度一致不就好了"）：

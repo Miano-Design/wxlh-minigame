@@ -20,6 +20,16 @@ const story=fs.readFileSync('js/sc-story.js','utf8'); ok(story.includes('cur.met
    只要有人把它改回"写死的常数"，这两条当场红。 */
 ok(story.includes('cur.autoAt = now + beatReadSec()'),'auto advance delay is reading-speed based');
 ok(story.includes('function beatReadSec()') && /READ_CPS\s*=\s*5\.5/.test(story),'reading speed constant exists (5.5 chars/s)');
-ok(story.includes('cur.autoAt = now + 1.6'),'chapter card delay exists (1.6s)'); ok(story.includes('if (cur.chapter) return Story.autoOn()'),'save-power mode cannot freeze auto story'); ok(story.includes('W36 终局不是普通剧情'),'W36 skip cannot bypass final choice'); ok(story.includes('const tail = n === 1'),'W36 choice has consequence epilogue');
+ok(story.includes('cur.autoAt = now + 1.6'),'chapter card delay exists (1.6s)'); ok(story.includes('if (cur.chapter) return Story.autoOn()'),'save-power mode cannot freeze auto story'); ok(story.includes('W36 终局不是普通剧情'),'W36 skip cannot bypass final choice');
+/* ================= 2026-10-03（NARRATIVE-UX-FINAL §十二 / §十三）· **判据过时，已改** =================
+   原来这条钉的是播放器里的一个字面量（`const tail = n === 1`，旧世界身份写的那三句
+   "王座后的九十六盏灯 / 转身走下王座"）。本轮两个结局的正文搬到**内容层**
+   （`js/sc-story-overhaul-data.js` 的 `SD.ENDING.off` / `.on`），播放器只做搬运。
+   判据跟着换成"这两件事必须同时成立"，钉的仍然是**结果**（两个结局都有正文、而且只有一个真源）：
+     · 播放器确实从 `STORYDATA.ENDING` 取，而且两个分支都接了；
+     · 内容层确实有 `off` / `on` 两套正文。 */
+const over=fs.readFileSync('js/sc-story-overhaul-data.js','utf8');
+ok(/STORYDATA\.ENDING/.test(story) && /E\.off\.lines/.test(story) && /E\.on\.lines/.test(story),'W36 choice epilogue reads the single-source ENDING data');
+ok(/const ENDING = \{/.test(over) && /off: \{/.test(over) && /on: \{/.test(over),'ENDING data carries both endings (off / on)');
 const dun=fs.readFileSync('js/sc-dungeon.js','utf8'); ok(dun.includes("St.hasInterlude && St.hasInterlude(view.worldId)"),'stage-6 interlude trigger exists'); ok(dun.includes('postStoryAfterClose'),'boss-clear auto post hook exists');
 console.log(JSON.stringify({pass,fail})); process.exit(fail?1:0);

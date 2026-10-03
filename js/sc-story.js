@@ -154,14 +154,112 @@
   };
   Story.markSeen = function (worldId, part) {
     const t = state(); if (!t) return;
+    const firstTime = !(t.w[worldId] && t.w[worldId][part]);
     if (!t.w[worldId]) t.w[worldId] = {};
     t.w[worldId][part] = 1;
     mark('世界 · ' + worldId);
+    /* ================= 2026-10-03 · 卷宗是**打完才捡到的** =================
+       战后那一拍第一次读完 → 这个世界的记录进卷宗，并挑一条当"发现"卡（见 collectArchive）。
+       ⚠️ 只在**第一次**收（`firstTime`）—— 重读一遍不该再弹一次"新发现"。 */
+    if (part === 'post' && firstTime) {
+      try { const rec = Story.collectArchive(worldId); if (rec) findCard = rec; } catch (e) {}
+    }
   };
   Story.seenBoss = function (worldId) { const t = state(); return !!(t && t.b[worldId]); };
   Story.markBoss = function (worldId) {
     const t = state(); if (!t) return; t.b[worldId] = 1; mark('Boss · ' + worldId);
   };
+
+  /* ===================== 一·五、卷宗记录（2026-10-03 · NARRATIVE-UX-FINAL §十七～§二十）=====================
+     卷宗从"看过什么都记下来"升级成**调查证据库**：编号 / 类型 / 状态 / 正文 / 相关世界 / 关联卷宗。
+     三条口径：
+       · **内容只有一份真源**：`SD.ARCHIVE`（`js/sc-story-overhaul-data.js`），这里只读不写；
+       · **已读状态只有一份**：`S.story.a[id]`（懒补，老档没有也不迁移 —— 和 `story.e` 同一条做法）；
+       · **什么时候算"发现"**：这个世界的 `post`（Boss 战后）看完那一刻 —— 记录是打完才捡到的，
+         不是"打开卷宗页就自动全给你"。`markSeen(worldId,'post')` 是唯一入口（见下面那两行钩子）。
+     ⚠️ 记录**不做"数量本身即成就"那套**：`已确认/待确认/矛盾/核心` 是**状态**，
+        玩家读到的是内容，不是进度条。 */
+  const ARCH = SD.ARCHIVE || {};
+  const ARCH_ALL = SD.ARCHIVE_ALL || {};
+  function archState() {
+    const t = state(); if (!t) return {};
+    if (!t.a || typeof t.a !== 'object') t.a = {};
+    return t.a;
+  }
+  Story.recordsOf = function (worldId) { return (ARCH[worldId] || []).slice(); };
+  Story.recordOf = function (id) { return ARCH_ALL[id] || null; };
+  /* 关联卷宗：**双向**（在数据层补过，见 sc-story-overhaul-data.js） */
+  Story.refsOf = function (id) {
+    const r = ARCH_ALL[id]; if (!r) return [];
+    return (r.refs || []).map(function (x) { return ARCH_ALL[x]; }).filter(Boolean);
+  };
+  /* 这个世界**已经能读到**的记录（＝打过这一场） */
+  Story.recordsFound = function (worldId) {
+    if (!Story.seen(worldId, 'post') && !Story.seenBoss(worldId)) return [];
+    return Story.recordsOf(worldId);
+  };
+  Story.archiveSeen = function (id) { return !!archState()[id]; };
+  /* `quiet` ＝ 批量收卷时用：这一趟只落一次盘（6 条记录不必存 6 次） */
+  Story.markArchive = function (id, quiet) {
+    const a = archState(); if (!a || !id) return;
+    a[id] = 1;
+    if (!quiet) mark('卷宗 · ' + id);
+  };
+  /* 上一次"新捡到"的那条（发现感那张卡用它；不是存档字段，只是当场的一次提示） */
+  let findCard = null;
+  Story.pendingFind = function () { return findCard; };
+  Story.clearFind = function () { findCard = null; };
+  /** 打完一个世界 → 把这个世界的记录收进卷宗。返回"这一趟新捡到的那条"（没有就 null）。
+      挑哪一条当发现卡：优先 核心/矛盾（信息量最大的那类），否则就是第一条。 */
+  function collectArchive(worldId) {
+    const list = Story.recordsFound(worldId);
+    if (!list.length) return null;
+    const fresh = list.filter(function (r) { return !Story.archiveSeen(r.id); });
+    list.forEach(function (r) { Story.markArchive(r.id, true); });
+    if (!fresh.length) return null;
+    mark('卷宗 · ' + worldId);           // 一次落盘就够（上面那几条是同一笔）
+    const rank = { core: 0, conflict: 1, fragment: 2, pending: 3, confirmed: 4 };
+    fresh.sort(function (a, b) { return (rank[a.status] | 0) - (rank[b.status] | 0); });
+    return fresh[0];
+  }
+  Story.collectArchive = collectArchive;
+  /* 调查记录：四个数字 + 最近几条（卷宗页第一屏读它） */
+  Story.archiveStats = function () {
+    let total = 0, found = 0, confirmed = 0, pending = 0, conflict = 0, core = 0;
+    Object.keys(ARCH).forEach(function (wid) {
+      Story.recordsFound(wid).forEach(function (r) {
+        found++;
+        if (r.status === 'confirmed') confirmed++;
+        else if (r.status === 'pending') pending++;
+        else if (r.status === 'conflict') conflict++;
+        else if (r.status === 'core') core++;
+      });
+    });
+    Object.keys(ARCH).forEach(function (wid) { total += Story.recordsOf(wid).length; });
+    /* 最近记录：按"这个世界走到哪"倒序（没有时间戳可用，也不新增字段） */
+    const recent = [];
+    for (let i = WORLDLIST.length - 1; i >= 0 && recent.length < 3; i--) {
+      const wid = WORLDLIST[i] && WORLDLIST[i].id;
+      if (!wid) continue;
+      const list = Story.recordsFound(wid);
+      for (let k = list.length - 1; k >= 0 && recent.length < 3; k--) recent.push(list[k]);
+    }
+    return { total: total, found: found, confirmed: confirmed, pending: pending, conflict: conflict, core: core, recent: recent };
+  };
+  /* 当前世界（首页 / 调查记录页头那句"我在残域的什么位置"读它） */
+  Story.currentWorldId = function () {
+    const S = G.Core && G.Core.S;
+    for (let i = WORLDLIST.length - 1; i >= 0; i--) {
+      const id = WORLDLIST[i].id, st = S && S.worlds && S.worlds[id];
+      if (!st || !st.unlocked) continue;
+      const done = S.worlds[id].stages && (S.worlds[id].stages.normal || []).filter(Boolean).length >= 12;
+      if (!done) return id;
+    }
+    return (WORLDLIST[WORLDLIST.length - 1] || {}).id || '';
+  };
+  const STATUS_NAME = { confirmed: '已确认', pending: '待确认', conflict: '互相矛盾', core: '核心记录', fragment: '残缺' };
+  Story.statusName = function (s) { return STATUS_NAME[s] || String(s || ''); };
+
   Story.seenChar = function (id, n) { const t = state(); return !!(t && t.c[id] && t.c[id]['s' + n]); };
   Story.markChar = function (id, n) {
     const t = state(); if (!t) return;
@@ -1061,11 +1159,47 @@
       cur.choiceLocked = true;
     }
     /* 继续提示（全屏热区 · 点一下往下） */
-    const hint = done() ? (cur.i < cur.beats.length - 1 ? '轻点继续' : '轻点结束') : '';
+    const hint = findCard ? '' : (done() ? (cur.i < cur.beats.length - 1 ? '轻点继续' : '轻点结束') : '');
     if (hint) {
       CV.text(hint, CV.W - U.pad(), bottom - 10 * CV.SCALE, { size: CV.FS.sm, align: 'right', color: CV.a(C.dim, .9) });
     }
   CV.hit('story_next', 0, top, CV.W, bottom - top);
+
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §三十四）· **卷宗的发现感** =================
+       打完一个世界、第一次捡到那条记录时，不许走普通 Toast（"获得卷宗"四个字没有信息）。
+       这里给一张**黑底记录卡**：编号 → 一句关键内容 → 一颗【保存至卷宗】。
+       ⚠️ 它是**内容层的最后一块**（登记在 `story_next` 之后）—— 同一层里"后画的先中"，
+          所以卡片盖着的地方点下去只会保存，不会误触翻页；卡片之外仍然轻点继续。
+       ⚠️ 只在这一场结尾出现一次（`markSeen` 里只在 firstTime 时给）。 */
+    /* ⚠️ 只在**战后那一拍读完**的那一刻弹（`done()`）——
+       提前弹会变成"剧情还没讲，记录先给你看"，顺序反了。 */
+    if (findCard && cur.meta && cur.meta.part === 'post' && done() && !cur.choiceLocked) {
+      const cardTop = top + 24 * CV.SCALE, cardBot = bottom - 24 * CV.SCALE;
+      const c2 = CV.ctx;
+      c2.save();
+      c2.fillStyle = CV.a(CV.C.shade, .92);
+      c2.fillRect(0, top, CV.W, bottom - top);
+      c2.restore();
+      const pad = U.pad() + 6 * CV.SCALE;
+      const bw = CV.W - pad * 2;
+      const st = statusOf(findCard.status);
+      let by = cardTop + 18 * CV.SCALE;
+      CV.text(findCard.id, pad, by, { size: CV.FS.md, color: CV.C.gold, bold: true });
+      CV.text(st.name, CV.W - pad, by, { size: CV.FS.sm, align: 'right', color: st.c() });
+      by += 26 * CV.SCALE;
+      CV.text(CV.fit(findCard.title, bw, CV.FS.f1, true), pad, by, { size: CV.FS.f1, bold: true, color: C.text });
+      by += 22 * CV.SCALE;
+      /* 正文按宽度折行（复用剧情正文那套 `wrap`） */
+      const lines = wrap(findCard.body, bw, CV.FS.md, false);
+      const lh = CV.FS.md * 1.9;
+      lines.forEach(function (ln, i) { CV.text(ln, pad, by + i * lh, { size: CV.FS.md, color: C.text2 }); });
+      /* 【保存至卷宗】：一颗，落在卡片底部 */
+      const bh = 44 * CV.SCALE;
+      const btnY = Math.min(cardBot - bh, by + lines.length * lh + 14 * CV.SCALE);
+      CV.round(pad, btnY, bw, bh, CV.RADIUS_SM, CV.a(CV.C.gold, .16), CV.C.gold);
+      CV.text('保存至卷宗', CV.W / 2, btnY + bh / 2, { size: CV.FS.md, align: 'center', color: CV.C.gold, bold: true });
+      CV.hit('story_find', 0, top, CV.W, bottom - top);
+    }
     /* 跳过：右上角一颗小按钮（不挡阅读） */
     const skW = CV.measure('跳过', CV.FS.sm) + 22 * CV.SCALE, skH = 28 * CV.SCALE;
     const skY = top + 10 * CV.SCALE, skX = CV.W - U.pad() - skW;
@@ -1108,10 +1242,32 @@
     c.fillRect(0, 0, CV.W, CV.H);
   };
   CV.on('story_next', function () { advance(); CV.render(); });
+  /* 【保存至卷宗】：这一条**已经**在 markSeen 那一刻进册了（见 collectArchive）——
+     这颗按钮只负责"收下"这个动作本身：关掉卡片，继续往下读。 */
+  CV.on('story_find', function () { Story.clearFind(); CV.render(); });
   CV.on('story_skip', function () { Story.skip(); });
 
   /* ===================== 五、卷宗（看过的东西都在这里） ===================== */
-  let arcTab = 'world';
+  /* ================= 2026-10-03（NARRATIVE-UX-FINAL §十七～§二十 / §六十 / §六十一）=================
+     卷宗页从"看过什么"升级成**调查证据库**：
+       ① 第一屏是【调查记录】—— 当前世界 + 已确认 / 待确认 / 矛盾 / 核心线索 四个数 + 最近三条；
+       ② 页签从四档变五档，**第一档换成「记录」**（编号 / 类型 / 状态 的那一套），
+          残域 / Boss / 人物 / 装备 原样保留在后面；
+       ③ 记录可以点进二级页：正文 + 相关世界 + **关联卷宗**（点得进去，两份一对就知道对不上）。
+     ⚠️ 页签**不放数字**了：五个数字挤在五个半字宽的格子里 320 屏会糊成一片 ——
+        数字全部搬到上面那张【调查记录】卡里，页签只留名字。 */
+  let arcTab = 'records';
+  let arcRecId = null;                 // 二级页：正在看哪一条记录
+  /* 状态 → 颜色 / 徽标。**一份表**：列表行、二级页、详情页都读它，不许各写一套。 */
+  const ARC_STATUS = {
+    core:       { name: '核心记录', c: () => C.gold },
+    conflict:   { name: '互相矛盾', c: () => C.danger },
+    pending:    { name: '待确认',   c: () => C.anom },
+    fragment:   { name: '残缺',     c: () => C.dim },
+    confirmed:  { name: '已确认',   c: () => C.gain },
+  };
+  const statusOf = (st) => ARC_STATUS[st] || ARC_STATUS.confirmed;
+  function worldNo(id) { const i = WORLDLIST.findIndex(function (x) { return x.id === id; }); return i < 0 ? '--' : String(i + 1).padStart(2, '0'); }
   function archiveCount() {
     let w = 0, b = 0, cc = 0, it = 0;
     Object.keys(WORLDS).forEach(function (id) {
@@ -1125,19 +1281,36 @@
   function drawArchive() {
     const n = archiveCount();
     U.begin(); U.pageHead('卷宗', { backId: 'story_back' });
+    /* ---------- ① 调查记录（第一屏 · §六十一） ----------
+       这一屏回答玩家三件事：我在哪儿、查到多少、最近捡到了什么。 */
+    const a = Story.archiveStats();
+    const wid = Story.currentWorldId();
+    const wrec = (WORLDLIST.filter(function (x) { return x.id === wid; })[0]) || null;
     U.card(function () {
-      U.h3('灯录之外的那一本', '残域的记录，只记你看过的');
-      U.note('剧情段落 ' + n.w + ' / ' + (Object.keys(WORLDS).length * 4) +
-        '　Boss ' + n.b + ' / ' + Object.keys(BOSS).length +
-        '　人物 ' + n.c + ' / ' + (Object.keys(CHARS).length * 3) +
-        '　装备 ' + n.i + ' / ' + Story.itemKeys().length);
+      U.h3('调查记录', wid ? ('当前 W' + worldNo(wid) + ' ' + (wrec ? wrec.name : '')) : '还没有可查的世界');
+      U.space(CV.SP[1]);
+      const cells = [
+        ['已确认', a.confirmed, () => C.gain],
+        ['待确认', a.pending, () => C.anom],
+        ['矛盾记录', a.conflict, () => C.danger],
+        ['核心线索', a.core, () => C.gold],
+      ];
+      const gap = 8 * CV.SCALE, cw = (U.iw() - gap * 3) / 4, top = U.y, ch = 46 * CV.SCALE;
+      cells.forEach(function (cell, i) {
+        const x = U.ix() + i * (cw + gap);
+        CV.round(x, top, cw, ch, CV.RADIUS_SM, CV.a(CV.C.panel3, .55), CV.C.line);
+        CV.text(String(cell[1]), x + cw / 2, top + 15 * CV.SCALE, { size: CV.FS.f1, align: 'center', color: cell[2](), bold: true });
+        CV.text(cell[0], x + cw / 2, top + 33 * CV.SCALE, { size: CV.FS.tag, align: 'center', color: C.dim });
+      });
+      U.y = top + ch + 10 * CV.SCALE;
+      U.note('卷宗 ' + a.found + ' / ' + a.total + '　·　打完一个世界，就会捡到它留下的记录');
     });
     /* 四个页签：**当前这一卷画成"状态"、不登记热区**。
        理由（与项目既有那条"禁用态不许登记热区"同一条规矩）：点当前这一卷本来就不会有任何变化
        ——登记了就是一根死键，`deadkey_audit` 会当场把它报出来（实测过：只有这一条不合格）。
        所以"选中的那一卷"是状态、其余三卷才是按钮。 */
     {
-      const tabs = [['world', '残域卷 ' + n.w], ['boss', 'Boss ' + n.b], ['char', '人物 ' + n.c], ['item', '装备 ' + n.i]];
+      const tabs = [['records', '记录'], ['world', '残域'], ['boss', 'Boss'], ['char', '人物'], ['item', '装备']];
       const gap = 6 * CV.SCALE, h = U.BTN_SM * CV.SCALE;
       const cw = (U.cw() - gap * (tabs.length - 1)) / tabs.length;
       const top = U.y;
@@ -1154,7 +1327,34 @@
       U.y = top + h + 12 * CV.SCALE;
     }
     U.space(CV.SP[1]);
-    if (arcTab === 'world') {
+    if (arcTab === 'records') {
+      /* 记录：**按世界分组**，只列"已经捡到的"（打过那一场）。
+         没打过的世界不占位 —— 卷宗不是图鉴进度表，是已经拿到手的证据。 */
+      let any = false;
+      WORLDLIST.forEach(function (w) {
+        const list = Story.recordsFound(w.id);
+        if (!list.length) return;
+        any = true;
+        U.sectionTitle('W' + worldNo(w.id) + ' ' + w.name);
+        list.forEach(function (r) {
+          U.card(function () {
+            const st = statusOf(r.status);
+            const rowY = U.y;
+            CV.text(r.id, U.ix(), rowY + 9 * CV.SCALE, { size: CV.FS.tag, color: C.dim });
+            CV.text(st.name, U.ix() + U.iw(), rowY + 9 * CV.SCALE, { size: CV.FS.tag, align: 'right', color: st.c() });
+            CV.text(CV.fit(r.title, U.iw(), CV.FS.f1 - 1 * CV.SCALE, true), U.ix(), rowY + 28 * CV.SCALE, { size: CV.FS.f1, bold: true });
+            U.y = rowY + 46 * CV.SCALE;
+          });
+          CV.hit('arcrec:' + r.id, U.ix(), U.y - 54 * CV.SCALE, U.iw(), 54 * CV.SCALE);
+        });
+      });
+      if (!any) {
+        U.card(function () {
+          U.h3('还没有记录', '卷宗里现在只有你读过的东西');
+          U.note('打完一个世界的守关 Boss，就会捡到它留下的记录。');
+        });
+      }
+    } else if (arcTab === 'world') {
       WORLDLIST.forEach(function (w) {
         const has = !!WORLDS[w.id]; if (!has) return;
         U.card(function () {
@@ -1210,21 +1410,95 @@
     }
   }
   CV.register('story_archive', drawArchive);
+
+  /* ---------- 卷宗二级页（§十八）：编号 → 类型 → 状态 → 正文 → 相关世界 → 关联卷宗 → 灯阁备注 ---------- */
+  function drawRecord() {
+    const r = Story.recordOf(arcRecId);
+    U.begin();
+    U.pageHead('卷宗记录', { backId: 'story_back' });
+    if (!r) {
+      U.card(function () { U.h3('记录不存在', '这条已经不在册了'); });
+      return;
+    }
+    const st = statusOf(r.status);
+    U.card(function () {
+      U.h3(r.id, st.name);
+      U.space(CV.SP[1]);
+      U.kv('记录类型', r.type);
+      U.kv('状态', st.name);
+    });
+    U.space(CV.SP[1]);
+    U.card(function () {
+      U.h3(r.title, '');
+      U.note(r.body);
+      if (r.note) {
+        U.space(CV.SP[1]);
+        U.note('灯阁备注：' + r.note, 0);
+      }
+    });
+    /* 相关世界 */
+    if (r.world) {
+      const w = WORLDLIST.filter(function (x) { return x.id === r.world; })[0];
+      U.space(CV.SP[1]);
+      U.card(function () {
+        U.h3('相关世界', w ? ('W' + worldNo(r.world) + ' ' + w.name) : r.world);
+        U.note(w ? (String(w.desc || '') + '　机制：' + String(w.mechanic || '')) : '', 0);
+      });
+    }
+    /* 关联卷宗：**点得进去** —— 两份记录摆在一起，玩家自己就看出哪对不上 */
+    const refs = Story.refsOf(r.id);
+    if (refs.length) {
+      U.space(CV.SP[1]);
+      U.sectionTitle('关联卷宗');
+      refs.forEach(function (x) {
+        const xs = statusOf(x.status);
+        U.card(function () {
+          const rowY = U.y;
+          CV.text(x.id, U.ix(), rowY + 9 * CV.SCALE, { size: CV.FS.tag, color: C.dim });
+          CV.text(xs.name, U.ix() + U.iw(), rowY + 9 * CV.SCALE, { size: CV.FS.tag, align: 'right', color: xs.c() });
+          CV.text(CV.fit(x.title, U.iw(), CV.FS.f1 - 1 * CV.SCALE, true), U.ix(), rowY + 28 * CV.SCALE, { size: CV.FS.f1, bold: true });
+          U.y = rowY + 44 * CV.SCALE;
+        });
+        CV.hit('arcrec:' + x.id, U.ix(), U.y - 54 * CV.SCALE, U.iw(), 54 * CV.SCALE);
+      });
+    }
+  }
+  CV.register('story_record', drawRecord);
+  CV.on('arcrec:*', function (id) {
+    arcRecId = String(id || '');
+    if (!arcRecId) return;
+    if (CV.top() && CV.top().name === 'story_record') CV.render();
+    else CV.push('story_record', {});
+  });
   CV.on('story_choice:*', function (v) {
     if (!cur) return;
     const n = +v || 0;
     if (n !== 1 && n !== 2) return;
     Story.setChoice(n);
     cur.choiceLocked = false;
-    const tail = n === 1 ? [
-      { k: 'n', s: '你把灯芯按进最后一层灰里。长久不散的光，在你手里第一次安静下来。' },
-      { k: 'o', s: '王座后的九十六盏灯一盏接一盏熄灭，回音却没有消失。它沿着来路，替你把三十六个世界重新连了起来。' },
-      { k: 'n', s: '门没有关。只是这一次，出去的人不再需要留下自己的名字。' },
-    ] : [
-      { k: 'n', s: '你接住灯火。火焰没有灼伤你，反而像终于等到了一个愿意继续的人。' },
-      { k: 'o', s: '三十六盏远灯同时亮起，世界深处传来一声迟到很久的回应。' },
-      { k: 'n', s: '你转身走下王座。灯还在燃，而下一扇门已经替你打开。' },
-    ];
+    /* ================= 2026-10-03（NARRATIVE-UX-FINAL §十二 / §十三 / §十四）=================
+       两个结局的**正文只有一个真源**：`SD.ENDING.off` / `SD.ENDING.on`
+       （见 `js/sc-story-overhaul-data.js`）。这里**只做搬运**，一句都不另写。
+       ⚠️ 原来这一段是旧世界身份写的（"王座后的九十六盏灯""转身走下王座"）——
+          而现在的 W36 是《最后的问题》/ 新世界入口，第九座残影台才是终局那一处；
+          留着它就会变成"台词讲王座、画面是一道门"。所以整段换掉。
+       ⚠️ 两条都不说"哪个是对的"（§十四）：一条是世界终止，一条是世界延续。 */
+    const E = (G.STORYDATA && G.STORYDATA.ENDING) || null;
+    const toBeats = (arr, k) => (arr || []).map((s) => ({ k: k, s: String(s) }));
+    let tail;
+    if (E && n === 1 && E.off) {
+      tail = toBeats(E.off.lines, 'n')
+        .concat(toBeats(E.off.records, 'o'))
+        .concat(toBeats([E.off.last], 'n'));
+    } else if (E && n === 2 && E.on) {
+      tail = toBeats(E.on.lines, 'n')
+        .concat(toBeats(E.on.records, 'o'))
+        .concat(toBeats(E.on.then, 'n'))
+        .concat(toBeats([E.on.last], 'o'));
+    } else {
+      /* 数据缺失也不许白屏：退到一句能站住的话（两条都适用）。 */
+      tail = [{ k: 'n', s: '灯还在亮着。答案已经交出去了。' }];
+    }
     cur.beats = cur.beats.concat(tail);
     cur.i = cur.beats.length - tail.length;
     cur.reveal = 0;
