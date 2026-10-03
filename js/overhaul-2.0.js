@@ -73,7 +73,8 @@
      判据**不在本文件** —— 走 `G.homeVis.locked()`（sc-home.js 那一份，与开场引导的文案同源）：
         · R3.4 我曾经把没解锁的格子"标个 🔒 灰着摆出来"（那时父亲大人要"合理就行"），
           他看过之后定了口径：**干脆不摆**；
-        · 没解锁的功能**不是消失**：页面底部那行「还没解锁：… ›」照样点得进"怎么解锁"页。 */
+        · 没解锁的功能**不是消失**：页面底部还有一行「还没解锁：…」把它们的名字写出来
+          （2026-10-03 父亲大人定稿：**那行只是注释、不给二级入口**）。 */
   function isLocked(id){ return G.homeVis ? G.homeVis.locked(id) : false; }
   /* 过滤一行格子：锁着的不画。`U.tiles` 的列数不变（剩几格就摆几格，从左往右排）。
      顺手把"这一排真画了哪几格"登记到 `G.homeRowNames[rowId]` —— 开场引导的文案读它，
@@ -219,7 +220,9 @@
         const gap=10*CV.SCALE, bh=U.BTN_H*CV.SCALE, bw=(U.iw()-gap)*0.42;
         U.btn(U.ix(), U.y, bw, bh, '派人分工', 'ghost', 'open_idlelines');
         U.btn(U.ix()+bw+gap, U.y, U.iw()-bw-gap, bh,
-          tk.claimable>0?('收取奖励（'+tk.claimable+' 项）'):'收取奖励',
+          /* 2026-10-03（父亲大人截图点名）：按钮上**不要"（N 项）"** ——
+             那是给开发者看的计数；玩家看到"有东西可领"就够了，具体几项进结算页自然清楚。 */
+          '收取奖励',
           tk.claimable>0?'primary':'ghost','claim_all', tk.claimable<=0);
         U.y+=bh;
         /* ★ 挂机加速（看广告）—— 原首页挂机卡里就有这一颗（B5：每天 3 次 × 每次 2 小时产出）。
@@ -329,8 +332,11 @@
       (D.HOME_GROUPS||[]).forEach(function(g){ g.members.forEach(function(m){ if(m.unlock&&!Core.isUnlocked(m.unlock)) lk.push(m); }); });
       if(lk.length){
         U.space(CV.SP[1]);
-        const hh=U.hint('还没解锁：'+lk.map(function(x){return x.name;}).join(' / ')+'  ›', 0);
-        CV.hit('open_locked', U.ix()-2, U.y-hh, U.iw()+4, hh);
+        /* 2026-10-03（父亲大人）：「还没解锁的功能不需要有二级界面，**就是纯一行字注释就行**」
+           ⇒ 不再登记热区、行尾的 `›` 也去掉（那是"能点"的暗示，留着就是骗玩家去点）。
+           连带：`locked` 那个"怎么解锁"专页从此没有任何入口（`entry_audit` 的允许清单里一直记着
+           `open_locked`，闸门不会因此变红）；要不要整页删掉，等父亲大人一句话。 */
+        U.hint('还没解锁：'+lk.map(function(x){return x.name;}).join(' / '), 0);
       }
     }
     /* R2.9（父亲大人）："**下面的注释文字去掉**" ——
