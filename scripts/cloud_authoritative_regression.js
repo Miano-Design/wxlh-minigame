@@ -140,7 +140,7 @@ const resetAll = () => {
   Core.S.savedAt = Date.now() + 600000;          // 本地 savedAt **故意比云端 ts 大**
   Core.save();
   const localToldTime = Core.S.savedAt;
-  let r = await CS.sync('show');                 // 回前台（典型自动同步）
+  let r = await CS.triggerAuto('show');          // 回前台（典型自动同步，走真正的那个触发口）
   t('1 本地 W03 / 云端 W08 → 自动同步之后是**云端那份**（lv88）',
     lvNow() === 88, 'lv88（云端）', 'lv' + lvNow() + ' · ' + JSON.stringify(r));
   t('2 本地 savedAt 比云端 ts 更大时**依然**以云端为准（savedAt 退出同步决策）',
@@ -161,7 +161,10 @@ const resetAll = () => {
   /* ---------- 4：回前台自动拉（不需要玩家点任何东西） ---------- */
   saves.get(cloudId).payload = saveAt(77);       // 另一台推了 W?? 上去（lv77）
   Core.newGame(); Core.setPlayerName('前台'); saveAt(5);
-  r = await CS.sync('show');
+  /* ⚠️ 这里必须走 `triggerAuto('show')`（产品里 onShow 真正调的那个口），**不是** `sync('show')`：
+     第一版写的是 `sync('show')` —— 于是"onShow 不拉"这种破坏（塞在 triggerAuto 里）**照样绿**，
+     破坏测试当场把这条揪出来了（尺子测的不是玩家走的那条路）。 */
+  r = await CS.triggerAuto('show');
   t('4 回前台（onShow）自动拉到云端最新那份', lvNow() === 77 && r.took === 'cloud',
     'lv77', 'lv' + lvNow() + ' · ' + JSON.stringify(r));
 
@@ -209,12 +212,25 @@ const resetAll = () => {
     const before = saves.get(cloudId).payload;
     Core.newGame(); Core.setPlayerName('本地'); saveAt(7);
     dbMode = 'dberror';
+    const pushBefore10 = fnCalls.push;
+    const claimBefore10 = fnCalls.claim;
     r = await CS.sync('progress');
     const after = saves.get(cloudId).payload;
-    t('10 云端数据库报错（DB_ERROR）→ **绝不建空档、绝不覆盖**云端那条',
-      r.ok === false && after === before && lvNow() === 7,
-      'ok=false · 云端原文不动 · 本地照常玩',
-      'ok=' + r.ok + ' · code=' + (r.code || '') + ' · 云端' + (after === before ? '没动' : '**被改了**') + ' · lv' + lvNow());
+    /* ⚠️ 判据里**必须有"连试都没试过去建"这一条**：第一版只比"云端原文有没有变" ——
+       而 DB_ERROR 时 `push` 自己也会失败，于是"把它当成没有存档、去建一份"这个错误动作
+       **照样能通过**。破坏测试就是这么把这条揪出来的。 */
+    /* ⚠️ 第二条（破坏测试又揪出来的）：**光盯 `fnCalls.push` 还不够** ——
+       写路径是"先 `claim` 拿 token、再 `push`"，DB_ERROR 时那一趟 `claim` 自己也会失败、
+       于是 `if (!leaseToken) return {skip:'notoken'}` 把 `push` 挡在门外：`push` 计数器不动，
+       可**客户端明明已经伸手去写云端了**（真赶上"只有 pull 这一步坏"的岔路，那一趟就会把云档覆盖掉）。
+       ⇒ 判据改盯**整个写路径**（claim ＋ push 一起数）。 */
+    t('10 云端数据库报错（DB_ERROR）→ 不判定为"没有存档"：写路径一次都不许碰',
+      r.ok === false && after === before && lvNow() === 7
+        && fnCalls.push === pushBefore10 && fnCalls.claim === claimBefore10,
+      'ok=false · 云端原文不动 · **claim/push 一次都没发** · 本地照常玩',
+      'ok=' + r.ok + ' · 云端' + (after === before ? '没动' : '**被改了**')
+        + ' · push ' + pushBefore10 + '→' + fnCalls.push + ' · claim ' + claimBefore10 + '→' + fnCalls.claim
+        + ' · lv' + lvNow());
   }
 
   /* ---------- 11：busy 期间产生的 push，最终一定执行 ---------- */
@@ -227,6 +243,24 @@ const resetAll = () => {
     await CS.reclaim();
     Core.S.player.level = 31; Core.save();         // 玩家真打了一关
     const pushBefore = fnCalls.push;
+    /* ⚠️ 场景要摆对（前两版都摆错了，这条一直是假红）：
+       "busy 吞掉的那次推" 必须是**第一次 push 已经取完快照、还挂在空中**的时候发生的。
+       前两版一上来就 `Core.save()` 抬到 32 —— 而那一趟 push 还没轮到取快照，它**本身就带了 32**，
+       收工后补跑自然只剩 `clean`（量到 push=1，看着像"吞了"，其实压根没吞。
+       反过来说，这也说明**光看"push 次数"分不清"真吞了"和"快照本来就新"**）。
+       ⇒ 这里把**第一趟 push**扣在空中（拦 `wx.cloud.callFunction` 里 action==='push' 那一下），
+         等它确实取完快照（lv31）之后再抬到 32 —— 这才是任务书 §十四 要的那个岔路。 */
+    const origCall = wx.cloud.callFunction;
+    let held = false, releaseHold = null;
+    wx.cloud.callFunction = function (o) {
+      const p = origCall.apply(this, arguments);      // 照常发出去（fnCalls 也照常计）
+      const act = String((o && o.data && o.data.action) || '');
+      if (!held && act === 'push') {
+        held = true;
+        return new Promise(function (res, rej) { releaseHold = function () { p.then(res, rej); }; });
+      }
+      return p;
+    };
     /* 盯住"补跑"那一趟：它是由 `finish` 里的脏标记排出来的 `sync('pending',{push:true})`。 */
     let catchup = null;
     const origSync = CS.sync;
@@ -235,22 +269,26 @@ const resetAll = () => {
       if (String(reason) === 'pending' && opts && opts.push) { try { p.then(function (x) { catchup = x; }); } catch (e) {} }
       return p;
     };
-    /* ⚠️ 场景要摆对（第一版摆错了、量出来是 `clean`）：**"忙"发生在两次推之间**。
-       如果忙的那一趟是"开机 pull"，它收工后本地已经被云端覆盖回原样 —— 补跑自然没东西可推
-       （那正是"云端唯一权威"的正确表现，不是 bug）。所以这里让第一趟就是 push。 */
-    const first = CS.sync('progress');             // 占住 busy
-    Core.S.player.level = 32; Core.save();         // 同步在飞的时候又打了一关
+    const first = CS.sync('progress');             // 占住 busy；快照 lv31，这个 push 被扣在空中
+    await wait(25);                                // 等它真的走到 push（readOwn 回来、快照已取）
+    Core.S.player.level = 32; Core.save();         // **同步在飞的时候**又打了一关
     const second = CS.sync('progress');            // 撞上 busy → 记脏标记
+    if (releaseHold) releaseHold();                // 放行第一趟
     let firstR = null, secondR = null;
     first.then(function (x) { firstR = x; }); second.then(function (x) { secondR = x; });
     await Promise.all([first, second]);
     await wait(400);                               // 等补跑那一趟（它是 setTimeout(0) 排的，跑完还要过一次网络）
+    wx.cloud.callFunction = origCall;
     CS.sync = origSync;
     /* 诊断：万一自动补跑没成，手动来一次同口径的 `pending` 看它到底卡在哪（写进 actual 里）。 */
     const probe = await CS.sync('pending', { push: true });
+    /* ⚠️ 判据必须是"**至少两次**"（第一趟 + 补跑那一趟）：第一版只写 `> pushBefore` ——
+       于是"busy 那次被吞掉、只留下第一趟"这种破坏照样能过（破坏测试揪出来的第二条）。 */
     t('11 busy 期间产生的 push **最终一定执行**（脏标记补跑，不吞进度）',
-      fnCalls.push > pushBefore, 'push 次数增加',
-      pushBefore + ' → ' + fnCalls.push + ' · first=' + JSON.stringify(firstR) + ' · second=' + JSON.stringify(secondR) + ' · 自动补跑=' + JSON.stringify(catchup) + ' · 手动同口径=' + JSON.stringify(probe));
+      fnCalls.push >= pushBefore + 2, 'push 至少 2 次（第一趟 + 补跑）',
+      '起始=' + pushBefore + ' · 收工后=' + fnCalls.push
+        + ' · first=' + JSON.stringify(firstR) + ' · second=' + JSON.stringify(secondR)
+        + ' · 自动补跑=' + JSON.stringify(catchup) + ' · 手动同口径=' + JSON.stringify(probe));
   }
 
   R.finish();

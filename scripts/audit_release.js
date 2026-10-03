@@ -51,6 +51,9 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   'story_asset_runtime_audit',
   /* 2026-10-03 云同步最终回归：云端唯一权威（11 条产品口径，真跑客户端×真云函数×假数据库）。 */
   'cloud_authoritative_regression',
+  /* 2026-10-03 云同步最终回归 §二十：**反向破坏测试** —— 把 6 种旧行为逐个塞回源码，
+     要求上面那把回归尺子当场变红（绿了说明它没盯住），塞完逐字节还原。 */
+  'cloud_authoritative_breaktest',
   /* 2026-10-03 落盘时机（A）：界面层改档必须紧跟保存 + 逻辑层动作"改了就必须落盘"。 */
   'save_timing_audit'];
 SUBS.forEach((name) => {

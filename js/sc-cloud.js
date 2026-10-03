@@ -123,7 +123,7 @@
   /* `supersededTs` ＝ 判我们"被顶下线"那一刻**云上那条的时间戳**。
      为什么要留它：判据必须是"**另一台更新** ⇒ 本机只读"（父亲大人 09-27 的口径），
      不是"另一台开过一次 ⇒ 本机永远只读"。留了这个数，本机之后**真玩出了更新的进度**时
-     才能自己重新站起来（见 push 里"抢位重推"那一段），不用玩家去点「重新登录」。 */
+     —— 2026-10-03：**那段自动 reclaim 已经删掉**（见 push 顶部），拿回写权只能显式「重新登录」。 */
   let supersededTs = 0;
   const NOTICE_HOLD_MS = 3 * 60 * 1000;
 
@@ -378,8 +378,9 @@
            完全可能落在**同一个毫秒**里（尺子上真的复现过：三次里错两次）。同刻且不是本机时，
            判对方持有才是安全的 —— 反正服务端那一道条件更新也会拒（本机不会因此被误写成"在线"）。 */
         else if ((Number(sess.ts) || 0) >= leaseTs && (Date.now() - (Number(sess.ts) || 0)) < LEASE_TTL_MS) {
-          /* 2026-10-03：顺手记下"判只读那一刻云上那条的 ts" —— 本机之后真玩出更新的进度时，
-             `push` 要靠它决定"能不能自己站起来"（见 push 顶部与抢位重推那两段）。 */
+          /* 2026-10-03：顺手记下"判只读那一刻云上那条的 ts" —— 只留给诊断与日志用。
+             ⚠️ 它**不再**参与任何"自己站起来"的判断：自动 reclaim 那一段已经删掉（见 push 顶部），
+             拿回写权只有显式「重新登录」这一条路。 */
           superseded = true; supersededTs = doc ? (Number(doc.ts) || 0) : 0;
         }
         else { superseded = false; supersededTs = 0; }
@@ -671,16 +672,11 @@
        读档失败时留的那份原样备份）；拉下来又会把救援现场换掉。等玩家显式选择之后再说。 */
     if (G.Core && G.Core.rescueInfo && G.Core.rescueInfo()) return Promise.resolve({ ok: false, skip: 'rescue' });
     busy = true;
-    /* V1.1.20（F1-1）：冲突判据在**这一轮同步开始的那一刻**取一次快照 —— readOwn() 要过网络，
-       期间玩家操作 / 心跳存盘都可能把本机判据抬新；拿"网络回来那一刻的本机"去比，
-       比的就不是"这一轮开始时谁新"了（第一下触摸之后紧跟的那次存盘最典型）。
-       ⚠️ 光靠这一步还不够：真正让判据"不虚高"的是 core 的 settleWriting 那道闸
-       （开机结算不许刷新 savedAt）—— 两条一起才成立。 */
-    const localAtStart = localTs();
+    /* 2026-10-03：这里原来还要在本轮开工时快照一份 `localAtStart`（V1.1.20 的冲突判据）——
+       云端唯一权威之后**没有任何判据再读它**，连声明一起删掉（§十一：savedAt 退出同步决策）。 */
     return readOwn().then(function (got) {
       if (!got.ok) return { ok: false, skip: 'fail', why: got.why, msg: NET_MSG(got) };
       const doc = got.doc || null;
-      const cloudTs = doc ? (Number(doc.ts) || 0) : 0;
       /* ================= 康康 2026-10-01 · **双端单活**（两处分流）=================
          ① **开机 / 回前台 ＝ 一次登陆 ⇒ 先占位**（父亲大人：「以晚登陆的为主」）。
             只在云上那条的租约**不是本机**时才写 —— 同一台设备连着开几次，一次都不多写。
@@ -692,16 +688,14 @@
          （`publicDoc()` 特意不下发 `_id` / `_openid`）。 */
       const needClaim = wantClaim && !(sess && String(sess.id) === deviceId());
       return (needClaim ? claimLease(doc) : Promise.resolve(null)).then(function () {
-        /* ================= 2026-10-03（父亲大人：「手机同步不到开发者工具的存档」）=================
-           `superseded` 只说明"云上那条的租约在别的设备手里"，**不等于"对面更新"**。
-           对面可能只是开过一次 App（开机那一趟就占了位）—— 那就把本机**刚打出来的进度**白白拦住，
-           云上永远是旧那份，第三台设备自然怎么都同步不到（父亲大人报的就是这一条）。
-           收口成原口径：**只有"云上那份不比本机旧"才是真·被顶下线**（转只读 ＋ 讲一次）；
-           本机比云上更新 ⇒ 照常往下走，`push` 会先替我们把租约抢回来（见那里"抢位重推"）。
-           ⚠️ 这里比的是 `localAtStart`（本轮同步开始时取的那一份判据），不是取档之后的本机。 */
         /* §八 / §九：**被顶号 = 只读**（能拉、不能推），而且**不再自动 reclaim**。
-           旧判据 `superseded && !(supersededTs && localAtStart > supersededTs)` 是在拿本地
-           `savedAt` 去争"到底谁被顶" —— 那正是这一轮要拆掉的冲突裁判（§十一：savedAt 退出决策）。 */
+           `superseded` 只由 `readOwn()` 一处判定："云上那条的租约在别的设备手里、还在有效期内"
+           （谁在场看租约，**不是**看谁更新）。旧的两套判据都已经删掉：
+             · `superseded && !(supersededTs && localAtStart > supersededTs)`（拿本地 `savedAt` 争谁被顶）
+             · push 里"被拒之后按 `savedAt` 抢回租约重推一遍"（自动 reclaim）
+           —— 两者都是"本地时间当冲突裁判"，正是这一轮要拆掉的（§十一：savedAt 退出决策）；
+           留着还会让 A/B 两台设备互相抢位（A 登录 → B 登录 → A 自动 reclaim → B 自动 reclaim → …）。
+           想拿回写权只有一条路：玩家显式点设置页「重新登录」（`reclaim()`）。 */
         const reallyBehind = !!superseded;
         if (reallyBehind) {
           maybeNotifySuperseded(true);
@@ -1165,6 +1159,7 @@
     /* 尺子用：清掉内存缓存与挂着的计时器（偏好本身留在 localStorage 里，由尺子自己控制） */
     _reset: function () {
       cache = null; inited = false; busy = false; retryTries = 0; armed = false;
+      pendingPush = false;                   // §十二：脏标记也一起清（尺子要反复试各种岔路）
       initErr = ''; lastErr = null;          // F2 · 0930L：诊断状态也一起清（尺子要反复试各种岔路）
       absentLogged = false;
       leaseTs = 0; superseded = false; noticeShown = false; noticeAt = 0; leaseToken = '';   // 双端单活：租约状态也一起清
