@@ -282,17 +282,21 @@ function pngInfo(buf) {
       { expected: '能 boot 出 Story.charScene / Story.itemScene', actual: '没拿到' });
   }
 
-  /* R1.6 叙事轮：残响从"只有一个触发点（第一次打到 Boss）"升级成**事件驱动**
-     （`BattleStory.trigger(event)`，见 `js/sc-story-battle.js`）——
-     这条尺子的**判据跟着实现走**，但要求一样：必须是战斗页**自己**触发 + 自己绘制，
-     不许出现"世界页上有个按钮能手动播残响"。 */
-  t('⑭ 「残响」由战斗自动触发（不是世界页按钮）',
-    BATTLE_SRC.indexOf('echoTrigger(') >= 0 && BATTLE_SRC.indexOf('drawEcho') >= 0
-    && BATTLE_SRC.indexOf('BattleStory') >= 0,
-    'sc-battle 里有触发 + 绘制（触发＝BattleStory 事件）',
-    (BATTLE_SRC.indexOf('echoTrigger(') >= 0 ? '触发✓' : '触发✗') + ' ' +
-      (BATTLE_SRC.indexOf('drawEcho') >= 0 ? '绘制✓' : '绘制✗') + ' ' +
-      (BATTLE_SRC.indexOf('BattleStory') >= 0 ? '事件层✓' : '事件层✗'));
+  /* ================= ⑭ 2026-10-03 口径反转（父亲大人：「战斗过程的残响窗口……不要了」）=========
+     原来这条钉的是"残响必须**战斗页自己触发 + 自己绘制**（不许世界页开手动入口）"。
+     现在连那个窗口都不要了，所以判据反过来钉：
+       · `sc-battle.js` 里**不许再有** `echoTrigger` / `drawEcho` / `B.echo`（窗口真的没了，
+         不是"藏起来"——留一个半死的触发点比留着 UI 更容易骗人）；
+       · 内容仍在：`js/sc-story-battle.js` 的事件表**保留**（`story_battle_matrix` 按它核 36 世界覆盖面），
+         `mid` 那一拍仍能在**卷宗**里逐句重读（`sc-story.js` 的卷宗 `PARTS`）。
+     做坏试验：把 `sc-battle.js` 里任意一处 `echoTrigger(` 加回去 → 本条当场红。 */
+  const echoLeft = ['echoTrigger(', 'drawEcho', 'B.echo', 'ECHO_MS'].filter((k) => BATTLE_SRC.indexOf(k) >= 0);
+  const midReadable = STORY_SRC.indexOf("'mid'") >= 0 || STORY_SRC.indexOf('"mid"') >= 0;
+  t('⑭ 战斗内残响窗口已撤除（触发点与绘制都不在 sc-battle 里），内容仍可在卷宗重读',
+    echoLeft.length === 0 && midReadable,
+    'sc-battle 里 0 处残响；卷宗仍列「mid」',
+    (echoLeft.length ? ('仍见 ' + echoLeft.join(' ')) : '残响已清干净')
+      + ' · 卷宗里的 mid ' + (midReadable ? '还在' : '**没了**（内容会读不到）'));
 
   /* ⑮ 「pre」自动触发 —— **行为验证**（在真代码里派发一次 Boss 关，看它是不是自己开剧情、
         播完是不是接着开打）。比"字符串在不在"强一层：走的是 sc-dungeon 那个真处理器。 */

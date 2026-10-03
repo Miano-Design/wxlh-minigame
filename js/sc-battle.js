@@ -350,9 +350,6 @@
     return (B.floaters || []).some(function (f) { return now - f.t < (f.ttl || D.BATTLE_GEOM.floatMs); })
       || Object.keys(B.hitAt || {}).some(function (k) { return now - B.hitAt[k] < 320; })
       || Object.keys(B.atkAt || {}).some(function (k) { return now - B.atkAt[k] < 220; })
-      /* 残响也得算"还有活着的动效" —— 不然它刚淡到一半，帧循环就因为"没动效了"停下，
-         那一行会**僵在屏幕上不消失**（这是这类"借别人的循环"最容易漏的一条腿）。 */
-      || !!B.echo
       || !!B.entrance                       // R1.6：Boss 出场那 2.4 秒也得有帧（否则它僵住不淡出）
       || (B.shakeUntil || 0) > now;
   }
@@ -403,65 +400,17 @@
   function hitFx(uid) { if (uid) { B.hitAt[uid] = Date.now(); ensureFx(); } }
   function atkFx(uid) { if (uid) { B.atkAt[uid] = Date.now(); ensureFx(); } }
 
-  /* ================= 「残响」（mid）：**战斗内非阻塞**（2026-10-01 · 父亲大人二轮） =================
-     他原话：「`mid` 必须从`手动剧情页面`改为`战斗内非阻塞残响`……不 push 页面、不暂停战斗、
-     不要求玩家点击、不改变战斗结果。只显示【残响】+ 一句极短文字，持续约 1～2 秒然后淡出。
-     同一段只在首次满足条件时播放一次。」
-
-     触发点选 **这一场第一次打到 Boss**（`case 'damage'` 里目标单位带 `isBoss`）：
-       · 它**一定发生** —— 比"血量阈值"稳（Boss 被秒也照样触发），也比 `phase` 稳
-         （`phase` 只有部分 Boss 有，且要打到 70%/40%）；
-       · 它天然就是"战斗里的一个瞬间"（第一次交手），不是人为插的一个播报点。
-     两次保证：① 一进来先 `markSeen`（同一帧被调两次也不会播两遍）；
-               ② 借战斗自己那条帧循环淡出（**不新起定时器**，离场即停，不会留着烧电）。
-     不产生任何副作用：不改 B.res、不发奖、不动回合、不登记热区（**点不到，也挡不住操作**）。 */
-  const ECHO_MS = (G.BattleStory && G.BattleStory.ECHO_MS) || 1800;
-  /* ================= R1.6 叙事轮 · 残响改由**战斗事件**驱动（§八） =================
-     以前只有一个触发点（第一次打到 Boss），文本也固定取 `mid` 的第一拍。
-     现在：`G.BattleStory` 是**唯一**的"事件 → 残响"映射表（世界 → 事件 → 一句），
-     战斗页只负责在**真实事件**发生时按名字喊一嗓子（`echoTrigger`），
-     然后从队列里取一条来播（`echoPull`）。顺序、文本、去重都在那一份表里，这里不判断。
-     ⚠️ 行为上一点没变坏：没有 `BattleStory`（旧版本 / 尺子单独加载）时，这一块**整段跳过**，
-        战斗照打，只是不播残响。 */
-  function echoPull() {
-    if (B.echo) return;
-    const BS = G.BattleStory;
-    if (!BS) return;
-    const nxt = BS.take();
-    if (!nxt || !nxt.text) return;
-    const wid = BS.worldOf();
-    const St = G.Story;
-    /* 老口径留着：残响播过就把这一拍的 `mid` 记成已读（剧情页/卷宗那边的状态别分叉） */
-    if (wid && St && St.markSeen && St.seen && !St.seen(wid, 'mid')) St.markSeen(wid, 'mid');
-    B.echo = { text: nxt.text, at: Date.now(), ev: nxt.ev };
-    ensureFx();
-  }
-  /* 战斗里发生了一件事 → 问叙事层要不要说话（要不要、说不说都归它管） */
-  function echoTrigger(ev) {
-    const BS = G.BattleStory;
-    if (!BS) return;
-    try { BS.trigger(ev); } catch (e) {}
-    echoPull();
-  }
-  /* 残响那一行：画在**战场上沿居中**（不盖阵容、不盖日志、不登记热区）。
-     淡入 0.25s → 停留 → 淡出，整段 1.8s。 */
-  function drawEcho() {
-    if (!B.echo) return;
-    const el = Date.now() - B.echo.at;
-    /* 这一条淡完 → 从叙事层的队列里接着取下一条（多条残响按"发生顺序"排队播，不叠加） */
-    if (el > ECHO_MS) { B.echo = null; echoPull(); return; }
-    const k = Math.max(0, Math.min(1, el < 250 ? el / 250 : (ECHO_MS - el) / 450));
-    const c = CV.ctx;
-    const bw = Math.min(CV.W - U.pad() * 2, 340 * CV.SCALE);
-    const bh = 52 * CV.SCALE;
-    const bx = (CV.W - bw) / 2, by = CV.TOP + 20 * CV.SCALE;
-    c.save(); c.globalAlpha = k;
-    CV.round(bx, by, bw, bh, CV.RADIUS_SM, CV.a(CV.C.shade, .58), CV.a(CV.C.gold, .45));
-    CV.text('【残响】', bx + bw / 2, by + 15 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: CV.C.gold, ls: 1 });
-    CV.text(CV.fit(B.echo.text, bw - 20 * CV.SCALE, CV.FS.lg), bx + bw / 2, by + 34 * CV.SCALE,
-      { size: CV.FS.lg, align: 'center', color: CV.C.text2 });
-    c.restore();
-  }
+  /* ================= 2026-10-03（父亲大人：「战斗过程的残响窗口……不要了」）=================
+     这里原来有**一整套战斗内残响**：`ECHO_MS` / `echoPull` / `echoTrigger` / `drawEcho`
+     —— 由真实战斗事件（first_hit / 血量阈值 / Boss 开盾 / 阶段 / 召唤 / 世界机制改写…）触发，
+     在战场上沿弹一张【残响】小卡，1.8 秒淡出，播过就把这一拍的 `mid` 记成已读。
+     父亲大人不要这个窗口，所以**整段撤掉**（连同所有触发点，一处没留）。
+     ⚠️ 内容没删：`mid` 那一拍仍然写在世界数据里，也仍然能**在卷宗里逐句重读**
+        （`sc-story.js` 的卷宗 `PARTS` 里那条「战斗中残响」就是它的读法）。
+     ⚠️ `js/sc-story-battle.js` 的事件表也留着 —— 它是**内容**（哪个世界在什么时刻会说什么），
+        不再有人播它，但 `story_battle_matrix` 仍按它核 36 个世界的覆盖面；将来要换一种呈现
+        （比如战后一次性给）时，那张表就是现成的。
+     连带删掉的还有 `fxAlive()` 里那条 `|| !!B.echo`（原来靠它保证残响淡出时有帧）。 */
 
   /* F6（R6 #11）：把引擎帧里的能量读成 0~100 的显示值；帧里没有那一项时返回 null
      （null ＝"这一帧没告诉我"，调用方退回界面自己的记账，见 applyFrame 里三处的用法）。 */
@@ -492,18 +441,10 @@
       case 'damage': {
         const u = B.units[f.target];
         hitFx(f.target); atkFx(f.source || f.actor);      // 受击闪红 + 出手前冲
-        /* ================= R1.6：残响的触发点全部落在**真实战斗事件**上（§七 / §八） =================
-           兵分两路：**打 Boss**（first_hit / 三条血量阈值）与 **我方挨打**（player_low_hp）。
-           每次都是"先问叙事层要不要说话"，不说话就什么都不发生 —— 不新起定时器、不挡操作。 */
-        if (u && u.isBoss) {
-          if (!B._bsBossHit) { B._bsBossHit = 1; echoTrigger('first_hit'); }
-          const ratio = u.maxHp ? Math.max(0, (u.hp - f.dmg) / u.maxHp) : 1;
-          if (ratio <= 0.75) echoTrigger('boss_hp75');
-          if (ratio <= 0.50) echoTrigger('boss_hp50');
-          if (ratio <= 0.25) echoTrigger('boss_hp25');
-        } else if (u && u.maxHp && (u.hp - f.dmg) / u.maxHp <= 0.30) {
-          echoTrigger('player_low_hp');       // 我方某个人快站不住了（含主角）
-        }
+        /* 2026-10-03（父亲大人：「战斗过程的残响窗口……不要了」）：
+           这里原来按"真实战斗事件"（first_hit / 三条血量阈值 / player_low_hp）往战斗里塞残响。
+           残响那一层 UI 已经整个撤掉，所以这些触发点一并删干净 —— 保留一个"问了也没人接"的
+           调用只会让人以为还有这条链。 */
         /* V9.6.68（资料 §8/§9）：轻击一点点震、暴击明显一点 + 一下 hitstop（见 step）；
            平时不震，免得整场都在抖（原文："如果普通攻击都在震屏，玩家很快就烦"。） */
         B.shakeUntil = Date.now() + (f.crit ? 160 : 90);
@@ -550,25 +491,20 @@
          `heal`（回血 / 吸血）**故意不出声** —— 吸血几乎每次都触发，再叠一声就是糊；
          这是本岗的判断，不是漏（要加一句话就行）。 */
       case 'shield': floater(f.target, '🛡+' + f.amount, CV.C.green); snd('shield');
-        if (B.units[f.target] && B.units[f.target].isBoss) echoTrigger('boss_buff');   // Boss 开盾＝叙事节点
         break;
       case 'dodge': floater(f.target, '闪避', CV.C.dim); snd('dodge'); break;
       case 'skip': pushLog('😵 ' + nameOf(f.actor) + ' 无法行动'); break;
       case 'buff': floater(f.target, '↑ ' + f.name, CV.C.green); break;
       case 'status': floater(f.target, STATUS_TEXT[f.status] || '异常', CV.C.debuff, 1500);
-        /* 状态落在谁身上，就是谁在被改变 —— Boss 中状态＝玩家破解了机制（player_break），
-           我方中状态＝Boss 在压制我们（boss_debuff）。两条都在 §八 的事件表里。 */
-        if (B.units[f.target] && B.units[f.target].isBoss) echoTrigger('player_break');
-        else echoTrigger('boss_debuff');
         break;
       /* V1.0.1（UI 设计师会诊）：Boss 二阶段 / 狂暴以前**只有日志**（日志在下方、战斗在上方，
          等于没提示）。现在日志留全句、头上飘一行短标，当场就能看见。 */
       case 'phase': floater(f.boss, f.phase === 70 ? '⚠ 二阶段' : '⚠ 狂暴', CV.C.gold, 1800); pushLog('🔥 ' + f.text);
-        echoTrigger(f.phase === 70 ? 'boss_phase_2' : 'boss_phase_3'); break;
+        break;
       case 'revive': { const u = B.units[f.boss]; if (u) u.hp = Math.round(u.maxHp * 0.3); floater(f.boss, '♻️ 复活', CV.C.green, 1500); snd('revive'); pushLog('♻️ ' + f.text);
-        echoTrigger('player_revive'); break; }
-      case 'summon': pushLog('🕯 ' + f.text); echoTrigger('boss_skill'); break;
-      case 'rule': pushLog('👁 ' + f.text); echoTrigger('world_rule'); break;   // 世界机制改写＝"世界在说话"
+        break; }
+      case 'summon': pushLog('🕯 ' + f.text); break;
+      case 'rule': pushLog('👁 ' + f.text); break;
       case 'nearDeath': floater(f.target, '⚠ 濒死', CV.C.gold); break;
       default: break;
     }
@@ -958,10 +894,6 @@
         rect: fieldRect(FIELD_TOP, FIELD_BOTTOM_UNITS) };
       drawField(B.field);
     } else B.field = null;   // 波次卡那一段不画战场 → 动效帧也退回整页（见 fxPaint）
-    /* 残响层：画在战场上沿（`drawField` 之后 ⇒ 在人头上），但**不登记热区**：
-       点它没有反应，它也挡不住任何操作 —— 父亲大人要的"不打断、不要求点击"。 */
-    drawEcho();
-
     /* 右下角三颗按钮：撤离 / N×速度 / ×5
        标准档：单独一行，压在日志卡上面（V9.6.8 父亲大人定的站位）；
        压缩档：并进日志卡的表头行（见下面那段注释）—— 卡先画，角标后画，才压得住卡底。 */
@@ -1144,7 +1076,21 @@
     /* V9.6.8（父亲大人真机截图："结算界面乱的"）：奖励胶囊会换行，这里必须用**真实高度**，
        以前写死 28px —— 胶囊换到第二排时按钮就压在胶囊上。 */
     const chipsH = rewards.length ? chipLayout(rewards).height : 0;
+    /* ================= 2026-10-03（父亲大人：「战斗失败的结算页面文字的行距有问题」）=================
+       失败时多出来的那一行"为什么输"（`defeatHint`）原来**画在 `y - 12`**，
+       而上一行（回合 + 副题）画在同一个 y 的 `y + 8` —— 两行只差 **10px**，
+       长句子看上去就是贴着上一行；而且它**没有算进 `total`**（竖直居中的那个总高），
+       内容比算出来的高，整块就会偏下、按钮上面的留白被吃掉。
+       现在把它**提到这里先算**（算出要占几行），按与上一行同一套排版摆，再照实行高推进。
+       ⚠️ `defeatHint` 只读 `res`，不依赖任何绘制状态，所以提前算没有副作用。 */
+    /* ⚠️ 这里只能读 `res`，**不能读 `R`** —— `const R = res || {}` 在下面几行才声明，
+       提前读会撞上 TDZ 直接抛错（结算页当场白屏）。`p.hintLine` 是原来就有的"抑制开关"，口径不变。 */
+    const hint = (!(res && res.win) && !p.hintLine) ? (defeatHint(res || {}) || '') : '';
+    const HINTW = Math.min(340 * CV.SCALE, U.iw());
+    const hintLines = hint ? CV.wrap(hint, HINTW, CV.FS.md, 3) : [];
+    const HINTLH = CV.FS.md * 1.6;                       // 行距：比字号宽一点，长句才不挤
     let total = 92 * CV.SCALE + SUB + 12 * CV.SCALE;
+    if (hintLines.length) total += 10 * CV.SCALE + hintLines.length * HINTLH;   // 与下面真正推进的量一致
     if (rewards.length) total += chipsH + 10 * CV.SCALE;
     /* 剧情线索那一层也要占高度，否则按钮会压在它上面（与胶囊同一条纪律）。 */
     if (p.lore) total += 44 * CV.SCALE;
@@ -1169,12 +1115,12 @@
        数据都在 `res.frames` 里（每一帧的 `type/target/dmg` ＋ 开场那一帧的两队名单），
        所以这里只做三件事：把"我方打出去的"和"对面打进来的"各自加总 → 按比值／回合数分四档
        → 失败时多画**一行灰字**。判断不了（没帧、没伤害）就一个字都不显示，绝不编。 */
-    if (!R.win && !p.hintLine) {
-      const hint = defeatHint(R);
-      if (hint) {
-        CV.text(hint, cx, y - 12 * CV.SCALE, { size: CV.FS.md, align: 'center', color: CV.C.dim });
-        y += 20 * CV.SCALE;
-      }
+    if (hintLines.length) {
+      /* 上一行画在它的 `y + 8`，这里跟着空一格再画 —— 两行的**基线距离**从 10px 放到 ~1.6 行高。 */
+      hintLines.forEach(function (ln, i) {
+        CV.text(ln, cx, y + 8 * CV.SCALE + i * HINTLH, { size: CV.FS.md, align: 'center', color: CV.C.dim });
+      });
+      y += 10 * CV.SCALE + hintLines.length * HINTLH;
     }
     if (rewards.length) {
       drawChips(rewards, cx, y);

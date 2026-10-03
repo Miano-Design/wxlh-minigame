@@ -95,6 +95,16 @@ window.BattleStory = (function () {
     cfg = cfg || {};
     const wid = cfg.worldId || '';
     cur = { worldId: wid, isBoss: !!cfg.isBoss, table: tableOf(wid), fired: {}, queue: [] };
+    /* ================= 2026-10-03（父亲大人：「战斗过程的残响窗口……不要了」）=================
+       残响那一层 UI 撤掉之后，"播过就记已读"的那一下**没有执行者了**——
+       而卷宗里那条「战斗中残响」是按已读/未读展示的（`sc-story.js` 的 `PARTS`），
+       一个永远点不亮的"未读"看着就像坏了。
+       所以这里补上：**玩家进了这一场，就把这一拍的 `mid` 记成已读** ——
+       事实也如此（他确实打过这一场了）；内容照旧能在卷宗里逐句重读。 */
+    try {
+      const St = Story();
+      if (wid && St && St.markSeen && St.seen && !St.seen(wid, 'mid')) St.markSeen(wid, 'mid');
+    } catch (e) {}
     /* battle_start 是"这一场的第一句"—— 有就排在最前面（没有就跳过，不报错） */
     if (cur.table.battle_start) { cur.fired.battle_start = 1; cur.queue.push({ ev: 'battle_start', text: cur.table.battle_start }); }
     /* 老行为兜底：`mid` 一拍都没有的世界，仍然给一句（免得"这一场完全没有叙事反馈"）。

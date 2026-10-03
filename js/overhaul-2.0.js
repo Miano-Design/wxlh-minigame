@@ -490,23 +490,15 @@
   };
   CV.on('ov_current_world',function(){const w=currentWorld();if(w)CV.dispatch('w:'+w.id);});
 
-  /* battle HUD: unobtrusive, always tied to the actual current world mechanism */
-  if(prev.battle){
-    CV.panels.battle=function(){
-      prev.battle();
-      /* 2026-10-02（康康 · `api_audit` 第一次扫到这个文件时抓到的**真死代码**）：
-         战斗状态的真出口是 **`G.BattleUI.state`**（js/sc-battle.js 末尾 `G.BattleUI = {state:B,…}`，
-         `sc-dungeon.js` / `sc-lines.js` 都读它）—— 这里原来写成 `Core.BattleUI`（那个名字全仓不存在），
-         于是 `st` 恒为 undefined、下面这段"战斗页顶部显示当前世界机制"**从来没画出来过**。
-         改一个词就活：`Core.` → `G.`（仍是"先判存在再取"，缺了也不抛错）。 */
-      const st=G.BattleUI&&G.BattleUI.state;
-      if(!st||!st.on||!st.cfg||st.panel)return;
-      const wid=st.cfg.worldId,w=D.WORLDS.find(x=>x.id===wid); if(!w)return;
-      const txt=String(w.mechanic||'');
-      const c=CV.ctx, x=12*CV.SCALE, y=CV.TOP+10*CV.SCALE, bw=Math.min(CV.W-24*CV.SCALE,190*CV.SCALE), bh=24*CV.SCALE;
-      c.save(); c.globalAlpha=.9; CV.round(x,y,bw,bh,CV.RADIUS_SM,CV.a(CV.C.panel,.68),CV.C.line2); CV.text('机制 · '+CV.fit(txt.split('：')[0],bw-16*CV.SCALE,CV.FS.sm),x+8*CV.SCALE,y+bh/2,{size:CV.FS.sm,color:CV.C.text2}); c.restore();
-    };
-  }
+  /* ================= 2026-10-03（父亲大人：「界面中的那条机制信息不要了吧」）=================
+     这里原来在战斗页左上角挂一条「机制 · 感染」的小胶囊（`CV.panels.battle` 包了一层）。
+     现在整个撤掉 —— 理由与实现无关，是**信息重复**：同一个机制在战斗页里已经说过两遍，
+       ① 开打前 / 战斗日志第一行有完整的那句（「世界机制 · 感染：敌人攻击附带中毒」），
+       ② 战场左上角这一条只截了冒号前两个字（「机制 · 感染」），既不完整、又正好压在
+          Boss 血条那一片上（父亲大人圈出来的就是它）。
+     删掉之后战斗页顶部**只剩关卡名那一行**，不再有第二块浮标跟它抢注意力。
+     ⚠️ 这是**两轮之间的口径反转**（2026-10-02 那轮我按"有价值"留了它）—— 以父亲大人这次的为准。
+     ⚠️ `prev.battle` 的包装一并去掉：它只为这一个 HUD 存在，留着就是一层空壳。 */
 
   /* ================= R1.9 整合裁定：**这一段不合并** =================
      2.0 完整工程在这里做了两件事：① 包一层 `BattleUI.run` 记"来路快照"；
