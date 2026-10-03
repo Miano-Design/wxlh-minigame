@@ -43,7 +43,10 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
      · `migration_fixture_audit`  8 个虚拟旧档的黑盒迁移（读→迁移→断言→存盘→再读→再断言）
      · `world_save_compat_audit`  世界 ID 稳定性 + 世界改名兼容（任务书 §7 的 A/B/C/D）
      · `save_upgrade_regression`  十一项升级回归总表（含**真跑**云函数验 NOT_FOUND ≠ DB_ERROR） */
-  'migration_fixture_audit', 'world_save_compat_audit', 'save_upgrade_regression'];
+  'migration_fixture_audit', 'world_save_compat_audit', 'save_upgrade_regression',
+  /* 2026-10-03 复检收口：七处点名裂缝各一条断言（云客户端 code / 事务切换 / mid 统一 /
+     精英关 worldId / session 顺序 / 凭据落账时机 / 夹具 A~E）。真跑与源码检查在回单里分开列。 */
+  'recheck_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

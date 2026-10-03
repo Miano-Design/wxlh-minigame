@@ -248,7 +248,12 @@
            ① 精英关右上角要挂 ⚔ 角标（wg 用 wavePlan 判，和网页版同一份数据）；
            ② 格子里字号统一走层级：网页版 .stage-cell 是 **二级 15px**、整格粗体
               （我上一版把守关格写成 20px 反而更偏了）。 */
-        const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
+        /* ⚠️ 2026-10-03 复检 P0-4：`wavePlan` 是**世界相关**的逻辑（第 1 张图 1 波、第 2 张 2 波、
+           第 3 张起固定 3 波，精英波的位置也跟着世界走）——
+           漏传 `worldId` 时 `wi = -1`，走的永远是"兜底那一套"，
+           于是这一格的 ⚔ 角标和真正开打时的波次方案对不上。
+           真正开打那句（`startStage`）早就传了世界号，这里必须同步。 */
+        const isElite = !isBoss && Dun.wavePlan(i + 1, w.id).indexOf('elite') >= 0;
         const done = stars > 0;
         /* ================= V1.1.15（2026-09-27 · 派单 I 第 1 条「320 挤压/顶格」）=================
            320 上格子是 68×68（(296−24)/4），而星标原来钉在 `y + cw − 14` ——
@@ -740,24 +745,25 @@
           waves: (run && run.waves && run.waves.length), st: (run && run.stage) });
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
-          /* ① **这一场已经结算过** → 把那份真面板原样还回去（幂等：不重算、不重发奖）。
-             认的是**对象身份**（`settledRun === myRun`），不是"上一张面板"。
-             盯这条的是 `scripts/settle_audit.js` ②③。 */
-          if (settledRun && settledRun === myRun) return settledPanel;
-          /* ================= ② 旧回调不许复活旧战斗（§21，**原来的写法已删**）=================
-             任务书点名禁止的正是这一行：`if (!run && myRun) run = myRun;`
-             —— "为了防止数据消失把旧状态塞回来"，等于让一次晚到的收尾**重跑整套结算**
-             （奖励发双份、首通重算、结算页被顶掉）。
-             现在只认号：**我这一场还是不是当前那一场**。
-             号对不上 ⇒ 这个回调属于已经过去的那一场 ⇒ 一个字都不许改
-             （不恢复 run、不结算、不发奖、不覆盖结算页、不启动下一关）。
-             返回的那张只用来让 `finish()` 别把战斗页卡住；新一场的 `start()` 会立刻
-             `B.panel = null` 把它冲掉（`session` 号不同 ⇒ 连"同号"都算不上）。 */
-          if (!run || run.session !== mySession) {
-            trace('stale', { win: !!win, my: mySession, cur: (run && run.session) });
-            try { G.LOG && G.LOG.warn('dun', 'stale_end', { my: mySession, cur: (run && run.session), win: !!win }); } catch (e3) {}
-            return { title: '这一场已结束', sub: '', rewards: [], acts: [] };
+          /* ================= ① **session 隔离优先于 settledPanel 回放**（2026-10-03 复检 P1）=================
+             判两次的顺序很要紧：
+               先看"这是不是**当前**那一场"（号对不对），再谈"要不要把旧面板还回去"。
+             反过来写（先回放面板）就会有一个洞：当前已经在打**新的一场**了，
+             而一个属于旧场的回调进来，会拿旧场那份 `settledPanel` 盖到新场的战斗页上。
+             号对不上 ⇒ 这个回调属于已经过去的那一场 ⇒ 一个字都不许改：
+             不结算、不发奖、不写当前面板、不恢复旧 run、不启动下一关。
+             （任务书 §21 点名禁止的 `if (!run && myRun) run = myRun;` 早就删了，
+               这里补的是它后面那半句：**旧回调永远不许复活旧战斗**。）
+             返回的那张只用来让 `finish()` 别把战斗页卡住；`stale:true` 是给尺子的记号。 */
+          if (run && run.session !== mySession) {
+            trace('stale', { win: !!win, my: mySession, cur: run.session });
+            try { G.LOG && G.LOG.warn('dun', 'stale_end', { my: mySession, cur: run.session, win: !!win }); } catch (e3) {}
+            return { title: '这一场已结束', sub: '', rewards: [], acts: [], stale: true };
           }
+          /* ② 当前**没有**进行中的 session（这一场已经收工 / 被清掉）：
+             只有"就是这一场、而且它**成功结算过**"才允许把那份真面板原样还回去（幂等）；
+             其余（真的没有这一场了）才落到兜底 —— 兜底只是最后的保险。 */
+          if (!run) return (settledRun && settledRun === myRun) ? settledPanel : lastResortPanel(win);
           /* F6（R6 #7）：**波与波交界处累加真实阵亡数** ——
              判据是"这一波结束时 hp<=0"，而且只记**这一波新倒下的**
              （上一波已经 0 血的人不算第二次，免得一颗星被扣两遍）。
@@ -820,8 +826,15 @@
               after() { fightWave(); },
             };
           }
-          settledRun = myRun;                 // ← 先立凭据，再拿面板（顺序反了会又结算一遍）
-          settledPanel = settleRun(res, hpLeft);
+          /* ================= 账要在**成功之后**才落（2026-10-03 复检 P1）=================
+             顺序：`settleRun` 先真的跑完、拿到一张完整面板 → 写 `settledPanel`
+             → 最后才把 `settledRun` 标记成"这一场已结算"。
+             反过来写（先立凭据）会留一个假标记：`settleRun` 中途抛错时，
+             "已经结算过"这句谎话已经写下去了 —— 下一次进来会拿一个不存在的面板，
+             或者干脆跳过真正该做的那次结算。抛错时统一落到 `lastResortPanel()`。 */
+          const panel = settleRun(res, hpLeft);
+          settledPanel = panel;               // ① 先拿到完整面板
+          settledRun = myRun;                 // ② 再落"这一场已结算"的账
           return settledPanel;
         } catch (e) {
           /* 兜底不许再抛：出错了就记一笔日志、返一个"能退出"的面板（玩家永远不会卡死）。 */
@@ -881,14 +894,18 @@
       const St = G.Story;
       /* 2.1：第 6 关是每个世界的“故事转折点”。玩家已经实际玩过前半段后，剧情从战斗里自然长出来，
          播完马上回到第 6 关，不增加一个独立剧情菜单。 */
+      /* P0-3：这里的已读判据跟着收成 `mid`（与卷宗 / 未读统计 / 老档迁移同一个字段）——
+         原来是 `midstory`，于是"卷宗里显示没读、第 6 关却不再自动播"这种错位迟早会出现。 */
       if (i === 5 && St && St.autoOn && St.autoOn() && St.hasInterlude && St.hasInterlude(view.worldId)
-        && !St.seen(view.worldId, 'midstory')) {
+        && !St.seen(view.worldId, 'mid')) {
         const widMid = view.worldId, dfMid = view.diff;
         St.openInterlude(widMid, { onDone: function () { startStage(widMid, dfMid, i); } });
         return;
       }
       const isBoss = i === 11;
-      const isElite = !isBoss && Dun.wavePlan(i + 1).indexOf('elite') >= 0;
+      /* P0-4（同上）：这一段判"要不要自动播战前剧情"，更不能漏世界号 ——
+         漏了就会出现"这一关其实有精英波、但战前剧情没播"。 */
+      const isElite = !isBoss && Dun.wavePlan(i + 1, view.worldId).indexOf('elite') >= 0;
       if (St && St.hasStory && St.hasStory(view.worldId) && (isBoss || isElite)
         && St.autoOn && St.autoOn()
         && St.part(view.worldId, 'pre') && !St.seen(view.worldId, 'pre')) {

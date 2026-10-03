@@ -469,26 +469,56 @@ window.Core = (function () {
     try { data = JSON.parse(unpackSave(o.raw)); }
     catch (e) { return  getProxied({ ok: false, msg: '备份也读不出来（' + (e.message || '未知') + '）' }); }
     if (!data || typeof data !== 'object') return  getProxied({ ok: false, msg: '备份内容不像存档' });
-    /* 恢复之前先把"当前这份"留一手（父亲大人可能只是试一下）—— 存在 `_pre_restore`，不参与自动读写。 */
-    try { const cur = localStorage.getItem(SAVE_KEY); if (cur) localStorage.setItem(SAVE_KEY + '_pre_restore', cur); } catch (e) {}
-    S = fillDefaults(defaultState(), data);
-    S.v = SAVE_VER;
-    try { migrate(); } catch (e) { /* 恢复优先：迁移这一步出问题也不拦着玩家把进度拿回来 */ }
-    lastLoadIssue = null;
-    /* V1.1.20（F1-5 / F1-2）：恢复成功＝玩家**显式**选定了这份档 —— 救援态到此结束（主键可以写了）。 */
-    rescue = null;
-    /* savedAt 按"现在"（与"删档重开 / 新档"同一口径）：玩家这一下是明确要这一份。
-       —— 若不盖，这份档会因为 savedAt 老（老档补的是 idle.lastTs）被云上那份盖回去。 */
-    S.savedAt = Date.now();
-    /* V1.1.20（F1-2）：这份档自带的**离线窗口要补跑一次**。
-       原来这里直接 `offlineSettled = true; save();` —— 等于把那份档的 idle.lastTs 盖章成"现在"，
-       它自带的离线收益（比如"8 小时没玩"那一段）当场归零。现在：闸门先关回去，按它自己的
-       时间戳补跑一次结算（沿用开机那一条唯一的结算函数），再落盘。 */
-    offlineSettled = false;
-    try { settleOffline(); } catch (e) { /* 补结算出错不该拦着"把进度拿回来"这件事本身 */ }
-    offlineSettled = true;
-    save();
-    return  getProxied({ ok: true, at: o.at || 0, msg: '已恢复到 ' + (o.at ? new Date(o.at).toLocaleString() : '备份那份') });
+    /* ================= 2026-10-03 复检 P0-2 · **恢复备份也是事务** =================
+     原来的写法有三处不老实（复检点名）：
+       ① `migrate()` 抛异常被当场吞掉 ⇒ 半迁移的档照样 `save()` 写进主档；
+       ② `lastLoadIssue = null` **无条件**清空 ⇒ 失败被抹得不留痕；
+       ③ 补结算失败也照报"恢复成功"，玩家看不出区别。
+     现在与导入 / 读档槽**同一套事务原则**：整段包在 try 里，任何一步失败
+     就把内存 S / 主档原文 / 离线闸门 / 历史标记 / 救援态 / 诊断记录**整份退回动手前**。 */
+    const prevS = S, prevOffline = offlineSettled, prevLegacy = legacyRaw;
+    const prevRescue = rescue, prevSuppress = suppressSave, prevIssue = lastLoadIssue;
+    let prevRaw = null;
+    try { prevRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+    /* 恢复之前先把"当前这份"留一手（父亲大人可能只是试一下）—— `_pre_restore` 不参与自动读写。 */
+    try { if (prevRaw) localStorage.setItem(SAVE_KEY + '_pre_restore', prevRaw); } catch (e) {}
+    let settleWarn = '';
+    try {
+      offlineSettled = false;                 // 切档期间不许盖章（同 switchStateTo）
+      legacyRaw = (data.c001Merged === undefined) && (data.altPlayers === undefined) && (data.fabao === undefined);
+      S = fillDefaults(defaultState(), data);
+      S.v = SAVE_VER;
+      migrate();                              // ← 抛出去 = 整份回滚（不再吞）
+      /* V1.1.20（F1-5 / F1-2）：恢复成功＝玩家**显式**选定了这份档 —— 救援态到此结束（主键可以写了）。 */
+      rescue = null;
+      /* savedAt 按"现在"（与"删档重开 / 新档"同一口径）：玩家这一下是明确要这一份。
+         —— 若不盖，这份档会因为 savedAt 老（老档补的是 idle.lastTs）被云上那份盖回去。
+         ⚠️ 这是**玩家显式行为**，与"自动存盘 / 离线结算不许刷新 savedAt"那两条不冲突。 */
+      S.savedAt = Date.now();
+      /* V1.1.20（F1-2）：这份档自带的**离线窗口要补跑一次**。
+         原来这里直接 `offlineSettled = true; save();` —— 等于把那份档的 idle.lastTs 盖章成"现在"，
+         它自带的离线收益（比如"8 小时没玩"那一段）当场归零。 */
+      try { settleOffline(); }
+      catch (e) {
+        /* 档已经换好、进度一分没丢，所以**不算恢复失败**；但也不能假装"全须全尾"，
+           把这一条如实带回去（上层的提示会跟着变脸）。 */
+        settleWarn = '离线收益没补算成功（进度已经回来，不影响这份档）';
+        offlineSettled = true;
+        try { console.warn('[save] 恢复备份后的离线补结算失败：' + (e && e.message)); } catch (e2) {}
+      }
+      offlineSettled = true;
+      save();
+      lastLoadIssue = null;                   // ← **只有真的成功**才清（失败那支一律不动它）
+      return  getProxied({ ok: true, at: o.at || 0, warn: settleWarn,
+        msg: '已恢复到 ' + (o.at ? new Date(o.at).toLocaleString() : '备份那份') + (settleWarn ? '（' + settleWarn + '）' : '') });
+    } catch (e) {
+      /* 迁移 / 存盘任一步失败 ⇒ 整份退回：内存、主档、离线闸门、历史标记、救援态、诊断记录。 */
+      S = prevS; offlineSettled = prevOffline; legacyRaw = prevLegacy;
+      rescue = prevRescue; suppressSave = prevSuppress; lastLoadIssue = prevIssue;
+      if (prevRaw) { try { localStorage.setItem(SAVE_KEY, prevRaw); } catch (e2) {} }
+      try { console.warn('[save] 恢复备份失败（本机存档一个字没动）：' + (e && e.message)); } catch (e2) {}
+      return  getProxied({ ok: false, msg: '恢复失败，本机存档一个字没动：' + ((e && e.message) || '未知错误') });
+    }
   }
   function saveDiag() {
     let raw = null;
@@ -1064,6 +1094,27 @@ window.Core = (function () {
         S.reincarnCorridorRestored = true;
       }
     }
+    /* ================= 2026-10-03 复检 P0-3 · 把历史遗留的 `midstory` 收成 `mid` =================
+     第 6 关的自动中段剧情原来把"看过没有"写进 `story.w[wid].midstory`，
+     而卷宗 / 未读统计 / 老档迁移读的都是 `story.w[wid].mid` —— 同一个事实存了两份。
+     体验版 / 测试档里可能已经留下了旧键，所以这里做**一次**收敛：
+        存在 `midstory = 1`  →  写 `mid = 1`  →  **删掉** `midstory`
+     三条纪律：
+       · **只增不减**：只把 `mid` 从 0 写成 1，绝不把已读改回未读；
+       · **只做一次**：标记 `storyMidUnified` 跑完就写，**不许进 `defaultState`**（老坑，见下）；
+       · **跑在下面那段世界故事迁移之前** —— 先把旧键收干净，再按战斗证据往前补。 */
+    if (!S.storyMidUnified) {
+      const stm = S.story;
+      if (stm && stm.w !== undefined && stm.w !== null) {
+        Object.keys(stm.w).forEach(function (wid) {
+          const rec = stm.w[wid];
+          if (!rec || !rec.midstory) return;
+          rec.mid = 1;                 // 看过就是看过
+          delete rec.midstory;         // 不许留两个长期并行状态
+        });
+      }
+      S.storyMidUnified = true;
+    }
     /* ================= 终版（2026-10-03 任务书 §2–§14 · §23 · §31）· 旧档「世界故事线」自动补全 =================
      【要解决的事】剧情系统（B 批）是后来才加的。在那之前的版本里，玩家的玩法就是
      「选世界 → 打关卡 → 推进下一世界」，存档里**天然没有 `S.story`**。
@@ -1309,9 +1360,18 @@ window.Core = (function () {
      现在：切档前把主档原文留一份（`_pre_switch`），并把 `S / offlineSettled / legacyRaw`
      一起入栈，任何一步抛错都**整份回滚**再报错；迁移出错不再致命（与 `load()` 同一口径）。 */
   function switchStateTo(rawData, why) {
+    /* ================= 2026-10-03 复检 P0-2 · **换档是事务：要么全成、要么一个字都不改** =================
+     这一段原来的注释写着"迁移失败整份回滚"，但代码不是那样跑的：
+     `migrate()` 抛异常被当场吃掉、接着照常 `save()` —— 也就是说
+     **一份半迁移的坏档会被写进主档**，玩家原来那份就没了。导入存档 / 读档槽 /
+     云端取回 / 恢复备份四条路都走这个函数，所以这是能一次伤到所有人的那条。
+     现在：迁移失败**抛出去**，由下面 catch 整份回滚（内存 S / 主档原文 / 离线闸门 /
+     历史标记 / 救援态 / 诊断记录，一样不少）。 */
     const prevS = S, prevOffline = offlineSettled, prevLegacy = legacyRaw;
+    const prevRescue = rescue, prevSuppress = suppressSave;
     let prevRaw = null;
     try { prevRaw = localStorage.getItem(SAVE_KEY); } catch (e) {}
+    let migErr = '';                     // 迁移失败的原因（下面 catch 用它写诊断，不被笼统的 why 盖掉）
     try {
       if (prevRaw) { try { localStorage.setItem(SAVE_KEY + '_pre_switch', prevRaw); } catch (e) {} }
       /* V1.1.20（F1-2 / F1-1）：切档期间**一律不许盖章** —— 下面 `migrate()` 与那句 `save()`
@@ -1325,11 +1385,13 @@ window.Core = (function () {
       S.v = SAVE_VER;
       try { migrate(); }
       catch (e) {
-        lastLoadIssue = issue('migrate:' + (e && e.message ? e.message : 'unknown'), prevRaw || '');
+        migErr = (e && e.message) ? e.message : 'unknown';
+        lastLoadIssue = issue('migrate:' + migErr, prevRaw || '');
         /* 同 `load()`：迁移出错也要把**切换前那份主档**留成备份（`_pre_switch` 是现场快照，
            这里再进一次标准备份口，设置页的【恢复上一份存档】才看得到它）。 */
         if (prevRaw) backupSave(prevRaw, 'migrate');
         try { console.warn('[save] 迁移这一步出错了（' + why + '），进度按已读到的样子保留：' + (e && e.message)); } catch (e2) {}
+        throw e;                       // ← 关键：不许把半迁移的档写盘（P0-2）
       }
       /* V1.1.20（F1-5）：换档成功＝玩家**显式**选定了这一份（云取回 / 存档码 / 导入 / 读档槽）——
          救援态到此结束，并把那道禁写一起解掉（否则刚换进来的这份永远落不了盘）。 */
@@ -1347,9 +1409,12 @@ window.Core = (function () {
       }
       return true;
     } catch (e) {
-      S = prevS; offlineSettled = prevOffline; legacyRaw = prevLegacy;      // 整份回滚，绝不留下半迁移的 S
+      /* 整份回滚，绝不留下半迁移的 S —— 内存、主档、离线闸门、历史标记、救援态全回到动手前。 */
+      S = prevS; offlineSettled = prevOffline; legacyRaw = prevLegacy;
+      rescue = prevRescue; suppressSave = prevSuppress;
       if (prevRaw) { try { localStorage.setItem(SAVE_KEY, prevRaw); } catch (e2) {} }
-      lastLoadIssue = issue(why + ':' + (e && e.message ? e.message : 'unknown'), '');
+      /* 迁移那一步已经写过更准的诊断（`migrate:xxx`）就不要用笼统的 `why` 盖掉它。 */
+      if (!migErr) lastLoadIssue = issue(why + ':' + (e && e.message ? e.message : 'unknown'), '');
       return false;
     }
   }

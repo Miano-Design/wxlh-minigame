@@ -592,8 +592,17 @@
   Story.openInterlude = function (worldId, opts) {
     const w = WORLDS[worldId]; if (!w || !w.midstory || !w.midstory.length) return false;
     opts = opts || {};
-    if (Story.seen(worldId, 'midstory')) return false;
-    return Story.play({ beats: w.midstory, title: w.title, chNo: 'W' + String(WORLDLIST.findIndex(function(x){return x.id===worldId;})+1).padStart(2,'0'), scene: Story.sceneOf(worldId), obj: w.obj, actor: null, kind:'world', onDone: opts.onDone || null, meta:{worldId:worldId,part:'midstory',interlude:true} });
+    /* ================= 2026-10-03 复检 P0-3 · **中段剧情只有一个已读状态** =================
+       原来第 6 关的自动剧情把已读写进 `story.w[wid].midstory`，
+       而卷宗 / 未读统计 / 老档迁移读的都是 `story.w[wid].mid` —— 同一个"看没看过"存了两份，
+       "卷宗说没读、第 6 关却不再自动播"（或反过来）这类错位迟早会出现。
+       现在**存档只认 `mid`**。`midstory` 只保留两处用途（任务书 §P0-3 明确允许）：
+         · 数据表里那段**内容**的字段名（`w.midstory`，见 sc-story-overhaul-data.js）；
+         · 这个函数的名字。
+       `Story.play` 播完会走 `finish()` → `markSeen(worldId, meta.part)`，
+       所以把 `part` 直接写成 `'mid'`，写进去的就是卷宗读的那一个字段。 */
+    if (Story.seen(worldId, 'mid')) return false;
+    return Story.play({ beats: w.midstory, title: w.title, chNo: 'W' + String(WORLDLIST.findIndex(function(x){return x.id===worldId;})+1).padStart(2,'0'), scene: Story.sceneOf(worldId), obj: w.obj, actor: null, kind:'world', onDone: opts.onDone || null, meta:{worldId:worldId,part:'mid',interlude:true} });
   };
   Story.hasInterlude = function(worldId){ const w=WORLDS[worldId]; return !!(w&&w.midstory&&w.midstory.length); };
 

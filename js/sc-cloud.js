@@ -337,7 +337,13 @@
 
   function readOwn() {
     return saveFn('pull', {}).then(function (r) {
-      if (!r.ok) return { ok: false, why: r.why, err: r.err };
+      /* ================= 2026-10-03 复检 P0-1 · **不要把 `code` 丢在这一层** =================
+         `saveFn()` 已经从云函数把 `code` / `stage` / `lease` 带回来了，
+         但这里原来只透传 `why` / `err` —— 于是上面 `NET_MSG()` 永远看不到 `DB_ERROR`，
+         客户端又退回"按 msg 猜"的老路（而任务书明确禁止靠中文 msg 判类型）。
+         `readOwn()` 是**唯一的读入口**（自动同步 / 找回存档 / 取回上一份都走它），
+         所以它必须把云函数给的机器可判字段原样带出去。 */
+      if (!r.ok) return { ok: false, why: r.why, err: r.err, code: r.code, stage: r.stage, lease: r.lease || null };
       const P = prefs(), doc = r.doc || null;
       /* 账号指纹由**服务端**算（`fpOf(openid)`，与客户端同一套 FNV-1a）——
          客户端再也看不到 openid，但导出档里的 `fp` 口径一个字没变。 */
