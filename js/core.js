@@ -2342,6 +2342,19 @@ window.Core = (function () {
   /* ⚠ 这里要的是**血统名**，不是套装 key（V9.6.82 踩过：传错的池子会让 makeEquip 找不到套装、
      静默降级成世界套装 —— 表面不报错，实际血统套装一件都掉不出来）。 */
   function randomBloodlineSet() { return randomBloodSet(D.BLOODLINE_KEYS || Object.keys(D.BLOODLINE_SETS)); }
+  /* ================= 2026-10-03（《长期留存型成长生态重平衡》§十一 / §十二）=================
+     **SIGNATURE（伙伴专属装备 / 本命）的时代节点是 W25。**
+       · W01–W24：**任何来源都不许产出**专属装备；
+       · W25 起：才进入 SIGNATURE 时代。
+     判据**只此一处**（`inSignatureEra()`）—— 所有来源都必须过它：
+       Hell Boss / UR 箱 / 商店 / 旅行事件 / 任务 / 登录奖励 / 活动 / 礼包 / 隐藏掉落 / 将来新增的。
+     "到达 W25"的口径取**这个世界已解锁**（打过 W24 普通就会解锁它）；`bestWorldIdx` 兜一手
+     老档/补偿档（历史最高通关世界 ≥ W25 时同样算进入时代）。 */
+  function inSignatureEra() {
+    const w25 = S.worlds && S.worlds.W25;
+    if (w25 && w25.unlocked) return true;
+    return (S.player.bestWorldIdx || 0) >= 24;      // 下标 24 ＝ W25 已通关（老档兜底）
+  }
   // 伙伴专属装备（本命 · UR · 绑定角色 · 6 支血统 × 6 个部位 ＝ 36 件，见 data.js 的 SIGNATURE_EQUIPS）
   function grantSignatureEquip(sigId) {
     const uid = 'eq' + Date.now().toString(36) + '_' + (uidCounter++);
@@ -4780,8 +4793,11 @@ window.Core = (function () {
     /* V1.1.4（A12 材料包）：三档材料包走**同一个开箱入口**（两端的"开启"按钮都调 openBoxes），
        所以在这里分岔。开出表只有一处（`D.MAT_PACKS`），这里只管摇与入库。 */
     if (item.matPack) return openMatPack(item.matPack);
-    // UR 箱：10% 开出伙伴专属装备（UR · 本命 36 件，见 data.js 的 SIGNATURE_EQUIPS）
-    if (item.rarity === 'UR' && Math.random() < 0.10) {
+    /* UR 箱：10% 开出伙伴专属装备（UR · 本命 36 件，见 data.js 的 SIGNATURE_EQUIPS）——
+       ⚠️ 2026-10-03（§十二 点名）：**先过 SIGNATURE 时代这道门**。
+       W25 以前，UR 箱只能给**普通 UR**（走下面那条常规路），不许因为"开了个 UR 箱"
+       就凭空产出角色专属装备；W25 起才进 SIGNATURE 逻辑。 */
+    if (item.rarity === 'UR' && inSignatureEra() && Math.random() < 0.10) {
       /* 2026-09-27（父亲大人要的"收集感"）：36 件里**优先给还没拥有过的那件**，
          全拿到之后转 ◆ 折现（不再硬塞重复件）。挑件这一句在数据层（`D.pickSignatureEquip`），
          `grantSignatureEquip` 仍然是"给我第几件、就发第几件"的笨函数。 */
