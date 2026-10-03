@@ -319,7 +319,13 @@
              它要走"被顶下线"那条路（只读 ＋ 提示 ＋ 重新登录），重试只会一直撞墙。 */
           const why = String(r.msg || 'fail');
           if (why !== 'superseded') noteErr('fn', why);
-          resolve({ ok: false, why: why, lease: r.lease || null });
+          /* ================= 2026-10-03（终版任务书 §19）=================
+             云函数现在把「这个账号还没有云端存档」与「云数据库读不出来」分开了：
+               · 前者 → `ok:true, hasDoc:false`（正常的"新玩家"，该建就建）；
+               · 后者 → `ok:false, code:'DB_ERROR'`（**绝不是"没有"**）。
+             这里把 `code` 原样带出去，上层靠它给一句人话（见 NET_MSG）。
+             ⚠️ 判据只看 `code`，不去猜 `msg` 的字符串 —— 文案会改，code 不会。 */
+          resolve({ ok: false, why: why, code: String(r.code || ''), stage: String(r.stage || ''), lease: r.lease || null });
         }
       }).catch(function (e) {
         const em = (e && (e.errMsg || e.message)) || '未知错误';
@@ -468,6 +474,12 @@
     if (r && r.why === 'too_big') return '这份存档太大了，传不上去（先照本机玩，稍后我们再处理）';
     if (r && r.why === 'empty') return '云端那边没收到存档内容，稍后再试';
     if (r && r.why === 'no_token') return '这台还没占上位，稍后会自动再试一次';
+    /* ================= 2026-10-03（终版任务书 §19 · P0）=================
+       「这个账号还没有云端存档」和「云数据库读不出来」是两件完全不同的事：
+       前者该建、后者**绝不能建**（一建就拿空档顶掉玩家的真进度）。
+       云函数那边已经用 `code:'DB_ERROR'` 把后者标出来了 —— 这里给一句说得清的话，
+       别让玩家以为"云端没有我的档"然后去删档重开。 */
+    if (r && r.code === 'DB_ERROR') return '云端暂时读不到这份存档（不是"没有存档"，别删档）：稍后会自动重试';
     return '云端连不上（' + ((r && (r.err || r.why)) || '网络问题') + '）';
   };
 

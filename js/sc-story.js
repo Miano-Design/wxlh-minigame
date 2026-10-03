@@ -150,6 +150,29 @@
   };
   Story.seenItem = function (k) { const t = state(); return !!(t && t.i[k]); };
   Story.markItem = function (k) { const t = state(); if (!t) return; t.i[k] = 1; mark('装备 · ' + k); };
+  /* ================= 终版（2026-10-03 任务书 §15）· 旧档「人物故事」补全 =================
+     有故事的只有 `SD.CHARS` 这几位（名单锁死在数据层）。老档里**已经拥有**某位角色，
+     就等于"首次获得"这件事真的发生过 —— 所以第一则（`s1`）可以补。
+     **s2（成长里程碑）/ s3（特殊事件）不补**：这两件在旧档里没有任何凭据，
+     补了就是伪造一次"事件发生过"（任务书原话："不要因为迁移而自动伪造'特殊事件已经发生'"）。
+     只增不减 + 自己的幂等标记；标记**不许写进 `defaultState`**（否则 `fillDefaults` 会先把
+     它补进老档，这段永远不进 —— 同一个坑项目里踩过好几次，见 core.js migrate 那段长注释）。
+     ⚠️ 这里**刻意不 save()**：读档路径上任何一次存盘都可能把 `idle.lastTs` 顶到"现在"、
+        抹掉离线收益。结果是纯增量的，下次正常存盘自然带上；真没落盘也不怕，重跑结果一样。 */
+  Story.migrateLegacyChars = function () {
+    const S = Core.S;
+    if (!S || S.storyLegacyChars) return false;
+    const t = state();
+    if (!t) return false;
+    let n = 0;
+    Object.keys(CHARS).forEach(function (id) {
+      if (!S.chars || !S.chars[id]) return;             // 没有这个人 → 什么都不做
+      if (!t.c[id]) t.c[id] = {};
+      if (!t.c[id].s1) { t.c[id].s1 = 1; n++; }
+    });
+    S.storyLegacyChars = true;
+    return n > 0;
+  };
   /* 一次存档（剧情进度要跟存档走，云同步才带得动） */
   function mark(tag) {
     try { Core.save && Core.save(); } catch (e) {}

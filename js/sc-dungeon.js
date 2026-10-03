@@ -18,6 +18,8 @@
 
   let view = { worldId: null, diff: 'normal' };
   let run = null;              // 进行中的关卡（与网页版同结构，落盘用）
+  /* 战斗 session 的号源（§20）：`startStage` 每次 ++，`onEnd` 拿它认"我这一场还在不在"。 */
+  let sessionSeq = 0;
 
   /* 世界图标：**能自绘的走矢量**（形状在 data.js 的 WORLD_ICONS 一处定义，本文件只负责画），
      没进表的退回这个世界自己的 emoji（`w.ico`）。V1.1.15 · 派单 I 第 2 条。
@@ -435,6 +437,12 @@
     while (CV.stack.length > 1 && CV.top().name === 'story') CV.stack.pop();
     run = {
       worldId, diff, stage, stageIdx,
+      /* ================= 2026-10-03（终版任务书 §20 / §21）· 每场战斗一个 sessionId =================
+         一次"进关卡 → 打完三波 → 结算"＝**一场**，它有一个只属于自己的号。
+         `onEnd` 是回调：它只看"我这一场是不是现在那一场"（`run.session === mySession`），
+         不再看"模块级 run 还在不在"——那样会把**上一场的收尾**当成"这一场的数据丢了"，
+         然后把旧 run 塞回去继续结算（任务书 §21 点名禁止的那一行）。 */
+      session: ++sessionSeq,
       /* F6（R6 #10）：**worldId 必须传** —— `wavePlan(stage, worldId)` 按世界定波数
          （W01 一波 / W02 两波 / W03 起固定三波，V1.0.1 父亲大人的原话）。
          原来这里不传 → `wi = -1` → 永远走"兜底 3 波"，
@@ -701,6 +709,7 @@
      不会再把好面板顶成兜底。（`B.done` 那道闸只管"同一场只 finish 一次"，
      挡不住"另一场/另一次 onEnd"，所以要在数据这一层认回来。） */
     const myRun = run;
+    const mySession = run.session;      // ← 这一场（三波连打＝一场）的唯一号
     const kind = run.waves[run.wave];
     const w = D.WORLDS.find((x) => x.id === run.worldId);
     const allies = BattleUI.buildAllies(run.hpPct, null);
@@ -727,20 +736,28 @@
         }
       },
       onEnd(win, res, hpLeft) {
-        trace('onEnd', { win: !!win, hasRun: !!run, hasMy: !!myRun, wave: (run && run.wave),
+        trace('onEnd', { win: !!win, hasRun: !!run, my: mySession, cur: (run && run.session), wave: (run && run.wave),
           waves: (run && run.waves && run.waves.length), st: (run && run.stage) });
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
           /* ① **这一场已经结算过** → 把那份真面板原样还回去（幂等：不重算、不重发奖）。
-             ⚠️ 这一句必须排在"认回 run"**前面**。上一版把顺序写反了：先 `run = myRun`、
-             再往下走完整套流程 ⇒ 晚到的那一次**又跑了一遍 `settleRun`**，
-             奖励发双份。盯这条的是 `scripts/settle_audit.js` ③。 */
+             认的是**对象身份**（`settledRun === myRun`），不是"上一张面板"。
+             盯这条的是 `scripts/settle_audit.js` ②③。 */
           if (settledRun && settledRun === myRun) return settledPanel;
-          /* 晚到的收尾：模块级 `run` 已经被清（正常结算 / 别处清理），
-             但闭包里这一场还在 ⇒ **认回来**，让结算拿到真数据（波次、阵亡、首通…）。 */
-          if (!run && myRun) run = myRun;
-          /* 到这儿既没结算过、`run` 又没了 —— 只剩"真的没有这一场"这一种可能，才给兜底。 */
-          if (!run) return lastResortPanel(win);
+          /* ================= ② 旧回调不许复活旧战斗（§21，**原来的写法已删**）=================
+             任务书点名禁止的正是这一行：`if (!run && myRun) run = myRun;`
+             —— "为了防止数据消失把旧状态塞回来"，等于让一次晚到的收尾**重跑整套结算**
+             （奖励发双份、首通重算、结算页被顶掉）。
+             现在只认号：**我这一场还是不是当前那一场**。
+             号对不上 ⇒ 这个回调属于已经过去的那一场 ⇒ 一个字都不许改
+             （不恢复 run、不结算、不发奖、不覆盖结算页、不启动下一关）。
+             返回的那张只用来让 `finish()` 别把战斗页卡住；新一场的 `start()` 会立刻
+             `B.panel = null` 把它冲掉（`session` 号不同 ⇒ 连"同号"都算不上）。 */
+          if (!run || run.session !== mySession) {
+            trace('stale', { win: !!win, my: mySession, cur: (run && run.session) });
+            try { G.LOG && G.LOG.warn('dun', 'stale_end', { my: mySession, cur: (run && run.session), win: !!win }); } catch (e3) {}
+            return { title: '这一场已结束', sub: '', rewards: [], acts: [] };
+          }
           /* F6（R6 #7）：**波与波交界处累加真实阵亡数** ——
              判据是"这一波结束时 hp<=0"，而且只记**这一波新倒下的**
              （上一波已经 0 血的人不算第二次，免得一颗星被扣两遍）。

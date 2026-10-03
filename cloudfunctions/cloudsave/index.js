@@ -57,6 +57,12 @@ const str = (v) => String(v == null ? '' : v);
 function dbErr(stage, e) {
   return {
     ok: false,
+    /* ================= 2026-10-03（终版任务书 §19 · P0）=================
+       这是一个**机器可判的类别**，与 `stage`（哪一步炸的）/ `errCode`（云库给的原码）
+       分工不同：客户端只看 `code`，一眼就知道"这是数据库坏了"，
+       而不是"这个账号没有存档" —— 后者会让它去建一份新档，把玩家真进度顶掉。
+       **每一个数据库错误都从这里出去**，所以这一句等于给所有出口盖了同一个章。 */
+    code: 'DB_ERROR',
     msg: String(stage) + '_fail',
     stage: String(stage),
     errCode: String((e && (e.errCode || e.code)) || ''),
@@ -70,24 +76,54 @@ function dataForSet(doc) {
   return out;
 }
 
+/* ================= 2026-10-03（终版任务书 §19 · P0）· 「没有这条记录」≠「数据库坏了」 =================
+   云库里 `doc(id).get()` **文档不存在时也会抛**，于是"这个玩家还没存过档"和
+   "数据库此刻是坏的"走进了同一个 catch。原来这里一律 `return null` —— 两种完全不同的
+   情况在客户端看来一模一样，而客户端拿到 null 会走"云端没有存档"那条路去**建一份新的**：
+   数据库抖一下，玩家一年的进度就被一份空档顶掉了。这是本轮点名的 P0。
+
+   现在返回带判定的信封：
+     · `{ ok: true,  found: true,  doc }`  → 读到了
+     · `{ ok: true,  found: false, doc: null }` → **这个账号确实还没有云端存档**（正常的"新玩家"）
+     · `{ ok: false, code: 'DB_ERROR', err }` → 读不出来（**绝不是"没有"**，调用方必须原样往上报）
+   "不存在"怎么认：先看错误码（云库给 -502004 / DOCUMENT_NOT_EXIST 这一类），
+   再看错误文案。**判不出来一律当 DB_ERROR** —— 宁可让玩家多点一次重试，
+   也绝不允许拿一份空档顶掉他的真实进度（这条口径与 `ensure()` 里那句注释是同一条）。 */
+const NOT_FOUND_CODES = ['-502004', 'DOCUMENT_NOT_EXIST', 'DATABASE_DOCUMENT_NOT_EXIST', 'DOCUMENT_NOT_FOUND'];
+function isNotFoundErr(e) {
+  const code = String((e && (e.errCode || e.code)) || '');
+  if (NOT_FOUND_CODES.indexOf(code) >= 0) return true;
+  const msg = String((e && (e.errMsg || e.message)) || '').toLowerCase();
+  return /does not exist|not exist|no document|document not found|不存在/.test(msg);
+}
 async function getById(id) {
   try {
     const r = await db.collection(COLL).doc(id).get();
-    return (r && r.data) ? r.data : null;
-  } catch (e) { return null; }          /* 不存在（doc.get 会抛）—— 不是错误 */
+    const d = (r && r.data) ? r.data : null;
+    return d ? { ok: true, found: true, doc: d } : { ok: true, found: false, doc: null };
+  } catch (e) {
+    if (isNotFoundErr(e)) return { ok: true, found: false, doc: null };
+    return { ok: false, found: false, code: 'DB_ERROR', err: dbErr('get', e) };
+  }
 }
 
 /** 定位"这个账号唯一那条"；老结构（随机 `_id`、可能多条）在这一步归并成一条。 */
 async function ensure(openid) {
   const id = docIdOf(openid);
-  const cur = await getById(id);
-  if (cur) return { id: id, doc: cur };
+  const got = await getById(id);
+  /* 读挂了 → **原样往上报**。绝不许在这里把 DB_ERROR 折成"没有存档"（§19 的 P0）。 */
+  if (!got.ok) return { id: id, doc: null, err: got.err };
+  if (got.doc) return { id: id, doc: got.doc };
 
   let list = [];
   try {
     const q = await db.collection(COLL).where({ _openid: openid }).limit(20).get();
     list = (q && q.data) || [];
-  } catch (e) { list = []; }
+  } catch (e) {
+    /* ⚠️ 这里原来写的是 `list = []` —— 等于"数据库一坏就判玩家是新账号"，
+         正是这条 P0 的第二种形态。查挂了就必须报错。 */
+    return { id: id, doc: null, err: dbErr('ensure_where', e) };
+  }
   if (!list.length) return { id: id, doc: null };
 
   list.sort((a, b) => num(b.ts) - num(a.ts));
@@ -119,7 +155,9 @@ async function ensure(openid) {
     if (!d || !d._id || d._id === id) continue;
     try { await db.collection(COLL).doc(d._id).remove(); } catch (e) {}
   }
-  return { id: id, doc: await getById(id) };
+  const again = await getById(id);
+  if (!again.ok) return { id: id, doc: null, err: again.err };
+  return { id: id, doc: again.doc };
 }
 
 /** 返回给客户端的形状：**只有自己的那一条**，且不含 `_id` / `_openid`。 */
@@ -214,8 +252,10 @@ exports.main = async (event) => {
         return { ok: true, pushed: true, created: true, ts: seed.ts, at: now, bytes: seed.bytes, prev: false };
       } catch (e) {
         /* 被另一端抢建了：**这不是服务异常** —— 重新读一次，按租约判 */
-        const cur = await getById(r.id);
-        if (!cur) return dbErr('create_add', e);
+        const again = await getById(r.id);
+        /* 读挂了、或者"抢建"之后居然还是查无此条 → 都是服务异常，按 DB_ERROR 报（§19）。 */
+        if (!again.ok || !again.doc) return dbErr('create_add', again.err ? new Error(again.err.errMsg) : e);
+        const cur = again.doc;
         const ct = (cur.lease && cur.lease.token) ? str(cur.lease.token) : '';
         if (ct && ct !== token) {
           return { ok: false, msg: 'superseded', stage: 'create_lost',
@@ -245,7 +285,8 @@ exports.main = async (event) => {
         bytes: num(input.bytes) || payloadIn.length, prev: !!(out && out.prev) };
     } catch (e) {
       if (verdict === 'superseded') {
-        const cur = await getById(r.id);
+        const gr = await getById(r.id);
+        const cur = gr.ok ? gr.doc : null;
         return { ok: false, msg: 'superseded', stage: 'push_tx',
           lease: (cur && cur.lease) ? { id: str(cur.lease.id), ts: num(cur.lease.ts) } : null };
       }

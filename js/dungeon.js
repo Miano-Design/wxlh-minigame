@@ -323,8 +323,16 @@ function stageMult(stage) { return Math.pow(1.15, stage - 1); }
          结算页得说清"这件装备是被折现了、不是没掉" —— 带上 bagFull 让胶囊标出来。 */
       else if (res.sold) got.push({ k: 'otherworld', v: res.gain, sold: true, bagFull: !!res.bagFull, overflow: !!res.overflow });
     }
-    // 地狱 Boss：5% 掉落伙伴专属装备（UR · 本命 36 件）
-    if (kind === 'boss' && diff === 'hell' && Math.random() < 0.05) {
+    /* ================= 2026-10-03（终版任务书 §35 · P0）=================
+     地狱 Boss：5% 掉落伙伴专属装备（UR · 本命 36 件）。
+     ⚠️ **原来这里缺了 SIGNATURE 时代那道门** —— 而地狱难度并不是"很后期"才够得着：
+        打通 W01 普通 → 打通 W01 困难 → W01 地狱就能打，W25 以前照样每周刷，
+        于是"W01 就掉本命装"。任务书原话：「不能出现 Boss 直接掉 SIGNATURE，
+        但其他来源有 W25 检查」。
+     门只有一个（`Core.inSignatureEra()`，定义在 core.js）：W25 以前任何来源都不产出专属装备。
+     ⚠️ 做坏试验：把这句 `Core.inSignatureEra() &&` 删掉，
+        `scripts/save_upgrade_regression.js` 的 SIGNATURE_GATE 那节当场红。 */
+    if (kind === 'boss' && diff === 'hell' && Core.inSignatureEra() && Math.random() < 0.05) {
       /* 2026-09-27（父亲大人要的"收集感"）：36 件里**优先给还没拥有过的那件**（挑件在数据层，
          见 data.js 的 `pickSignatureEquip`）；36 件全拿到之后转 ◆ 折现，不再硬塞重复件。 */
       const sigId = D.pickSignatureEquip((Core.S.codex && Core.S.codex.equipNames) || []);

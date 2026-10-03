@@ -38,7 +38,12 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
      立这把尺子的当天就抓到：`settleRun` 里引用了一个不存在的 `win`
      ⇒ **每一关打完都抛 `win is not defined`、结算页被兜底顶掉**（奖励已发、玩家看不见）。
      以前没有任何尺子真跑过"打一关 → 拿结算面板"这条路，所以它能活好几个版本。 */
-  'settle_audit'];
+  'settle_audit',
+  /* 2026-10-03 终版任务书（旧档全面升级）新增三支 —— 第一优先级是"旧档绝对不能变成新档"：
+     · `migration_fixture_audit`  8 个虚拟旧档的黑盒迁移（读→迁移→断言→存盘→再读→再断言）
+     · `world_save_compat_audit`  世界 ID 稳定性 + 世界改名兼容（任务书 §7 的 A/B/C/D）
+     · `save_upgrade_regression`  十一项升级回归总表（含**真跑**云函数验 NOT_FOUND ≠ DB_ERROR） */
+  'migration_fixture_audit', 'world_save_compat_audit', 'save_upgrade_regression'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }

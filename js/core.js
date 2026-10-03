@@ -1064,7 +1064,87 @@ window.Core = (function () {
         S.reincarnCorridorRestored = true;
       }
     }
+    /* ================= 终版（2026-10-03 任务书 §2–§14 · §23 · §31）· 旧档「世界故事线」自动补全 =================
+     【要解决的事】剧情系统（B 批）是后来才加的。在那之前的版本里，玩家的玩法就是
+     「选世界 → 打关卡 → 推进下一世界」，存档里**天然没有 `S.story`**。
+     升级之后如果什么都不做，老玩家打开卷宗看到的是「剧情 0 / Boss 0 / 36」——
+     等于告诉他"你以前白玩了"，还有人会被要求"再打一遍才能看剧情"。这是本轮的第一优先级。
+
+     【判据只能用历史进度，不能用剧情状态】
+     他自己说过：`S.story` 是空的**不代表没玩过**。所以我们只看**战斗那一层的证据**：
+       · `stages[diff]` 里有星 → 进过这张图；
+       · 普通难度 12/12 全通 → 这张图当年打完过；
+       · `worldFirstClear[wid_normal]` → 同一件事的另一份凭据（V9.2 起就有）；
+       · `bestWorldIdx` → **旧规则转生会清掉 `S.worlds`**，被清过时这是唯一留痕（它只涨不跌）。
+     ⚠️ **`worlds[wid].unlocked` 不算证据**：开机 `refreshWorldUnlocks()` 会把 W01 解锁给
+        一张刚建档的空档 —— 拿它当"进过"，新玩家一开局就会被标成"W01 已读过"（P0）。
+
+     【补什么】按证据分档（与任务书 §4.2 一一对应）：
+       进过        → `w[wid].in = 1`
+       推进到第 6 关 → `w[wid].mid = 1`（`mid` 就是"第 6 关"那一拍，见 §24）
+       普通全通     → `w[wid].pre/post = 1` ＋ `b[wid] = 1`（Boss 卷宗，§23）
+
+     【不补什么】—— 这几条是红线，改动前先看这里：
+       · **不补星**：旧档里没有"当年三星还是两星"的任何留痕，凭空写星就是编数据（§29）；
+       · **不补资源**：这不是发奖，是"历史资料补全"（§12 / §30）。首通那笔账另有它的闸
+         （上面那段 `worldFirstClear` 回填已经把"已打穿的世界"标成已领过）；
+       · **不碰 `S.worlds` 的解锁**：世界的解锁/门禁只有一个真相 `refreshWorldUnlocks()`（§45）。
+         剧情字段**不参与战斗门禁**（§8），反过来也一样。
+
+     【幂等】标记 `storyLegacyMigrated` **只在第一次跑完时写**，而且**绝不能写进 `defaultState()`** ——
+     写进去 `fillDefaults` 会先给老档补上它，这段就永远不进了（§5 / §58，本项目已经踩过好几次）。
+     函数本身也写成**只增不减**（只把 0 写成 1），所以就算标记丢了、重跑一遍，结果逐字相同（§59）。 */
+    if (!S.storyLegacyMigrated) {
+      const st = S.story || (S.story =  getProxied({}));
+      ['w', 'b', 'c', 'i'].forEach(function (k) { if (!st[k]) st[k] =  getProxied({}); });
+      const hi = Math.max(0, S.player.bestWorldIdx || 0);          // 历史最高**通关**的图（下标）
+      const reinc = Math.max(0, S.player.reincarnations || 0);
+      const note =  getProxied({ entered: 0, mid: 0, cleared: 0 });
+      D.WORLDS.forEach(function (w, i) {
+        const ws = S.worlds && S.worlds[w.id];
+        const stages = (ws && ws.stages) || {};
+        const norm = Array.isArray(stages.normal) ? stages.normal : null;
+        const anyStar = ['normal', 'hard', 'hell'].some(function (d) {
+          const a = stages[d]; return Array.isArray(a) && a.some(function (x) { return x > 0; });
+        });
+        const clearedNormal = !!(norm && norm.length >= 12 && norm.every(function (x) { return x > 0; }));
+        const fcCleared = !!(S.worldFirstClear && S.worldFirstClear[w.id + '_normal']);
+        /* 旧规则转生清掉 `S.worlds` 的情形：`i <= hi` 就是"当年通关到这儿"的凭据。
+           两个护栏跟上面那段补偿同一口径 —— 空档（hi=0 且没转过生）不许被判成"打过 W01"。 */
+        const historicalClear = (i <= hi) && (reinc >= 1 || hi >= 1);
+        const entered = anyStar || clearedNormal || fcCleared || historicalClear;
+        if (!entered) return;
+        const cleared = clearedNormal || fcCleared || historicalClear;
+        note.entered++;
+        if (!st.w[w.id]) st.w[w.id] =  getProxied({});
+        st.w[w.id].in = 1;
+        if ((norm && norm[5] > 0) || cleared) { note.mid++; st.w[w.id].mid = 1; }
+        if (cleared) {
+          note.cleared++;
+          st.w[w.id].pre = 1;
+          st.w[w.id].post = 1;
+          st.b[w.id] = 1;
+        }
+      });
+      S.storyLegacyMigrated = true;
+      /* 留一份可核对的痕（§56：迁移做了什么要查得到）。**界面一个字都不显示**（§32）。 */
+      S.storyLegacyNote = note;
+      try { if (window.LOG) window.LOG.info('save', 'story_legacy', note); } catch (e) {}
+    }
+    /* 人物故事那一半交给剧情模块自己补 —— 名单在 `js/sc-story-data.js` 里，core 不该去读它。
+       同样是只增不减 + 自己的幂等标记；模块还没就绪就下次读档再补。 */
+    try { if (window.Story && window.Story.migrateLegacyChars) window.Story.migrateLegacyChars(); } catch (e) {}
     refreshUnlocks();
+    /* ================= 终版（2026-10-03 任务书 §9 / §45）· 世界解锁在**读档出口**再过一遍 =================
+       世界的解锁只有一个真相：`refreshWorldUnlocks()`（上一世界普通通关 + 转生门）。
+       原来它只在 `reincarnate` 与"转过生的老档补偿"那两处被调 —— 也就是说
+       **一份 `S.worlds` 是空的老档读进来之后，连 W01 都还是锁的**（世界列表里第一张图点不进）。
+       真机上不容易撞到（任何一版 `newGame()` 都会 `unlockWorld('W01')`，所以带 `worlds` 的档都有它），
+       但任务书 §41 的 Fixture 01 就是"只含 player / worlds 的最原始档"，这种档必须能进。
+       放在这里是**读档出口**：开机 / 导入存档 / 切档 / 备份恢复四条路走完都过一遍，
+       与"世界列表 / 世界页 / 任务 / 剧情 / 掉落"读的是同一份 `S.worlds`（§45 的单一真相）。
+       幂等：已经解锁的一个都不动，判据是"上一世界普通 12/12"这个**可证的**事实（不凭空开图）。 */
+    try { refreshWorldUnlocks(); } catch (e) {}
   }
   /* V1.1.20（F1-5）：`opt.keepRescue` ＝ 这条路只是"把内存档建起来让界面能用"
      （开机 boot / 渲染兜底 ensureState），**不算玩家选择** ⇒ 救援态那道禁写继续留着。
@@ -5798,7 +5878,10 @@ window.Core = (function () {
     equipStats, effectiveStats, power, teamPower, factionBuffs, formationState,
     effectivePlayerStats, playerPower, choosePlayerBloodline, upgradePlayerBloodline,
     allocateAttr, resetAttrs, allocateSkill, resetSkills, protagonistSkills, protagonistList, createProtagonist, switchProtagonist,
-    grantEquip, grantSignatureEquip, equipItem, canEquip, unequipItem, enhanceCost, enhance, decompose, decomposeMany, inventoryEquips,
+    /* `inSignatureEra` 必须导出：SIGNATURE（本命装）的**所有来源**都要过同一道 W25 门
+       （UR 箱在 core 里、地狱 Boss 在 dungeon 里、将来还有别的）——
+       门只此一个，谁都不许自己写一句"世界号 ≥ 25"（终版任务书 §35）。 */
+    inSignatureEra, grantEquip, grantSignatureEquip, equipItem, canEquip, unequipItem, enhanceCost, enhance, decompose, decomposeMany, inventoryEquips,
     enhanceQuote, bloodlineQuote,
     toggleEquipLock, autoEquipBest, equipScore, savePreset, applyPreset,
     /* V1.1.8（戊组 A13-F）：重铸石 —— 报价与重铸（界面只调这两个，判据都在这里） */
