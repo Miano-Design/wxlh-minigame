@@ -283,6 +283,46 @@ R.note('按【认真档】各档位日收入折算的工期（取最紧的那一
   });
 }
 
+/* ================= 2026-10-03（《长期留存型成长生态重平衡》§九 · MYTH 获得节奏）=================
+   书里要求把"第一个 / 第 2 / 第 6 / 第 12 / 第 36 件 MYTH 分别落在第几天"算出来，
+   并且检查两件坏事：① 前期就大量冒出来；② 到第 60 天已经半身神话。
+   算法（只用实测过的数）：
+     守关次数/天 ≈ 扫荡次数 ÷ 12（一轮 12 关里有 1 关是守关 Boss）
+     难度按玩家画像走：A/B 打普通、C 打困难、D 打地狱（越活跃越往高难打）
+     MYTH 概率取 `Dun.battleRewards(world,'boss')` 里那一档（**唯一来源**，见 §十 的审计）
+     ⇒ 件/天 = 守关次数 × 概率；第 N 件的天数 ≈ N ÷ 件/天
+   §八 的门：**W01–W19 不产出**，W20 起才有 mythChance（脚本里直接读，不硬写）。
+   ⚠️ 只报数、不改数；要调概率就改 `js/dungeon.js` 那一行再重跑本尺子。 */
+{
+  const DIFF_OF = { A: 'normal', B: 'normal', C: 'hard', D: 'hell' };
+  const probe = (wid, diff) => (Dun.battleRewards(wid, diff, 12, 'boss') || {}).mythChance || 0;
+  const firstWorld = (function () {
+    for (let i = 1; i <= 36; i++) {
+      const id = 'W' + (i < 10 ? '0' + i : i);
+      if (probe(id, 'normal') > 0) return { n: i, id: id };
+    }
+    return { n: 0, id: '—' };
+  })();
+  R[(firstWorld.n >= 20 ? 'pass' : 'fail')]('§八 MYTH 时代从 W' + firstWorld.n + ' 起（要求 W20+，W01–W19 一件都不产出）', {
+    file: 'js/dungeon.js', expected: '首个有神话率的世界 ≥ W20', actual: '首个 = ' + firstWorld.id + '（' + firstWorld.n + '）',
+  });
+  R.note('');
+  R.note('MYTH 获得节奏（§九 · 起点取书里的参考档，实际值读 dungeon 的 mythChance）：');
+  Object.keys(PROFILES).forEach((pf) => {
+    const diff = DIFF_OF[pf];
+    const wid = 'W36';
+    const pBoss = probe(wid, diff);
+    const bossesPerDay = PROFILES[pf].sweep / 12;
+    const perDay = bossesPerDay * pBoss;
+    const dayOf = (n) => (perDay > 0 ? (n / perDay) : Infinity);
+    const f = (n) => { const d = dayOf(n); return isFinite(d) ? d.toFixed(0) + 'd' : '∞'; };
+    R.note('  [' + pf + ' ' + PROFILES[pf].name + '] ' + diff + '档 · 守关 ' + bossesPerDay.toFixed(1)
+      + ' 次/天 × 神话率 ' + (pBoss * 100).toFixed(1) + '% = ' + perDay.toFixed(4) + ' 件/天 ⇒ 第 1 件 ' + f(1)
+      + ' · 2 件 ' + f(2) + ' · 6 件 ' + f(6) + ' · 12 件 ' + f(12) + ' · 36 件 ' + f(36));
+  });
+  R.note('  判据（§九）：第 1 件不该在 D20 之前就"大量出现"；D60 不该"全身神话"。上面这一行就是那把尺子。');
+}
+
 /* ---------- 库存趋势（1/3/7/…/180 天）：按各档日收入线性积分 ---------- */
 {
   R.note('');
