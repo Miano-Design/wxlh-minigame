@@ -50,7 +50,9 @@ const SUBS = ['audit_balance', 'audit_routes', 'audit_pages', 'audit_text', 'aud
   /* 2026-10-03 剧情深化轮：剧情素材**运行时**审计（分包时序 / 失败缓存 / 重试 / 直接开打）。 */
   'story_asset_runtime_audit',
   /* 2026-10-03 云同步最终回归：云端唯一权威（11 条产品口径，真跑客户端×真云函数×假数据库）。 */
-  'cloud_authoritative_regression'];
+  'cloud_authoritative_regression',
+  /* 2026-10-03 落盘时机（A）：界面层改档必须紧跟保存 + 逻辑层动作"改了就必须落盘"。 */
+  'save_timing_audit'];
 SUBS.forEach((name) => {
   const file = path.join(__dirname, name + '.js');
   if (!fs.existsSync(file)) { R.blocked(name + ' 不存在', { expected: '能独立跑', actual: '缺文件' }); return; }
