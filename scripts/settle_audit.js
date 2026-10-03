@@ -215,6 +215,37 @@ if (St && 'autoPlay' in St) { try { St.autoPlay = false; } catch (e) {} }
     await wait(60);
   }
 
+  /* ---------- ⑦ 战败面板只有一个"离开"出口 ---------- */
+  /* 2026-10-03 真机截图验收抓到的：失败面板上「返回世界」（面板自己挂的那颗）
+     与底部的「返回」（`drawSettle` 的保底那颗）做的是**同一件事**（都是 battle_close），
+     玩家看到两个出口不知道点哪个 —— 和当年守关 Boss 那两颗是同一类问题。
+     现在只留底部那颗、文案换成「返回世界」；这条断言就是防止有人再挂一颗回去。 */
+  {
+    UI.clear();
+    CV.reset('dungeon');
+    CV.dispatch('w:W01');
+    const before = cfgs.length;
+    CV.dispatch('stage:0');
+    await wait(300);
+    const fcfg = cfgs[cfgs.length - 1];
+    if (cfgs.length === before || !fcfg || typeof fcfg.onEnd !== 'function') {
+      R.fail('⑦ 能拿到这一场的 onEnd（战败面板检查）', { file: 'js/sc-dungeon.js', expected: 'cfg.onEnd', actual: '没抓到' });
+    } else {
+      const pf = fcfg.onEnd(false, { win: false, rounds: 7, frames: [] }, {}) || {};
+      const fActs = (pf.acts || []).filter((a) => a.id !== 'battle_revive');
+      const dupExit = fActs.filter((a) => a.id === 'battle_close');
+      (dupExit.length === 0 ? R.pass : R.fail)('⑦ 战败面板只有一个"离开"出口（不再出现两颗同义按钮）', {
+        file: 'js/sc-dungeon.js', expected: '面板自己不再挂 battle_close（底部那颗负责退出）',
+        actual: dupExit.length ? ('重复的：' + dupExit.map((a) => a.label).join(' / ')) : '干净',
+      });
+      (pf.closeLabel === '返回世界' ? R.pass : R.fail)('⑦b 底部那颗在失败时写清"回哪"（返回世界）', {
+        file: 'js/sc-dungeon.js', expected: 'closeLabel = 返回世界', actual: 'closeLabel = ' + String(pf.closeLabel),
+      });
+    }
+    UI.clear();
+    await wait(60);
+  }
+
   G.coachFor = savedCoachFor;
   R.finish();
 })();

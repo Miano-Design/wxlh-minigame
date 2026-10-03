@@ -923,7 +923,10 @@
       CV.text(cur.obj, U.pad() + ow / 2, y - oh / 2 - 8 * CV.SCALE, { size: CV.FS.sm, align: 'center', color: C.gold });
     }
     if (nameH) {
-      CV.text(b.who, U.pad(), y, { size: CV.FS.md, color: C.gold, bold: true });
+      /* 说话人一律是全称之后（2026-10-03：「台词人名都用全称」），这里最长的一档是
+         「灯阁代行者」5 个字 —— 380 的屏幕上富余，320 的窄屏上也不能越出右边界。
+         所以按**内容宽**过一道 `CV.fit`（放得下就一个字不动，放不下才收），别写死。 */
+      CV.text(CV.fit(b.who, U.cw(), CV.FS.md, true), U.pad(), y, { size: CV.FS.md, color: C.gold, bold: true });
       y += nameH;
     }
     c.save();

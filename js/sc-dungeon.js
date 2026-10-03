@@ -764,7 +764,14 @@
              ⚠️ "复活**不得**进资源结算路径"（B12 的第③条尺子在盯）：这一条**只重开战斗**，
                 不经过 `settleRun` / `grantRewards` —— 复活本身**不给任何资源**，只是把这一场接着打完。 */
             const AD0 = G.AD;
-            const acts = [{ label: '返回世界', style: 'ghost', id: 'battle_close' }];
+            /* ================= 2026-10-03（真机截图验收抓到的）=================
+             失败面板原来有**两颗做同一件事的按钮**：「返回世界」（这一条）＋底部的「返回」
+             （`drawSettle` 的保底那颗，id 同样是 `battle_close`）。玩家看到两个出口，
+             不知道该点哪个 —— 和当年守关 Boss 那两颗「返回世界」是同一类问题
+             （父亲大人：「还是功能重复的按钮，你再查查」）。
+             收法跟那次一样：**只留底部那颗**，把它的文案换成说清要去哪的「返回世界」
+             （`closeLabel`，见返回对象）。所以这里从空数组起，只往里加"复活续战"。 */
+            const acts = [];
             /* F6 #1（后半 · R6 #1 原话「ledger.revived 为真时把复活按钮藏掉（每场 1 次要看得见）」）：
                这一场的账本就是 `run`（`reviveState: run`）。已经复活过还把这颗按钮画在那里，
                玩家点下去只会收到一句"这一场已经复活过了"——**看着能点、点了白等**，
@@ -777,7 +784,9 @@
                 style: 'primary', id: 'battle_revive',
               });
             }
-            return { title: '战斗失败', sub: '先练一练，再来。', rewards: [], acts: acts };
+            /* `closeLabel` 是给底部那一颗用的（失败时它才要写清"回哪儿"；
+               胜利那条路底下是「收下奖励并返回」，不用换）。 */
+            return { title: '战斗失败', sub: '先练一练，再来。', rewards: [], acts: acts, closeLabel: '返回世界' };
           }
           const isLast = run.wave === run.waves.length - 1;
           if (!isLast) {
