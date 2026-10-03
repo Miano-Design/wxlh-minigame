@@ -126,7 +126,26 @@
   Story.itemScene = itemScene;
   Story.bossOf = function (worldId) { return BOSS[worldId] || null; };
   Story.charOf = function (id) { return CHARS[id] || null; };
-  Story.itemOf = function (k) { return ITEMS[k] || null; };
+  /* ================= 2026-10-03 剧情深化轮 §十四 / §十五 · **装备叙事落点不许漏算** =================
+     装备故事有两个来源、两张表：
+       · `ITEMS`     —— 核心道具 / 套装锚点 / 本命 / 神装那一批；
+       · `SET_LINE`  —— **30 条世界套装故事**（W01…W36 里除六个卷末锚点之外的那些）。
+     改之前：卷宗那本只遍历 `ITEMS`、`openItem()` 也只认 `ITEMS` ——
+     于是界面写着「装备 0 / 22」，而真正写着故事的 30 条世界套装**整个不在册**（点都点不开）。
+     这里把"哪些是装备叙事落点"收成**一个出口**（`itemKeys`），计数与列表都读它，
+     取文本走 `itemOf`（两张表统一），播放器仍然是原来那一个 `Story.openItem`（不新造第二套）。 */
+  Story.itemOf = function (k) { return ITEMS[k] || SET_LINE[k] || null; };
+  Story.itemKeys = function () { return Object.keys(ITEMS).concat(Object.keys(SET_LINE)); };
+  /* 卡片标题：`SET_W07` 这种内部键**不给玩家看** —— 折成"世界名 · 世界套装"。
+     其余（核心道具 / 本命 / 神装）沿用它们自己的名字（那些名字本来就是给玩家看的）。 */
+  Story.itemLabel = function (k) {
+    const m = /^SET_(W\d\d)$/.exec(String(k || ''));
+    if (m) {
+      const w = WORLDLIST.filter(function (x) { return x.id === m[1]; })[0];
+      return (w ? w.name : m[1]) + ' · 世界套装';
+    }
+    return String(k || '');
+  };
   Story.setLineOf = function (worldId) { return SET_LINE[worldId] || null; };
   /* 这一段看过没有（打完就记；读取只在"标未读"用） */
   Story.seen = function (worldId, part) {
@@ -691,7 +710,7 @@
   };
   /* 装备故事（一条文字 → 两拍：物件 + 旁白） */
   Story.openItem = function (key, title) {
-    const txt = ITEMS[key]; if (!txt) return false;
+    const txt = Story.itemOf(key); if (!txt) return false;   // §十五：ITEMS ∪ SET_LINE，同一个播放器
     return Story.play({
       beats: [{ k: 'n', s: txt }], title: title || '装备故事', chNo: '装备',
       scene: itemScene(key), kind: 'item', meta: { key: key },
@@ -1100,7 +1119,7 @@
       if (Story.seenBoss(id)) b++;
     });
     Object.keys(CHARS).forEach(function (id) { [1, 2, 3].forEach(function (n) { if (Story.seenChar(id, n)) cc++; }); });
-    Object.keys(ITEMS).forEach(function (k) { if (Story.seenItem(k)) it++; });
+    Story.itemKeys().forEach(function (k) { if (Story.seenItem(k)) it++; });   // §十四：两张表一起算
     return { w: w, b: b, c: cc, i: it };
   }
   function drawArchive() {
@@ -1111,7 +1130,7 @@
       U.note('剧情段落 ' + n.w + ' / ' + (Object.keys(WORLDS).length * 4) +
         '　Boss ' + n.b + ' / ' + Object.keys(BOSS).length +
         '　人物 ' + n.c + ' / ' + (Object.keys(CHARS).length * 3) +
-        '　装备 ' + n.i + ' / ' + Object.keys(ITEMS).length);
+        '　装备 ' + n.i + ' / ' + Story.itemKeys().length);
     });
     /* 四个页签：**当前这一卷画成"状态"、不登记热区**。
        理由（与项目既有那条"禁用态不许登记热区"同一条规矩）：点当前这一卷本来就不会有任何变化
@@ -1180,11 +1199,12 @@
         });
       });
     } else {
-      Object.keys(ITEMS).forEach(function (k) {
+      Story.itemKeys().forEach(function (k) {
         const ok = Story.seenItem(k);
         U.card(function () {
-          U.h3(ok ? k : '？', ok ? '' : '未解锁');
-          U.note(ok ? ITEMS[k] : '（拿到这件东西才会记下来）');
+          /* §十四：30 条世界套装故事现在也在册；标题折成玩家看得懂的名字（`SET_W07` 这种内部键不上屏）。 */
+          U.h3(ok ? Story.itemLabel(k) : '？', ok ? '' : '未解锁');
+          U.note(ok ? Story.itemOf(k) : '（拿到这件东西才会记下来）');
         });
       });
     }
