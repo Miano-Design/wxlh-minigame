@@ -446,6 +446,7 @@
     Core.setPendingRun(run);
     lastPlayed = { worldId: worldId, diff: diff, stageIdx: stageIdx };
     lastPanel = null;                    // ← 开新一场：上一场的"已结算"证据作废
+    trace('start', { w: worldId, st: stage, waves: run.waves.length });
     fightWave();
   }
 
@@ -462,6 +463,25 @@
      修法：`settleRun` 把它返回的面板记在这里；`onEnd` 再进来发现 `run` 空了，
      就**把那一次真结算的面板还回去**（而不是拿兜底盖掉它）。兜底只在"从来没结算过"时才用。 */
   let lastPanel = null;
+  /* ================= 2026-10-03（结算页取证）=================
+     这条链每次战斗要打 3 波、每波都发好几条账，而 `get_simulator_console` 只能拿到最后 ~30 行 ——
+     上一次排查里最关键的 `dun · resort` 那条账**很可能就是被后来的日志冲掉的**。
+     所以把时序写进**存档里的一个 20 条环形缓冲**（`S.diag.trace`），并在"走兜底"那一刻
+     一次性把整条时序打出来（见 lastResortPanel）——一次 grep 就能看到全程，不再靠运气。
+     ⚠️ 只存事件名与几个短字段（world/stage/wave/rewards 数），不存存档内容、不存玩家数据。 */
+  const TRACE = [];                       // 模块级（当场看；存档那份是备份，代理对象上写新键不一定生效）
+  function trace(ev, data) {
+    try {
+      const line = String(ev) + (data ? (':' + JSON.stringify(data)) : '');
+      TRACE.push(line);
+      if (TRACE.length > 20) TRACE.splice(0, TRACE.length - 20);
+      const S2 = Core.S;
+      if (S2) { if (!S2.diag) S2.diag = {}; if (!S2.diag.trace) S2.diag.trace = []; S2.diag.trace.push(line);
+        if (S2.diag.trace.length > 20) S2.diag.trace.splice(0, S2.diag.trace.length - 20); }
+    } catch (e) {}
+  }
+  function traceTail(n) { try { return TRACE.slice(-(n || 8)).join(' | '); } catch (e) { return ''; } }
+  G.__dunTrace = function () { return traceTail(20); };   // console 里粘一行就能读（排查用）
   /* 这一场打的是哪一关（`startStage` 里落）。兜底面板要靠它才能给出「↻ 再来一次 / › 下一关」——
      没有它，"结算数据不在了"那张兜底就只剩一颗「返回世界」，玩家会以为**自动下一关没了**。 */
   let lastPlayed = null;
@@ -492,8 +512,12 @@
      能点、能退出的面板。onEnd 一抛，`finish()`（sc-battle.js）跟着抛 → 结算面板画不出来、
      busy 闸门不放 → 玩家卡死在战斗页上（上一轮探针抓到的 `reading 'wave'` 就是这么卡住的）。 */
   function lastResortPanel(win) {
-    /* 兜底是"最后的保险"，本身很少走到 —— 走到就落一条账（不看调用栈，免得日志里全是噪声）。 */
-    try { G.LOG.warn('dun', 'resort', { win: !!win, hadPanel: !!lastPanel, hadRun: !!run, stage: (lastPlayed && lastPlayed.stageIdx) }); } catch (e1) {}
+    /* 兜底是"最后的保险"，本身很少走到 —— 走到就把**最近 8 条时序**一起打出来，
+       这样一次 grep 就能看到"谁清空了 run / settleRun 有没有跑"，不受 console 缓冲大小影响。 */
+    trace('resort', { win: !!win, hadPanel: !!lastPanel, hasRun: !!run });
+    try { G.LOG.warn('dun', 'resort', { win: !!win, hadPanel: !!lastPanel, hasRun: !!run }); } catch (e1) {}
+    /* 时序**逐条**打出来（长字段会被日志格式化吃掉，一条一行最稳） */
+    try { TRACE.slice(-8).forEach(function (l, i) { G.LOG.warn('dun', 'trace' + i, { l: l }); }); } catch (e2) {}
     /* ================= 2026-10-03（父亲大人：「你改完结算的自动下一关没了」）=================
      兜底面板原来只有一颗「返回世界」——一旦走到这里（`run` 空 / 结算抛错），
      **「再来一次 / 下一关」全没了，自动下一关的倒计时自然也不会启动**。
@@ -643,6 +667,7 @@
         if (ch && ch.after) changed = ch.after;
       }
     } catch (e) { try { G.LOG.warn('dun', 'settle_deco3', { err: String(e && e.message) }); } catch (e2) {} }
+    trace('settled', { st: stage, rewards: (rewards || []).length, acts: (acts || []).length });
     return { title: '★'.repeat(stars) + ' 通关', sub: '第 ' + stage + ' 关已通过' + (firstClear ? ' · 🎉 首通' : ''),
       rewards, acts, worldId: wid, lore: lore, loreId: loreId, changed: changed };
   }
@@ -688,6 +713,8 @@
         }
       },
       onEnd(win, res, hpLeft) {
+        trace('onEnd', { win: !!win, hasRun: !!run, hasMy: !!myRun, wave: (run && run.wave),
+          waves: (run && run.waves && run.waves.length), st: (run && run.stage) });
         /* F2-1：整段兜底 —— 任何一条路径（含以后新加的）都不许把玩家卡在战斗页上。 */
         try {
           /* 晚到的收尾：模块级 `run` 已经被清（正常结算 / 别处清理），
